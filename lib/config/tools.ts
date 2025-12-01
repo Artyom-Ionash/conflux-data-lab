@@ -42,6 +42,14 @@ export const tools: Tool[] = [
     category: 'conversion',
     tags: ['base64', 'encoding', 'decoding'],
   },
+  {
+    id: 'video-frame-extractor',
+    name: 'Video Frame Extractor',
+    description: 'Извлечение серии кадров из видео с заданной частотой и диапазоном времени',
+    category: 'conversion',
+    tags: ['video', 'frames', 'images', 'extraction'],
+    featured: true,
+  },
 ];
 
 export const toolsByCategory = tools.reduce((acc, tool) => {

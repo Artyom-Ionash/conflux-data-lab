@@ -3,9 +3,11 @@
  */
 
 import { JsonToCsvConverter } from '../../app/components/tools/json-to-csv/JsonToCsvConverter';
+import { VideoFrameExtractor } from '../../app/components/tools/video-frame-extractor/VideoFrameExtractor';
 
 const toolComponents: Record<string, React.ComponentType> = {
   'json-to-csv': JsonToCsvConverter,
+  'video-frame-extractor': VideoFrameExtractor,
   // Добавьте здесь другие компоненты инструментов
   // 'csv-to-json': CsvToJsonConverter,
   // 'xml-to-json': XmlToJsonConverter,

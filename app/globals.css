@@ -24,3 +24,47 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/* Двухкурсорный ползунок диапазона */
+.range-dual {
+  -webkit-appearance: none;
+  appearance: none;
+  background: transparent;
+}
+
+.range-dual:focus {
+  outline: none;
+}
+
+.range-dual::-webkit-slider-runnable-track {
+  height: 0;
+  background: transparent;
+}
+
+.range-dual::-moz-range-track {
+  height: 0;
+  background: transparent;
+}
+
+.range-dual::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 9999px;
+  background: #2563eb; /* blue-600 */
+  border: 2px solid #ffffff;
+  box-shadow: 0 0 0 1px rgba(15, 23, 42, 0.3);
+  cursor: pointer;
+  margin-top: -7px; /* центрирование по треку */
+}
+
+.range-dual::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border-radius: 9999px;
+  background: #2563eb;
+  border: 2px solid #ffffff;
+  box-shadow: 0 0 0 1px rgba(15, 23, 42, 0.3);
+  cursor: pointer;
+}
