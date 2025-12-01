@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useRef, useEffect, useCallback, useMemo } from "react";
@@ -13,6 +12,219 @@ interface ExtractedFrame {
 interface GifshotResult {
   image?: string;
   error?: string;
+}
+
+// --- НОВАЯ ФУНКЦИЯ: Создание горизонтального PNG-спрайта ---
+function useSpriteSheetGenerator() {
+  const generateSpriteSheet = useCallback(async (frames: ExtractedFrame[], options?: {
+    maxHeight?: number;
+    spacing?: number;
+    backgroundColor?: string;
+  }) => {
+    if (frames.length === 0) {
+      throw new Error("Нет кадров для создания спрайт-листа");
+    }
+
+    // Загружаем первое изображение для получения размеров
+    const firstImage = new Image();
+    await new Promise<void>((resolve) => {
+      firstImage.onload = () => resolve();
+      firstImage.src = frames[0].dataUrl;
+    });
+
+    // Параметры по умолчанию - используем ?? вместо ||
+    const maxHeight = options?.maxHeight ?? 500;
+    const spacing = options?.spacing ?? 0;  // ← Исправлено здесь
+    const backgroundColor = options?.backgroundColor || 'transparent';
+
+    // Рассчитываем масштабирование для сохранения пропорций
+    const scale = maxHeight / firstImage.height;
+    const scaledWidth = Math.floor(firstImage.width * scale);
+    const scaledHeight = maxHeight;
+
+    // Создаем канвас для спрайт-листа
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+
+    if (!ctx) {
+      throw new Error("Не удалось создать контекст канваса");
+    }
+
+    // Рассчитываем общую ширину канваса
+    canvas.width = (scaledWidth + spacing) * frames.length - spacing;
+    canvas.height = scaledHeight;
+
+    // Заполняем фон если указан
+    if (backgroundColor !== 'transparent') {
+      ctx.fillStyle = backgroundColor;
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+    }
+
+    // Загружаем и рисуем все кадры
+    for (let i = 0; i < frames.length; i++) {
+      const img = new Image();
+      await new Promise<void>((resolve) => {
+        img.onload = () => resolve();
+        img.src = frames[i].dataUrl;
+      });
+
+      const x = i * (scaledWidth + spacing);
+      ctx.drawImage(img, x, 0, scaledWidth, scaledHeight);
+    }
+
+    // Добавляем разделительные линии между кадрами
+    if (spacing > 0) {
+      ctx.strokeStyle = 'rgba(0, 0, 0, 0.1)';
+      ctx.lineWidth = 1;
+      for (let i = 1; i < frames.length; i++) {
+        const x = i * (scaledWidth + spacing) - spacing / 2;
+        ctx.beginPath();
+        ctx.moveTo(x, 0);
+        ctx.lineTo(x, scaledHeight);
+        ctx.stroke();
+      }
+    }
+
+    return canvas.toDataURL('image/png');
+  }, []);
+
+  return { generateSpriteSheet };
+}
+
+// --- НОВЫЙ КОМПОНЕНТ: Управление спрайт-листом ---
+function SpriteSheetManager({ frames }: { frames: ExtractedFrame[] }) {
+  const [spriteSheetUrl, setSpriteSheetUrl] = useState<string | null>(null);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [spriteOptions, setSpriteOptions] = useState({
+    maxHeight: 500,
+    spacing: 0,
+    backgroundColor: 'transparent' as 'transparent' | 'white' | 'black',
+  });
+
+  const { generateSpriteSheet } = useSpriteSheetGenerator();
+
+  const handleGenerateSpriteSheet = async () => {
+    if (frames.length === 0) return;
+
+    setIsGenerating(true);
+    try {
+      const dataUrl = await generateSpriteSheet(frames, {
+        maxHeight: spriteOptions.maxHeight,
+        spacing: spriteOptions.spacing,
+        backgroundColor: spriteOptions.backgroundColor,
+      });
+      setSpriteSheetUrl(dataUrl);
+    } catch (error) {
+      console.error('Ошибка при создании спрайт-листа:', error);
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  const downloadSpriteSheet = () => {
+    if (!spriteSheetUrl) return;
+    const a = document.createElement('a');
+    a.href = spriteSheetUrl;
+    a.download = `sprite-sheet-${frames.length}-frames.png`;
+    a.click();
+  };
+
+  if (frames.length === 0) {
+    return null;
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div>
+          <label className="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1">
+            Макс. высота (пикс)
+          </label>
+          <input
+            type="range"
+            min="50"
+            max="500"
+            step="10"
+            value={spriteOptions.maxHeight}
+            onChange={(e) => setSpriteOptions(prev => ({ ...prev, maxHeight: parseInt(e.target.value) }))}
+            className="w-full"
+          />
+          <div className="text-xs text-zinc-600 dark:text-zinc-400 mt-1">
+            {spriteOptions.maxHeight}px
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1">
+            Отступ между кадрами
+          </label>
+          <input
+            type="range"
+            min="0"
+            max="20"
+            step="1"
+            value={spriteOptions.spacing}
+            onChange={(e) => setSpriteOptions(prev => ({ ...prev, spacing: parseInt(e.target.value) }))}
+            className="w-full"
+          />
+          <div className="text-xs text-zinc-600 dark:text-zinc-400 mt-1">
+            {spriteOptions.spacing}px
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1">
+            Фон
+          </label>
+          <select
+            value={spriteOptions.backgroundColor}
+            onChange={(e) => setSpriteOptions(prev => ({ ...prev, backgroundColor: e.target.value as any }))}
+            className="w-full rounded-md border border-zinc-300 bg-white px-2 py-1 text-sm dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
+          >
+            <option value="transparent">Прозрачный</option>
+            <option value="white">Белый</option>
+            <option value="black">Черный</option>
+          </select>
+        </div>
+      </div>
+
+      <div className="flex gap-2">
+        <button
+          onClick={handleGenerateSpriteSheet}
+          disabled={isGenerating || frames.length === 0}
+          className="flex-1 rounded-md bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          {isGenerating ? 'Создание...' : 'Создать спрайт-лист (PNG)'}
+        </button>
+
+        {spriteSheetUrl && (
+          <button
+            onClick={downloadSpriteSheet}
+            className="flex-1 rounded-md border border-green-600 px-4 py-2 text-sm font-medium text-green-600 hover:bg-green-50 dark:border-green-500 dark:text-green-400 dark:hover:bg-green-950/30"
+          >
+            Скачать спрайт-лист
+          </button>
+        )}
+      </div>
+
+      {spriteSheetUrl && (
+        <div className="mt-4">
+          <div className="rounded-md border border-zinc-200 dark:border-zinc-700 overflow-hidden">
+            <div className="bg-zinc-50 dark:bg-zinc-800 p-2 text-xs text-zinc-600 dark:text-zinc-400">
+              Предпросмотр спрайт-листа ({frames.length} кадров)
+            </div>
+            <div className="p-4 bg-zinc-100 dark:bg-zinc-900 overflow-x-auto">
+              <img
+                src={spriteSheetUrl}
+                alt="Sprite sheet preview"
+                className="max-w-full h-auto border border-zinc-300 dark:border-zinc-700"
+              />
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
 }
 
 // --- НОВЫЙ КОМПОНЕНТ: Наложение кадров с удалением фона ---
@@ -180,18 +392,17 @@ function FrameDiffOverlay({ frames }: { frames: ExtractedFrame[] }) {
               Фон определяется по цвету левого верхнего пикселя
             </p>
           </div>
-          <Button
+          <button
             onClick={() => {
               const a = document.createElement('a');
               a.href = overlayDataUrl;
               a.download = 'frame-diff-overlay.png';
               a.click();
             }}
-            variant="secondary"
-            size="sm"
+            className="rounded-md border border-blue-600 px-3 py-1.5 text-xs font-medium text-blue-600 hover:bg-blue-50 dark:border-blue-500 dark:text-blue-400 dark:hover:bg-blue-950/30"
           >
             Скачать наложение
-          </Button>
+          </button>
         </>
       ) : null}
     </div>
@@ -645,14 +856,12 @@ export function VideoFrameExtractor() {
                   </div>
 
                   {gifParams.dataUrl && (
-                    <Button
+                    <button
                       onClick={downloadGif}
-                      variant="primary"
-                      size="sm"
-                      disabled={!gifParams.dataUrl}
+                      className="w-full rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
                     >
                       Скачать GIF
-                    </Button>
+                    </button>
                   )}
                 </div>
               </div>
@@ -687,17 +896,19 @@ export function VideoFrameExtractor() {
             {errors.gif && <ErrorMessage message={errors.gif} />}
 
             <div className="space-y-2">
-              <Button
+              <button
                 onClick={extractFramesAndGenerateGif}
-                disabled={status.isProcessing}
-                variant="primary"
+                disabled={status.isProcessing || !videoFile}
+                className="w-full rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {getButtonText()}
-              </Button>
+              </button>
             </div>
           </div>
         </Card>
       </div>
+
+
       {/* НОВАЯ СЕКЦИЯ: Разница кадров */}
       {frames.length >= 2 && (
         <Card>
@@ -739,6 +950,22 @@ export function VideoFrameExtractor() {
           )}
         </div>
       </Card>
+
+      {/* НОВАЯ СЕКЦИЯ: Спрайт-лист для анимации */}
+      {frames.length > 0 && (
+        <Card>
+          <div className="space-y-3">
+            <h3 className="text-sm font-medium text-zinc-900 dark:text-zinc-100">
+              Спрайт-лист для анимации (PNG)
+            </h3>
+            <p className="text-xs text-zinc-600 dark:text-zinc-400">
+              Создайте горизонтальное изображение со всеми кадрами для использования в игровых движках или CSS-анимациях
+            </p>
+            <SpriteSheetManager frames={frames} />
+          </div>
+        </Card>
+      )}
+
 
       {/* Скрытые элементы для обработки */}
       <video ref={videoRef} className="hidden" crossOrigin="anonymous" />
@@ -860,40 +1087,6 @@ function NumberInput({
         className="w-full rounded-md border border-zinc-300 bg-white px-2 py-1 text-sm dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
       />
     </div>
-  );
-}
-
-function Button({
-  children,
-  onClick,
-  disabled,
-  variant = 'primary',
-  size = 'md'
-}: {
-  children: React.ReactNode;
-  onClick: () => void;
-  disabled?: boolean;
-  variant?: 'primary' | 'secondary';
-  size?: 'sm' | 'md';
-}) {
-  const baseClasses = "rounded-md font-medium disabled:cursor-not-allowed disabled:opacity-60 transition-colors";
-  const variants = {
-    primary: "bg-blue-600 text-white hover:bg-blue-700",
-    secondary: "border border-blue-600 text-blue-600 hover:bg-blue-50 dark:border-blue-500 dark:text-blue-400 dark:hover:bg-blue-950/30",
-  };
-  const sizes = {
-    sm: "px-3 py-1.5 text-xs",
-    md: "px-4 py-2 text-sm",
-  };
-
-  return (
-    <button
-      onClick={onClick}
-      disabled={disabled}
-      className={`${baseClasses} ${variants[variant]} ${sizes[size]} w-full`}
-    >
-      {children}
-    </button>
   );
 }
 
