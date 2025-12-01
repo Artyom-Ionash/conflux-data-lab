@@ -1,36 +1,89 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Conflux Data Lab
 
-## Getting Started
+Портфолио инструментов для обработки и конвертации данных.
 
-First, run the development server:
+## Структура проекта
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+```
+conflux-data-lab/
+├── app/
+│   ├── components/
+│   │   ├── layout/          # Компоненты макета (Header, Footer)
+│   │   ├── tools/           # Компоненты инструментов
+│   │   │   ├── ToolCard.tsx
+│   │   │   ├── ToolGrid.tsx
+│   │   │   └── [tool-id]/   # Компоненты конкретных инструментов
+│   │   └── ui/              # Переиспользуемые UI компоненты
+│   ├── tools/
+│   │   └── [category]/
+│   │       ├── page.tsx     # Страница категории
+│   │       └── [toolId]/
+│   │           └── page.tsx # Страница инструмента
+│   ├── layout.tsx           # Корневой layout
+│   └── page.tsx             # Главная страница
+├── lib/
+│   ├── config/
+│   │   └── tools.ts         # Конфигурация всех инструментов
+│   ├── types/
+│   │   └── tools.ts         # TypeScript типы
+│   └── utils/
+│       └── tool-loader.tsx  # Загрузчик компонентов инструментов
+└── public/                   # Статические файлы
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Добавление нового инструмента
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+1. **Добавьте инструмент в конфигурацию** (`lib/config/tools.ts`):
+```typescript
+{
+  id: 'my-tool',
+  name: 'My Tool',
+  description: 'Описание инструмента',
+  category: 'conversion',
+  tags: ['tag1', 'tag2'],
+}
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+2. **Создайте компонент инструмента** (`app/components/tools/my-tool/MyTool.tsx`):
+```typescript
+'use client';
 
-## Learn More
+export function MyTool() {
+  // Ваша логика инструмента
+  return <div>...</div>;
+}
+```
 
-To learn more about Next.js, take a look at the following resources:
+3. **Зарегистрируйте компонент** (`lib/utils/tool-loader.tsx`):
+```typescript
+import { MyTool } from '@/app/components/tools/my-tool/MyTool';
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+const toolComponents: Record<string, React.ComponentType> = {
+  'my-tool': MyTool,
+  // ...
+};
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Категории инструментов
 
-## Deploy on Vercel
+- **conversion** - Конвертация данных (JSON ↔ CSV, XML ↔ JSON и т.д.)
+- **transformation** - Трансформация данных
+- **analysis** - Анализ данных
+- **validation** - Валидация данных
+- **formatting** - Форматирование данных
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Технологии
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- Next.js 16
+- React 19
+- TypeScript
+- Tailwind CSS
+
+## Запуск проекта
+
+```bash
+npm install
+npm run dev
+```
+
+Откройте [http://localhost:3000](http://localhost:3000) в браузере.
