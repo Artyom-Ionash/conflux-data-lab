@@ -1,8 +1,8 @@
+
 "use client";
 
-// @ts-ignore – gifshot не имеет встроенных типов
-import gifshot from "gifshot";
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback, useMemo } from "react";
+import gifshot from "gifshot"; // @ts-ignore - нет типов
 import { Card } from "../../ui/Card";
 
 interface ExtractedFrame {
@@ -10,486 +10,926 @@ interface ExtractedFrame {
   dataUrl: string;
 }
 
-export function VideoFrameExtractor() {
-  const [videoFile, setVideoFile] = useState<File | null>(null);
-  const [startTime, setStartTime] = useState(0);
-  const [endTime, setEndTime] = useState<number | "">("");
-  const [videoDuration, setVideoDuration] = useState<number | null>(null);
-  const [frameStep, setFrameStep] = useState(1); // шаг между кадрами, сек
-  const [frames, setFrames] = useState<ExtractedFrame[]>([]);
+interface GifshotResult {
+  image?: string;
+  error?: string;
+}
+
+// --- НОВЫЙ КОМПОНЕНТ: Наложение кадров с удалением фона ---
+function FrameDiffOverlay({ frames }: { frames: ExtractedFrame[] }) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [overlayDataUrl, setOverlayDataUrl] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [isGeneratingGif, setIsGeneratingGif] = useState(false);
-  const [autoGenerate, setAutoGenerate] = useState(true);
-  const [error, setError] = useState("");
-  const [gifError, setGifError] = useState("");
-  const [gifDataUrl, setGifDataUrl] = useState<string | null>(null);
-  const [gifFps, setGifFps] = useState(5);
 
-  const videoRef = useRef<HTMLVideoElement | null>(null);
-  const canvasRef = useRef<HTMLCanvasElement | null>(null);
-
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0] || null;
-    setVideoFile(file);
-    setFrames([]);
-    setError("");
-    setGifError("");
-    setGifDataUrl(null);
-    setVideoDuration(null);
-    setStartTime(0);
-    setEndTime("");
-
-    if (file && videoRef.current) {
-      const videoEl = videoRef.current;
-      const objectUrl = URL.createObjectURL(file);
-      videoEl.src = objectUrl;
-
-      const onLoadedMetadata = () => {
-        const duration = videoEl.duration || 0;
-        setVideoDuration(duration || null);
-
-        // По умолчанию делим диапазон на ~10 кадров
-        if (duration > 0) {
-          const step = duration / 10;
-          // Не даём шагу быть слишком маленьким
-          setFrameStep(Number(step.toFixed(2)) || 1);
-        }
-
-        URL.revokeObjectURL(objectUrl);
-
-        // При включённом автообновлении запускаем извлечение кадров и GIF
-        if (autoGenerate) {
-          void extractFrames();
-        }
-      };
-
-      const onError = () => {
-        URL.revokeObjectURL(objectUrl);
-      };
-
-      videoEl.addEventListener("loadedmetadata", onLoadedMetadata, { once: true });
-      videoEl.addEventListener("error", onError, { once: true });
+  useEffect(() => {
+    if (frames.length < 2 || !canvasRef.current) {
+      setOverlayDataUrl(null);
+      return;
     }
+
+    const processFrames = async () => {
+      setIsProcessing(true);
+      try {
+        const canvas = canvasRef.current;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return;
+
+        // Загружаем изображения
+        const firstImg = new Image();
+        const lastImg = new Image();
+
+        await Promise.all([
+          new Promise<void>((resolve) => {
+            firstImg.onload = () => resolve();
+            firstImg.src = frames[0].dataUrl;
+          }),
+          new Promise<void>((resolve) => {
+            lastImg.onload = () => resolve();
+            lastImg.src = frames[frames.length - 1].dataUrl;
+          })
+        ]);
+
+        // Устанавливаем размер канваса
+        canvas.width = firstImg.width;
+        canvas.height = firstImg.height;
+
+        // Очищаем канвас
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        // Получаем пиксели изображений
+        ctx.drawImage(firstImg, 0, 0);
+        const firstImageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+
+        ctx.drawImage(lastImg, 0, 0);
+        const lastImageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+
+        // Получаем цвет фона (левый верхний пиксель первого кадра)
+        const bgR = firstImageData.data[0];
+        const bgG = firstImageData.data[1];
+        const bgB = firstImageData.data[2];
+
+        // Создаем результирующее изображение
+        const resultImageData = ctx.createImageData(canvas.width, canvas.height);
+
+        // Порог для определения похожести на фоновый цвет
+        const threshold = 30;
+
+        for (let i = 0; i < firstImageData.data.length; i += 4) {
+          const firstR = firstImageData.data[i];
+          const firstG = firstImageData.data[i + 1];
+          const firstB = firstImageData.data[i + 2];
+
+          const lastR = lastImageData.data[i];
+          const lastG = lastImageData.data[i + 1];
+          const lastB = lastImageData.data[i + 2];
+
+          // Проверяем, является ли пиксель фоном для первого кадра
+          const firstIsBg = Math.abs(firstR - bgR) < threshold &&
+            Math.abs(firstG - bgG) < threshold &&
+            Math.abs(firstB - bgB) < threshold;
+
+          // Проверяем, является ли пиксель фоном для последнего кадра
+          const lastIsBg = Math.abs(lastR - bgR) < threshold &&
+            Math.abs(lastG - bgG) < threshold &&
+            Math.abs(lastB - bgB) < threshold;
+
+          // Если оба пикселя - фон, оставляем прозрачным
+          if (firstIsBg && lastIsBg) {
+            resultImageData.data[i + 3] = 0; // alpha = 0
+          }
+          // Если только первый кадр не фон - красный
+          else if (!firstIsBg && lastIsBg) {
+            resultImageData.data[i] = 255;     // R
+            resultImageData.data[i + 1] = 0;   // G
+            resultImageData.data[i + 2] = 0;   // B
+            resultImageData.data[i + 3] = 200; // alpha
+          }
+          // Если только последний кадр не фон - синий
+          else if (firstIsBg && !lastIsBg) {
+            resultImageData.data[i] = 0;       // R
+            resultImageData.data[i + 1] = 100; // G
+            resultImageData.data[i + 2] = 255; // B
+            resultImageData.data[i + 3] = 200; // alpha
+          }
+          // Если оба не фон - фиолетовый (смешение)
+          else {
+            resultImageData.data[i] = 200;     // R
+            resultImageData.data[i + 1] = 50;  // G
+            resultImageData.data[i + 2] = 255; // B
+            resultImageData.data[i + 3] = 220; // alpha
+          }
+        }
+
+        // Рисуем результат
+        ctx.putImageData(resultImageData, 0, 0);
+
+        // Сохраняем как data URL
+        setOverlayDataUrl(canvas.toDataURL('image/png'));
+      } catch (error) {
+        console.error('Error processing frames:', error);
+      } finally {
+        setIsProcessing(false);
+      }
+    };
+
+    processFrames();
+  }, [frames]);
+
+  if (frames.length < 2) {
+    return (
+      <div className="flex h-full items-center justify-center">
+        <p className="text-xs text-zinc-600 dark:text-zinc-400">
+          Извлеките минимум 2 кадра для отображения наложения
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      <canvas ref={canvasRef} className="hidden" />
+
+      {isProcessing ? (
+        <div className="flex h-48 items-center justify-center">
+          <p className="text-sm text-zinc-600 dark:text-zinc-400">Обработка...</p>
+        </div>
+      ) : overlayDataUrl ? (
+        <>
+          <div className="relative overflow-hidden rounded-md bg-zinc-100 dark:bg-zinc-800">
+            <img
+              src={overlayDataUrl}
+              alt="Frame difference overlay"
+              className="w-full object-contain"
+              style={{ maxHeight: '300px' }}
+            />
+          </div>
+          <div className="space-y-2 text-xs text-zinc-600 dark:text-zinc-400">
+            <div className="flex items-center gap-2">
+              <div className="h-3 w-3 rounded bg-red-600"></div>
+              <span>Только в первом кадре ({frames[0].time.toFixed(1)}s)</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="h-3 w-3 rounded bg-blue-600"></div>
+              <span>Только в последнем кадре ({frames[frames.length - 1].time.toFixed(1)}s)</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="h-3 w-3 rounded bg-purple-600"></div>
+              <span>В обоих кадрах</span>
+            </div>
+            <p className="mt-2 text-[10px]">
+              Фон определяется по цвету левого верхнего пикселя
+            </p>
+          </div>
+          <Button
+            onClick={() => {
+              const a = document.createElement('a');
+              a.href = overlayDataUrl;
+              a.download = 'frame-diff-overlay.png';
+              a.click();
+            }}
+            variant="secondary"
+            size="sm"
+          >
+            Скачать наложение
+          </Button>
+        </>
+      ) : null}
+    </div>
+  );
+}
+
+// ... остальной код компонента RangeVideoPlayer остается без изменений ...
+
+function RangeVideoPlayer({
+  src,
+  startTime,
+  endTime,
+}: {
+  src: string | null;
+  startTime: number;
+  endTime: number;
+}) {
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [currentTime, setCurrentTime] = useState(startTime);
+
+  // Синхронизация с изменением startTime (скраббинг)
+  useEffect(() => {
+    if (videoRef.current && Math.abs(videoRef.current.currentTime - startTime) > 0.5) {
+      videoRef.current.currentTime = startTime;
+      setCurrentTime(startTime);
+    }
+  }, [startTime]);
+
+  // Логика зацикливания и обновление таймера
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+
+    const handleTimeUpdate = () => {
+      const time = video.currentTime;
+      setCurrentTime(time);
+
+      // Если вышли за пределы endTime
+      if (time >= endTime) {
+        video.currentTime = startTime;
+        // Если видео должно играть, запускаем снова
+        if (isPlaying) video.play().catch(() => { });
+      }
+    };
+
+    video.addEventListener("timeupdate", handleTimeUpdate);
+    return () => video.removeEventListener("timeupdate", handleTimeUpdate);
+  }, [endTime, startTime, isPlaying]);
+
+  const togglePlay = () => {
+    if (!videoRef.current) return;
+    if (isPlaying) {
+      videoRef.current.pause();
+    } else {
+      // Если мы в конце диапазона, прыгаем в начало перед стартом
+      if (videoRef.current.currentTime >= endTime) {
+        videoRef.current.currentTime = startTime;
+      }
+      videoRef.current.play().catch(console.error);
+    }
+    setIsPlaying(!isPlaying);
   };
 
-  const extractFrames = async () => {
+  // Вычисляем прогресс в диапазоне
+  const duration = endTime - startTime;
+  const progress = duration > 0 ? ((currentTime - startTime) / duration) * 100 : 0;
+  const progressSafe = Math.max(0, Math.min(100, progress));
+
+  // Форматирование времени
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  const elapsedTime = Math.max(0, currentTime - startTime);
+  const remainingTime = Math.max(0, endTime - currentTime);
+
+  if (!src) return null;
+
+  return (
+    <div className="space-y-2 mb-4">
+      {/* Видео плеер */}
+      <div className="relative overflow-hidden rounded-md bg-black aspect-video">
+        <video
+          ref={videoRef}
+          src={src}
+          className="h-full w-full object-contain"
+          muted
+          playsInline
+          onPlay={() => setIsPlaying(true)}
+          onPause={() => setIsPlaying(false)}
+        />
+
+        {/* Оверлей с кнопкой Play/Pause */}
+        <div className="absolute inset-0 flex items-center justify-center bg-black/10 opacity-0 hover:opacity-100 transition-opacity group">
+          <button
+            onClick={togglePlay}
+            className="rounded-full bg-white/90 p-3 text-black shadow-lg hover:bg-white hover:scale-110 transition-all"
+          >
+            {isPlaying ? (
+              <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" /></svg>
+            ) : (
+              <svg className="w-6 h-6 translate-x-0.5" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z" /></svg>
+            )}
+          </button>
+        </div>
+
+        {/* Индикатор статуса */}
+        {!isPlaying && (
+          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+            <div className="rounded-full bg-black/50 p-3 text-white backdrop-blur-sm">
+              <svg className="w-8 h-8 translate-x-0.5" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z" /></svg>
+            </div>
+          </div>
+        )}
+
+        {/* Таймер в углу видео */}
+        <div className="absolute bottom-2 right-2 bg-black/70 backdrop-blur-sm rounded px-2 py-1 text-xs text-white font-mono">
+          {formatTime(elapsedTime)} / {formatTime(duration)}
+        </div>
+      </div>
+
+      {/* Прогресс-бар и контролы времени */}
+      <div className="space-y-1">
+        {/* Прогресс-бар */}
+        <div className="relative h-2 bg-zinc-200 dark:bg-zinc-800 rounded-full overflow-hidden">
+          <div
+            className="absolute inset-y-0 left-0 bg-blue-600 transition-all duration-100 ease-linear"
+            style={{ width: `${progressSafe}%` }}
+          />
+
+          {/* Кликабельная область для перемотки */}
+          <button
+            className="absolute inset-0 cursor-pointer"
+            onClick={(e) => {
+              if (!videoRef.current) return;
+              const rect = e.currentTarget.getBoundingClientRect();
+              const x = e.clientX - rect.left;
+              const percentage = x / rect.width;
+              const newTime = startTime + (duration * percentage);
+              videoRef.current.currentTime = Math.max(startTime, Math.min(endTime, newTime));
+            }}
+          />
+        </div>
+
+        {/* Временные метки */}
+        <div className="flex items-center justify-between text-xs text-zinc-600 dark:text-zinc-400">
+          <div className="flex items-center gap-2">
+            <span className="font-mono">{formatTime(elapsedTime)}</span>
+            <span className="text-zinc-400 dark:text-zinc-600">•</span>
+            <span>Позиция: {currentTime.toFixed(2)}s</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <span>Осталось: {formatTime(remainingTime)}</span>
+            <span className="text-zinc-400 dark:text-zinc-600">•</span>
+            <span className="font-mono">{formatTime(duration)}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export function VideoFrameExtractor() {
+  const [videoFile, setVideoFile] = useState<File | null>(null);
+  const [videoSrc, setVideoSrc] = useState<string | null>(null);
+  const [videoDuration, setVideoDuration] = useState<number | null>(null);
+
+  const [extractionParams, setExtractionParams] = useState({
+    startTime: 0,
+    endTime: 0,
+    frameStep: 1,
+  });
+
+  const [frames, setFrames] = useState<ExtractedFrame[]>([]);
+  const [gifParams, setGifParams] = useState({
+    fps: 5,
+    dataUrl: null as string | null,
+  });
+
+  const [status, setStatus] = useState({
+    isProcessing: false,
+    currentStep: "" as "extracting" | "generating" | "",
+  });
+
+  const [errors, setErrors] = useState({
+    extraction: "",
+    gif: "",
+  });
+
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  const effectiveEnd = useMemo(
+    () => (extractionParams.endTime > 0 ? extractionParams.endTime : videoDuration ?? 0),
+    [extractionParams.endTime, videoDuration]
+  );
+
+  const frameCount = frames.length;
+
+  // Очистка URL при размонтировании
+  useEffect(() => {
+    return () => {
+      if (videoSrc) URL.revokeObjectURL(videoSrc);
+    };
+  }, [videoSrc]);
+
+  const handleFileChange = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0] || null;
+
+    setVideoFile(file);
+    setFrames([]);
+    setErrors({ extraction: "", gif: "" });
+    setGifParams(prev => ({ ...prev, dataUrl: null }));
+    setVideoDuration(null);
+    setExtractionParams(prev => ({ ...prev, startTime: 0, endTime: 0 }));
+
+    if (videoSrc) URL.revokeObjectURL(videoSrc);
+    setVideoSrc(null);
+
+    if (!file || !videoRef.current) return;
+
+    const objectUrl = URL.createObjectURL(file);
+    setVideoSrc(objectUrl);
+
+    const videoEl = videoRef.current;
+    videoEl.src = objectUrl;
+
     try {
-      setError("");
-      setFrames([]);
-
-      if (!videoFile) {
-        setError("Пожалуйста, выберите видеофайл.");
-        return;
-      }
-
-      if (frameStep <= 0) {
-        setError("Шаг между кадрами должен быть больше 0.");
-        return;
-      }
-
-      const videoEl = videoRef.current;
-      const canvasEl = canvasRef.current;
-
-      if (!videoEl || !canvasEl) {
-        setError("Внутренняя ошибка: видео или канвас недоступны.");
-        return;
-      }
-
-      const objectUrl = URL.createObjectURL(videoFile);
-      videoEl.src = objectUrl;
-
       await new Promise<void>((resolve, reject) => {
         const onLoaded = () => {
+          const duration = videoEl.duration || 0;
+          setVideoDuration(duration);
+
+          const defaultStep = Math.max(0.5, duration / 10);
+          setExtractionParams(prev => ({
+            ...prev,
+            endTime: duration,
+            frameStep: Number(defaultStep.toFixed(2)),
+          }));
+
           resolve();
-        };
-        const onError = () => {
-          reject(new Error("Не удалось загрузить видео."));
         };
 
         videoEl.addEventListener("loadedmetadata", onLoaded, { once: true });
-        videoEl.addEventListener("error", onError, { once: true });
+        videoEl.addEventListener("error", () => reject(new Error("Ошибка загрузки видео")), { once: true });
       });
+    } catch (err) {
+      setErrors(prev => ({
+        ...prev,
+        extraction: err instanceof Error ? err.message : "Ошибка загрузки видео",
+      }));
+    }
+  }, [videoSrc]);
 
-      const duration = videoEl.duration;
-      const safeStart = Math.max(0, startTime);
-      const safeEnd = Math.min(
-        endTime === "" ? duration : endTime,
-        duration
-      );
+  const extractFramesAndGenerateGif = useCallback(async () => {
+    if (!videoFile || !videoRef.current || !canvasRef.current) {
+      setErrors(prev => ({ ...prev, extraction: "Необходимо выбрать видеофайл" }));
+      return;
+    }
 
-      if (safeStart >= safeEnd) {
-        setError("Начальное время должно быть меньше конечного.");
-        URL.revokeObjectURL(objectUrl);
-        return;
+    if (extractionParams.frameStep <= 0) {
+      setErrors(prev => ({ ...prev, extraction: "Шаг между кадрами должен быть > 0" }));
+      return;
+    }
+
+    const videoEl = videoRef.current;
+    const canvasEl = canvasRef.current;
+
+    if (!videoEl.src && videoSrc) {
+      videoEl.src = videoSrc;
+    }
+
+    setStatus({ isProcessing: true, currentStep: "extracting" });
+    setErrors({ extraction: "", gif: "" });
+    setFrames([]);
+    setGifParams(prev => ({ ...prev, dataUrl: null }));
+
+    try {
+      if (videoEl.readyState < 1) {
+        await new Promise<void>((resolve, reject) => {
+          videoEl.addEventListener("loadedmetadata", () => resolve(), { once: true });
+          videoEl.addEventListener("error", () => reject(new Error("Не удалось загрузить видео")), { once: true });
+        });
       }
 
-      const interval = frameStep;
-      const resultFrames: ExtractedFrame[] = [];
+      const duration = videoEl.duration;
+      const safeStart = Math.max(0, extractionParams.startTime);
+      const safeEnd = Math.min(effectiveEnd, duration);
+
+      if (safeStart >= safeEnd) {
+        throw new Error("Начальное время должно быть меньше конечного");
+      }
 
       canvasEl.width = videoEl.videoWidth;
       canvasEl.height = videoEl.videoHeight;
       const ctx = canvasEl.getContext("2d");
+      if (!ctx) throw new Error("Не удалось инициализировать канвас");
 
-      if (!ctx) {
-        setError("Не удалось инициализировать канвас.");
-        URL.revokeObjectURL(objectUrl);
-        return;
-      }
-
-      setIsProcessing(true);
+      const resultFrames: ExtractedFrame[] = [];
+      const interval = extractionParams.frameStep;
 
       for (let current = safeStart; current <= safeEnd; current += interval) {
-        await new Promise<void>((resolve, reject) => {
+        await new Promise<void>((resolve) => {
           const onSeeked = () => {
-            try {
-              ctx.drawImage(videoEl, 0, 0, canvasEl.width, canvasEl.height);
-              const dataUrl = canvasEl.toDataURL("image/png");
-              resultFrames.push({ time: current, dataUrl });
-              resolve();
-            } catch (e) {
-              reject(e);
-            }
+            ctx.drawImage(videoEl, 0, 0, canvasEl.width, canvasEl.height);
+            resultFrames.push({
+              time: current,
+              dataUrl: canvasEl.toDataURL("image/png"),
+            });
+            resolve();
           };
 
           videoEl.currentTime = current;
-          videoEl.addEventListener("seeked", onSeeked, { once: true });
+          const timeout = setTimeout(() => {
+            resolve();
+          }, 1000);
+
+          videoEl.addEventListener("seeked", () => {
+            clearTimeout(timeout);
+            onSeeked();
+          }, { once: true });
         });
       }
 
       setFrames(resultFrames);
-      if (autoGenerate) {
-        // Автоматически обновляем GIF после пересчёта кадров
-        generateGif();
-      }
-      URL.revokeObjectURL(objectUrl);
-    } catch (err) {
-      console.error(err);
-      setError(
-        err instanceof Error
-          ? err.message
-          : "Произошла ошибка при извлечении кадров."
-      );
-    } finally {
-      setIsProcessing(false);
-    }
-  };
 
-  const handleDownload = (frame: ExtractedFrame, index: number) => {
+      if (resultFrames.length === 0) {
+        throw new Error("Не удалось извлечь кадры");
+      }
+
+      if (gifParams.fps <= 0) {
+        throw new Error("Скорость GIF должна быть > 0");
+      }
+
+      setStatus({ isProcessing: true, currentStep: "generating" });
+
+      const gifDataUrl = await new Promise<string>((resolve, reject) => {
+        const intervalSeconds = 1 / gifParams.fps;
+
+        gifshot.createGIF(
+          {
+            images: resultFrames.map(f => f.dataUrl),
+            interval: intervalSeconds,
+            gifWidth: canvasEl.width,
+            gifHeight: canvasEl.height,
+            numFrames: resultFrames.length,
+          },
+          (result: GifshotResult) => {
+            if (result?.error) {
+              reject(new Error(result.error || "Не удалось создать GIF"));
+              return;
+            }
+
+            if (result?.image) {
+              resolve(result.image);
+            } else {
+              reject(new Error("GIF создан, но данные отсутствуют"));
+            }
+          }
+        );
+      });
+
+      setGifParams(prev => ({ ...prev, dataUrl: gifDataUrl }));
+      setErrors({ extraction: "", gif: "" });
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : "Произошла ошибка";
+
+      if (status.currentStep === "extracting") {
+        setErrors(prev => ({ ...prev, extraction: errorMessage }));
+      } else {
+        setErrors(prev => ({ ...prev, gif: errorMessage }));
+      }
+    } finally {
+      setStatus({ isProcessing: false, currentStep: "" });
+    }
+  }, [videoFile, extractionParams, effectiveEnd, gifParams.fps, status.currentStep, videoSrc]);
+
+  const downloadFrame = useCallback((frame: ExtractedFrame, index: number) => {
     const a = document.createElement("a");
     a.href = frame.dataUrl;
-    const timeLabel = frame.time.toFixed(2).replace(".", "-");
-    a.download = `frame-${index + 1}-${timeLabel}s.png`;
+    a.download = `frame-${index + 1}-${frame.time.toFixed(2).replace(".", "-")}s.png`;
     a.click();
-  };
+  }, []);
 
-  const effectiveEnd =
-    typeof endTime === "number"
-      ? endTime
-      : videoDuration ?? 0;
+  const downloadGif = useCallback(() => {
+    if (!gifParams.dataUrl) return;
+    const a = document.createElement("a");
+    a.href = gifParams.dataUrl;
+    a.download = "frames.gif";
+    a.click();
+  }, [gifParams.dataUrl]);
 
-  const generateGif = () => {
-    try {
-      setGifError("");
-      setGifDataUrl(null);
+  const handleTimeChange = useCallback((type: 'start' | 'end', value: number) => {
+    if (!videoDuration) return;
 
-      if (frames.length === 0) {
-        setGifError("Сначала извлеките кадры из видео.");
-        return;
-      }
+    const updates = type === 'start'
+      ? { startTime: Math.max(0, Math.min(value, effectiveEnd - 0.01)) }
+      : { endTime: Math.min(videoDuration, Math.max(value, extractionParams.startTime + 0.01)) };
 
-      if (gifFps <= 0) {
-        setGifError("Скорость GIF должна быть больше 0.");
-        return;
-      }
+    setExtractionParams(prev => ({ ...prev, ...updates }));
+  }, [videoDuration, effectiveEnd, extractionParams.startTime]);
 
-      setIsGeneratingGif(true);
-
-      const intervalSeconds = 1 / gifFps;
-
-      gifshot.createGIF(
-        {
-          images: frames.map((f) => f.dataUrl),
-          interval: intervalSeconds,
-          gifWidth: canvasRef.current?.width || undefined,
-          gifHeight: canvasRef.current?.height || undefined,
-          numFrames: frames.length,
-          progressCallback: () => {},
-        },
-        (obj: any) => {
-          setIsGeneratingGif(false);
-
-          if (!obj || obj.error) {
-            setGifError(
-              obj && obj.error
-                ? String(obj.error)
-                : "Не удалось создать GIF."
-            );
-            return;
-          }
-
-          if (obj.image) {
-            setGifDataUrl(obj.image as string);
-          } else {
-            setGifError("GIF создан, но данные изображения отсутствуют.");
-          }
-        }
-      );
-    } catch (err) {
-      console.error(err);
-      setIsGeneratingGif(false);
-      setGifError(
-        err instanceof Error ? err.message : "Ошибка при создании GIF."
-      );
+  const getButtonText = () => {
+    if (status.isProcessing) {
+      return status.currentStep === "extracting"
+        ? "Извлечение кадров..."
+        : "Создание GIF...";
     }
+    return frames.length > 0
+      ? "Обновить кадры и GIF"
+      : "Извлечь кадры и создать GIF";
   };
 
   return (
     <div className="flex min-h-[80vh] flex-col space-y-6">
-      <div className="grid gap-6 md:grid-cols-2">
-        {/* Input / Controls (left) */}
+      <div className="space-y-6">
         <Card>
           <div className="space-y-4">
-            <div>
-              <label className="mb-1 block text-sm font-medium text-zinc-900 dark:text-zinc-100">
-                Видео файл
-              </label>
-              <input
-                type="file"
-                accept="video/*"
-                onChange={handleFileChange}
-                className="block w-full text-sm text-zinc-900 file:mr-4 file:rounded-md file:border-0 file:bg-blue-600 file:px-4 file:py-2 file:text-sm file:font-medium file:text-white hover:file:bg-blue-700 dark:text-zinc-100"
+            <FileInput onChange={handleFileChange} />
+
+            {videoSrc && (
+              <div className="grid gap-4 md:grid-cols-2 items-start">
+                {/* Слева – видео-плеер */}
+                <RangeVideoPlayer
+                  src={videoSrc}
+                  startTime={extractionParams.startTime}
+                  endTime={effectiveEnd}
+                />
+
+                {/* Справа – GIF той же высоты */}
+                <div className="space-y-2">
+                  <div className="relative overflow-hidden rounded-md bg-black aspect-video flex items-center justify-center">
+                    {gifParams.dataUrl ? (
+                      <img
+                        src={gifParams.dataUrl}
+                        alt="GIF preview"
+                        className="h-full w-full object-contain"
+                      />
+                    ) : (
+                      <p className="px-3 text-center text-xs text-zinc-400">
+                        {status.isProcessing
+                          ? (status.currentStep === "generating"
+                            ? "Создание GIF..."
+                            : "Обработка...")
+                          : "GIF появится здесь после генерации."}
+                      </p>
+                    )}
+                  </div>
+
+                  {gifParams.dataUrl && (
+                    <Button
+                      onClick={downloadGif}
+                      variant="primary"
+                      size="sm"
+                      disabled={!gifParams.dataUrl}
+                    >
+                      Скачать GIF
+                    </Button>
+                  )}
+                </div>
+              </div>
+            )}
+
+            <TimeRangeSlider
+              startTime={extractionParams.startTime}
+              endTime={effectiveEnd}
+              duration={videoDuration}
+              onTimeChange={handleTimeChange}
+            />
+
+            <div className="grid grid-cols-2 gap-4">
+              <NumberInput
+                label="Шаг между кадрами (сек)"
+                value={extractionParams.frameStep}
+                min={0.01}
+                step={0.01}
+                onChange={(value) => setExtractionParams(prev => ({ ...prev, frameStep: value }))}
+              />
+              <NumberInput
+                label="Скорость GIF (кадров/сек)"
+                value={gifParams.fps}
+                min={0.5}
+                max={30}
+                step={0.5}
+                onChange={(fps) => setGifParams(prev => ({ ...prev, fps }))}
               />
             </div>
 
-            <div className="grid grid-cols-[minmax(0,2fr)_minmax(0,1fr)] gap-4">
-              <div className="space-y-2">
-                <div className="flex items-center justify-between text-xs font-medium text-zinc-700 dark:text-zinc-300">
-                  <span>Диапазон (сек)</span>
-                  <span>
-                    {startTime.toFixed(1)}s{" "}
-                    {videoDuration !== null && effectiveEnd > 0
-                      ? `– ${effectiveEnd.toFixed(1)}s`
-                      : ""}
-                  </span>
-                </div>
-                <div className="relative h-8">
-                  {/* Общий трек */}
-                  <div className="absolute inset-y-3 left-0 right-0 rounded-full bg-zinc-200 dark:bg-zinc-800" />
-                  {/* Подсветка выбранного диапазона */}
-                  {videoDuration && videoDuration > 0 && effectiveEnd > startTime && (
-                    <div
-                      className="absolute inset-y-3 rounded-full bg-blue-500/50"
-                      style={{
-                        left: `${(startTime / videoDuration) * 100}%`,
-                        right: `${100 - (effectiveEnd / videoDuration) * 100}%`,
-                      }}
-                    />
-                  )}
-                  {/* Левый курсор (начало) */}
-                  <input
-                    type="range"
-                    min={0}
-                    max={videoDuration ?? 0}
-                    step={0.1}
-                    value={startTime}
-                    disabled={!videoDuration}
-                    onChange={(e) => {
-                      if (!videoDuration) return;
-                      const raw = Number(e.target.value);
-                      const maxStart = effectiveEnd - 0.1;
-                      const next = Math.max(0, Math.min(raw, maxStart > 0 ? maxStart : 0));
-                      setStartTime(next);
-                    }}
-                    onMouseUp={() => {
-                      if (autoGenerate) void extractFrames();
-                    }}
-                    onTouchEnd={() => {
-                      if (autoGenerate) void extractFrames();
-                    }}
-                    className="range-dual absolute inset-x-0 top-0 z-20 w-full"
-                  />
-                  {/* Правый курсор (конец) */}
-                  <input
-                    type="range"
-                    min={0}
-                    max={videoDuration ?? 0}
-                    step={0.1}
-                    value={effectiveEnd}
-                    disabled={!videoDuration}
-                    onChange={(e) => {
-                      if (!videoDuration) return;
-                      const raw = Number(e.target.value);
-                      const minEnd = startTime + 0.1;
-                      const next = Math.min(
-                        videoDuration,
-                        Math.max(raw, minEnd <= videoDuration ? minEnd : videoDuration)
-                      );
-                      setEndTime(next);
-                    }}
-                    onMouseUp={() => {
-                      if (autoGenerate) void extractFrames();
-                    }}
-                    onTouchEnd={() => {
-                      if (autoGenerate) void extractFrames();
-                    }}
-                    className="range-dual absolute inset-x-0 bottom-0 z-10 w-full"
-                  />
-                </div>
-                <div className="flex justify-between text-[10px] text-zinc-500 dark:text-zinc-400">
-                  <span>0s</span>
-                  <span>{videoDuration !== null ? `${videoDuration.toFixed(1)}s` : "—"}</span>
-                </div>
-              </div>
-              <div>
-                <label className="mb-1 block text-xs font-medium text-zinc-700 dark:text-zinc-300">
-                  Шаг между кадрами (сек)
-                </label>
-                <input
-                  type="number"
-                  min={0.1}
-                  step={0.1}
-                  value={frameStep}
-                  onChange={(e) => setFrameStep(Number(e.target.value) || 1)}
-                  className="w-full rounded-md border border-zinc-300 bg-white px-2 py-1 text-sm dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
-                />
-                <div className="mt-3">
-                  <label className="mb-1 block text-xs font-medium text-zinc-700 dark:text-zinc-300">
-                    Скорость GIF (кадров/сек)
-                  </label>
-                  <input
-                    type="number"
-                    min={0.5}
-                    max={30}
-                    step={0.5}
-                    value={gifFps}
-                    onChange={(e) => setGifFps(Number(e.target.value) || 5)}
-                    className="w-full rounded-md border border-zinc-300 bg-white px-2 py-1 text-sm dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
-                  />
-                  <label className="mt-3 flex items-center gap-2 text-xs text-zinc-700 dark:text-zinc-300">
-                    <input
-                      type="checkbox"
-                      checked={autoGenerate}
-                      onChange={(e) => setAutoGenerate(e.target.checked)}
-                      className="h-3.5 w-3.5 rounded border-zinc-300 text-blue-600 focus:outline-none focus:ring-0 dark:border-zinc-600"
-                    />
-                    <span>Автообновление кадров и GIF при изменении параметров</span>
-                  </label>
-                </div>
-              </div>
+            {errors.extraction && <ErrorMessage message={errors.extraction} />}
+            {errors.gif && <ErrorMessage message={errors.gif} />}
+
+            <div className="space-y-2">
+              <Button
+                onClick={extractFramesAndGenerateGif}
+                disabled={status.isProcessing}
+                variant="primary"
+              >
+                {getButtonText()}
+              </Button>
             </div>
-
-            {error && (
-              <div className="rounded-md bg-red-50 p-3 text-sm text-red-800 dark:bg-red-900/20 dark:text-red-200">
-                {error}
-              </div>
-            )}
-
-            <div className="grid gap-4 md:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)]">
-              <div className="space-y-2">
-                <button
-                  onClick={extractFrames}
-                  disabled={isProcessing}
-                  className="w-full rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  {isProcessing ? "Извлечение кадров..." : "Извлечь кадры"}
-                </button>
-
-                <button
-                  onClick={generateGif}
-                  disabled={isGeneratingGif || frames.length === 0}
-                  className="w-full rounded-md border border-blue-600 px-4 py-2 text-sm font-medium text-blue-600 hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-blue-500 dark:text-blue-400 dark:hover:bg-blue-950/30"
-                >
-                  {isGeneratingGif ? "Создание GIF..." : "Создать GIF из кадров"}
-                </button>
-              </div>
-            </div>
-          </div>
-        </Card>
-
-        {/* GIF preview (right column, full height of top row) */}
-        <Card>
-          <div className="flex h-full flex-col">
-            <h3 className="mb-3 text-sm font-medium text-zinc-900 dark:text-zinc-100">
-              GIF-превью
-            </h3>
-            {gifError && (
-              <div className="mb-2 rounded-md bg-red-50 p-2 text-xs text-red-800 dark:bg-red-900/20 dark:text-red-200">
-                {gifError}
-              </div>
-            )}
-            {gifDataUrl ? (
-              <div className="space-y-2">
-                <img
-                  src={gifDataUrl}
-                  alt="GIF preview"
-                  className="max-h-64 w-full rounded-md border border-zinc-200 object-contain dark:border-zinc-700"
-                />
-                <button
-                  onClick={() => {
-                    if (!gifDataUrl) return;
-                    const a = document.createElement("a");
-                    a.href = gifDataUrl;
-                    a.download = "frames.gif";
-                    a.click();
-                  }}
-                  className="w-full rounded-md bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700"
-                >
-                  Скачать GIF
-                </button>
-              </div>
-            ) : (
-              <p className="text-xs text-zinc-600 dark:text-zinc-400">
-                Создайте GIF, чтобы увидеть здесь превью.
-              </p>
-            )}
           </div>
         </Card>
       </div>
+      {/* НОВАЯ СЕКЦИЯ: Разница кадров */}
+      {frames.length >= 2 && (
+        <Card>
+          <div className="space-y-3">
+            <h3 className="text-sm font-medium text-zinc-900 dark:text-zinc-100">
+              Анализ изменений между кадрами
+            </h3>
+            <FrameDiffOverlay frames={frames} />
+          </div>
+        </Card>
+      )}
 
-      {/* Output frames - full-width row, fills remaining height */}
+      {/* Список кадров */}
       <Card className="flex min-h-[220px] flex-1 flex-col gap-4">
         <div className="flex flex-1 flex-col">
           <div className="mb-2 flex items-center justify-between">
             <h3 className="text-sm font-medium text-zinc-900 dark:text-zinc-100">
-              Извлечённые кадры ({frames.length})
+              Извлечённые кадры ({frameCount})
             </h3>
           </div>
 
           {frames.length === 0 ? (
             <p className="text-sm text-zinc-600 dark:text-zinc-400">
-              Кадры появятся здесь после извлечения.
+              {status.isProcessing && status.currentStep === "extracting"
+                ? "Извлечение кадров..."
+                : "Кадры появятся здесь после извлечения."}
             </p>
           ) : (
             <div className="flex h-full items-stretch gap-3 overflow-x-auto overflow-y-hidden pr-1 pb-1">
               {frames.map((frame, index) => (
-                <div
+                <FrameItem
                   key={index}
-                  className="flex h-full w-40 flex-shrink-0 flex-col justify-between rounded-md border border-zinc-200 p-2 dark:border-zinc-700"
-                >
-                  <img
-                    src={frame.dataUrl}
-                    alt={`Кадр ${index + 1}`}
-                    className="w-full flex-1 rounded-md object-contain bg-zinc-100 dark:bg-zinc-800"
-                  />
-                  <div className="mt-1 flex items-center justify-between text-[11px] text-zinc-600 dark:text-zinc-400">
-                    <span>{frame.time.toFixed(2)}s</span>
-                    <button
-                      onClick={() => handleDownload(frame, index)}
-                      className="text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
-                    >
-                      Скачать
-                    </button>
-                  </div>
-                </div>
+                  frame={frame}
+                  index={index}
+                  onDownload={() => downloadFrame(frame, index)}
+                />
               ))}
             </div>
           )}
         </div>
       </Card>
 
-      {/* Hidden video/canvas elements for processing */}
-      <video ref={videoRef} className="hidden" />
+      {/* Скрытые элементы для обработки */}
+      <video ref={videoRef} className="hidden" crossOrigin="anonymous" />
       <canvas ref={canvasRef} className="hidden" />
+    </div>
+  );
+}
+
+// --- Вспомогательные компоненты (оставляем как были) ---
+
+function FileInput({ onChange }: { onChange: (e: React.ChangeEvent<HTMLInputElement>) => void }) {
+  return (
+    <div>
+      <label className="mb-1 block text-sm font-medium text-zinc-900 dark:text-zinc-100">
+        Видео файл
+      </label>
+      <input
+        type="file"
+        accept="video/*"
+        onChange={onChange}
+        className="block w-full text-sm text-zinc-900 file:mr-4 file:rounded-md file:border-0 file:bg-blue-600 file:px-4 file:py-2 file:text-sm file:font-medium file:text-white hover:file:bg-blue-700 dark:text-zinc-100"
+      />
+    </div>
+  );
+}
+
+function TimeRangeSlider({
+  startTime,
+  endTime,
+  duration,
+  onTimeChange
+}: {
+  startTime: number;
+  endTime: number;
+  duration: number | null;
+  onTimeChange: (type: 'start' | 'end', value: number) => void;
+}) {
+  if (!duration || duration <= 0) return null;
+
+  const startPercent = (startTime / duration) * 100;
+  const endPercent = (endTime / duration) * 100;
+
+  return (
+    <div className="space-y-2 pt-2">
+      <div className="flex items-center justify-between text-xs font-medium text-zinc-700 dark:text-zinc-300">
+        <span>Диапазон (сек)</span>
+        <span>{startTime.toFixed(1)}s – {endTime.toFixed(1)}s</span>
+      </div>
+
+      <div className="relative h-8">
+        <div className="absolute inset-y-3 left-0 right-0 rounded-full bg-zinc-200 dark:bg-zinc-800" />
+
+        {startTime < endTime && (
+          <div
+            className="absolute inset-y-3 rounded-full bg-blue-500/50"
+            style={{
+              left: `${startPercent}%`,
+              right: `${100 - endPercent}%`,
+            }}
+          />
+        )}
+
+        <input
+          type="range"
+          min={0}
+          max={duration}
+          step={0.01}
+          value={startTime}
+          onChange={(e) => onTimeChange('start', Number(e.target.value))}
+          className="range-dual absolute inset-x-0 top-0 z-20 w-full"
+        />
+
+        <input
+          type="range"
+          min={0}
+          max={duration}
+          step={0.01}
+          value={endTime}
+          onChange={(e) => onTimeChange('end', Number(e.target.value))}
+          className="range-dual absolute inset-x-0 bottom-0 z-10 w-full"
+        />
+      </div>
+
+      <div className="flex justify-between text-[10px] text-zinc-500 dark:text-zinc-400">
+        <span>0s</span>
+        <span>{duration.toFixed(1)}s</span>
+      </div>
+    </div>
+  );
+}
+
+function NumberInput({
+  label,
+  value,
+  min,
+  max,
+  step,
+  onChange
+}: {
+  label: string;
+  value: number;
+  min?: number;
+  max?: number;
+  step?: number;
+  onChange: (value: number) => void;
+}) {
+  return (
+    <div>
+      <label className="mb-1 block text-xs font-medium text-zinc-700 dark:text-zinc-300">
+        {label}
+      </label>
+      <input
+        type="number"
+        min={min}
+        max={max}
+        step={step}
+        value={value}
+        onChange={(e) => onChange(Number(e.target.value))}
+        className="w-full rounded-md border border-zinc-300 bg-white px-2 py-1 text-sm dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
+      />
+    </div>
+  );
+}
+
+function Button({
+  children,
+  onClick,
+  disabled,
+  variant = 'primary',
+  size = 'md'
+}: {
+  children: React.ReactNode;
+  onClick: () => void;
+  disabled?: boolean;
+  variant?: 'primary' | 'secondary';
+  size?: 'sm' | 'md';
+}) {
+  const baseClasses = "rounded-md font-medium disabled:cursor-not-allowed disabled:opacity-60 transition-colors";
+  const variants = {
+    primary: "bg-blue-600 text-white hover:bg-blue-700",
+    secondary: "border border-blue-600 text-blue-600 hover:bg-blue-50 dark:border-blue-500 dark:text-blue-400 dark:hover:bg-blue-950/30",
+  };
+  const sizes = {
+    sm: "px-3 py-1.5 text-xs",
+    md: "px-4 py-2 text-sm",
+  };
+
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      className={`${baseClasses} ${variants[variant]} ${sizes[size]} w-full`}
+    >
+      {children}
+    </button>
+  );
+}
+
+function ErrorMessage({ message }: { message: string }) {
+  return (
+    <div className="rounded-md bg-red-50 p-3 text-sm text-red-800 dark:bg-red-900/20 dark:text-red-200">
+      {message}
+    </div>
+  );
+}
+
+function FrameItem({
+  frame,
+  index,
+  onDownload
+}: {
+  frame: ExtractedFrame;
+  index: number;
+  onDownload: () => void;
+}) {
+  return (
+    <div className="flex h-full w-40 flex-shrink-0 flex-col justify-between rounded-md border border-zinc-200 p-2 dark:border-zinc-700">
+      <img
+        src={frame.dataUrl}
+        alt={`Кадр ${index + 1}`}
+        className="w-full flex-1 rounded-md object-contain bg-zinc-100 dark:bg-zinc-800"
+      />
+      <div className="mt-1 flex items-center justify-between text-[11px] text-zinc-600 dark:text-zinc-400">
+        <span>{frame.time.toFixed(2)}s</span>
+        <button
+          onClick={onDownload}
+          className="text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
+        >
+          Скачать
+        </button>
+      </div>
     </div>
   );
 }
