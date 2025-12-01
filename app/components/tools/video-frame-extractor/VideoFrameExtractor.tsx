@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback, useMemo } from "react";
-import gifshot from "gifshot"; // @ts-ignore - нет типов
+import gifshot from "gifshot";
 import { Card } from "../../ui/Card";
 
 interface ExtractedFrame {
@@ -243,8 +243,8 @@ function FrameDiffOverlay({ frames }: { frames: ExtractedFrame[] }) {
       setIsProcessing(true);
       try {
         const canvas = canvasRef.current;
-        const ctx = canvas.getContext('2d');
-        if (!ctx) return;
+        const ctx = canvas?.getContext('2d');
+        if (!ctx || !canvas) return;
 
         // Загружаем изображения
         const firstImg = new Image();
@@ -753,9 +753,9 @@ export function VideoFrameExtractor() {
             gifHeight: canvasEl.height,
             numFrames: resultFrames.length,
           },
-          (result: GifshotResult) => {
+          (result) => {
             if (result?.error) {
-              reject(new Error(result.error || "Не удалось создать GIF"));
+              reject(new Error(String(result.error) || "Не удалось создать GIF"));
               return;
             }
 
