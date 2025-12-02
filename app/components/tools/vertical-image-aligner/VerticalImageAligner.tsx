@@ -35,7 +35,7 @@ export function VerticalImageAligner() {
   // Настройки слотов
   const [cellHeight, setCellHeight] = useState(300);
 
-  // Настройки вспомогательной сетки (Overlay Grid)
+  // Настройки вспомогательной сетки
   const [showGrid, setShowGrid] = useState(true);
   const [gridWidth, setGridWidth] = useState(100);
   const [gridHeight, setGridHeight] = useState(100);
@@ -58,22 +58,16 @@ export function VerticalImageAligner() {
     [images]
   );
 
-  // Вычисляем размеры "Активной зоны" (то, что пойдет в экспорт)
+  // Границы композиции
   const compositionBounds = useMemo(() => {
     if (!images.length) return { width: 0, height: 0 };
-
-    // Высота фиксирована слотами
     const height = images.length * cellHeight;
-
-    // Ширина определяется самым правым краем контента
     let maxRight = 0;
     images.forEach((img) => {
       const rightEdge = img.offsetX + (img.naturalWidth * img.scale);
       if (rightEdge > maxRight) maxRight = rightEdge;
     });
-    // Минимальная ширина 1px, чтобы outline не схлопнулся в ноль
     const width = Math.max(1, maxRight);
-
     return { width, height };
   }, [images, cellHeight]);
 
@@ -82,21 +76,19 @@ export function VerticalImageAligner() {
   const handleFilesChange = useCallback(
     (event: React.ChangeEvent<HTMLInputElement>) => {
       const files = event.target.files;
-      if (!files) return;
+      if (!files || files.length === 0) return;
 
-      setImages((prev) => {
-        prev.forEach((img) => revokeObjectURLSafely(img.url));
-        return [];
-      });
+      const newImages: AlignImage[] = [];
 
-      const nextImages: AlignImage[] = [];
+      // Генерируем ID и структуры сразу
       Array.from(files).forEach((file, index) => {
         if (!file.type.startsWith('image/')) return;
 
         const url = createObjectURLSafely(file);
-        const id = `${Date.now()}-${index}`;
+        // Используем random, чтобы id не пересекались при повторном добавлении
+        const id = `${Date.now()}-${index}-${Math.random().toString(36).substr(2, 9)}`;
 
-        nextImages.push({
+        newImages.push({
           id,
           file,
           url,
@@ -104,37 +96,67 @@ export function VerticalImageAligner() {
           offsetX: 0,
           offsetY: 0,
           scale: 1,
-          isActive: index === 0,
+          isActive: false, // Новые не активны по умолчанию, или можно сделать последнюю активной
           naturalWidth: 0,
           naturalHeight: 0,
         });
-
-        const img = new Image();
-        img.onload = () => {
-          if (index === 0) {
-            setCellHeight(img.height);
-          }
-          setImages((prev) =>
-            prev.map((item) =>
-              item.id === id
-                ? { ...item, naturalWidth: img.width, naturalHeight: img.height }
-                : item
-            )
-          );
-        };
-        img.src = url;
       });
 
-      setImages(nextImages);
+      // Добавляем в стейт
+      setImages((prev) => {
+        // Если это первая загрузка вообще, и есть картинки, берем высоту первой для cellHeight
+        // (но это нужно сделать асинхронно после загрузки, см. ниже)
+        return [...prev, ...newImages];
+      });
+
+      // Асинхронная загрузка размеров
+      newImages.forEach((item, idx) => {
+        const img = new Image();
+        img.onload = () => {
+          setImages((currentImages) => {
+            // Если это было самое первое изображение в пустом списке, задаем высоту ячейки
+            // Проверяем: если индекс этого элемента в общем массиве был 0
+            const isFirstEver = currentImages.length === newImages.length && idx === 0;
+            if (isFirstEver) {
+              setCellHeight(img.height);
+            }
+
+            return currentImages.map((existingItem) =>
+              existingItem.id === item.id
+                ? { ...existingItem, naturalWidth: img.width, naturalHeight: img.height }
+                : existingItem
+            );
+          });
+        };
+        img.src = item.url;
+      });
+
       event.target.value = '';
     },
     []
   );
 
+  const handleRemoveImage = useCallback((id: string) => {
+    setImages((prev) => {
+      const target = prev.find((img) => img.id === id);
+      if (target) {
+        revokeObjectURLSafely(target.url);
+      }
+      return prev.filter((img) => img.id !== id);
+    });
+  }, []);
+
   const handleSelectActive = useCallback((id: string) => {
     setImages((current) =>
       current.map((img) => ({ ...img, isActive: img.id === id }))
     );
+  }, []);
+
+  const handleClearAll = useCallback(() => {
+    setImages((prev) => {
+      prev.forEach(img => revokeObjectURLSafely(img.url));
+      return [];
+    });
   }, []);
 
   const handleChangeTransform = useCallback(
@@ -273,10 +295,20 @@ export function VerticalImageAligner() {
             Серым цветом помечена зона, которая будет обрезана при экспорте.
           </p>
 
-          <label className="mb-4 flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed border-zinc-300 bg-zinc-50 p-4 transition hover:bg-zinc-100 dark:border-zinc-700 dark:bg-zinc-800/50 dark:hover:bg-zinc-800">
-            <span className="text-sm font-medium">Загрузить файлы</span>
-            <input type="file" multiple accept="image/*" className="hidden" onChange={handleFilesChange} />
-          </label>
+          <div className="mb-4 flex flex-col gap-2">
+            <label className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed border-zinc-300 bg-zinc-50 p-4 transition hover:bg-zinc-100 dark:border-zinc-700 dark:bg-zinc-800/50 dark:hover:bg-zinc-800">
+              <span className="text-sm font-medium">Добавить изображения</span>
+              <input type="file" multiple accept="image/*" className="hidden" onChange={handleFilesChange} />
+            </label>
+            {images.length > 0 && (
+              <button
+                onClick={handleClearAll}
+                className="text-xs text-red-500 hover:text-red-600 underline self-center"
+              >
+                Удалить все
+              </button>
+            )}
+          </div>
 
           {images.length > 0 && (
             <div className="space-y-6">
@@ -287,12 +319,6 @@ export function VerticalImageAligner() {
                   className="flex-1 rounded bg-blue-600 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
                 >
                   {isExporting ? '...' : 'Скачать PNG'}
-                </button>
-                <button
-                  onClick={() => setImages([])}
-                  className="rounded border border-zinc-300 px-3 py-2 text-sm hover:bg-zinc-50 dark:border-zinc-700 dark:hover:bg-zinc-800"
-                >
-                  Сброс
                 </button>
               </div>
 
@@ -390,18 +416,30 @@ export function VerticalImageAligner() {
                 <h3 className="mb-1 text-xs font-medium uppercase text-zinc-400">Слои</h3>
                 <div className="flex-1 space-y-1 overflow-y-auto rounded border border-zinc-200 p-1 dark:border-zinc-800">
                   {images.map((img, i) => (
-                    <button
+                    <div
                       key={img.id}
-                      onClick={() => handleSelectActive(img.id)}
-                      className={`flex w-full items-center justify-between rounded px-2 py-1.5 text-xs transition ${img.isActive
+                      className={`group flex w-full items-center justify-between rounded px-2 py-1.5 text-xs transition ${img.isActive
                           ? 'bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-200'
                           : 'hover:bg-zinc-100 dark:hover:bg-zinc-800'
                         }`}
                     >
-                      <span className="truncate font-medium">
+                      <button
+                        onClick={() => handleSelectActive(img.id)}
+                        className="flex-1 text-left truncate font-medium"
+                      >
                         #{i + 1} {img.name}
-                      </span>
-                    </button>
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleRemoveImage(img.id);
+                        }}
+                        className="ml-2 text-zinc-400 hover:text-red-500 dark:text-zinc-500 dark:hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity px-1"
+                        title="Удалить слой"
+                      >
+                        ✕
+                      </button>
+                    </div>
                   ))}
                 </div>
               </div>
@@ -458,33 +496,23 @@ export function VerticalImageAligner() {
 
           {images.length > 0 && (
             <>
-              {/* --- ЗАТЕМНЕНИЕ НЕАКТИВНЫХ ЗОН (Outline Mask) --- */}
-              {/* 
-                 Этот div занимает ровно ту область, которая пойдет в экспорт.
-                 С помощью outline мы затемняем всё, что снаружи.
-                 z-30: Поверх изображений (z-10/20), чтобы показать, что отрежется.
-              */}
+              {/* --- ЗАТЕМНЕНИЕ НЕАКТИВНЫХ ЗОН --- */}
               <div
                 className="absolute top-0 left-0 pointer-events-none z-30"
                 style={{
                   width: compositionBounds.width,
                   height: compositionBounds.height,
-                  // Огромная рамка создает эффект "Modal backdrop" вокруг активной зоны
                   outline: '50000px solid rgba(0, 0, 0, 0.65)'
                 }}
               />
 
-              {/* --- ВСПОМОГАТЕЛЬНАЯ СЕТКА (OVERLAY GRID) --- */}
-              {/* 
-                 z-50: Поверх всего, включая затемнение, чтобы работать линейкой
-              */}
+              {/* --- ВСПОМОГАТЕЛЬНАЯ СЕТКА --- */}
               {showGrid && (
                 <div
                   className="absolute top-0 left-0 z-50 pointer-events-none"
                   style={{
                     width: '50000px',
                     height: '50000px',
-                    // Используем выбранный gridColor для градиента
                     backgroundImage: `
                             linear-gradient(to right, ${gridColor} 1px, transparent 1px),
                             linear-gradient(to bottom, ${gridColor} 1px, transparent 1px)
@@ -508,7 +536,6 @@ export function VerticalImageAligner() {
                 zIndex: img.isActive ? 20 : 10
               }}
             >
-              {/* Изображение */}
               <div
                 className="relative"
                 style={{
@@ -524,8 +551,6 @@ export function VerticalImageAligner() {
                   className={`w-full h-full object-fill select-none ${img.isActive ? 'ring-2 ring-blue-500 shadow-lg' : ''}`}
                 />
               </div>
-
-              {/* Маркер слота (показываем его поверх картинки, но под маской) */}
               <div className="absolute left-0 top-0 bg-red-600/80 px-1.5 py-0.5 text-[10px] text-white font-mono pointer-events-none opacity-70">
                 {i + 1}
               </div>
@@ -535,7 +560,7 @@ export function VerticalImageAligner() {
 
         {!images.length && (
           <div className="pointer-events-none absolute inset-0 flex items-center justify-center text-zinc-400 z-20">
-            <p>Перетащите файлы</p>
+            <p>Нажмите "Добавить изображения" слева</p>
           </div>
         )}
 
