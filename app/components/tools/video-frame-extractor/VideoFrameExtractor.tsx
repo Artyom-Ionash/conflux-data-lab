@@ -82,12 +82,14 @@ export function VideoFrameExtractor() {
               </div>
             )}
 
-            <TimeRangeSlider
-              startTime={extractionParams.startTime}
-              endTime={effectiveEnd}
-              duration={videoDuration}
-              onTimeChange={handleTimeChange}
-            />
+            <div className="no-select">
+              <TimeRangeSlider
+                startTime={extractionParams.startTime}
+                endTime={effectiveEnd}
+                duration={videoDuration}
+                onTimeChange={handleTimeChange}
+              />
+            </div>
 
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
