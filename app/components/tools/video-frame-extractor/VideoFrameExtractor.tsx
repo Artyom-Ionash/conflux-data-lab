@@ -557,6 +557,9 @@ export function VideoFrameExtractor() {
     startTime: 0,
     endTime: 0,
     frameStep: 1,
+    // Опция симметричного набора кадров для точного зацикливания:
+    // последовательность кадров идет вперед до конца, затем назад до начал    symmetricLoop: false,
+    symmetricLoop: false,
   });
 
   const [frames, setFrames] = useState<ExtractedFrame[]>([]);
@@ -709,9 +712,20 @@ export function VideoFrameExtractor() {
         });
       }
 
-      setFrames(resultFrames);
 
-      if (resultFrames.length === 0) {
+      // Формируем конечную последовательность кадров.
+      // При включенном symmetricLoop добавляем обратную последовательность кадров
+      // (без первого и последнего, чтобы избежать дублирования на стыках цикла).
+      let finalFrames: ExtractedFrame[] = resultFrames;
+
+      if (extractionParams.symmetricLoop && resultFrames.length > 1) {
+        const backward = resultFrames.slice(1, -1).reverse();
+        finalFrames = [...resultFrames, ...backward];
+      }
+
+      setFrames(finalFrames);
+
+      if (finalFrames.length === 0) {
         throw new Error("Не удалось извлечь кадры");
       }
 
@@ -726,11 +740,11 @@ export function VideoFrameExtractor() {
 
         gifshot.createGIF(
           {
-            images: resultFrames.map(f => f.dataUrl),
+            images: finalFrames.map(f => f.dataUrl),
             interval: intervalSeconds,
             gifWidth: canvasEl.width,
             gifHeight: canvasEl.height,
-            numFrames: resultFrames.length,
+            numFrames: finalFrames.length,
           },
           (result) => {
             if (result?.error) {
@@ -857,22 +871,38 @@ export function VideoFrameExtractor() {
               onTimeChange={handleTimeChange}
             />
 
-            <div className="grid grid-cols-2 gap-4">
-              <NumberInput
-                label="Шаг между кадрами (сек)"
-                value={extractionParams.frameStep}
-                min={0.01}
-                step={0.01}
-                onChange={(value) => setExtractionParams(prev => ({ ...prev, frameStep: value }))}
-              />
-              <NumberInput
-                label="Скорость GIF (кадров/сек)"
-                value={gifParams.fps}
-                min={0.5}
-                max={30}
-                step={0.5}
-                onChange={(fps) => setGifParams(prev => ({ ...prev, fps }))}
-              />
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <NumberInput
+                  label="Шаг между кадрами (сек)"
+                  value={extractionParams.frameStep}
+                  min={0.01}
+                  step={0.01}
+                  onChange={(value) => setExtractionParams(prev => ({ ...prev, frameStep: value }))}
+                />
+                <NumberInput
+                  label="Скорость GIF (кадров/сек)"
+                  value={gifParams.fps}
+                  min={0.5}
+                  max={30}
+                  step={0.5}
+                  onChange={(fps) => setGifParams(prev => ({ ...prev, fps }))}
+                />
+              </div>
+
+              <label className="flex items-center gap-2 text-xs text-zinc-700 dark:text-zinc-300">
+                <input
+                  type="checkbox"
+                  checked={extractionParams.symmetricLoop}
+                  onChange={(e) =>
+                    setExtractionParams(prev => ({ ...prev, symmetricLoop: e.target.checked }))
+                  }
+                  className="h-4 w-4 rounded border-zinc-300 text-blue-600 focus:ring-blue-500 dark:border-zinc-600"
+                />
+                <span>
+                  Симметричный набор кадров для точного зацикливания (туда-обратно)
+                </span>
+              </label>
             </div>
 
             {errors.extraction && <ErrorMessage message={errors.extraction} />}
@@ -997,7 +1027,7 @@ function TimeRangeSlider({
     <div className="space-y-2 pt-2">
       <div className="flex items-center justify-between text-xs font-medium text-zinc-700 dark:text-zinc-300">
         <span>Диапазон (сек)</span>
-        <span>{startTime.toFixed(1)}s – {endTime.toFixed(1)}s</span>
+        <span>{startTime.toFixed(2)}s – {endTime.toFixed(2)}s</span>
       </div>
 
       <div className="relative h-8">
