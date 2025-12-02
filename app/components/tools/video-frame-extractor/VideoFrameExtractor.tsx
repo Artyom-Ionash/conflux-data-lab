@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useRef, useEffect, useCallback, useMemo } from "react";
@@ -25,24 +26,20 @@ function useSpriteSheetGenerator() {
       throw new Error("Нет кадров для создания спрайт-листа");
     }
 
-    // Загружаем первое изображение для получения размеров
     const firstImage = new Image();
     await new Promise<void>((resolve) => {
       firstImage.onload = () => resolve();
       firstImage.src = frames[0].dataUrl;
     });
 
-    // Параметры по умолчанию - используем ?? вместо ||
     const maxHeight = options?.maxHeight ?? 500;
-    const spacing = options?.spacing ?? 0;  // ← Исправлено здесь
+    const spacing = options?.spacing ?? 0;
     const backgroundColor = options?.backgroundColor || 'transparent';
 
-    // Рассчитываем масштабирование для сохранения пропорций
     const scale = maxHeight / firstImage.height;
     const scaledWidth = Math.floor(firstImage.width * scale);
     const scaledHeight = maxHeight;
 
-    // Создаем канвас для спрайт-листа
     const canvas = document.createElement('canvas');
     const ctx = canvas.getContext('2d');
 
@@ -50,17 +47,14 @@ function useSpriteSheetGenerator() {
       throw new Error("Не удалось создать контекст канваса");
     }
 
-    // Рассчитываем общую ширину канваса
     canvas.width = (scaledWidth + spacing) * frames.length - spacing;
     canvas.height = scaledHeight;
 
-    // Заполняем фон если указан
     if (backgroundColor !== 'transparent') {
       ctx.fillStyle = backgroundColor;
       ctx.fillRect(0, 0, canvas.width, canvas.height);
     }
 
-    // Загружаем и рисуем все кадры
     for (let i = 0; i < frames.length; i++) {
       const img = new Image();
       await new Promise<void>((resolve) => {
@@ -72,7 +66,6 @@ function useSpriteSheetGenerator() {
       ctx.drawImage(img, x, 0, scaledWidth, scaledHeight);
     }
 
-    // Добавляем разделительные линии между кадрами
     if (spacing > 0) {
       ctx.strokeStyle = 'rgba(0, 0, 0, 0.1)';
       ctx.lineWidth = 1;
@@ -227,15 +220,17 @@ function SpriteSheetManager({ frames }: { frames: ExtractedFrame[] }) {
   );
 }
 
-// --- НОВЫЙ КОМПОНЕНТ: Наложение кадров с удалением фона ---
-function FrameDiffOverlay({ frames }: { frames: ExtractedFrame[] }) {
+// --- ИЗМЕНЕННЫЙ КОМПОНЕНТ: Наложение кадров с сохранением изображения при загрузке ---
+function FrameDiffOverlay({ frames, isExtracting }: { frames: ExtractedFrame[], isExtracting: boolean }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [overlayDataUrl, setOverlayDataUrl] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
 
   useEffect(() => {
-    if (frames.length < 2 || !canvasRef.current) {
-      setOverlayDataUrl(null);
+    // Если кадров мало, мы НЕ очищаем overlayDataUrl сразу, 
+    // чтобы сохранить старое изображение во время ре-экстракции.
+    // Очистка произойдет только если мы попытаемся нарисовать, а кадров не будет.
+    if (frames.length < 2) {
       return;
     }
 
@@ -246,7 +241,6 @@ function FrameDiffOverlay({ frames }: { frames: ExtractedFrame[] }) {
         const ctx = canvas?.getContext('2d');
         if (!ctx || !canvas) return;
 
-        // Загружаем изображения
         const firstImg = new Image();
         const lastImg = new Image();
 
@@ -261,29 +255,22 @@ function FrameDiffOverlay({ frames }: { frames: ExtractedFrame[] }) {
           })
         ]);
 
-        // Устанавливаем размер канваса
         canvas.width = firstImg.width;
         canvas.height = firstImg.height;
 
-        // Очищаем канвас
         ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-        // Получаем пиксели изображений
         ctx.drawImage(firstImg, 0, 0);
         const firstImageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
 
         ctx.drawImage(lastImg, 0, 0);
         const lastImageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
 
-        // Получаем цвет фона (левый верхний пиксель первого кадра)
         const bgR = firstImageData.data[0];
         const bgG = firstImageData.data[1];
         const bgB = firstImageData.data[2];
 
-        // Создаем результирующее изображение
         const resultImageData = ctx.createImageData(canvas.width, canvas.height);
-
-        // Порог для определения похожести на фоновый цвет
         const threshold = 30;
 
         for (let i = 0; i < firstImageData.data.length; i += 4) {
@@ -295,47 +282,38 @@ function FrameDiffOverlay({ frames }: { frames: ExtractedFrame[] }) {
           const lastG = lastImageData.data[i + 1];
           const lastB = lastImageData.data[i + 2];
 
-          // Проверяем, является ли пиксель фоном для первого кадра
           const firstIsBg = Math.abs(firstR - bgR) < threshold &&
             Math.abs(firstG - bgG) < threshold &&
             Math.abs(firstB - bgB) < threshold;
 
-          // Проверяем, является ли пиксель фоном для последнего кадра
           const lastIsBg = Math.abs(lastR - bgR) < threshold &&
             Math.abs(lastG - bgG) < threshold &&
             Math.abs(lastB - bgB) < threshold;
 
-          // Если оба пикселя - фон, оставляем прозрачным
           if (firstIsBg && lastIsBg) {
-            resultImageData.data[i + 3] = 0; // alpha = 0
+            resultImageData.data[i + 3] = 0;
           }
-          // Если только первый кадр не фон - красный
           else if (!firstIsBg && lastIsBg) {
-            resultImageData.data[i] = 255;     // R
-            resultImageData.data[i + 1] = 0;   // G
-            resultImageData.data[i + 2] = 0;   // B
-            resultImageData.data[i + 3] = 200; // alpha
+            resultImageData.data[i] = 255;
+            resultImageData.data[i + 1] = 0;
+            resultImageData.data[i + 2] = 0;
+            resultImageData.data[i + 3] = 200;
           }
-          // Если только последний кадр не фон - синий
           else if (firstIsBg && !lastIsBg) {
-            resultImageData.data[i] = 0;       // R
-            resultImageData.data[i + 1] = 100; // G
-            resultImageData.data[i + 2] = 255; // B
-            resultImageData.data[i + 3] = 200; // alpha
+            resultImageData.data[i] = 0;
+            resultImageData.data[i + 1] = 100;
+            resultImageData.data[i + 2] = 255;
+            resultImageData.data[i + 3] = 200;
           }
-          // Если оба не фон - фиолетовый (смешение)
           else {
-            resultImageData.data[i] = 200;     // R
-            resultImageData.data[i + 1] = 50;  // G
-            resultImageData.data[i + 2] = 255; // B
-            resultImageData.data[i + 3] = 220; // alpha
+            resultImageData.data[i] = 200;
+            resultImageData.data[i + 1] = 50;
+            resultImageData.data[i + 2] = 255;
+            resultImageData.data[i + 3] = 220;
           }
         }
 
-        // Рисуем результат
         ctx.putImageData(resultImageData, 0, 0);
-
-        // Сохраняем как data URL
         setOverlayDataUrl(canvas.toDataURL('image/png'));
       } catch (error) {
         console.error('Error processing frames:', error);
@@ -347,42 +325,60 @@ function FrameDiffOverlay({ frames }: { frames: ExtractedFrame[] }) {
     processFrames();
   }, [frames]);
 
-  if (frames.length < 2) {
-    return (
-      <div className="flex h-full items-center justify-center">
-        <p className="text-xs text-zinc-600 dark:text-zinc-400">
-          Извлеките минимум 2 кадра для отображения наложения
-        </p>
-      </div>
-    );
+  // Определяем, нужно ли показывать лоадер
+  // Показываем если идет внутренняя обработка ИЛИ внешнее извлечение кадров
+  const isLoading = isProcessing || isExtracting;
+
+  // Если нет данных и мы не грузим ничего - показываем заглушку или ничего
+  if (frames.length < 2 && !overlayDataUrl && !isLoading) {
+    return null;
   }
 
   return (
     <div className="space-y-3">
       <canvas ref={canvasRef} className="hidden" />
 
-      {isProcessing ? (
-        <div className="flex h-48 items-center justify-center">
-          <p className="text-sm text-zinc-600 dark:text-zinc-400">Обработка...</p>
-        </div>
-      ) : overlayDataUrl ? (
-        <>
-          <div className="relative overflow-hidden rounded-md bg-zinc-100 dark:bg-zinc-800">
-            <img
-              src={overlayDataUrl}
-              alt="Frame difference overlay"
-              className="w-full object-contain"
-              style={{ maxHeight: '300px' }}
-            />
+      <div className="relative overflow-hidden rounded-md bg-zinc-100 dark:bg-zinc-800 min-h-[200px] flex items-center justify-center">
+
+        {/* Изображение (если есть) */}
+        {overlayDataUrl && (
+          <img
+            src={overlayDataUrl}
+            alt="Frame difference overlay"
+            className="w-full object-contain transition-opacity duration-300"
+            style={{ maxHeight: '300px' }}
+          />
+        )}
+
+        {/* Оверлей загрузки (поверх изображения или вместо него) */}
+        {isLoading && (
+          <div className={`absolute inset-0 z-10 flex flex-col items-center justify-center 
+            ${overlayDataUrl ? 'bg-white/60 dark:bg-black/60 backdrop-blur-[2px]' : 'bg-transparent'}`}>
+            <div className="h-8 w-8 animate-spin rounded-full border-4 border-zinc-300 border-t-blue-600"></div>
+            <p className="mt-2 text-xs font-medium text-zinc-700 dark:text-zinc-300">
+              {isExtracting ? 'Извлечение кадров...' : 'Обработка разницы...'}
+            </p>
           </div>
+        )}
+
+        {/* Состояние "пусто" (только при первом запуске до генерации) */}
+        {!overlayDataUrl && !isLoading && (
+          <p className="text-xs text-zinc-600 dark:text-zinc-400">
+            Извлеките минимум 2 кадра для отображения наложения
+          </p>
+        )}
+      </div>
+
+      {overlayDataUrl && (
+        <>
           <div className="space-y-2 text-xs text-zinc-600 dark:text-zinc-400">
             <div className="flex items-center gap-2">
               <div className="h-3 w-3 rounded bg-red-600"></div>
-              <span>Только в первом кадре ({frames[0].time.toFixed(1)}s)</span>
+              <span>Только в первом кадре ({frames[0]?.time.toFixed(1) ?? '?'}s)</span>
             </div>
             <div className="flex items-center gap-2">
               <div className="h-3 w-3 rounded bg-blue-600"></div>
-              <span>Только в последнем кадре ({frames[frames.length - 1].time.toFixed(1)}s)</span>
+              <span>Только в последнем кадре ({frames[frames.length - 1]?.time.toFixed(1) ?? '?'}s)</span>
             </div>
             <div className="flex items-center gap-2">
               <div className="h-3 w-3 rounded bg-purple-600"></div>
@@ -394,6 +390,7 @@ function FrameDiffOverlay({ frames }: { frames: ExtractedFrame[] }) {
           </div>
           <button
             onClick={() => {
+              if (!overlayDataUrl) return;
               const a = document.createElement('a');
               a.href = overlayDataUrl;
               a.download = 'frame-diff-overlay.png';
@@ -404,12 +401,10 @@ function FrameDiffOverlay({ frames }: { frames: ExtractedFrame[] }) {
             Скачать наложение
           </button>
         </>
-      ) : null}
+      )}
     </div>
   );
 }
-
-// ... остальной код компонента RangeVideoPlayer остается без изменений ...
 
 function RangeVideoPlayer({
   src,
@@ -424,7 +419,6 @@ function RangeVideoPlayer({
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(startTime);
 
-  // Синхронизация с изменением startTime (скраббинг)
   useEffect(() => {
     if (videoRef.current && Math.abs(videoRef.current.currentTime - startTime) > 0.5) {
       videoRef.current.currentTime = startTime;
@@ -432,7 +426,6 @@ function RangeVideoPlayer({
     }
   }, [startTime]);
 
-  // Логика зацикливания и обновление таймера
   useEffect(() => {
     const video = videoRef.current;
     if (!video) return;
@@ -441,10 +434,8 @@ function RangeVideoPlayer({
       const time = video.currentTime;
       setCurrentTime(time);
 
-      // Если вышли за пределы endTime
       if (time >= endTime) {
         video.currentTime = startTime;
-        // Если видео должно играть, запускаем снова
         if (isPlaying) video.play().catch(() => { });
       }
     };
@@ -458,7 +449,6 @@ function RangeVideoPlayer({
     if (isPlaying) {
       videoRef.current.pause();
     } else {
-      // Если мы в конце диапазона, прыгаем в начало перед стартом
       if (videoRef.current.currentTime >= endTime) {
         videoRef.current.currentTime = startTime;
       }
@@ -467,12 +457,10 @@ function RangeVideoPlayer({
     setIsPlaying(!isPlaying);
   };
 
-  // Вычисляем прогресс в диапазоне
   const duration = endTime - startTime;
   const progress = duration > 0 ? ((currentTime - startTime) / duration) * 100 : 0;
   const progressSafe = Math.max(0, Math.min(100, progress));
 
-  // Форматирование времени
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
     const secs = Math.floor(seconds % 60);
@@ -486,7 +474,6 @@ function RangeVideoPlayer({
 
   return (
     <div className="space-y-2 mb-4">
-      {/* Видео плеер */}
       <div className="relative overflow-hidden rounded-md bg-black aspect-video">
         <video
           ref={videoRef}
@@ -498,7 +485,6 @@ function RangeVideoPlayer({
           onPause={() => setIsPlaying(false)}
         />
 
-        {/* Оверлей с кнопкой Play/Pause */}
         <div className="absolute inset-0 flex items-center justify-center bg-black/10 opacity-0 hover:opacity-100 transition-opacity group">
           <button
             onClick={togglePlay}
@@ -512,7 +498,6 @@ function RangeVideoPlayer({
           </button>
         </div>
 
-        {/* Индикатор статуса */}
         {!isPlaying && (
           <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
             <div className="rounded-full bg-black/50 p-3 text-white backdrop-blur-sm">
@@ -521,22 +506,18 @@ function RangeVideoPlayer({
           </div>
         )}
 
-        {/* Таймер в углу видео */}
         <div className="absolute bottom-2 right-2 bg-black/70 backdrop-blur-sm rounded px-2 py-1 text-xs text-white font-mono">
           {formatTime(elapsedTime)} / {formatTime(duration)}
         </div>
       </div>
 
-      {/* Прогресс-бар и контролы времени */}
       <div className="space-y-1">
-        {/* Прогресс-бар */}
         <div className="relative h-2 bg-zinc-200 dark:bg-zinc-800 rounded-full overflow-hidden">
           <div
             className="absolute inset-y-0 left-0 bg-blue-600 transition-all duration-100 ease-linear"
             style={{ width: `${progressSafe}%` }}
           />
 
-          {/* Кликабельная область для перемотки */}
           <button
             className="absolute inset-0 cursor-pointer"
             onClick={(e) => {
@@ -550,7 +531,6 @@ function RangeVideoPlayer({
           />
         </div>
 
-        {/* Временные метки */}
         <div className="flex items-center justify-between text-xs text-zinc-600 dark:text-zinc-400">
           <div className="flex items-center gap-2">
             <span className="font-mono">{formatTime(elapsedTime)}</span>
@@ -605,7 +585,6 @@ export function VideoFrameExtractor() {
 
   const frameCount = frames.length;
 
-  // Очистка URL при размонтировании
   useEffect(() => {
     return () => {
       if (videoSrc) URL.revokeObjectURL(videoSrc);
@@ -819,6 +798,12 @@ export function VideoFrameExtractor() {
       : "Извлечь кадры и создать GIF";
   };
 
+  // Условие для отображения оверлея:
+  // Либо у нас уже есть кадры,
+  // ЛИБО идет процесс извлечения (status.isProcessing && status.currentStep === 'extracting')
+  // Это предотвращает исчезновение компонента при повторном нажатии кнопки, когда frames=[]
+  const showDiffOverlay = frames.length >= 2 || (status.isProcessing && status.currentStep === 'extracting');
+
   return (
     <div className="flex min-h-[80vh] flex-col space-y-6">
       <div className="space-y-6">
@@ -828,14 +813,12 @@ export function VideoFrameExtractor() {
 
             {videoSrc && (
               <div className="grid gap-4 md:grid-cols-2 items-start">
-                {/* Слева – видео-плеер */}
                 <RangeVideoPlayer
                   src={videoSrc}
                   startTime={extractionParams.startTime}
                   endTime={effectiveEnd}
                 />
 
-                {/* Справа – GIF той же высоты */}
                 <div className="space-y-2">
                   <div className="relative overflow-hidden rounded-md bg-black aspect-video flex items-center justify-center">
                     {gifParams.dataUrl ? (
@@ -909,14 +892,18 @@ export function VideoFrameExtractor() {
       </div>
 
 
-      {/* НОВАЯ СЕКЦИЯ: Разница кадров */}
-      {frames.length >= 2 && (
+      {/* СЕКЦИЯ: Разница кадров (Обновленная логика показа) */}
+      {showDiffOverlay && (
         <Card>
           <div className="space-y-3">
             <h3 className="text-sm font-medium text-zinc-900 dark:text-zinc-100">
               Анализ изменений между кадрами
             </h3>
-            <FrameDiffOverlay frames={frames} />
+            {/* Передаем флаг isExtracting для отображения лоадера поверх старого изображения */}
+            <FrameDiffOverlay
+              frames={frames}
+              isExtracting={status.isProcessing && status.currentStep === 'extracting'}
+            />
           </div>
         </Card>
       )}
@@ -951,7 +938,7 @@ export function VideoFrameExtractor() {
         </div>
       </Card>
 
-      {/* НОВАЯ СЕКЦИЯ: Спрайт-лист для анимации */}
+      {/* Спрайт-лист */}
       {frames.length > 0 && (
         <Card>
           <div className="space-y-3">
@@ -966,15 +953,13 @@ export function VideoFrameExtractor() {
         </Card>
       )}
 
-
-      {/* Скрытые элементы для обработки */}
       <video ref={videoRef} className="hidden" crossOrigin="anonymous" />
       <canvas ref={canvasRef} className="hidden" />
     </div>
   );
 }
 
-// --- Вспомогательные компоненты (оставляем как были) ---
+// --- Вспомогательные компоненты ---
 
 function FileInput({ onChange }: { onChange: (e: React.ChangeEvent<HTMLInputElement>) => void }) {
   return (
