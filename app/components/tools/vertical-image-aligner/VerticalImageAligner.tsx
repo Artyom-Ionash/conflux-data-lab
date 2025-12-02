@@ -48,29 +48,28 @@ export function VerticalImageAligner() {
   const [cameraOffset, setCameraOffset] = useState({ x: 100, y: 100 });
   const [isPanning, setIsPanning] = useState(false);
 
+  // Refs
+  const viewportRef = useRef<HTMLDivElement>(null); // Ref для контейнера полотна
   const panStartRef = useRef<{ x: number; y: number } | null>(null);
   const cameraStartRef = useRef<{ x: number; y: number } | null>(null);
-  const [isExporting, setIsExporting] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const [isExporting, setIsExporting] = useState(false);
 
   const activeImageId = useMemo(
     () => images.find((img) => img.isActive)?.id ?? null,
     [images]
   );
 
-  // Вычисляем границы контента (активной области)
+  // Границы композиции
   const compositionBounds = useMemo(() => {
     if (!images.length) return { width: 0, height: 0 };
-
     const height = images.length * cellHeight;
-
     let maxRight = 0;
     images.forEach((img) => {
       const rightEdge = img.offsetX + (img.naturalWidth * img.scale);
       if (rightEdge > maxRight) maxRight = rightEdge;
     });
     const width = Math.max(1, maxRight);
-
     return { width, height };
   }, [images, cellHeight]);
 
@@ -108,7 +107,6 @@ export function VerticalImageAligner() {
         const img = new Image();
         img.onload = () => {
           setImages((currentImages) => {
-            // Если это первая загрузка в пустой проект, берем высоту для настройки слота
             const isFirstEver = currentImages.length === newImages.length && idx === 0;
             if (isFirstEver) {
               setCellHeight(img.height);
@@ -224,13 +222,14 @@ export function VerticalImageAligner() {
     }
   }, [images, cellHeight, compositionBounds]);
 
-  // --- Управление камерой ---
+  // --- Управление камерой (ZOOM TO CURSOR) ---
 
   const handlePreviewWheel = useCallback(
     (event: React.WheelEvent<HTMLDivElement>) => {
       event.preventDefault();
       event.stopPropagation();
 
+      // 1. Зум отдельного слоя (Ctrl + колесо)
       if (event.ctrlKey && activeImageId) {
         const delta = event.deltaY > 0 ? -0.05 : 0.05;
         setImages((current) =>
@@ -242,10 +241,31 @@ export function VerticalImageAligner() {
         );
         return;
       }
+
+      // 2. Зум всего полотна (Курсор как точка привязки)
+      if (!viewportRef.current) return;
+
+      const rect = viewportRef.current.getBoundingClientRect();
+      // Координаты мыши относительно верхнего левого угла контейнера viewport
+      const mouseX = event.clientX - rect.left;
+      const mouseY = event.clientY - rect.top;
+
+      // Вычисляем новый масштаб
       const zoomFactor = event.deltaY > 0 ? 0.9 : 1.1;
-      setCameraScale((prev) => Math.min(5, Math.max(0.05, prev * zoomFactor)));
+      const newScale = Math.min(5, Math.max(0.05, cameraScale * zoomFactor));
+
+      // Коэффициент изменения масштаба
+      const scaleRatio = newScale / cameraScale;
+
+      // Формула: NewOffset = Mouse - (Mouse - OldOffset) * Ratio
+      // Это смещает камеру так, что точка под мышью остается на месте
+      const newOffsetX = mouseX - (mouseX - cameraOffset.x) * scaleRatio;
+      const newOffsetY = mouseY - (mouseY - cameraOffset.y) * scaleRatio;
+
+      setCameraScale(newScale);
+      setCameraOffset({ x: newOffsetX, y: newOffsetY });
     },
-    [activeImageId]
+    [activeImageId, cameraScale, cameraOffset]
   );
 
   const handlePointerDown = useCallback(
@@ -285,7 +305,7 @@ export function VerticalImageAligner() {
         <div className="flex-1 overflow-y-auto p-4 custom-scrollbar">
           <h2 className="mb-1 text-lg font-bold">Редактор</h2>
           <p className="mb-6 text-xs text-zinc-500 dark:text-zinc-400">
-            Серым цветом помечена зона, которая будет обрезана при экспорте.
+            Масштаб колесиком приближает к курсору.
           </p>
 
           <div className="mb-4 flex flex-col gap-2">
@@ -469,6 +489,7 @@ export function VerticalImageAligner() {
 
       {/* --- ПРАВАЯ ПАНЕЛЬ --- */}
       <main
+        ref={viewportRef}
         className="relative flex-1 overflow-hidden bg-[#e5e5e5] dark:bg-[#111] cursor-grab active:cursor-grabbing"
         onWheel={handlePreviewWheel}
         onPointerDown={handlePointerDown}
@@ -477,7 +498,7 @@ export function VerticalImageAligner() {
         onPointerLeave={stopPanning}
       >
 
-        {/* 1. МИР (Контейнер с трансформацией: зум и панорама) */}
+        {/* КОНТЕЙНЕР ТРАНСФОРМАЦИЙ (Мир) */}
         <div
           style={{
             transform: `translate(${cameraOffset.x}px, ${cameraOffset.y}px) scale(${cameraScale})`,
@@ -486,14 +507,9 @@ export function VerticalImageAligner() {
           }}
           className="absolute left-0 top-0 z-10"
         >
-
           {images.length > 0 && (
             <>
-              {/* 
-                 ЗАТЕМНЕНИЕ НЕАКТИВНЫХ ЗОН (MASK)
-                 Находится ВНУТРИ мира, чтобы двигаться вместе с ним.
-                 outline затемняет все вокруг.
-              */}
+              {/* МАСКА (Затемнение неактивной зоны) */}
               <div
                 className="absolute top-0 left-0 pointer-events-none z-30"
                 style={{
@@ -503,9 +519,7 @@ export function VerticalImageAligner() {
                 }}
               />
 
-              {/* 
-                 СЛОТЫ И ИЗОБРАЖЕНИЯ
-              */}
+              {/* СЛОТЫ И ИЗОБРАЖЕНИЯ */}
               {images.map((img, i) => (
                 <div
                   key={img.id}
@@ -541,31 +555,31 @@ export function VerticalImageAligner() {
         </div>
 
         {/* 
-            2. ВСПОМОГАТЕЛЬНАЯ СЕТКА (OVERLAY GRID)
-            Находится СНАРУЖИ трансформации мира, поэтому линии всегда 1px (физический пиксель экрана).
-            Мы вручную позиционируем и масштабируем её параметры, чтобы она совпадала с миром.
+           ВСПОМОГАТЕЛЬНАЯ СЕТКА (OVERLAY GRID)
+           Отображается вне трансформируемого контейнера, 
+           но синхронизирована с ним по положению.
+           Это гарантирует толщину линий в 1px.
         */}
         {images.length > 0 && showGrid && (
           <div
             className="absolute pointer-events-none z-50"
             style={{
-              // Позиция и размер блока совпадают с активной областью на экране
+              // Позиционируем блок сетки ровно над Активной Зоной контента
               left: cameraOffset.x,
               top: cameraOffset.y,
               width: compositionBounds.width * cameraScale,
               height: compositionBounds.height * cameraScale,
 
-              // Рисуем сетку градиентом
+              // Градиент рисуется в экранных пикселях (1px)
               backgroundImage: `
                     linear-gradient(to right, ${gridColor} 1px, transparent 1px),
                     linear-gradient(to bottom, ${gridColor} 1px, transparent 1px)
                 `,
-              // Размер клетки масштабируется вместе с миром
+              // Размер и сдвиг клетки масштабируются
               backgroundSize: `${gridWidth * cameraScale}px ${gridHeight * cameraScale}px`,
-              // Сдвиг сетки масштабируется вместе с миром
               backgroundPosition: `${gridOffsetX * cameraScale}px ${gridOffsetY * cameraScale}px`,
 
-              // (Опционально) можно добавить overflow: hidden, чтобы гарантировать обрезку
+              // Обрезаем сетку границами активной зоны, чтобы она не лезла на "серое"
               overflow: 'hidden'
             }}
           />
