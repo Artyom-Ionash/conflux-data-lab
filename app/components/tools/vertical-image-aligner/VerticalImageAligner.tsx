@@ -58,16 +58,19 @@ export function VerticalImageAligner() {
     [images]
   );
 
-  // Границы композиции
+  // Вычисляем границы контента (активной области)
   const compositionBounds = useMemo(() => {
     if (!images.length) return { width: 0, height: 0 };
+
     const height = images.length * cellHeight;
+
     let maxRight = 0;
     images.forEach((img) => {
       const rightEdge = img.offsetX + (img.naturalWidth * img.scale);
       if (rightEdge > maxRight) maxRight = rightEdge;
     });
     const width = Math.max(1, maxRight);
+
     return { width, height };
   }, [images, cellHeight]);
 
@@ -80,12 +83,9 @@ export function VerticalImageAligner() {
 
       const newImages: AlignImage[] = [];
 
-      // Генерируем ID и структуры сразу
       Array.from(files).forEach((file, index) => {
         if (!file.type.startsWith('image/')) return;
-
         const url = createObjectURLSafely(file);
-        // Используем random, чтобы id не пересекались при повторном добавлении
         const id = `${Date.now()}-${index}-${Math.random().toString(36).substr(2, 9)}`;
 
         newImages.push({
@@ -96,26 +96,19 @@ export function VerticalImageAligner() {
           offsetX: 0,
           offsetY: 0,
           scale: 1,
-          isActive: false, // Новые не активны по умолчанию, или можно сделать последнюю активной
+          isActive: false,
           naturalWidth: 0,
           naturalHeight: 0,
         });
       });
 
-      // Добавляем в стейт
-      setImages((prev) => {
-        // Если это первая загрузка вообще, и есть картинки, берем высоту первой для cellHeight
-        // (но это нужно сделать асинхронно после загрузки, см. ниже)
-        return [...prev, ...newImages];
-      });
+      setImages((prev) => [...prev, ...newImages]);
 
-      // Асинхронная загрузка размеров
       newImages.forEach((item, idx) => {
         const img = new Image();
         img.onload = () => {
           setImages((currentImages) => {
-            // Если это было самое первое изображение в пустом списке, задаем высоту ячейки
-            // Проверяем: если индекс этого элемента в общем массиве был 0
+            // Если это первая загрузка в пустой проект, берем высоту для настройки слота
             const isFirstEver = currentImages.length === newImages.length && idx === 0;
             if (isFirstEver) {
               setCellHeight(img.height);
@@ -419,8 +412,8 @@ export function VerticalImageAligner() {
                     <div
                       key={img.id}
                       className={`group flex w-full items-center justify-between rounded px-2 py-1.5 text-xs transition ${img.isActive
-                          ? 'bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-200'
-                          : 'hover:bg-zinc-100 dark:hover:bg-zinc-800'
+                        ? 'bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-200'
+                        : 'hover:bg-zinc-100 dark:hover:bg-zinc-800'
                         }`}
                     >
                       <button
@@ -484,7 +477,7 @@ export function VerticalImageAligner() {
         onPointerLeave={stopPanning}
       >
 
-        {/* Контейнер "Мира" */}
+        {/* 1. МИР (Контейнер с трансформацией: зум и панорама) */}
         <div
           style={{
             transform: `translate(${cameraOffset.x}px, ${cameraOffset.y}px) scale(${cameraScale})`,
@@ -496,7 +489,11 @@ export function VerticalImageAligner() {
 
           {images.length > 0 && (
             <>
-              {/* --- ЗАТЕМНЕНИЕ НЕАКТИВНЫХ ЗОН --- */}
+              {/* 
+                 ЗАТЕМНЕНИЕ НЕАКТИВНЫХ ЗОН (MASK)
+                 Находится ВНУТРИ мира, чтобы двигаться вместе с ним.
+                 outline затемняет все вокруг.
+              */}
               <div
                 className="absolute top-0 left-0 pointer-events-none z-30"
                 style={{
@@ -506,57 +503,73 @@ export function VerticalImageAligner() {
                 }}
               />
 
-              {/* --- ВСПОМОГАТЕЛЬНАЯ СЕТКА --- */}
-              {showGrid && (
+              {/* 
+                 СЛОТЫ И ИЗОБРАЖЕНИЯ
+              */}
+              {images.map((img, i) => (
                 <div
-                  className="absolute top-0 left-0 z-50 pointer-events-none"
+                  key={img.id}
+                  className={`absolute left-0 w-[50000px] overflow-hidden border-b border-dashed border-red-500/20 transition-all`}
                   style={{
-                    width: '50000px',
-                    height: '50000px',
-                    backgroundImage: `
-                            linear-gradient(to right, ${gridColor} 1px, transparent 1px),
-                            linear-gradient(to bottom, ${gridColor} 1px, transparent 1px)
-                        `,
-                    backgroundSize: `${gridWidth}px ${gridHeight}px`,
-                    backgroundPosition: `${gridOffsetX}px ${gridOffsetY}px`
+                    top: i * cellHeight,
+                    height: cellHeight,
+                    zIndex: img.isActive ? 20 : 10
                   }}
-                />
-              )}
+                >
+                  <div
+                    className="relative"
+                    style={{
+                      transform: `translate(${img.offsetX}px, ${img.offsetY}px)`,
+                      width: img.naturalWidth * img.scale,
+                      height: img.naturalHeight * img.scale,
+                    }}
+                  >
+                    <img
+                      src={img.url}
+                      alt=""
+                      draggable={false}
+                      className={`w-full h-full object-fill select-none ${img.isActive ? 'ring-2 ring-blue-500 shadow-lg' : ''}`}
+                    />
+                  </div>
+                  <div className="absolute left-0 top-0 bg-red-600/80 px-1.5 py-0.5 text-[10px] text-white font-mono pointer-events-none opacity-70">
+                    {i + 1}
+                  </div>
+                </div>
+              ))}
             </>
           )}
-
-          {/* СЛОТЫ И ИЗОБРАЖЕНИЯ */}
-          {images.map((img, i) => (
-            <div
-              key={img.id}
-              className={`absolute left-0 w-[50000px] overflow-hidden border-b border-dashed border-red-500/20 transition-all`}
-              style={{
-                top: i * cellHeight,
-                height: cellHeight,
-                zIndex: img.isActive ? 20 : 10
-              }}
-            >
-              <div
-                className="relative"
-                style={{
-                  transform: `translate(${img.offsetX}px, ${img.offsetY}px)`,
-                  width: img.naturalWidth * img.scale,
-                  height: img.naturalHeight * img.scale,
-                }}
-              >
-                <img
-                  src={img.url}
-                  alt=""
-                  draggable={false}
-                  className={`w-full h-full object-fill select-none ${img.isActive ? 'ring-2 ring-blue-500 shadow-lg' : ''}`}
-                />
-              </div>
-              <div className="absolute left-0 top-0 bg-red-600/80 px-1.5 py-0.5 text-[10px] text-white font-mono pointer-events-none opacity-70">
-                {i + 1}
-              </div>
-            </div>
-          ))}
         </div>
+
+        {/* 
+            2. ВСПОМОГАТЕЛЬНАЯ СЕТКА (OVERLAY GRID)
+            Находится СНАРУЖИ трансформации мира, поэтому линии всегда 1px (физический пиксель экрана).
+            Мы вручную позиционируем и масштабируем её параметры, чтобы она совпадала с миром.
+        */}
+        {images.length > 0 && showGrid && (
+          <div
+            className="absolute pointer-events-none z-50"
+            style={{
+              // Позиция и размер блока совпадают с активной областью на экране
+              left: cameraOffset.x,
+              top: cameraOffset.y,
+              width: compositionBounds.width * cameraScale,
+              height: compositionBounds.height * cameraScale,
+
+              // Рисуем сетку градиентом
+              backgroundImage: `
+                    linear-gradient(to right, ${gridColor} 1px, transparent 1px),
+                    linear-gradient(to bottom, ${gridColor} 1px, transparent 1px)
+                `,
+              // Размер клетки масштабируется вместе с миром
+              backgroundSize: `${gridWidth * cameraScale}px ${gridHeight * cameraScale}px`,
+              // Сдвиг сетки масштабируется вместе с миром
+              backgroundPosition: `${gridOffsetX * cameraScale}px ${gridOffsetY * cameraScale}px`,
+
+              // (Опционально) можно добавить overflow: hidden, чтобы гарантировать обрезку
+              overflow: 'hidden'
+            }}
+          />
+        )}
 
         {!images.length && (
           <div className="pointer-events-none absolute inset-0 flex items-center justify-center text-zinc-400 z-20">
