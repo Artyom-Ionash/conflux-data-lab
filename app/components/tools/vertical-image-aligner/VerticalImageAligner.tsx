@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useCallback, useMemo, useRef, useState } from 'react';
@@ -36,20 +35,17 @@ export function VerticalImageAligner() {
 
   // Камера
   const [cameraScale, setCameraScale] = useState(0.4);
-  const [cameraOffset, setCameraOffset] = useState({ x: 50, y: 50 }); // Чуть сдвинем старт
+  const [cameraOffset, setCameraOffset] = useState({ x: 50, y: 50 });
   const [isPanning, setIsPanning] = useState(false);
 
-  // Линейка
-  const [showRuler, setShowRuler] = useState(true);
-  const [rulerInterval, setRulerInterval] = useState(0); // 0 = не задано
+  // Сетка (Grid)
+  const [showGrid, setShowGrid] = useState(true);
+  const [gridSize, setGridSize] = useState(200); // Размер клетки в пикселях "мира"
 
   const panStartRef = useRef<{ x: number; y: number } | null>(null);
   const cameraStartRef = useRef<{ x: number; y: number } | null>(null);
   const [isExporting, setIsExporting] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
-
-  // Ref для контейнера превью, чтобы знать его размеры для отрисовки сетки
-  const viewportRef = useRef<HTMLDivElement>(null);
 
   const activeImageId = useMemo(
     () => images.find((img) => img.isActive)?.id ?? null,
@@ -73,7 +69,7 @@ export function VerticalImageAligner() {
         if (!file.type.startsWith('image/')) return;
 
         const url = createObjectURLSafely(file);
-        const id = `${Date.now()} -${index} `;
+        const id = `${Date.now()}-${index}`;
 
         nextImages.push({
           id,
@@ -81,7 +77,7 @@ export function VerticalImageAligner() {
           url,
           name: file.name,
           offsetX: 0,
-          offsetY: index === 0 ? 0 : 100 * index, // временный отступ
+          offsetY: index === 0 ? 0 : 200 * index, // стартовый разброс
           scale: 1,
           isActive: index === 0,
           naturalWidth: 0,
@@ -90,11 +86,6 @@ export function VerticalImageAligner() {
 
         const img = new Image();
         img.onload = () => {
-          // Если это первое изображение, берем его высоту как шаг линейки
-          if (index === 0) {
-            setRulerInterval(img.height);
-          }
-
           setImages((prev) =>
             prev.map((item) =>
               item.id === id
@@ -143,16 +134,13 @@ export function VerticalImageAligner() {
     [activeImageId]
   );
 
-  // Вычисляем границы контента (для экспорта и центрирования, если нужно)
   const compositionBounds = useMemo(() => {
     if (!images.length) return null;
     let minX = Infinity; let minY = Infinity;
     let maxX = -Infinity; let maxY = -Infinity;
-    let hasSized = false;
 
     images.forEach((meta) => {
       if (!meta.naturalWidth || !meta.naturalHeight) return;
-      hasSized = true;
       const w = meta.naturalWidth * meta.scale;
       const h = meta.naturalHeight * meta.scale;
       if (meta.offsetX < minX) minX = meta.offsetX;
@@ -161,8 +149,8 @@ export function VerticalImageAligner() {
       if (meta.offsetY + h > maxY) maxY = meta.offsetY + h;
     });
 
-    if (!hasSized) return null;
-    return { minX, minY, width: maxX - minX, height: maxY - minY, maxX, maxY };
+    if (minX === Infinity) return null;
+    return { minX, minY, width: maxX - minX, height: maxY - minY };
   }, [images]);
 
   // --- Управление камерой ---
@@ -172,7 +160,6 @@ export function VerticalImageAligner() {
       event.preventDefault();
       event.stopPropagation();
 
-      // Ctrl + Wheel = зум активного слоя
       if (event.ctrlKey && activeImageId) {
         const delta = event.deltaY > 0 ? -0.05 : 0.05;
         setImages((current) =>
@@ -185,8 +172,6 @@ export function VerticalImageAligner() {
         return;
       }
 
-      // Просто Wheel = зум камеры
-      // Зуммируем в точку курсора (приблизительно) или просто в центр
       const zoomFactor = event.deltaY > 0 ? 0.9 : 1.1;
       setCameraScale((prev) => Math.min(5, Math.max(0.05, prev * zoomFactor)));
     },
@@ -195,7 +180,6 @@ export function VerticalImageAligner() {
 
   const handlePointerDown = useCallback(
     (event: React.PointerEvent<HTMLDivElement>) => {
-      // Разрешаем перетаскивание только если кликнули не по контролам (хотя тут всё canvas)
       (event.target as HTMLElement).setPointerCapture(event.pointerId);
       setIsPanning(true);
       panStartRef.current = { x: event.clientX, y: event.clientY };
@@ -228,7 +212,6 @@ export function VerticalImageAligner() {
     if (!images.length || !compositionBounds) return;
     setIsExporting(true);
     try {
-      // Загружаем все картинки
       const loaded = await Promise.all(
         images.map((item) =>
           new Promise<{ meta: AlignImage; img: HTMLImageElement }>((resolve, reject) => {
@@ -287,10 +270,9 @@ export function VerticalImageAligner() {
         <div className="flex-1 overflow-y-auto p-4 custom-scrollbar">
           <h2 className="mb-1 text-lg font-bold">Редактор</h2>
           <p className="mb-6 text-xs text-zinc-500 dark:text-zinc-400">
-            Загрузите и выровняйте изображения
+            Масштаб колесом. Сдвиг перетаскиванием.
           </p>
 
-          {/* Кнопка загрузки */}
           <label className="mb-4 flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed border-zinc-300 bg-zinc-50 p-4 transition hover:bg-zinc-100 dark:border-zinc-700 dark:bg-zinc-800/50 dark:hover:bg-zinc-800">
             <span className="text-sm font-medium">Загрузить файлы</span>
             <input type="file" multiple accept="image/*" className="hidden" onChange={handleFilesChange} />
@@ -298,7 +280,6 @@ export function VerticalImageAligner() {
 
           {images.length > 0 && (
             <div className="space-y-6">
-              {/* Экспорт / Очистка */}
               <div className="flex gap-2">
                 <button
                   onClick={handleExport}
@@ -315,38 +296,40 @@ export function VerticalImageAligner() {
                 </button>
               </div>
 
-              {/* Настройки линейки */}
+              {/* Настройки Сетки */}
               <div className="rounded-lg border border-zinc-200 p-3 dark:border-zinc-800">
                 <div className="mb-2 flex items-center justify-between">
                   <label className="flex cursor-pointer items-center gap-2 text-sm font-medium">
                     <input
                       type="checkbox"
-                      checked={showRuler}
-                      onChange={(e) => setShowRuler(e.target.checked)}
+                      checked={showGrid}
+                      onChange={(e) => setShowGrid(e.target.checked)}
                       className="h-4 w-4 rounded border-zinc-300 text-blue-600"
                     />
-                    Линейка
+                    Показать сетку
                   </label>
                 </div>
-                {showRuler && (
+                {showGrid && (
                   <div className="space-y-2">
                     <div className="flex items-center justify-between text-xs">
-                      <span className="text-zinc-500">Шаг (px):</span>
+                      <span className="text-zinc-500">Размер клетки (px):</span>
                       <input
                         type="number"
-                        value={rulerInterval}
-                        onChange={(e) => setRulerInterval(Number(e.target.value))}
+                        min={10}
+                        max={2000}
+                        step={10}
+                        value={gridSize}
+                        onChange={(e) => setGridSize(Number(e.target.value))}
                         className="w-20 rounded border border-zinc-300 bg-transparent px-1 py-0.5 text-right dark:border-zinc-700"
                       />
                     </div>
                     <p className="text-[10px] text-zinc-400">
-                      Вертикальная линейка с горизонтальными направляющими
+                      Толщина линий фиксирована (5px)
                     </p>
                   </div>
                 )}
               </div>
 
-              {/* Список слоев */}
               <div>
                 <h3 className="mb-2 text-sm font-medium">Слои</h3>
                 <div className="max-h-[30vh] space-y-1 overflow-y-auto rounded border border-zinc-200 p-1 dark:border-zinc-800">
@@ -354,10 +337,10 @@ export function VerticalImageAligner() {
                     <button
                       key={img.id}
                       onClick={() => handleSelectActive(img.id)}
-                      className={`flex w - full items - center justify - between rounded px - 2 py - 1.5 text - xs transition ${img.isActive
+                      className={`flex w-full items-center justify-between rounded px-2 py-1.5 text-xs transition ${img.isActive
                         ? 'bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-200'
                         : 'hover:bg-zinc-100 dark:hover:bg-zinc-800'
-                        } `}
+                        }`}
                     >
                       <span className="truncate font-medium">
                         #{i + 1} {img.name}
@@ -367,7 +350,6 @@ export function VerticalImageAligner() {
                 </div>
               </div>
 
-              {/* Настройки активного слоя */}
               {activeImageId && (
                 <div className="rounded-lg border border-zinc-200 p-3 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-900/50">
                   <div className="mb-2 text-xs font-bold text-zinc-500 uppercase">Активный слой</div>
@@ -437,55 +419,50 @@ export function VerticalImageAligner() {
 
       {/* --- ПРАВАЯ ПАНЕЛЬ (ХОЛСТ) --- */}
       <main
-        ref={viewportRef}
-        className="relative flex-1 overflow-hidden bg-[#e5e5e5] dark:bg-[#111] cursor-grab active:cursor-grabbing"
+        className="relative flex-1 overflow-hidden bg-[#f0f0f0] dark:bg-[#000000] cursor-grab active:cursor-grabbing"
         onWheel={handlePreviewWheel}
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={stopPanning}
         onPointerLeave={stopPanning}
       >
-        {/* Сетка фона */}
-        <div className="pointer-events-none absolute inset-0 opacity-10"
-          style={{
-            backgroundImage: 'radial-gradient(#000 1px, transparent 1px)',
-            backgroundSize: '20px 20px'
-          }}
-        />
+        {/* 
+          СЛОЙ СЕТКИ (GRID LAYER)
+          Рисуется с помощью CSS-градиентов прямо на вьюпорте.
+          Толщина линий (5px) задана в px и не зависит от transform: scale().
+          Размер клетки зависит от scale, чтобы соответствовать "миру".
+          Позиция зависит от сдвига камеры.
+        */}
+        {showGrid && (
+          <div
+            className="absolute inset-0 pointer-events-none z-0 opacity-30"
+            style={{
+              backgroundImage: `
+                linear-gradient(to right, #888 5px, transparent 5px),
+                linear-gradient(to bottom, #888 5px, transparent 5px)
+              `,
+              // Размер клетки = (Размер в мире) * (Текущий зум)
+              backgroundSize: `${gridSize * cameraScale}px ${gridSize * cameraScale}px`,
+              // Сдвиг = текущее положение камеры
+              backgroundPosition: `${cameraOffset.x}px ${cameraOffset.y}px`,
+            }}
+          />
+        )}
 
-        {/* Контейнер "Мира" */}
+        {/* Контейнер "Мира" с контентом */}
         <div
           style={{
             transform: `translate(${cameraOffset.x}px, ${cameraOffset.y}px) scale(${cameraScale})`,
             transformOrigin: '0 0',
             willChange: 'transform',
           }}
-          className="absolute left-0 top-0"
+          className="absolute left-0 top-0 z-10"
         >
-          {/* SVG слой для ЛИНИЙ линейки (находится в мире, сдвигается, но линии рендерятся тонко) */}
-          {showRuler && rulerInterval > 0 && (
-            <div
-              className="absolute top-[-50000px] bottom-[-50000px] left-[-50000px] right-[-50000px] pointer-events-none z-30"
-              style={{
-                // Используем repeating-linear-gradient для создания линий
-                // Они будут масштабироваться вместе с миром
-                backgroundImage: `repeating - linear - gradient(
-  to bottom,
-  transparent,
-  transparent ${rulerInterval - 1}px,
-  rgba(255, 50, 50, 0.6) ${rulerInterval - 1}px,
-  rgba(255, 50, 50, 0.6) ${rulerInterval}px
-)`
-              }}
-            />
-          )}
-
-          {/* Изображения */}
           {images.map((img, i) => (
             <div
               key={img.id}
-              className={`absolute select - none transition - shadow ${img.isActive ? 'z-10 shadow-[0_0_0_2px_#3b82f6]' : 'z-0'
-                } `}
+              className={`absolute select-none transition-shadow ${img.isActive ? 'z-20 shadow-[0_0_0_2px_#3b82f6] drop-shadow-xl' : 'z-10 drop-shadow-md'
+                }`}
               style={{
                 left: img.offsetX,
                 top: img.offsetY,
@@ -499,7 +476,6 @@ export function VerticalImageAligner() {
                 draggable={false}
                 className="h-full w-full object-fill"
               />
-              {/* Номер слоя */}
               <div className="absolute left-0 top-0 bg-black/70 px-1.5 py-0.5 text-[10px] text-white backdrop-blur-sm">
                 #{i + 1}
               </div>
@@ -507,28 +483,16 @@ export function VerticalImageAligner() {
           ))}
         </div>
 
-        {/* UI ЛИНЕЙКА (Статичная, прибитая к экрану, но показывающая позицию) */}
-        {/* Поскольку требование "фиксированная толщина 10px", мы рисуем её поверх мира */}
-        {showRuler && (
-          <div className="pointer-events-none absolute bottom-0 left-0 top-0 z-40 flex w-[10px] flex-col border-r border-white/20 bg-red-500/80 shadow-md backdrop-blur-sm">
-            {/* Это сама "палка" линейки. Она не двигается при панорамировании X, но линии исходят из неё. 
-                Если нужно, чтобы она ездила с камерой по X, её надо поместить внутрь world, 
-                но тогда она будет скейлиться.
-                Требование "fixed thickness 10px in any scale" говорит о том, что это UI элемент.
-            */}
-          </div>
-        )}
-
         {!images.length && (
-          <div className="pointer-events-none absolute inset-0 flex items-center justify-center text-zinc-400">
+          <div className="pointer-events-none absolute inset-0 flex items-center justify-center text-zinc-400 z-20">
             <div className="text-center">
-              <p>Перетащите файлы или используйте меню слева</p>
+              <p>Загрузите изображения для начала работы</p>
             </div>
           </div>
         )}
 
         {/* Индикатор зума */}
-        <div className="absolute bottom-4 right-4 rounded bg-black/60 px-2 py-1 text-xs font-mono text-white backdrop-blur">
+        <div className="absolute bottom-4 right-4 z-30 rounded bg-black/60 px-2 py-1 text-xs font-mono text-white backdrop-blur">
           Zoom: {(cameraScale * 100).toFixed(0)}%
         </div>
       </main>
