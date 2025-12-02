@@ -37,10 +37,11 @@ export function VerticalImageAligner() {
 
   // Настройки вспомогательной сетки (Overlay Grid)
   const [showGrid, setShowGrid] = useState(true);
-  const [gridWidth, setGridWidth] = useState(100);  // Ширина клетки
-  const [gridHeight, setGridHeight] = useState(100); // Высота клетки
+  const [gridWidth, setGridWidth] = useState(100);
+  const [gridHeight, setGridHeight] = useState(100);
   const [gridOffsetX, setGridOffsetX] = useState(0);
   const [gridOffsetY, setGridOffsetY] = useState(0);
+  const [gridColor, setGridColor] = useState('#ff0000'); // Красный по умолчанию
 
   // Камера
   const [cameraScale, setCameraScale] = useState(0.4);
@@ -93,8 +94,6 @@ export function VerticalImageAligner() {
         img.onload = () => {
           if (index === 0) {
             setCellHeight(img.height);
-            // Для удобства можно сразу подстроить сетку под высоту картинки, 
-            // но лучше оставить дефолт или настроить отдельно.
           }
           setImages((prev) =>
             prev.map((item) =>
@@ -317,17 +316,28 @@ export function VerticalImageAligner() {
               </div>
 
               {/* Настройки ВСПОМОГАТЕЛЬНОЙ СЕТКИ */}
-              <div className="rounded-lg border-2 border-cyan-500/30 bg-cyan-50/50 p-3 dark:border-cyan-800/30 dark:bg-cyan-950/30">
+              <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-3 dark:border-zinc-800 dark:bg-zinc-900/50">
                 <div className="mb-3 flex items-center justify-between">
-                  <label className="flex cursor-pointer items-center gap-2 text-xs font-bold uppercase text-cyan-800 dark:text-cyan-200">
+                  <label className="flex cursor-pointer items-center gap-2 text-xs font-bold uppercase text-zinc-700 dark:text-zinc-300">
                     <input
                       type="checkbox"
                       checked={showGrid}
                       onChange={(e) => setShowGrid(e.target.checked)}
-                      className="h-4 w-4 rounded border-cyan-400 text-cyan-600 focus:ring-cyan-500"
+                      className="h-4 w-4 rounded border-zinc-400"
                     />
                     Сетка (Helper)
                   </label>
+
+                  {/* ПАЛИТРА ЦВЕТА */}
+                  {showGrid && (
+                    <input
+                      type="color"
+                      value={gridColor}
+                      onChange={(e) => setGridColor(e.target.value)}
+                      className="h-5 w-6 cursor-pointer rounded border-none bg-transparent p-0"
+                      title="Цвет сетки"
+                    />
+                  )}
                 </div>
 
                 {showGrid && (
@@ -339,12 +349,12 @@ export function VerticalImageAligner() {
                       <div className="flex gap-2">
                         <input
                           type="number" placeholder="W"
-                          className="w-full rounded border border-cyan-200 px-1 py-1 dark:border-cyan-800 dark:bg-cyan-900"
+                          className="w-full rounded border border-zinc-300 px-1 py-1 dark:border-zinc-700 dark:bg-zinc-800"
                           value={gridWidth} onChange={(e) => setGridWidth(Number(e.target.value))}
                         />
                         <input
                           type="number" placeholder="H"
-                          className="w-full rounded border border-cyan-200 px-1 py-1 dark:border-cyan-800 dark:bg-cyan-900"
+                          className="w-full rounded border border-zinc-300 px-1 py-1 dark:border-zinc-700 dark:bg-zinc-800"
                           value={gridHeight} onChange={(e) => setGridHeight(Number(e.target.value))}
                         />
                       </div>
@@ -356,19 +366,19 @@ export function VerticalImageAligner() {
                       </div>
                       <div className="space-y-1">
                         <div className="flex items-center gap-2">
-                          <span className="w-3 text-cyan-600">X</span>
+                          <span className="w-3 text-zinc-500">X</span>
                           <input
                             type="range" min={-500} max={500}
-                            className="flex-1 accent-cyan-600"
+                            className="flex-1"
                             value={gridOffsetX} onChange={(e) => setGridOffsetX(Number(e.target.value))}
                           />
                           <span className="w-8 text-right">{gridOffsetX}</span>
                         </div>
                         <div className="flex items-center gap-2">
-                          <span className="w-3 text-cyan-600">Y</span>
+                          <span className="w-3 text-zinc-500">Y</span>
                           <input
                             type="range" min={-500} max={500}
-                            className="flex-1 accent-cyan-600"
+                            className="flex-1"
                             value={gridOffsetY} onChange={(e) => setGridOffsetY(Number(e.target.value))}
                           />
                           <span className="w-8 text-right">{gridOffsetY}</span>
@@ -388,8 +398,8 @@ export function VerticalImageAligner() {
                       key={img.id}
                       onClick={() => handleSelectActive(img.id)}
                       className={`flex w-full items-center justify-between rounded px-2 py-1.5 text-xs transition ${img.isActive
-                        ? 'bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-200'
-                        : 'hover:bg-zinc-100 dark:hover:bg-zinc-800'
+                          ? 'bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-200'
+                          : 'hover:bg-zinc-100 dark:hover:bg-zinc-800'
                         }`}
                     >
                       <span className="truncate font-medium">
@@ -454,22 +464,17 @@ export function VerticalImageAligner() {
           <div className="absolute top-[-50000px] bottom-[-50000px] w-[50000px] right-[100%] bg-black/60 backdrop-blur-[2px] z-40 pointer-events-none border-r border-white/20"></div>
 
           {/* --- ВСПОМОГАТЕЛЬНАЯ СЕТКА (OVERLAY GRID) --- */}
-          {/* 
-             - Находится внутри мира, значит скейлится и двигается вместе с ним.
-             - z-index 50 (поверх изображений).
-             - pointer-events-none (пропускает клики к изображениям).
-          */}
           {showGrid && images.length > 0 && (
             <div
               className="absolute left-0 z-50 pointer-events-none"
               style={{
                 top: 0,
-                width: '50000px', // Бесконечно вправо
-                height: images.length * cellHeight, // Высота равна высоте контента
-                // Градиентная сетка
+                width: '50000px',
+                height: images.length * cellHeight,
+                // Используем выбранный gridColor для градиента
                 backgroundImage: `
-                        linear-gradient(to right, rgba(0, 255, 255, 0.4) 1px, transparent 1px),
-                        linear-gradient(to bottom, rgba(0, 255, 255, 0.4) 1px, transparent 1px)
+                        linear-gradient(to right, ${gridColor} 1px, transparent 1px),
+                        linear-gradient(to bottom, ${gridColor} 1px, transparent 1px)
                     `,
                 backgroundSize: `${gridWidth}px ${gridHeight}px`,
                 backgroundPosition: `${gridOffsetX}px ${gridOffsetY}px`
