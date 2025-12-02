@@ -1,6 +1,12 @@
-# Conflux Data Lab
+# 🔄 Conflux Data Lab
 
 Портфолио инструментов для обработки и конвертации данных.
+
+<p align="center">
+  <a href="https://conflux-data-lab.vercel.app">
+    <img src="https://img.shields.io/badge/🚀_Попробовать_демо-Live_Demo-blue?style=for-the-badge" alt="Live Demo" />
+  </a>
+</p>
 
 ## Документация
 
@@ -24,6 +30,7 @@ conflux-data-lab/
 ## Добавление нового инструмента
 
 1. **Добавьте инструмент в конфигурацию** (`lib/config/tools.ts`):
+
 ```typescript
 {
   id: 'my-tool',
@@ -35,8 +42,9 @@ conflux-data-lab/
 ```
 
 2. **Создайте компонент инструмента** (`app/components/tools/my-tool/MyTool.tsx`):
+
 ```typescript
-'use client';
+"use client";
 
 export function MyTool() {
   // Ваша логика инструмента
@@ -45,11 +53,12 @@ export function MyTool() {
 ```
 
 3. **Зарегистрируйте компонент** (`lib/utils/tool-loader.tsx`):
+
 ```typescript
-import { MyTool } from '@/app/components/tools/my-tool/MyTool';
+import { MyTool } from "@/app/components/tools/my-tool/MyTool";
 
 const toolComponents: Record<string, React.ComponentType> = {
-  'my-tool': MyTool,
+  "my-tool": MyTool,
   // ...
 };
 ```
