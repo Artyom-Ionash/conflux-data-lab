@@ -50,6 +50,15 @@ export const tools: Tool[] = [
     tags: ['video', 'frames', 'images', 'extraction'],
     featured: true,
   },
+  {
+    id: 'vertical-image-aligner',
+    name: 'Vertical Image Aligner',
+    description:
+      'Калибровка и вертикальное объединение набора изображений с настраиваемым сдвигом и масштабом каждого слоя',
+    category: 'transformation',
+    tags: ['images', 'alignment', 'vertical', 'composition'],
+    featured: false,
+  },
 ];
 
 export const toolsByCategory = tools.reduce((acc, tool) => {
