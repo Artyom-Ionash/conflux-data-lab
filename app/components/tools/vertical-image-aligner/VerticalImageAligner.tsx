@@ -41,11 +41,11 @@ export function VerticalImageAligner() {
   const [gridHeight, setGridHeight] = useState(100);
   const [gridOffsetX, setGridOffsetX] = useState(0);
   const [gridOffsetY, setGridOffsetY] = useState(0);
-  const [gridColor, setGridColor] = useState('#ff0000'); // Красный по умолчанию
+  const [gridColor, setGridColor] = useState('#ff0000');
 
   // Камера
   const [cameraScale, setCameraScale] = useState(0.4);
-  const [cameraOffset, setCameraOffset] = useState({ x: 100, y: 50 });
+  const [cameraOffset, setCameraOffset] = useState({ x: 100, y: 100 });
   const [isPanning, setIsPanning] = useState(false);
 
   const panStartRef = useRef<{ x: number; y: number } | null>(null);
@@ -57,6 +57,25 @@ export function VerticalImageAligner() {
     () => images.find((img) => img.isActive)?.id ?? null,
     [images]
   );
+
+  // Вычисляем размеры "Активной зоны" (то, что пойдет в экспорт)
+  const compositionBounds = useMemo(() => {
+    if (!images.length) return { width: 0, height: 0 };
+
+    // Высота фиксирована слотами
+    const height = images.length * cellHeight;
+
+    // Ширина определяется самым правым краем контента
+    let maxRight = 0;
+    images.forEach((img) => {
+      const rightEdge = img.offsetX + (img.naturalWidth * img.scale);
+      if (rightEdge > maxRight) maxRight = rightEdge;
+    });
+    // Минимальная ширина 1px, чтобы outline не схлопнулся в ноль
+    const width = Math.max(1, maxRight);
+
+    return { width, height };
+  }, [images, cellHeight]);
 
   // --- Обработчики ---
 
@@ -129,20 +148,6 @@ export function VerticalImageAligner() {
     []
   );
 
-  const handleNudge = useCallback(
-    (deltaX: number, deltaY: number) => {
-      if (!activeImageId) return;
-      setImages((current) =>
-        current.map((img) =>
-          img.id === activeImageId
-            ? { ...img, offsetX: img.offsetX + deltaX, offsetY: img.offsetY + deltaY }
-            : img
-        )
-      );
-    },
-    [activeImageId]
-  );
-
   // --- Экспорт ---
 
   const handleExport = useCallback(async () => {
@@ -160,14 +165,8 @@ export function VerticalImageAligner() {
         )
       );
 
-      let maxRight = 0;
-      loaded.forEach(({ meta, img }) => {
-        const rightEdge = meta.offsetX + (img.width * meta.scale);
-        if (rightEdge > maxRight) maxRight = rightEdge;
-      });
-
-      const finalW = Math.ceil(Math.max(1, maxRight));
-      const finalH = images.length * cellHeight;
+      const finalW = Math.ceil(compositionBounds.width);
+      const finalH = compositionBounds.height;
 
       if (finalH > MAX_CANVAS_HEIGHT) throw new Error('Превышен лимит высоты canvas');
 
@@ -198,7 +197,7 @@ export function VerticalImageAligner() {
       const url = canvas.toDataURL('image/png');
       const a = document.createElement('a');
       a.href = url;
-      a.download = 'aligned-grid.png';
+      a.download = 'aligned-export.png';
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -208,7 +207,7 @@ export function VerticalImageAligner() {
     } finally {
       setIsExporting(false);
     }
-  }, [images, cellHeight]);
+  }, [images, cellHeight, compositionBounds]);
 
   // --- Управление камерой ---
 
@@ -271,7 +270,7 @@ export function VerticalImageAligner() {
         <div className="flex-1 overflow-y-auto p-4 custom-scrollbar">
           <h2 className="mb-1 text-lg font-bold">Редактор</h2>
           <p className="mb-6 text-xs text-zinc-500 dark:text-zinc-400">
-            Выравнивание по слотам и передней сетке.
+            Серым цветом помечена зона, которая будет обрезана при экспорте.
           </p>
 
           <label className="mb-4 flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed border-zinc-300 bg-zinc-50 p-4 transition hover:bg-zinc-100 dark:border-zinc-700 dark:bg-zinc-800/50 dark:hover:bg-zinc-800">
@@ -325,17 +324,15 @@ export function VerticalImageAligner() {
                       onChange={(e) => setShowGrid(e.target.checked)}
                       className="h-4 w-4 rounded border-zinc-400"
                     />
-                    Сетка (Helper)
+                    Линейка-Сетка
                   </label>
 
-                  {/* ПАЛИТРА ЦВЕТА */}
                   {showGrid && (
                     <input
                       type="color"
                       value={gridColor}
                       onChange={(e) => setGridColor(e.target.value)}
                       className="h-5 w-6 cursor-pointer rounded border-none bg-transparent p-0"
-                      title="Цвет сетки"
                     />
                   )}
                 </div>
@@ -344,7 +341,7 @@ export function VerticalImageAligner() {
                   <div className="space-y-3 text-xs">
                     <div>
                       <div className="flex justify-between mb-1">
-                        <span>Размер клетки (W x H)</span>
+                        <span>Шаг клетки (W x H)</span>
                       </div>
                       <div className="flex gap-2">
                         <input
@@ -389,7 +386,6 @@ export function VerticalImageAligner() {
                 )}
               </div>
 
-              {/* Список слоев */}
               <div className="flex-1 min-h-0 flex flex-col">
                 <h3 className="mb-1 text-xs font-medium uppercase text-zinc-400">Слои</h3>
                 <div className="flex-1 space-y-1 overflow-y-auto rounded border border-zinc-200 p-1 dark:border-zinc-800">
@@ -410,7 +406,6 @@ export function VerticalImageAligner() {
                 </div>
               </div>
 
-              {/* Настройки активного */}
               {activeImageId && (
                 <div className="rounded bg-zinc-100 p-2 text-xs dark:bg-zinc-800/50">
                   <div className="mb-2 font-bold text-zinc-500">Активный слой</div>
@@ -460,26 +455,46 @@ export function VerticalImageAligner() {
           }}
           className="absolute left-0 top-0 z-10"
         >
-          {/* --- ЗАТЕНЕНИЕ ЛЕВОЙ ГРАНИЦЫ (x < 0) --- */}
-          <div className="absolute top-[-50000px] bottom-[-50000px] w-[50000px] right-[100%] bg-black/60 backdrop-blur-[2px] z-40 pointer-events-none border-r border-white/20"></div>
 
-          {/* --- ВСПОМОГАТЕЛЬНАЯ СЕТКА (OVERLAY GRID) --- */}
-          {showGrid && images.length > 0 && (
-            <div
-              className="absolute left-0 z-50 pointer-events-none"
-              style={{
-                top: 0,
-                width: '50000px',
-                height: images.length * cellHeight,
-                // Используем выбранный gridColor для градиента
-                backgroundImage: `
-                        linear-gradient(to right, ${gridColor} 1px, transparent 1px),
-                        linear-gradient(to bottom, ${gridColor} 1px, transparent 1px)
-                    `,
-                backgroundSize: `${gridWidth}px ${gridHeight}px`,
-                backgroundPosition: `${gridOffsetX}px ${gridOffsetY}px`
-              }}
-            />
+          {images.length > 0 && (
+            <>
+              {/* --- ЗАТЕМНЕНИЕ НЕАКТИВНЫХ ЗОН (Outline Mask) --- */}
+              {/* 
+                 Этот div занимает ровно ту область, которая пойдет в экспорт.
+                 С помощью outline мы затемняем всё, что снаружи.
+                 z-30: Поверх изображений (z-10/20), чтобы показать, что отрежется.
+              */}
+              <div
+                className="absolute top-0 left-0 pointer-events-none z-30"
+                style={{
+                  width: compositionBounds.width,
+                  height: compositionBounds.height,
+                  // Огромная рамка создает эффект "Modal backdrop" вокруг активной зоны
+                  outline: '50000px solid rgba(0, 0, 0, 0.65)'
+                }}
+              />
+
+              {/* --- ВСПОМОГАТЕЛЬНАЯ СЕТКА (OVERLAY GRID) --- */}
+              {/* 
+                 z-50: Поверх всего, включая затемнение, чтобы работать линейкой
+              */}
+              {showGrid && (
+                <div
+                  className="absolute top-0 left-0 z-50 pointer-events-none"
+                  style={{
+                    width: '50000px',
+                    height: '50000px',
+                    // Используем выбранный gridColor для градиента
+                    backgroundImage: `
+                            linear-gradient(to right, ${gridColor} 1px, transparent 1px),
+                            linear-gradient(to bottom, ${gridColor} 1px, transparent 1px)
+                        `,
+                    backgroundSize: `${gridWidth}px ${gridHeight}px`,
+                    backgroundPosition: `${gridOffsetX}px ${gridOffsetY}px`
+                  }}
+                />
+              )}
+            </>
           )}
 
           {/* СЛОТЫ И ИЗОБРАЖЕНИЯ */}
@@ -490,6 +505,7 @@ export function VerticalImageAligner() {
               style={{
                 top: i * cellHeight,
                 height: cellHeight,
+                zIndex: img.isActive ? 20 : 10
               }}
             >
               {/* Изображение */}
@@ -509,8 +525,8 @@ export function VerticalImageAligner() {
                 />
               </div>
 
-              {/* Маркер слота */}
-              <div className="absolute left-0 top-0 bg-red-600/80 px-1.5 py-0.5 text-[10px] text-white font-mono z-20 pointer-events-none opacity-70">
+              {/* Маркер слота (показываем его поверх картинки, но под маской) */}
+              <div className="absolute left-0 top-0 bg-red-600/80 px-1.5 py-0.5 text-[10px] text-white font-mono pointer-events-none opacity-70">
                 {i + 1}
               </div>
             </div>
