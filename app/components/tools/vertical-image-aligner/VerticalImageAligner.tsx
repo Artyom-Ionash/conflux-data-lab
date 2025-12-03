@@ -48,10 +48,12 @@ export function VerticalImageAligner() {
   const [cameraOffset, setCameraOffset] = useState({ x: 100, y: 100 });
   const [isPanning, setIsPanning] = useState(false);
 
-  // Refs
-  const viewportRef = useRef<HTMLDivElement>(null); // Ref для контейнера полотна
+  // Drag and Drop (сортировка)
+  const [draggingIndex, setDraggingIndex] = useState<number | null>(null);
+
   const panStartRef = useRef<{ x: number; y: number } | null>(null);
   const cameraStartRef = useRef<{ x: number; y: number } | null>(null);
+  const viewportRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [isExporting, setIsExporting] = useState(false);
 
@@ -73,7 +75,7 @@ export function VerticalImageAligner() {
     return { width, height };
   }, [images, cellHeight]);
 
-  // --- Обработчики ---
+  // --- Обработчики Файлов ---
 
   const handleFilesChange = useCallback(
     (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -161,6 +163,42 @@ export function VerticalImageAligner() {
     []
   );
 
+  // --- Drag and Drop (Сортировка) ---
+
+  const handleDragStart = (e: React.DragEvent<HTMLDivElement>, index: number) => {
+    setDraggingIndex(index);
+    // Устанавливаем эффект перемещения
+    e.dataTransfer.effectAllowed = 'move';
+    // Можно убрать прозрачность для "призрака", если нужно, но стандартное поведение браузера обычно ок
+  };
+
+  const handleDragOver = (e: React.DragEvent<HTMLDivElement>, index: number) => {
+    // Разрешаем сброс (drop)
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+  };
+
+  const handleDrop = (e: React.DragEvent<HTMLDivElement>, targetIndex: number) => {
+    e.preventDefault();
+    if (draggingIndex === null || draggingIndex === targetIndex) {
+      setDraggingIndex(null);
+      return;
+    }
+
+    setImages((prev) => {
+      const newImages = [...prev];
+      const [movedItem] = newImages.splice(draggingIndex, 1);
+      newImages.splice(targetIndex, 0, movedItem);
+      return newImages;
+    });
+
+    setDraggingIndex(null);
+  };
+
+  const handleDragEnd = () => {
+    setDraggingIndex(null);
+  };
+
   // --- Экспорт ---
 
   const handleExport = useCallback(async () => {
@@ -222,14 +260,13 @@ export function VerticalImageAligner() {
     }
   }, [images, cellHeight, compositionBounds]);
 
-  // --- Управление камерой (ZOOM TO CURSOR) ---
+  // --- Управление камерой ---
 
   const handlePreviewWheel = useCallback(
     (event: React.WheelEvent<HTMLDivElement>) => {
       event.preventDefault();
       event.stopPropagation();
 
-      // 1. Зум отдельного слоя (Ctrl + колесо)
       if (event.ctrlKey && activeImageId) {
         const delta = event.deltaY > 0 ? -0.05 : 0.05;
         setImages((current) =>
@@ -242,23 +279,15 @@ export function VerticalImageAligner() {
         return;
       }
 
-      // 2. Зум всего полотна (Курсор как точка привязки)
       if (!viewportRef.current) return;
-
       const rect = viewportRef.current.getBoundingClientRect();
-      // Координаты мыши относительно верхнего левого угла контейнера viewport
       const mouseX = event.clientX - rect.left;
       const mouseY = event.clientY - rect.top;
 
-      // Вычисляем новый масштаб
       const zoomFactor = event.deltaY > 0 ? 0.9 : 1.1;
       const newScale = Math.min(5, Math.max(0.05, cameraScale * zoomFactor));
-
-      // Коэффициент изменения масштаба
       const scaleRatio = newScale / cameraScale;
 
-      // Формула: NewOffset = Mouse - (Mouse - OldOffset) * Ratio
-      // Это смещает камеру так, что точка под мышью остается на месте
       const newOffsetX = mouseX - (mouseX - cameraOffset.x) * scaleRatio;
       const newOffsetY = mouseY - (mouseY - cameraOffset.y) * scaleRatio;
 
@@ -305,7 +334,7 @@ export function VerticalImageAligner() {
         <div className="flex-1 overflow-y-auto p-4 custom-scrollbar">
           <h2 className="mb-1 text-lg font-bold">Редактор</h2>
           <p className="mb-6 text-xs text-zinc-500 dark:text-zinc-400">
-            Масштаб колесиком приближает к курсору.
+            Перетаскивайте слои за иконку слева для изменения порядка.
           </p>
 
           <div className="mb-4 flex flex-col gap-2">
@@ -338,7 +367,7 @@ export function VerticalImageAligner() {
               {/* Настройки высоты слота */}
               <div className="rounded-lg border border-zinc-200 p-3 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-900/50">
                 <div className="flex items-center justify-between text-xs mb-1">
-                  <span className="font-bold text-zinc-600 dark:text-zinc-400">ВЫСОТА СЛОТА (обрезка)</span>
+                  <span className="font-bold text-zinc-600 dark:text-zinc-400">ВЫСОТА СЛОТА</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <input
@@ -425,29 +454,53 @@ export function VerticalImageAligner() {
                 )}
               </div>
 
+              {/* СПИСОК СЛОЕВ С DRAG-AND-DROP */}
               <div className="flex-1 min-h-0 flex flex-col">
-                <h3 className="mb-1 text-xs font-medium uppercase text-zinc-400">Слои</h3>
+                <h3 className="mb-1 text-xs font-medium uppercase text-zinc-400">Слои (порядок)</h3>
                 <div className="flex-1 space-y-1 overflow-y-auto rounded border border-zinc-200 p-1 dark:border-zinc-800">
                   {images.map((img, i) => (
                     <div
                       key={img.id}
-                      className={`group flex w-full items-center justify-between rounded px-2 py-1.5 text-xs transition ${img.isActive
-                        ? 'bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-200'
-                        : 'hover:bg-zinc-100 dark:hover:bg-zinc-800'
+                      // Включаем DnD на самом элементе
+                      draggable
+                      onDragStart={(e) => handleDragStart(e, i)}
+                      onDragOver={(e) => handleDragOver(e, i)}
+                      onDrop={(e) => handleDrop(e, i)}
+                      onDragEnd={handleDragEnd}
+                      className={`group flex w-full items-center gap-2 rounded px-2 py-1.5 text-xs transition border 
+                        ${
+                        // Визуальный стиль при перетаскивании
+                        draggingIndex === i ? 'opacity-40 border-dashed border-zinc-400 bg-zinc-100' :
+                          img.isActive
+                            ? 'bg-blue-50 border-blue-200 text-blue-700 dark:bg-blue-900/30 dark:border-blue-800 dark:text-blue-200'
+                            : 'border-transparent hover:bg-zinc-100 dark:hover:bg-zinc-800'
                         }`}
                     >
+                      {/* Ручка для перетаскивания (Визуальная часть) */}
+                      <div className="cursor-move text-zinc-300 hover:text-zinc-500 dark:text-zinc-600 dark:hover:text-zinc-400 flex-shrink-0">
+                        <svg width="10" height="14" viewBox="0 0 6 14" fill="currentColor">
+                          <circle cx="1.5" cy="2" r="1.5" />
+                          <circle cx="4.5" cy="2" r="1.5" />
+                          <circle cx="1.5" cy="7" r="1.5" />
+                          <circle cx="4.5" cy="7" r="1.5" />
+                          <circle cx="1.5" cy="12" r="1.5" />
+                          <circle cx="4.5" cy="12" r="1.5" />
+                        </svg>
+                      </div>
+
                       <button
                         onClick={() => handleSelectActive(img.id)}
-                        className="flex-1 text-left truncate font-medium"
+                        className="flex-1 text-left truncate font-medium select-none"
                       >
                         #{i + 1} {img.name}
                       </button>
+
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
                           handleRemoveImage(img.id);
                         }}
-                        className="ml-2 text-zinc-400 hover:text-red-500 dark:text-zinc-500 dark:hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity px-1"
+                        className="text-zinc-400 hover:text-red-500 dark:text-zinc-500 dark:hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity px-1 text-sm"
                         title="Удалить слой"
                       >
                         ✕
@@ -498,7 +551,7 @@ export function VerticalImageAligner() {
         onPointerLeave={stopPanning}
       >
 
-        {/* КОНТЕЙНЕР ТРАНСФОРМАЦИЙ (Мир) */}
+        {/* 1. МИР */}
         <div
           style={{
             transform: `translate(${cameraOffset.x}px, ${cameraOffset.y}px) scale(${cameraScale})`,
@@ -509,7 +562,7 @@ export function VerticalImageAligner() {
         >
           {images.length > 0 && (
             <>
-              {/* МАСКА (Затемнение неактивной зоны) */}
+              {/* МАСКА */}
               <div
                 className="absolute top-0 left-0 pointer-events-none z-30"
                 style={{
@@ -554,32 +607,21 @@ export function VerticalImageAligner() {
           )}
         </div>
 
-        {/* 
-           ВСПОМОГАТЕЛЬНАЯ СЕТКА (OVERLAY GRID)
-           Отображается вне трансформируемого контейнера, 
-           но синхронизирована с ним по положению.
-           Это гарантирует толщину линий в 1px.
-        */}
+        {/* 2. ВСПОМОГАТЕЛЬНАЯ СЕТКА */}
         {images.length > 0 && showGrid && (
           <div
             className="absolute pointer-events-none z-50"
             style={{
-              // Позиционируем блок сетки ровно над Активной Зоной контента
               left: cameraOffset.x,
               top: cameraOffset.y,
               width: compositionBounds.width * cameraScale,
               height: compositionBounds.height * cameraScale,
-
-              // Градиент рисуется в экранных пикселях (1px)
               backgroundImage: `
                     linear-gradient(to right, ${gridColor} 1px, transparent 1px),
                     linear-gradient(to bottom, ${gridColor} 1px, transparent 1px)
                 `,
-              // Размер и сдвиг клетки масштабируются
               backgroundSize: `${gridWidth * cameraScale}px ${gridHeight * cameraScale}px`,
               backgroundPosition: `${gridOffsetX * cameraScale}px ${gridOffsetY * cameraScale}px`,
-
-              // Обрезаем сетку границами активной зоны, чтобы она не лезла на "серое"
               overflow: 'hidden'
             }}
           />
