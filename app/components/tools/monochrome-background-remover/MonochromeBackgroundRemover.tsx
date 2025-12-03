@@ -1,13 +1,15 @@
 'use client';
 
 import { useState, useRef, useEffect, ChangeEvent, MouseEvent as ReactMouseEvent } from 'react';
-import { Card } from '../../ui/Card'; // Предполагается наличие этого компонента
+import { Card } from '../../ui/Card'; // Заглушка, используйте ваш компонент Card
 
 interface RGB {
   r: number;
   g: number;
   b: number;
 }
+
+type BgTheme = 'light' | 'dark';
 
 export function MonochromeBackgroundRemover() {
   // --- Основные состояния обработки ---
@@ -17,18 +19,19 @@ export function MonochromeBackgroundRemover() {
   const [tolerance, setTolerance] = useState<number>(20);
   const [smoothness, setSmoothness] = useState<number>(10);
 
-  // --- Состояния для зума и панорамирования ---
+  // --- Состояния интерфейса ---
   const [scale, setScale] = useState<number>(1);
   const [position, setPosition] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState<boolean>(false);
-  const dragStartRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
+  const [bgTheme, setBgTheme] = useState<BgTheme>('light'); // Новое: тема фона
 
+  const dragStartRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const imageRef = useRef<HTMLImageElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
   // ---------------------------------------------------------
-  // Логика обработки изображения (без изменений алгоритма)
+  // Логика обработки
   // ---------------------------------------------------------
   const processImage = () => {
     if (!imageSrc || !canvasRef.current || !imageRef.current) return;
@@ -38,11 +41,9 @@ export function MonochromeBackgroundRemover() {
     if (!ctx) return;
 
     const img = imageRef.current;
-    // Используем naturalWidth/Height для честной обработки пикселей
     const w = img.naturalWidth;
     const h = img.naturalHeight;
 
-    // Если изображение не загрузилось до конца
     if (w === 0 || h === 0) return;
 
     canvas.width = w;
@@ -83,6 +84,7 @@ export function MonochromeBackgroundRemover() {
     setProcessedImageSrc(canvas.toDataURL('image/png'));
   };
 
+  // Реакция на изменение параметров
   useEffect(() => {
     if (imageSrc) {
       const timer = setTimeout(() => processImage(), 50);
@@ -91,7 +93,34 @@ export function MonochromeBackgroundRemover() {
   }, [targetColor, tolerance, smoothness, imageSrc]);
 
   // ---------------------------------------------------------
-  // Обработчики загрузки и утилит
+  // Инициализация изображения (Default Color = Pixel 0,0)
+  // ---------------------------------------------------------
+  const handleImageLoad = () => {
+    const img = imageRef.current;
+    const canvas = canvasRef.current;
+    if (!img || !canvas) return;
+
+    // Рисуем во временный канвас, чтобы получить данные пикселя
+    // (canvasRef уже есть в DOM, используем его)
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    // Нужно задать размер канваса, иначе drawImage может не сработать корректно
+    canvas.width = img.naturalWidth;
+    canvas.height = img.naturalHeight;
+
+    ctx.drawImage(img, 0, 0);
+
+    // Берем пиксель 0,0
+    const pixelData = ctx.getImageData(0, 0, 1, 1).data;
+    const defaultHex = rgbToHex(pixelData[0], pixelData[1], pixelData[2]);
+
+    // Устанавливаем цвет. Это триггернет useEffect выше и запустит processImage
+    setTargetColor(defaultHex);
+  };
+
+  // ---------------------------------------------------------
+  // Хендлеры событий
   // ---------------------------------------------------------
   const handleImageUpload = (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -100,7 +129,7 @@ export function MonochromeBackgroundRemover() {
       reader.onload = (event) => {
         if (event.target?.result) {
           setImageSrc(event.target.result as string);
-          resetView(); // Сброс зума при загрузке новой картинки
+          resetView();
         }
       };
       reader.readAsDataURL(file);
@@ -145,6 +174,13 @@ export function MonochromeBackgroundRemover() {
     resetView();
   };
 
+  const toggleBgTheme = () => {
+    setBgTheme(prev => prev === 'light' ? 'dark' : 'light');
+  };
+
+  // ---------------------------------------------------------
+  // Утилиты
+  // ---------------------------------------------------------
   const hexToRgb = (hex: string): RGB | null => {
     const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
     return result ? {
@@ -159,29 +195,25 @@ export function MonochromeBackgroundRemover() {
   };
 
   // ---------------------------------------------------------
-  // Логика Зума и Панорамирования (Pan & Zoom)
+  // Zoom & Pan
   // ---------------------------------------------------------
-
   const resetView = () => {
     setScale(1);
     setPosition({ x: 0, y: 0 });
   };
 
   const handleWheel = (e: React.WheelEvent) => {
-    // Если нет картинки, не зумим
     if (!processedImageSrc) return;
-
-    e.preventDefault(); // Блокируем скролл страницы, если фокус на канвасе
+    e.preventDefault();
     const zoomSensitivity = 0.1;
     const delta = e.deltaY > 0 ? -zoomSensitivity : zoomSensitivity;
-    const newScale = Math.max(0.1, Math.min(scale + delta, 5)); // Мин 0.1x, Макс 5x
+    const newScale = Math.max(0.1, Math.min(scale + delta, 5));
     setScale(newScale);
   };
 
   const handleMouseDown = (e: ReactMouseEvent) => {
     if (!processedImageSrc) return;
     setIsDragging(true);
-    // Запоминаем позицию начала перетаскивания относительно текущих координат
     dragStartRef.current = {
       x: e.clientX - position.x,
       y: e.clientY - position.y
@@ -196,24 +228,18 @@ export function MonochromeBackgroundRemover() {
     setPosition({ x: newX, y: newY });
   };
 
-  const handleMouseUp = () => {
-    setIsDragging(false);
-  };
-
-  const handleMouseLeave = () => {
-    setIsDragging(false);
-  };
+  const handleMouseUp = () => setIsDragging(false);
+  const handleMouseLeave = () => setIsDragging(false);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 h-[calc(100vh-40px)]">
       {/* Скрытый канвас для вычислений */}
       <canvas ref={canvasRef} style={{ display: 'none' }} />
 
-      {/* Grid Layout: Left (Settings) - Right (Canvas) */}
-      <div className="grid gap-6 lg:grid-cols-[400px_1fr] items-start">
+      <div className="grid gap-6 lg:grid-cols-[400px_1fr] items-start h-full">
 
         {/* --- ЛЕВАЯ ПАНЕЛЬ: НАСТРОЙКИ --- */}
-        <div className="flex flex-col gap-6">
+        <div className="flex flex-col gap-6 h-full overflow-y-auto pr-1">
           <Card>
             <div className="space-y-5">
               <div className="flex items-center justify-between">
@@ -233,7 +259,7 @@ export function MonochromeBackgroundRemover() {
                 <div className="flex items-center justify-center w-full">
                   <label className="flex flex-col items-center justify-center w-full h-40 border-2 border-dashed rounded-lg cursor-pointer bg-zinc-50 hover:bg-zinc-100 border-zinc-300 dark:bg-zinc-800 dark:border-zinc-600 dark:hover:border-zinc-500 dark:hover:bg-zinc-700 transition-colors">
                     <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                      <svg className="w-8 h-8 mb-2 text-zinc-500 dark:text-zinc-400" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 20 16">
+                      <svg className="w-8 h-8 mb-2 text-zinc-500 dark:text-zinc-400" aria-hidden="true" fill="none" viewBox="0 0 20 16">
                         <path stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 13h3a3 3 0 0 0 0-6h-.025A5.56 5.56 0 0 0 16 6.5 5.5 5.5 0 0 0 5.207 5.021C5.137 5.017 5.071 5 5 5a4 4 0 0 0 0 8h2.167M10 15V6m0 0L8 8m2-2 2 2" />
                       </svg>
                       <p className="text-xs text-zinc-500 dark:text-zinc-400">Загрузить изображение</p>
@@ -247,29 +273,24 @@ export function MonochromeBackgroundRemover() {
               {imageSrc && (
                 <div className="space-y-6 animate-in fade-in slide-in-from-left-4 duration-500">
 
-                  {/* Оригинал + Пипетка */}
                   <div className="space-y-2">
                     <p className="text-xs font-medium text-zinc-500 dark:text-zinc-400">
-                      1. Выберите цвет для удаления (пипетка)
+                      Оригинал (кликните для смены цвета):
                     </p>
-                    <div className="relative rounded-md overflow-hidden border border-zinc-200 dark:border-zinc-700 bg-checkerboard cursor-crosshair group h-40 flex items-center justify-center bg-zinc-100 dark:bg-zinc-800">
+                    <div className="relative rounded-md overflow-hidden border border-zinc-200 dark:border-zinc-700 h-40 flex items-center justify-center bg-zinc-100 dark:bg-zinc-800 cursor-crosshair group">
+                      {/* Основное изображение для сэмплирования */}
                       <img
                         ref={imageRef}
                         src={imageSrc}
                         alt="Original"
                         onClick={handleImageClick}
-                        onLoad={processImage}
+                        onLoad={handleImageLoad} // <--- ВАЖНО: Авто-выбор цвета (0,0)
                         className="max-h-full max-w-full object-contain"
                       />
-                      <div className="absolute inset-0 bg-black/0 group-hover:bg-black/5 transition-colors pointer-events-none flex items-center justify-center">
-                        <span className="opacity-0 group-hover:opacity-100 bg-black/70 text-white text-[10px] px-2 py-1 rounded shadow-sm backdrop-blur-sm">
-                          Кликните для выбора цвета
-                        </span>
-                      </div>
+                      <div className="absolute inset-0 bg-black/0 group-hover:bg-black/5 transition-colors pointer-events-none" />
                     </div>
                   </div>
 
-                  {/* Цвет */}
                   <div className="flex items-center gap-3 bg-zinc-50 dark:bg-zinc-800 p-2 rounded-md border border-zinc-100 dark:border-zinc-700">
                     <input
                       type="color"
@@ -278,16 +299,13 @@ export function MonochromeBackgroundRemover() {
                       className="h-8 w-8 cursor-pointer rounded border-none bg-transparent"
                     />
                     <div className="flex flex-col">
-                      <span className="text-xs text-zinc-500">Выбранный цвет</span>
+                      <span className="text-xs text-zinc-500">Удаляемый цвет</span>
                       <span className="text-sm font-mono text-zinc-700 dark:text-zinc-300 uppercase">
                         {targetColor}
                       </span>
                     </div>
                   </div>
 
-                  <hr className="border-zinc-200 dark:border-zinc-700" />
-
-                  {/* Слайдеры */}
                   <div className="space-y-4">
                     <div className="space-y-1">
                       <div className="flex justify-between">
@@ -328,70 +346,88 @@ export function MonochromeBackgroundRemover() {
             </div>
           </Card>
 
-          {/* Подсказка (переехала вниз левой колонки) */}
           <Card>
-            <h4 className="text-xs font-semibold mb-2 text-zinc-900 dark:text-zinc-100">Инструкция</h4>
-            <ul className="text-xs text-zinc-600 dark:text-zinc-400 list-disc pl-4 space-y-1">
-              <li>Загрузите изображение.</li>
-              <li>Кликните по фону на миниатюре.</li>
-              <li>Отрегулируйте <b>Допуск</b>, чтобы убрать фон.</li>
-              <li>Используйте <b>Сглаживание</b> для мягких краев.</li>
-            </ul>
+            <h4 className="text-xs font-semibold mb-2 text-zinc-900 dark:text-zinc-100">Подсказка</h4>
+            <p className="text-xs text-zinc-600 dark:text-zinc-400 leading-relaxed">
+              При загрузке изображения система автоматически выбирает цвет левого верхнего пикселя для удаления. Если результат некорректен, кликните пипеткой по нужному фону на миниатюре слева.
+            </p>
           </Card>
         </div>
 
-        {/* --- ПРАВАЯ ПАНЕЛЬ: РЕЗУЛЬТАТ (ПОЛОТНО) --- */}
-        <Card className="h-[calc(100vh-100px)] min-h-[500px] flex flex-col p-0 overflow-hidden">
+        {/* --- ПРАВАЯ ПАНЕЛЬ: ПОЛОТНО --- */}
+        <Card className="h-full flex flex-col p-0 overflow-hidden">
 
-          {/* Тулбар полотна */}
-          <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 z-10">
-            <span className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
-              Рабочая область
-            </span>
+          {/* Тулбар */}
+          <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 z-10 shrink-0">
             <div className="flex items-center gap-2">
+              <span className="text-sm font-medium text-zinc-700 dark:text-zinc-300">Результат</span>
+            </div>
+
+            <div className="flex items-center gap-2">
+              {/* Переключатель темы фона */}
+              <button
+                onClick={toggleBgTheme}
+                title="Сменить фон полотна"
+                className="p-1.5 rounded hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-500 dark:text-zinc-400 transition-colors"
+              >
+                {bgTheme === 'light' ? (
+                  // Moon icon
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"></path></svg>
+                ) : (
+                  // Sun icon
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M12 8a4 4 0 100 8 4 4 0 000-8z"></path></svg>
+                )}
+              </button>
+
+              <div className="h-4 w-px bg-zinc-300 dark:bg-zinc-700 mx-1" />
+
+              <button
+                onClick={resetView}
+                className="px-3 py-1 text-xs font-medium bg-zinc-100 hover:bg-zinc-200 text-zinc-700 rounded dark:bg-zinc-800 dark:hover:bg-zinc-700 dark:text-zinc-300 transition-colors"
+              >
+                Сброс вида
+              </button>
               {processedImageSrc && (
-                <>
-                  <span className="text-xs text-zinc-400 mr-2 hidden sm:inline">
-                    Колесико для зума, перетаскивание мышью
-                  </span>
-                  <button
-                    onClick={resetView}
-                    className="px-3 py-1 text-xs font-medium bg-zinc-100 hover:bg-zinc-200 text-zinc-700 rounded dark:bg-zinc-800 dark:hover:bg-zinc-700 dark:text-zinc-300 transition-colors"
-                  >
-                    100%
-                  </button>
-                  <button
-                    onClick={handleDownload}
-                    className="px-3 py-1 text-xs font-medium bg-blue-600 hover:bg-blue-700 text-white rounded transition-colors shadow-sm"
-                  >
-                    Скачать
-                  </button>
-                </>
+                <button
+                  onClick={handleDownload}
+                  className="px-3 py-1 text-xs font-medium bg-blue-600 hover:bg-blue-700 text-white rounded transition-colors shadow-sm"
+                >
+                  Скачать
+                </button>
               )}
             </div>
           </div>
 
-          {/* Интерактивная область (Canvas Viewport) */}
+          {/* Полотно (Canvas Viewport) */}
           <div
             ref={containerRef}
-            className="relative flex-1 w-full h-full bg-zinc-100 dark:bg-zinc-950 overflow-hidden select-none"
+            className={`relative flex-1 w-full overflow-hidden select-none`}
+            style={{
+              backgroundColor: bgTheme === 'light' ? '#f4f4f5' : '#18181b', // zinc-100 vs zinc-950
+              cursor: isDragging ? 'grabbing' : 'grab'
+            }}
             onWheel={handleWheel}
             onMouseDown={handleMouseDown}
             onMouseMove={handleMouseMove}
             onMouseUp={handleMouseUp}
             onMouseLeave={handleMouseLeave}
-            style={{ cursor: isDragging ? 'grabbing' : 'grab' }}
           >
-            {/* Шахматный фон */}
-            <div className="absolute inset-0 opacity-40 pointer-events-none"
+            {/* Динамический Шахматный фон */}
+            <div
+              className="absolute inset-0 pointer-events-none transition-opacity duration-300"
               style={{
-                backgroundImage: 'linear-gradient(45deg, #999 25%, transparent 25%), linear-gradient(-45deg, #999 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #999 75%), linear-gradient(-45deg, transparent 75%, #999 75%)',
+                opacity: bgTheme === 'light' ? 0.4 : 0.2,
+                backgroundImage: bgTheme === 'light'
+                  // Светлая тема (серый/прозрачный)
+                  ? 'linear-gradient(45deg, #999 25%, transparent 25%), linear-gradient(-45deg, #999 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #999 75%), linear-gradient(-45deg, transparent 75%, #999 75%)'
+                  // Тёмная тема (светло-серый/прозрачный на темном фоне)
+                  : 'linear-gradient(45deg, #555 25%, transparent 25%), linear-gradient(-45deg, #555 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #555 75%), linear-gradient(-45deg, transparent 75%, #555 75%)',
                 backgroundSize: '20px 20px',
                 backgroundPosition: '0 0, 0 10px, 10px -10px, -10px 0px'
               }}
             />
 
-            {/* Контейнер с трансформациями */}
+            {/* Контент */}
             <div
               className="w-full h-full flex items-center justify-center transition-transform duration-75 ease-linear origin-center will-change-transform"
               style={{
@@ -403,18 +439,20 @@ export function MonochromeBackgroundRemover() {
                   src={processedImageSrc}
                   alt="Processed Result"
                   draggable={false}
-                  className="max-w-none shadow-2xl" // max-w-none важен, чтобы картинку не сплющивало при зуме
+                  className="max-w-none shadow-2xl"
                 />
               ) : (
                 <div className="text-center p-6 opacity-50">
-                  <p className="text-sm font-medium text-zinc-500">Результат обработки</p>
+                  <p className="text-sm font-medium text-zinc-500 dark:text-zinc-400">
+                    Здесь появится результат
+                  </p>
                 </div>
               )}
             </div>
 
             {/* Индикатор зума */}
             {processedImageSrc && (
-              <div className="absolute bottom-4 right-4 bg-black/50 text-white px-2 py-1 rounded text-xs backdrop-blur-sm pointer-events-none">
+              <div className="absolute bottom-4 right-4 bg-black/50 text-white px-2 py-1 rounded text-xs backdrop-blur-sm pointer-events-none select-none">
                 {Math.round(scale * 100)}%
               </div>
             )}
