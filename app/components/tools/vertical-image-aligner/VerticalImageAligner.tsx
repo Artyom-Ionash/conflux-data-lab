@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useCallback, useMemo, useRef, useState, useEffect } from 'react';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
 
 type AlignImage = {
   id: string;
@@ -54,10 +54,10 @@ export function VerticalImageAligner() {
   const [gridOffsetY, setGridOffsetY] = useState(0);
   const [gridColor, setGridColor] = useState('#ff0000');
 
-  // --- НОВЫЕ НАСТРОЙКИ: Границы кадров ---
+  // Настройки границ кадров
   const [showFrameBorders, setShowFrameBorders] = useState(false);
-  const [frameWidth, setFrameWidth] = useState(300); // По умолчанию равно cellHeight
-  const [frameBorderColor, setFrameBorderColor] = useState('#00ff00'); // Зеленый для контраста
+  const [frameWidth, setFrameWidth] = useState(300);
+  const [frameBorderColor, setFrameBorderColor] = useState('#00ff00');
 
   // Камера
   const [cameraScale, setCameraScale] = useState(0.4);
@@ -73,12 +73,6 @@ export function VerticalImageAligner() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [isExporting, setIsExporting] = useState(false);
 
-  // При инициализации или загрузке первого изображения, если ширина кадра не менялась пользователем,
-  // можно было бы синхронизировать, но сделаем это через useEffect при первой загрузке
-  // или просто оставим ручное управление.
-  // Логика "по умолчанию шириной, равной высоте слота" реализована в инициализации useState(300)
-  // и кнопке синхронизации.
-
   const activeImageId = useMemo(
     () => images.find((img) => img.isActive)?.id ?? null,
     [images]
@@ -92,7 +86,6 @@ export function VerticalImageAligner() {
       const rightEdge = img.offsetX + (img.naturalWidth * img.scale);
       if (rightEdge > maxRight) maxRight = rightEdge;
     });
-    // Учитываем также ширину кадра для границ, чтобы сетка рисовалась достаточно далеко вправо
     const width = Math.max(1, maxRight, frameWidth * 2);
     return { width, height };
   }, [images, cellHeight, frameWidth]);
@@ -132,11 +125,8 @@ export function VerticalImageAligner() {
         const img = new Image();
         img.onload = () => {
           if (isListEmpty && idx === 0) {
-            // Устанавливаем высоту слота по первому изображению
             setCellHeight(img.height);
-            // Также обновляем дефолтную ширину кадра, если это первая загрузка
             setFrameWidth(img.height);
-
             try {
               const canvas = document.createElement('canvas');
               canvas.width = 1;
@@ -376,7 +366,6 @@ export function VerticalImageAligner() {
       <aside className="z-20 flex w-80 flex-shrink-0 flex-col border-r border-zinc-200 bg-white shadow-xl dark:border-zinc-800 dark:bg-zinc-900">
         <div className="flex-1 overflow-y-auto p-4 custom-scrollbar">
 
-          {/* КНОПКА НАЗАД */}
           <a href="/" className="mb-3 inline-flex items-center gap-2 text-xs font-medium text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-200 transition-colors">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M19 12H5M12 19l-7-7 7-7" />
@@ -462,7 +451,6 @@ export function VerticalImageAligner() {
                 </div>
               </div>
 
-              {/* БЛОК НАСТРОЙКИ ЛИНЕЙКИ */}
               <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-3 dark:border-zinc-800 dark:bg-zinc-900/50">
                 <div className="mb-3 flex items-center justify-between">
                   <label className="flex cursor-pointer items-center gap-2 text-xs font-bold uppercase text-zinc-700 dark:text-zinc-300">
@@ -534,7 +522,6 @@ export function VerticalImageAligner() {
                 )}
               </div>
 
-              {/* БЛОК НАСТРОЙКИ ГРАНИЦ КАДРОВ (НОВОЕ) */}
               <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-3 dark:border-zinc-800 dark:bg-zinc-900/50">
                 <div className="flex items-center justify-between mb-2">
                   <label className="flex cursor-pointer items-center gap-2 text-xs font-bold uppercase text-zinc-700 dark:text-zinc-300">
@@ -714,7 +701,7 @@ export function VerticalImageAligner() {
                       src={img.url}
                       alt=""
                       draggable={false}
-                      className={`w-full h-full object-fill select-none ${img.isActive ? 'ring-2 ring-blue-500 shadow-lg' : ''}`}
+                      className="w-full h-full object-fill select-none"
                     />
                   </div>
                   <div className="absolute left-0 top-0 bg-red-600/80 px-1.5 py-0.5 text-[10px] text-white font-mono pointer-events-none opacity-70">
@@ -726,7 +713,6 @@ export function VerticalImageAligner() {
           )}
         </div>
 
-        {/* ОБЫЧНАЯ ЛИНЕЙКА (Z-50) */}
         {images.length > 0 && showGrid && (
           <div
             className="absolute pointer-events-none z-50"
@@ -746,7 +732,6 @@ export function VerticalImageAligner() {
           />
         )}
 
-        {/* ГРАНИЦЫ КАДРОВ (Z-60, приоритетнее линейки) */}
         {images.length > 0 && showFrameBorders && (
           <div
             className="absolute pointer-events-none z-[60]"
@@ -760,7 +745,6 @@ export function VerticalImageAligner() {
                     linear-gradient(to bottom, ${frameBorderColor} 2px, transparent 2px)
                 `,
               backgroundSize: `${frameWidth * cameraScale}px ${cellHeight * cameraScale}px`,
-              // Границы кадров всегда начинаются от 0,0 относительно холста, без смещения
               backgroundPosition: `0px 0px`,
               overflow: 'hidden',
               opacity: 0.8
