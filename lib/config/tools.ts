@@ -11,7 +11,7 @@ export const tools: Tool[] = [
     description: 'Конвертация JSON данных в CSV формат',
     category: 'conversion',
     tags: ['json', 'csv', 'conversion', 'data'],
-    featured: true,
+    featured: false,
   },
   {
     id: 'csv-to-json',
@@ -19,7 +19,7 @@ export const tools: Tool[] = [
     description: 'Конвертация CSV файлов в JSON формат',
     category: 'conversion',
     tags: ['csv', 'json', 'conversion', 'data'],
-    featured: true,
+    featured: false,
   },
   {
     id: 'xml-to-json',
@@ -57,7 +57,7 @@ export const tools: Tool[] = [
       'Калибровка и вертикальное объединение набора изображений с настраиваемым сдвигом и масштабом каждого слоя',
     category: 'transformation',
     tags: ['images', 'alignment', 'vertical', 'composition'],
-    featured: false,
+    featured: true,
   },
 ];
 
