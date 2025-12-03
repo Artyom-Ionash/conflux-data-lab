@@ -33,12 +33,8 @@ export function MonochromeBackgroundRemover() {
 
   // --- STATE: Интерфейс и Авто-контраст ---
   const [isDarkBackground, setIsDarkBackground] = useState(true);
-
-  // ИЗМЕНЕНИЕ 1: По умолчанию включено (true)
   const [isAutoContrast, setIsAutoContrast] = useState(true);
-  // ИЗМЕНЕНИЕ 2: Частота по умолчанию 1 Гц
   const [contrastFreq, setContrastFreq] = useState(1);
-
   const [isProcessing, setIsProcessing] = useState(false);
 
   // --- STATE: Viewport (Зум и Пан) ---
@@ -52,6 +48,67 @@ export function MonochromeBackgroundRemover() {
   const containerRef = useRef<HTMLDivElement>(null);
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
 
+  // Добавляем рефы для scale/offset, чтобы использовать их в нативном слушателе событий
+  const scaleRef = useRef(scale);
+  const offsetRef = useRef(offset);
+  const processedUrlRef = useRef(processedUrl); // Чтобы знать, загружена ли картинка
+
+  // Синхронизируем рефы со стейтом
+  useEffect(() => { scaleRef.current = scale; }, [scale]);
+  useEffect(() => { offsetRef.current = offset; }, [offset]);
+  useEffect(() => { processedUrlRef.current = processedUrl; }, [processedUrl]);
+
+  // -------------------------------------------------------------------------
+  // ЭФФЕКТ: УМНЫЙ ЗУМ И БЛОКИРОВКА СКРОЛЛА
+  // -------------------------------------------------------------------------
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    const onWheel = (e: WheelEvent) => {
+      // 1. Блокируем скролл страницы, если мы над канвасом
+      e.preventDefault();
+
+      if (!processedUrlRef.current) return;
+
+      // 2. Логика зума
+      const zoomSpeed = 0.1;
+      const direction = e.deltaY > 0 ? -1 : 1;
+      const currentScale = scaleRef.current;
+
+      // Вычисляем новый масштаб
+      let newScale = currentScale + direction * zoomSpeed * currentScale; // Используем множитель для плавности
+      // Ограничиваем масштаб
+      newScale = Math.max(0.05, Math.min(newScale, 20));
+
+      // 3. Математика зума к курсору
+      // Получаем координаты курсора относительно контейнера
+      const rect = container.getBoundingClientRect();
+      const mouseX = e.clientX - rect.left;
+      const mouseY = e.clientY - rect.top;
+
+      const currentOffset = offsetRef.current;
+
+      // Формула смещения, чтобы точка под курсором осталась на месте:
+      // NewOffset = Mouse - (Mouse - OldOffset) * (NewScale / OldScale)
+      const scaleRatio = newScale / currentScale;
+
+      const newOffsetX = mouseX - (mouseX - currentOffset.x) * scaleRatio;
+      const newOffsetY = mouseY - (mouseY - currentOffset.y) * scaleRatio;
+
+      // Обновляем стейт
+      setScale(newScale);
+      setOffset({ x: newOffsetX, y: newOffsetY });
+    };
+
+    // { passive: false } критически важен, чтобы e.preventDefault() сработал
+    container.addEventListener('wheel', onWheel, { passive: false });
+
+    return () => {
+      container.removeEventListener('wheel', onWheel);
+    };
+  }, []); // Пустой массив зависимостей, так как мы используем Ref для доступа к актуальным данным
+
   // -------------------------------------------------------------------------
   // ЭФФЕКТ: АВТОМАТИЧЕСКАЯ СМЕНА ФОНА
   // -------------------------------------------------------------------------
@@ -59,19 +116,15 @@ export function MonochromeBackgroundRemover() {
     let interval: NodeJS.Timeout;
 
     if (isAutoContrast) {
-      // ИЗМЕНЕНИЕ 3: Расчет интервала на основе частоты (ms = 1000 / Hz)
       const ms = 1000 / contrastFreq;
-
       interval = setInterval(() => {
         setIsDarkBackground(prev => !prev);
       }, ms);
     }
 
     return () => clearInterval(interval);
-  }, [isAutoContrast, contrastFreq]); // Добавили contrastFreq в зависимости
+  }, [isAutoContrast, contrastFreq]);
 
-  // ИЗМЕНЕНИЕ 4: Расчет длительности анимации, чтобы она успевала за частотой
-  // Берем 90% от периода смены, но не более 2 секунд
   const transitionDurationMs = Math.min(2000, (1000 / contrastFreq) * 0.9);
 
   // -------------------------------------------------------------------------
@@ -91,12 +144,23 @@ export function MonochromeBackgroundRemover() {
 
       if (containerRef.current) {
         const contW = containerRef.current.clientWidth;
-        const scaleFactor = Math.min(1, (contW - 40) / img.width);
-        setScale(scaleFactor > 0 ? scaleFactor : 1);
-        setOffset({ x: 0, y: 0 });
+        const contH = containerRef.current.clientHeight; // Учитываем и высоту
+
+        // Центрируем и фитим изображение при загрузке
+        const scaleW = (contW - 40) / img.width;
+        const scaleH = (contH - 40) / img.height;
+        const scaleFactor = Math.min(1, Math.min(scaleW, scaleH));
+
+        const initialScale = scaleFactor > 0 ? scaleFactor : 1;
+
+        // Центрирование
+        const initialOffsetX = (contW - img.width * initialScale) / 2;
+        const initialOffsetY = (contH - img.height * initialScale) / 2;
+
+        setScale(initialScale);
+        setOffset({ x: initialOffsetX, y: initialOffsetY });
       }
 
-      // Авто-определение цвета (0,0)
       const tempCanvas = document.createElement('canvas');
       tempCanvas.width = 1;
       tempCanvas.height = 1;
@@ -175,15 +239,8 @@ export function MonochromeBackgroundRemover() {
   }, [processImage]);
 
   // -------------------------------------------------------------------------
-  // VIEWPORT HANDLERS
+  // VIEWPORT HANDLERS (Drag only, Wheel перемещен в Effect)
   // -------------------------------------------------------------------------
-  const handleWheel = (e: React.WheelEvent) => {
-    if (!processedUrl) return;
-    const zoomSpeed = 0.1;
-    const delta = e.deltaY > 0 ? -zoomSpeed : zoomSpeed;
-    const newScale = Math.max(0.05, Math.min(scale + delta, 10));
-    setScale(newScale);
-  };
 
   const handlePointerDown = (e: React.PointerEvent) => {
     if (!processedUrl) return;
@@ -215,8 +272,21 @@ export function MonochromeBackgroundRemover() {
   };
 
   const handleResetView = () => {
-    setScale(1);
-    setOffset({ x: 0, y: 0 });
+    if (containerRef.current && imgDimensions.w > 0) {
+      const contW = containerRef.current.clientWidth;
+      const contH = containerRef.current.clientHeight;
+      const scaleFactor = Math.min(1, Math.min((contW - 40) / imgDimensions.w, (contH - 40) / imgDimensions.h));
+      const finalScale = scaleFactor > 0 ? scaleFactor : 1;
+
+      setScale(finalScale);
+      setOffset({
+        x: (contW - imgDimensions.w * finalScale) / 2,
+        y: (contH - imgDimensions.h * finalScale) / 2
+      });
+    } else {
+      setScale(1);
+      setOffset({ x: 0, y: 0 });
+    }
   };
 
   const handleEyedropper = (e: React.MouseEvent<HTMLImageElement>) => {
@@ -244,9 +314,8 @@ export function MonochromeBackgroundRemover() {
     <div className="flex h-screen w-full bg-zinc-50 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 overflow-hidden font-sans">
       <canvas ref={canvasRef} className="hidden" />
 
-      {/* ================= ЛЕВАЯ ПАНЕЛЬ (НАСТРОЙКИ) ================= */}
+      {/* ================= ЛЕВАЯ ПАНЕЛЬ ================= */}
       <aside className="w-[360px] flex-shrink-0 flex flex-col border-r border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 z-10 shadow-xl">
-
         <div className="p-5 border-b border-zinc-200 dark:border-zinc-800">
           <h2 className="text-lg font-bold flex items-center gap-2">
             <span className="text-blue-600">Mono</span>Remover
@@ -255,7 +324,6 @@ export function MonochromeBackgroundRemover() {
         </div>
 
         <div className="flex-1 overflow-y-auto p-5 space-y-6 custom-scrollbar">
-          {/* 1. Загрузка */}
           <div className="space-y-2">
             <label className="block text-xs font-bold uppercase text-zinc-400">Исходник</label>
             <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-lg cursor-pointer bg-zinc-50 hover:bg-zinc-100 border-zinc-300 dark:bg-zinc-800/50 dark:border-zinc-700 dark:hover:bg-zinc-800 transition-all">
@@ -269,7 +337,6 @@ export function MonochromeBackgroundRemover() {
 
           {originalUrl && (
             <div className="space-y-6 animate-fade-in">
-              {/* 2. Цвет (Пипетка) */}
               <div className="space-y-2">
                 <label className="block text-xs font-bold uppercase text-zinc-400">Целевой цвет</label>
                 <div className="flex gap-3 items-start">
@@ -290,16 +357,12 @@ export function MonochromeBackgroundRemover() {
                         <span className="text-sm font-mono font-bold">{targetColor}</span>
                       </div>
                     </div>
-                    <p className="text-[10px] text-zinc-400 leading-tight">
-                      Авто-определение: (0,0). Кликните по миниатюре для изменения.
-                    </p>
                   </div>
                 </div>
               </div>
 
               <hr className="border-zinc-100 dark:border-zinc-800" />
 
-              {/* 3. Слайдеры */}
               <div className="space-y-5">
                 <div className="space-y-1.5">
                   <div className="flex justify-between text-xs">
@@ -328,7 +391,6 @@ export function MonochromeBackgroundRemover() {
                 </div>
               </div>
 
-              {/* 4. Кнопка скачивания */}
               <div className="pt-4">
                 <button
                   onClick={handleDownload}
@@ -346,25 +408,18 @@ export function MonochromeBackgroundRemover() {
       {/* ================= ПРАВАЯ ПАНЕЛЬ (ХОЛСТ) ================= */}
       <main className="flex-1 relative flex flex-col bg-zinc-100 dark:bg-[#0a0a0a] overflow-hidden">
 
-        {/* Тулбар холста */}
         <div className="absolute top-4 left-1/2 -translate-x-1/2 z-30 flex items-center gap-2 bg-white/90 dark:bg-zinc-900/90 backdrop-blur px-2 py-1.5 rounded-full shadow-lg border border-zinc-200 dark:border-zinc-700">
-
-          {/* Кнопка Авто-Контраст */}
           <button
             onClick={() => setIsAutoContrast(!isAutoContrast)}
             className={`p-2 rounded-full transition-colors ${isAutoContrast ? 'bg-blue-100 text-blue-600 dark:bg-blue-900 dark:text-blue-300' : 'hover:bg-zinc-100 text-zinc-600 dark:hover:bg-zinc-800 dark:text-zinc-400'}`}
-            title={isAutoContrast ? "Остановить авто-смену фона" : "Запустить авто-смену фона"}
           >
             {isAutoContrast ? (
-              /* Pause Icon */
               <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
             ) : (
-              /* Play/Loop Icon */
               <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" /><path strokeLinecap="round" strokeLinejoin="round" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
             )}
           </button>
 
-          {/* ИЗМЕНЕНИЕ 5: Слайдер частоты (показывается только при активном авто-контрасте) */}
           {isAutoContrast && (
             <div className="flex items-center gap-2 px-2 border-r border-zinc-200 dark:border-zinc-700 animate-fade-in">
               <input
@@ -375,7 +430,6 @@ export function MonochromeBackgroundRemover() {
                 value={contrastFreq}
                 onChange={(e) => setContrastFreq(parseFloat(e.target.value))}
                 className="w-20 h-1.5 bg-zinc-200 rounded-lg appearance-none cursor-pointer dark:bg-zinc-700 accent-blue-600"
-                title="Частота смены (Герц)"
               />
               <span className="text-[10px] font-mono text-zinc-500 w-8 text-right">
                 {contrastFreq.toFixed(1)}Hz
@@ -383,14 +437,12 @@ export function MonochromeBackgroundRemover() {
             </div>
           )}
 
-          {/* Ручной переключатель */}
           <button
             onClick={() => {
-              setIsAutoContrast(false); // Выключаем авто если юзер кликнул руками
+              setIsAutoContrast(false);
               setIsDarkBackground(!isDarkBackground);
             }}
             className="p-2 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-600 dark:text-zinc-400 transition-colors"
-            title="Сменить фон вручную"
           >
             {isDarkBackground ? (
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"></path></svg>
@@ -409,20 +461,18 @@ export function MonochromeBackgroundRemover() {
         {/* Viewport */}
         <div
           ref={containerRef}
-          // ИЗМЕНЕНИЕ 6: Используем style для динамического duration, а ease-in-out оставляем в классе
+          // Мы убрали onWheel отсюда и перенесли в useEffect выше
           className={`flex-1 relative overflow-hidden cursor-grab active:cursor-grabbing select-none transition-colors ease-in-out ${isDarkBackground ? 'bg-[#111]' : 'bg-[#e5e5e5]'}`}
           style={{ transitionDuration: `${transitionDurationMs}ms` }}
-          onWheel={handleWheel}
           onPointerDown={handlePointerDown}
           onPointerMove={handlePointerMove}
           onPointerUp={handlePointerUp}
           onPointerLeave={handlePointerUp}
         >
-          {/* Шахматная сетка с плавным переходом прозрачности */}
           <div
             className={`absolute inset-0 pointer-events-none transition-opacity ease-in-out ${isDarkBackground ? 'opacity-10' : 'opacity-30'}`}
             style={{
-              transitionDuration: `${transitionDurationMs}ms`, // Применяем ту же скорость для сетки
+              transitionDuration: `${transitionDurationMs}ms`,
               backgroundImage: `
                         linear-gradient(45deg, #888 25%, transparent 25%), 
                         linear-gradient(-45deg, #888 25%, transparent 25%), 
@@ -434,7 +484,6 @@ export function MonochromeBackgroundRemover() {
             }}
           />
 
-          {/* Содержимое */}
           <div
             className="absolute top-0 left-0 w-full h-full flex items-center justify-center will-change-transform"
             style={{
@@ -463,14 +512,6 @@ export function MonochromeBackgroundRemover() {
               </div>
             )}
           </div>
-
-          {/* Инструкция */}
-          {processedUrl && (
-            <div className="absolute bottom-5 right-5 text-[10px] text-zinc-500 pointer-events-none text-right space-y-1 opacity-50 hover:opacity-100 transition-opacity">
-              <p>Scroll = Zoom</p>
-              <p>Drag = Pan</p>
-            </div>
-          )}
         </div>
       </main>
     </div>
