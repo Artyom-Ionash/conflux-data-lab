@@ -34,7 +34,12 @@ export function MonochromeBackgroundRemover() {
   const [imgDimensions, setImgDimensions] = useState({ w: 0, h: 0 });
 
   // --- STATE: Настройки ---
-  const [targetColor, setTargetColor] = useState('#ffffff');
+  // ИЗМЕНЕНИЕ: Храним цвета для каждого режима отдельно
+  const [targetColors, setTargetColors] = useState<Record<ProcessingMode, string>>({
+    'remove': '#ffffff',
+    'keep': '#ffffff',
+    'flood-clear': '#000000' // Для контура обычно черный
+  });
 
   const [tolerances, setTolerances] = useState<Record<ProcessingMode, number>>({
     'remove': 20,
@@ -102,21 +107,19 @@ export function MonochromeBackgroundRemover() {
   };
 
   // -------------------------------------------------------------------------
-  // Смена режима
+  // Смена режима и цвета
   // -------------------------------------------------------------------------
   const handleModeChange = (mode: ProcessingMode) => {
     setProcessingMode(mode);
+    // Цвет автоматически подтянется из targetColors[mode] в рендере и processImage
+  };
 
-    // ИЗМЕНЕНИЕ: Убрана очистка floodPoints при смене режима.
-    // Теперь точки сохраняются, даже если мы переключаемся на 'remove' и обратно.
-
-    // Настройка цветов по умолчанию для режимов
-    if (mode === 'flood-clear') {
-      // Если перешли в режим заливки, предложим черный, если он не установлен
-      setTargetColor('#000000');
-    } else if (targetColor === '#000000') {
-      setTargetColor('#ffffff');
-    }
+  // Хелпер для смены цвета текущего режима
+  const handleColorChange = (newColor: string) => {
+    setTargetColors(prev => ({
+      ...prev,
+      [processingMode]: newColor
+    }));
   };
 
   const handleToleranceChange = (value: number) => {
@@ -204,7 +207,10 @@ export function MonochromeBackgroundRemover() {
         const width = canvas.width;
         const height = canvas.height;
 
-        const targetRGB = hexToRgb(targetColor);
+        // ИЗМЕНЕНИЕ: Берем цвет для текущего режима из объекта targetColors
+        const currentTargetHex = targetColors[processingMode];
+        const targetRGB = hexToRgb(currentTargetHex);
+
         if (!targetRGB) { setIsProcessing(false); return; }
 
         const maxDist = 441.67;
@@ -219,7 +225,6 @@ export function MonochromeBackgroundRemover() {
         );
 
         if (processingMode === 'flood-clear') {
-          // Если точек нет, просто показываем оригинал
           if (floodPoints.length === 0) {
             setProcessedUrl(originalUrl);
             setIsProcessing(false);
@@ -283,20 +288,17 @@ export function MonochromeBackgroundRemover() {
         setIsProcessing(false);
       }, 50);
     };
-  }, [originalUrl, targetColor, tolerances, smoothness, imgDimensions, processingMode, floodPoints]);
+  }, [originalUrl, targetColors, tolerances, smoothness, imgDimensions, processingMode, floodPoints]);
 
-  // ИЗМЕНЕНИЕ: Универсальный эффектор для автообновления
   useEffect(() => {
     if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
 
-    // Теперь мы не разделяем режимы. При изменении floodPoints, режима или настроек,
-    // запускается отложенное обновление. Это обеспечивает реактивность при перетаскивании.
     debounceTimerRef.current = setTimeout(() => {
       if (originalUrl) processImage();
     }, 100);
 
     return () => { if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current); }
-  }, [originalUrl, targetColor, tolerances, smoothness, processingMode, floodPoints]); // Добавлен floodPoints
+  }, [originalUrl, targetColors, tolerances, smoothness, processingMode, floodPoints]);
 
   useEffect(() => {
     if (manualTrigger > 0 && processingMode === 'flood-clear') {
@@ -445,12 +447,16 @@ export function MonochromeBackgroundRemover() {
     i.onload = () => {
       ctx.drawImage(i, -Math.floor(x), -Math.floor(y));
       const p = ctx.getImageData(0, 0, 1, 1).data;
-      setTargetColor(rgbToHex(p[0], p[1], p[2]));
+      // ИЗМЕНЕНИЕ: Устанавливаем цвет только для текущего режима
+      handleColorChange(rgbToHex(p[0], p[1], p[2]));
     }
   };
 
   const removeLastPoint = () => setFloodPoints(prev => prev.slice(0, -1));
   const clearAllPoints = () => setFloodPoints([]);
+
+  // Получаем текущий активный цвет для отображения в инпуте
+  const currentActiveColor = targetColors[processingMode];
 
   return (
     <div className="flex h-screen w-full bg-zinc-50 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 overflow-hidden font-sans">
@@ -505,8 +511,13 @@ export function MonochromeBackgroundRemover() {
                     <img src={originalUrl} className="w-full h-full object-cover" onClick={handleEyedropper} alt="picker" />
                   </div>
                   <div className="flex-1 flex items-center gap-2 p-2 border rounded bg-zinc-50 dark:bg-zinc-800 dark:border-zinc-700">
-                    <input type="color" value={targetColor} onChange={e => setTargetColor(e.target.value)} className="w-8 h-8 bg-transparent border-none cursor-pointer" />
-                    <span className="font-mono text-xs font-bold uppercase">{targetColor}</span>
+                    <input
+                      type="color"
+                      value={currentActiveColor}
+                      onChange={e => handleColorChange(e.target.value)}
+                      className="w-8 h-8 bg-transparent border-none cursor-pointer"
+                    />
+                    <span className="font-mono text-xs font-bold uppercase">{currentActiveColor}</span>
                   </div>
                 </div>
               </div>
@@ -583,8 +594,6 @@ export function MonochromeBackgroundRemover() {
           onPointerDown={handleCanvasPointerDown}
           onPointerMove={handlePointerMove}
           onPointerUp={handlePointerUp}
-
-          // Блокируем контекстное меню и drag-and-drop
           onContextMenu={(e) => e.preventDefault()}
           onDragStart={(e) => e.preventDefault()}
         >
