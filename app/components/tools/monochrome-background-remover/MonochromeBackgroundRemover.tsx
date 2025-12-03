@@ -290,15 +290,11 @@ export function MonochromeBackgroundRemover() {
 
   useEffect(() => {
     if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
-    // Для обычных режимов — автообновление при смене параметров
-    // Для flood-clear — обновление при смене режима (сброс) или триггере
     if (processingMode !== 'flood-clear') {
       debounceTimerRef.current = setTimeout(() => {
         if (originalUrl) processImage();
       }, 100);
     } else {
-      // При переключении на flood-clear тоже нужно запустить processImage, 
-      // чтобы он сбросил картинку в оригинал (если точек нет)
       if (originalUrl) processImage();
     }
     return () => { if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current); }
@@ -326,7 +322,6 @@ export function MonochromeBackgroundRemover() {
       setProcessedUrl(url);
       setImgDimensions({ w: img.width, h: img.height });
       setFloodPoints([]);
-      // При новой загрузке сбрасываем допуски? Или оставляем? Оставим как есть.
 
       if (containerRef.current) {
         const contW = containerRef.current.clientWidth;
@@ -345,6 +340,9 @@ export function MonochromeBackgroundRemover() {
   const handlePointPointerDown = (e: React.PointerEvent, index: number) => {
     e.stopPropagation();
     e.preventDefault();
+    // Точки двигаем только левой кнопкой
+    if (e.button !== 0) return;
+
     setDraggingPointIndex(index);
     if (containerRef.current) {
       containerRef.current.setPointerCapture(e.pointerId);
@@ -353,6 +351,10 @@ export function MonochromeBackgroundRemover() {
 
   const handleCanvasPointerDown = (e: React.PointerEvent) => {
     if (!originalUrl) return;
+
+    // --- ВАЖНО: Игнорируем правую кнопку мыши (и другие, кроме левой) ---
+    if (e.button !== 0) return;
+
     if (containerRef.current) {
       containerRef.current.setPointerCapture(e.pointerId);
     }
@@ -386,6 +388,11 @@ export function MonochromeBackgroundRemover() {
   };
 
   const handlePointerUp = (e: React.PointerEvent) => {
+    // --- ВАЖНО: Игнорируем отпускание правой кнопки, чтобы не ставить точку ---
+    if (e.button !== 0) {
+      return;
+    }
+
     if (draggingPointIndex !== null) {
       setDraggingPointIndex(null);
       return;
@@ -584,6 +591,10 @@ export function MonochromeBackgroundRemover() {
           onPointerDown={handleCanvasPointerDown}
           onPointerMove={handlePointerMove}
           onPointerUp={handlePointerUp}
+
+          // --- ВАЖНО: Блокируем контекстное меню и drag-and-drop ---
+          onContextMenu={(e) => e.preventDefault()}
+          onDragStart={(e) => e.preventDefault()}
         >
           <div className={`absolute inset-0 pointer-events-none transition-opacity ease-in-out ${isDarkBackground ? 'opacity-10' : 'opacity-30'}`} style={{ transitionDuration: `${transitionDurationMs}ms`, backgroundImage: 'linear-gradient(45deg, #888 25%, transparent 25%), linear-gradient(-45deg, #888 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #888 75%), linear-gradient(-45deg, transparent 75%, #888 75%)', backgroundSize: '20px 20px' }} />
 
