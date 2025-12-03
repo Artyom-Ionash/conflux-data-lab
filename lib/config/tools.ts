@@ -59,6 +59,15 @@ export const tools: Tool[] = [
     tags: ['images', 'alignment', 'vertical', 'composition'],
     featured: true,
   },
+  {
+    id: 'monochrome-background-remover',
+    name: 'Monochrome Background Remover',
+    description:
+      'Удаление монохромного фона из изображения',
+    category: 'formatting',
+    tags: ['image', 'background', 'removal'],
+    featured: true,
+  },
 ];
 
 export const toolsByCategory = tools.reduce((acc, tool) => {
