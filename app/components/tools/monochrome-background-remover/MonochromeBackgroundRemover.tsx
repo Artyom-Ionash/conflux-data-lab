@@ -36,7 +36,6 @@ export function MonochromeBackgroundRemover() {
   // --- STATE: Настройки ---
   const [targetColor, setTargetColor] = useState('#ffffff');
 
-  // ИЗМЕНЕНИЕ: Независимые значения допуска для каждого режима
   const [tolerances, setTolerances] = useState<Record<ProcessingMode, number>>({
     'remove': 20,
     'keep': 20,
@@ -52,7 +51,7 @@ export function MonochromeBackgroundRemover() {
 
   // --- STATE: Интерфейс ---
   const [isDarkBackground, setIsDarkBackground] = useState(true);
-  const [isAutoContrast, setIsAutoContrast] = useState(true);
+  const [isAutoContrast, setIsAutoContrast] = useState(false);
   const [autoContrastPeriod, setAutoContrastPeriod] = useState(5);
   const [isProcessing, setIsProcessing] = useState(false);
 
@@ -108,18 +107,18 @@ export function MonochromeBackgroundRemover() {
   const handleModeChange = (mode: ProcessingMode) => {
     setProcessingMode(mode);
 
-    // Сброс точек при уходе с заливки
-    if (mode !== 'flood-clear') setFloodPoints([]);
+    // ИЗМЕНЕНИЕ: Убрана очистка floodPoints при смене режима.
+    // Теперь точки сохраняются, даже если мы переключаемся на 'remove' и обратно.
 
     // Настройка цветов по умолчанию для режимов
     if (mode === 'flood-clear') {
+      // Если перешли в режим заливки, предложим черный, если он не установлен
       setTargetColor('#000000');
     } else if (targetColor === '#000000') {
       setTargetColor('#ffffff');
     }
   };
 
-  // Хелпер для изменения допуска текущего режима
   const handleToleranceChange = (value: number) => {
     setTolerances(prev => ({
       ...prev,
@@ -209,8 +208,6 @@ export function MonochromeBackgroundRemover() {
         if (!targetRGB) { setIsProcessing(false); return; }
 
         const maxDist = 441.67;
-
-        // ИСПОЛЬЗУЕМ ДОПУСК ТЕКУЩЕГО РЕЖИМА
         const currentTolerance = tolerances[processingMode];
         const tolVal = (currentTolerance / 100) * maxDist;
         const smoothVal = (smoothness / 100) * maxDist;
@@ -222,7 +219,7 @@ export function MonochromeBackgroundRemover() {
         );
 
         if (processingMode === 'flood-clear') {
-          // В режиме заливки, если точек нет — возвращаем оригинал (сброс эффектов других режимов)
+          // Если точек нет, просто показываем оригинал
           if (floodPoints.length === 0) {
             setProcessedUrl(originalUrl);
             setIsProcessing(false);
@@ -288,17 +285,18 @@ export function MonochromeBackgroundRemover() {
     };
   }, [originalUrl, targetColor, tolerances, smoothness, imgDimensions, processingMode, floodPoints]);
 
+  // ИЗМЕНЕНИЕ: Универсальный эффектор для автообновления
   useEffect(() => {
     if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
-    if (processingMode !== 'flood-clear') {
-      debounceTimerRef.current = setTimeout(() => {
-        if (originalUrl) processImage();
-      }, 100);
-    } else {
+
+    // Теперь мы не разделяем режимы. При изменении floodPoints, режима или настроек,
+    // запускается отложенное обновление. Это обеспечивает реактивность при перетаскивании.
+    debounceTimerRef.current = setTimeout(() => {
       if (originalUrl) processImage();
-    }
+    }, 100);
+
     return () => { if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current); }
-  }, [originalUrl, targetColor, tolerances, smoothness, processingMode]);
+  }, [originalUrl, targetColor, tolerances, smoothness, processingMode, floodPoints]); // Добавлен floodPoints
 
   useEffect(() => {
     if (manualTrigger > 0 && processingMode === 'flood-clear') {
@@ -340,7 +338,6 @@ export function MonochromeBackgroundRemover() {
   const handlePointPointerDown = (e: React.PointerEvent, index: number) => {
     e.stopPropagation();
     e.preventDefault();
-    // Точки двигаем только левой кнопкой
     if (e.button !== 0) return;
 
     setDraggingPointIndex(index);
@@ -351,8 +348,6 @@ export function MonochromeBackgroundRemover() {
 
   const handleCanvasPointerDown = (e: React.PointerEvent) => {
     if (!originalUrl) return;
-
-    // --- ВАЖНО: Игнорируем правую кнопку мыши (и другие, кроме левой) ---
     if (e.button !== 0) return;
 
     if (containerRef.current) {
@@ -388,10 +383,7 @@ export function MonochromeBackgroundRemover() {
   };
 
   const handlePointerUp = (e: React.PointerEvent) => {
-    // --- ВАЖНО: Игнорируем отпускание правой кнопки, чтобы не ставить точку ---
-    if (e.button !== 0) {
-      return;
-    }
+    if (e.button !== 0) return;
 
     if (draggingPointIndex !== null) {
       setDraggingPointIndex(null);
@@ -501,7 +493,7 @@ export function MonochromeBackgroundRemover() {
                   <div className="text-[10px] text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 p-2 rounded border border-blue-100 dark:border-blue-800 leading-tight">
                     1. Кликните на холст, чтобы поставить точки.<br />
                     2. Точки можно <b>перетаскивать</b>.<br />
-                    3. Нажмите "Выполнить заливку".
+                    3. Заливка обновляется <b>автоматически</b>.
                   </div>
                 )}
               </div>
@@ -552,7 +544,7 @@ export function MonochromeBackgroundRemover() {
                     <button onClick={removeLastPoint} disabled={floodPoints.length === 0} className="flex-1 py-2 text-xs bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded hover:bg-zinc-50 disabled:opacity-50">Отменить</button>
                     <button onClick={clearAllPoints} disabled={floodPoints.length === 0} className="flex-1 py-2 text-xs bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded hover:text-red-500 hover:bg-red-50 disabled:opacity-50">Сбросить</button>
                   </div>
-                  <button onClick={handleRunFloodFill} disabled={floodPoints.length === 0 || isProcessing} className="w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded font-bold text-xs shadow-sm uppercase tracking-wide disabled:opacity-50 disabled:cursor-not-allowed">{isProcessing ? 'Обработка...' : 'Выполнить заливку'}</button>
+                  <button onClick={handleRunFloodFill} disabled={floodPoints.length === 0 || isProcessing} className="w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded font-bold text-xs shadow-sm uppercase tracking-wide disabled:opacity-50 disabled:cursor-not-allowed">{isProcessing ? 'Обработка...' : 'Принудительно обновить'}</button>
                 </div>
               )}
               <button onClick={handleDownload} disabled={!processedUrl} className="w-full py-3 bg-zinc-900 dark:bg-white text-white dark:text-black rounded font-bold text-sm shadow hover:opacity-90 transition disabled:opacity-50">Скачать</button>
@@ -592,7 +584,7 @@ export function MonochromeBackgroundRemover() {
           onPointerMove={handlePointerMove}
           onPointerUp={handlePointerUp}
 
-          // --- ВАЖНО: Блокируем контекстное меню и drag-and-drop ---
+          // Блокируем контекстное меню и drag-and-drop
           onContextMenu={(e) => e.preventDefault()}
           onDragStart={(e) => e.preventDefault()}
         >
