@@ -17,6 +17,14 @@ type AlignImage = {
 
 const MAX_CANVAS_HEIGHT = 16000;
 
+// Вспомогательная функция для конвертации RGB в HEX (для input type="color")
+function rgbToHex(r: number, g: number, b: number) {
+  return "#" + [r, g, b].map(x => {
+    const hex = x.toString(16);
+    return hex.length === 1 ? "0" + hex : hex;
+  }).join("");
+}
+
 function createObjectURLSafely(file: File): string {
   return URL.createObjectURL(file);
 }
@@ -35,6 +43,10 @@ export function VerticalImageAligner() {
   // Настройки слотов
   const [cellHeight, setCellHeight] = useState(300);
 
+  // Настройки фона полотна
+  const [bgColorHex, setBgColorHex] = useState('#ffffff');
+  const [bgOpacity, setBgOpacity] = useState(0); // По умолчанию прозрачный, пока не загрузим фото
+
   // Настройки вспомогательной сетки
   const [showGrid, setShowGrid] = useState(true);
   const [gridWidth, setGridWidth] = useState(100);
@@ -48,7 +60,7 @@ export function VerticalImageAligner() {
   const [cameraOffset, setCameraOffset] = useState({ x: 100, y: 100 });
   const [isPanning, setIsPanning] = useState(false);
 
-  // Drag and Drop (сортировка)
+  // Drag and Drop
   const [draggingIndex, setDraggingIndex] = useState<number | null>(null);
 
   const panStartRef = useRef<{ x: number; y: number } | null>(null);
@@ -103,17 +115,44 @@ export function VerticalImageAligner() {
         });
       });
 
+      // Проверяем, пуст ли список до добавления (чтобы понять, нужно ли брать цвет с первого фото)
+      // Из-за асинхронности setState используем длину из текущего рендера,
+      // но надежнее проверить внутри onload, зная индекс.
+      const isListEmpty = images.length === 0;
+
       setImages((prev) => [...prev, ...newImages]);
 
       newImages.forEach((item, idx) => {
         const img = new Image();
         img.onload = () => {
-          setImages((currentImages) => {
-            const isFirstEver = currentImages.length === newImages.length && idx === 0;
-            if (isFirstEver) {
-              setCellHeight(img.height);
-            }
 
+          // --- Логика извлечения цвета и размера (только для самого первого фото) ---
+          if (isListEmpty && idx === 0) {
+            // 1. Установка высоты слота
+            setCellHeight(img.height);
+
+            // 2. Извлечение цвета пикселя (0,0)
+            try {
+              const canvas = document.createElement('canvas');
+              canvas.width = 1;
+              canvas.height = 1;
+              const ctx = canvas.getContext('2d');
+              if (ctx) {
+                ctx.drawImage(img, 0, 0);
+                const pixelData = ctx.getImageData(0, 0, 1, 1).data;
+                // pixelData = [r, g, b, a] (0-255)
+                const hex = rgbToHex(pixelData[0], pixelData[1], pixelData[2]);
+                const opacity = Number((pixelData[3] / 255).toFixed(2));
+
+                setBgColorHex(hex);
+                setBgOpacity(opacity);
+              }
+            } catch (e) {
+              console.warn("Не удалось извлечь цвет фона (возможно, CORS)", e);
+            }
+          }
+
+          setImages((currentImages) => {
             return currentImages.map((existingItem) =>
               existingItem.id === item.id
                 ? { ...existingItem, naturalWidth: img.width, naturalHeight: img.height }
@@ -126,7 +165,7 @@ export function VerticalImageAligner() {
 
       event.target.value = '';
     },
-    []
+    [images.length]
   );
 
   const handleRemoveImage = useCallback((id: string) => {
@@ -150,6 +189,10 @@ export function VerticalImageAligner() {
       prev.forEach(img => revokeObjectURLSafely(img.url));
       return [];
     });
+    // Сбрасываем фон при полной очистке, или оставляем - на усмотрение. 
+    // Обычно лучше сбросить, чтобы следующее первое фото задало новый фон.
+    setBgColorHex('#ffffff');
+    setBgOpacity(0);
   }, []);
 
   const handleChangeTransform = useCallback(
@@ -163,17 +206,14 @@ export function VerticalImageAligner() {
     []
   );
 
-  // --- Drag and Drop (Сортировка) ---
+  // --- Drag and Drop ---
 
   const handleDragStart = (e: React.DragEvent<HTMLDivElement>, index: number) => {
     setDraggingIndex(index);
-    // Устанавливаем эффект перемещения
     e.dataTransfer.effectAllowed = 'move';
-    // Можно убрать прозрачность для "призрака", если нужно, но стандартное поведение браузера обычно ок
   };
 
   const handleDragOver = (e: React.DragEvent<HTMLDivElement>, index: number) => {
-    // Разрешаем сброс (drop)
     e.preventDefault();
     e.dataTransfer.dropEffect = 'move';
   };
@@ -184,14 +224,12 @@ export function VerticalImageAligner() {
       setDraggingIndex(null);
       return;
     }
-
     setImages((prev) => {
       const newImages = [...prev];
       const [movedItem] = newImages.splice(draggingIndex, 1);
       newImages.splice(targetIndex, 0, movedItem);
       return newImages;
     });
-
     setDraggingIndex(null);
   };
 
@@ -229,6 +267,17 @@ export function VerticalImageAligner() {
 
       ctx.clearRect(0, 0, finalW, finalH);
 
+      // 1. Заливка фона
+      // Нужно сконвертировать hex + opacity в css строку
+      // Но для canvas fillStyle работает rgba(r,g,b,a) или hex. Hex с альфой #RRGGBBAA поддерживается современными браузерами.
+      // Для совместимости лучше распарсить hex обратно в rgb.
+      const r = parseInt(bgColorHex.slice(1, 3), 16);
+      const g = parseInt(bgColorHex.slice(3, 5), 16);
+      const b = parseInt(bgColorHex.slice(5, 7), 16);
+      ctx.fillStyle = `rgba(${r}, ${g}, ${b}, ${bgOpacity})`;
+      ctx.fillRect(0, 0, finalW, finalH);
+
+      // 2. Отрисовка изображений
       loaded.forEach(({ meta, img }, index) => {
         const slotY = index * cellHeight;
         ctx.save();
@@ -258,7 +307,7 @@ export function VerticalImageAligner() {
     } finally {
       setIsExporting(false);
     }
-  }, [images, cellHeight, compositionBounds]);
+  }, [images, cellHeight, compositionBounds, bgColorHex, bgOpacity]);
 
   // --- Управление камерой ---
 
@@ -325,6 +374,14 @@ export function VerticalImageAligner() {
     panStartRef.current = null;
   }, []);
 
+  // CSS-строка цвета фона для использования в style
+  const cssBackgroundColor = useMemo(() => {
+    const r = parseInt(bgColorHex.slice(1, 3), 16);
+    const g = parseInt(bgColorHex.slice(3, 5), 16);
+    const b = parseInt(bgColorHex.slice(5, 7), 16);
+    return `rgba(${r}, ${g}, ${b}, ${bgOpacity})`;
+  }, [bgColorHex, bgOpacity]);
+
   // --- Рендер ---
 
   return (
@@ -334,7 +391,7 @@ export function VerticalImageAligner() {
         <div className="flex-1 overflow-y-auto p-4 custom-scrollbar">
           <h2 className="mb-1 text-lg font-bold">Редактор</h2>
           <p className="mb-6 text-xs text-zinc-500 dark:text-zinc-400">
-            Перетаскивайте слои за иконку слева для изменения порядка.
+            Фон определяется первым загруженным изображением.
           </p>
 
           <div className="mb-4 flex flex-col gap-2">
@@ -362,6 +419,36 @@ export function VerticalImageAligner() {
                 >
                   {isExporting ? '...' : 'Скачать PNG'}
                 </button>
+              </div>
+
+              {/* Настройки фона (Филлер) */}
+              <div className="rounded-lg border border-zinc-200 p-3 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-900/50">
+                <div className="flex items-center justify-between text-xs mb-2">
+                  <span className="font-bold text-zinc-600 dark:text-zinc-400">ФОН (ЗАПОЛНИТЕЛЬ)</span>
+                  <div className="h-3 w-3 border border-zinc-300 shadow-sm rounded-full" style={{ backgroundColor: cssBackgroundColor }} />
+                </div>
+                <div className="space-y-2 text-xs">
+                  <div className="flex items-center justify-between">
+                    <span>Цвет</span>
+                    <input
+                      type="color"
+                      value={bgColorHex}
+                      onChange={(e) => setBgColorHex(e.target.value)}
+                      className="h-5 w-8 p-0 border-none bg-transparent cursor-pointer"
+                    />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span>Прозр.</span>
+                    <input
+                      type="range"
+                      min="0" max="1" step="0.01"
+                      value={bgOpacity}
+                      onChange={(e) => setBgOpacity(Number(e.target.value))}
+                      className="flex-1"
+                    />
+                    <span className="w-6 text-right">{bgOpacity.toFixed(1)}</span>
+                  </div>
+                </div>
               </div>
 
               {/* Настройки высоты слота */}
@@ -454,29 +541,25 @@ export function VerticalImageAligner() {
                 )}
               </div>
 
-              {/* СПИСОК СЛОЕВ С DRAG-AND-DROP */}
+              {/* СПИСОК СЛОЕВ */}
               <div className="flex-1 min-h-0 flex flex-col">
                 <h3 className="mb-1 text-xs font-medium uppercase text-zinc-400">Слои (порядок)</h3>
                 <div className="flex-1 space-y-1 overflow-y-auto rounded border border-zinc-200 p-1 dark:border-zinc-800">
                   {images.map((img, i) => (
                     <div
                       key={img.id}
-                      // Включаем DnD на самом элементе
                       draggable
                       onDragStart={(e) => handleDragStart(e, i)}
                       onDragOver={(e) => handleDragOver(e, i)}
                       onDrop={(e) => handleDrop(e, i)}
                       onDragEnd={handleDragEnd}
                       className={`group flex w-full items-center gap-2 rounded px-2 py-1.5 text-xs transition border 
-                        ${
-                        // Визуальный стиль при перетаскивании
-                        draggingIndex === i ? 'opacity-40 border-dashed border-zinc-400 bg-zinc-100' :
+                        ${draggingIndex === i ? 'opacity-40 border-dashed border-zinc-400 bg-zinc-100' :
                           img.isActive
                             ? 'bg-blue-50 border-blue-200 text-blue-700 dark:bg-blue-900/30 dark:border-blue-800 dark:text-blue-200'
                             : 'border-transparent hover:bg-zinc-100 dark:hover:bg-zinc-800'
                         }`}
                     >
-                      {/* Ручка для перетаскивания (Визуальная часть) */}
                       <div className="cursor-move text-zinc-300 hover:text-zinc-500 dark:text-zinc-600 dark:hover:text-zinc-400 flex-shrink-0">
                         <svg width="10" height="14" viewBox="0 0 6 14" fill="currentColor">
                           <circle cx="1.5" cy="2" r="1.5" />
@@ -562,7 +645,21 @@ export function VerticalImageAligner() {
         >
           {images.length > 0 && (
             <>
-              {/* МАСКА */}
+              {/* 
+                 ФОН АКТИВНОЙ ЗОНЫ (Заполнитель) 
+                 Этот слой лежит под картинками, но над подложкой мира.
+                 Его размер совпадает с активной областью.
+              */}
+              <div
+                className="absolute top-0 left-0 z-0"
+                style={{
+                  width: compositionBounds.width,
+                  height: compositionBounds.height,
+                  backgroundColor: cssBackgroundColor
+                }}
+              />
+
+              {/* МАСКА (Затемнение внешней зоны) */}
               <div
                 className="absolute top-0 left-0 pointer-events-none z-30"
                 style={{
