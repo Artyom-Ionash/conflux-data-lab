@@ -35,7 +35,14 @@ export function MonochromeBackgroundRemover() {
 
   // --- STATE: Настройки ---
   const [targetColor, setTargetColor] = useState('#ffffff');
-  const [tolerance, setTolerance] = useState(20);
+
+  // ИЗМЕНЕНИЕ: Независимые значения допуска для каждого режима
+  const [tolerances, setTolerances] = useState<Record<ProcessingMode, number>>({
+    'remove': 20,
+    'keep': 20,
+    'flood-clear': 20
+  });
+
   const [smoothness, setSmoothness] = useState(10);
   const [processingMode, setProcessingMode] = useState<ProcessingMode>('remove');
 
@@ -46,7 +53,7 @@ export function MonochromeBackgroundRemover() {
   // --- STATE: Интерфейс ---
   const [isDarkBackground, setIsDarkBackground] = useState(true);
   const [isAutoContrast, setIsAutoContrast] = useState(true);
-  const [autoContrastPeriod, setAutoContrastPeriod] = useState(5); // Период в секундах
+  const [autoContrastPeriod, setAutoContrastPeriod] = useState(5);
   const [isProcessing, setIsProcessing] = useState(false);
 
   // --- STATE: Viewport ---
@@ -83,7 +90,6 @@ export function MonochromeBackgroundRemover() {
     const visualX = clientX - rect.left;
     const visualY = clientY - rect.top;
 
-    // Учитываем натуральный размер vs текущий отображаемый размер
     const ratioX = imageRef.current.naturalWidth / rect.width;
     const ratioY = imageRef.current.naturalHeight / rect.height;
 
@@ -101,12 +107,24 @@ export function MonochromeBackgroundRemover() {
   // -------------------------------------------------------------------------
   const handleModeChange = (mode: ProcessingMode) => {
     setProcessingMode(mode);
+
+    // Сброс точек при уходе с заливки
     if (mode !== 'flood-clear') setFloodPoints([]);
+
+    // Настройка цветов по умолчанию для режимов
     if (mode === 'flood-clear') {
       setTargetColor('#000000');
     } else if (targetColor === '#000000') {
       setTargetColor('#ffffff');
     }
+  };
+
+  // Хелпер для изменения допуска текущего режима
+  const handleToleranceChange = (value: number) => {
+    setTolerances(prev => ({
+      ...prev,
+      [processingMode]: value
+    }));
   };
 
   // -------------------------------------------------------------------------
@@ -124,7 +142,7 @@ export function MonochromeBackgroundRemover() {
       const direction = e.deltaY > 0 ? -1 : 1;
       const currentScale = scaleRef.current;
       let newScale = currentScale + direction * zoomSpeed * currentScale;
-      newScale = Math.max(0.05, Math.min(newScale, 40)); // Увеличил макс зум до 40x для пиксель-арта
+      newScale = Math.max(0.05, Math.min(newScale, 40));
 
       const rect = container.getBoundingClientRect();
       const mouseX = e.clientX - rect.left;
@@ -157,7 +175,6 @@ export function MonochromeBackgroundRemover() {
     return () => clearInterval(interval);
   }, [isAutoContrast, autoContrastPeriod]);
 
-  // Быстрый переход если выключили авто, плавный если включили
   const transitionDurationMs = isAutoContrast ? (autoContrastPeriod * 1000) * 0.9 : 300;
 
   // -------------------------------------------------------------------------
@@ -192,7 +209,10 @@ export function MonochromeBackgroundRemover() {
         if (!targetRGB) { setIsProcessing(false); return; }
 
         const maxDist = 441.67;
-        const tolVal = (tolerance / 100) * maxDist;
+
+        // ИСПОЛЬЗУЕМ ДОПУСК ТЕКУЩЕГО РЕЖИМА
+        const currentTolerance = tolerances[processingMode];
+        const tolVal = (currentTolerance / 100) * maxDist;
         const smoothVal = (smoothness / 100) * maxDist;
 
         const getDist = (i: number) => Math.sqrt(
@@ -202,6 +222,7 @@ export function MonochromeBackgroundRemover() {
         );
 
         if (processingMode === 'flood-clear') {
+          // В режиме заливки, если точек нет — возвращаем оригинал (сброс эффектов других режимов)
           if (floodPoints.length === 0) {
             setProcessedUrl(originalUrl);
             setIsProcessing(false);
@@ -265,17 +286,23 @@ export function MonochromeBackgroundRemover() {
         setIsProcessing(false);
       }, 50);
     };
-  }, [originalUrl, targetColor, tolerance, smoothness, imgDimensions, processingMode, floodPoints]);
+  }, [originalUrl, targetColor, tolerances, smoothness, imgDimensions, processingMode, floodPoints]);
 
   useEffect(() => {
     if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+    // Для обычных режимов — автообновление при смене параметров
+    // Для flood-clear — обновление при смене режима (сброс) или триггере
     if (processingMode !== 'flood-clear') {
       debounceTimerRef.current = setTimeout(() => {
         if (originalUrl) processImage();
       }, 100);
+    } else {
+      // При переключении на flood-clear тоже нужно запустить processImage, 
+      // чтобы он сбросил картинку в оригинал (если точек нет)
+      if (originalUrl) processImage();
     }
     return () => { if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current); }
-  }, [originalUrl, targetColor, tolerance, smoothness, processingMode]);
+  }, [originalUrl, targetColor, tolerances, smoothness, processingMode]);
 
   useEffect(() => {
     if (manualTrigger > 0 && processingMode === 'flood-clear') {
@@ -299,6 +326,7 @@ export function MonochromeBackgroundRemover() {
       setProcessedUrl(url);
       setImgDimensions({ w: img.width, h: img.height });
       setFloodPoints([]);
+      // При новой загрузке сбрасываем допуски? Или оставляем? Оставим как есть.
 
       if (containerRef.current) {
         const contW = containerRef.current.clientWidth;
@@ -488,9 +516,16 @@ export function MonochromeBackgroundRemover() {
                 <div>
                   <div className="flex justify-between text-xs mb-1">
                     <span>Допуск</span>
-                    <span className="text-blue-500 font-mono">{tolerance}%</span>
+                    <span className="text-blue-500 font-mono">{tolerances[processingMode]}%</span>
                   </div>
-                  <input type="range" min="0" max="100" value={tolerance} onChange={e => setTolerance(Number(e.target.value))} className="w-full h-1.5 bg-zinc-200 rounded-lg appearance-none cursor-pointer dark:bg-zinc-600 accent-blue-600" />
+                  <input
+                    type="range"
+                    min="0"
+                    max="100"
+                    value={tolerances[processingMode]}
+                    onChange={e => handleToleranceChange(Number(e.target.value))}
+                    className="w-full h-1.5 bg-zinc-200 rounded-lg appearance-none cursor-pointer dark:bg-zinc-600 accent-blue-600"
+                  />
                 </div>
                 {processingMode !== 'flood-clear' && (
                   <div>
