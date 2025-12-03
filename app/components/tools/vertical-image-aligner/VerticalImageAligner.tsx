@@ -17,7 +17,6 @@ type AlignImage = {
 
 const MAX_CANVAS_HEIGHT = 16000;
 
-// Вспомогательная функция для конвертации RGB в HEX (для input type="color")
 function rgbToHex(r: number, g: number, b: number) {
   return "#" + [r, g, b].map(x => {
     const hex = x.toString(16);
@@ -45,7 +44,7 @@ export function VerticalImageAligner() {
 
   // Настройки фона полотна
   const [bgColorHex, setBgColorHex] = useState('#ffffff');
-  const [bgOpacity, setBgOpacity] = useState(0); // По умолчанию прозрачный, пока не загрузим фото
+  const [bgOpacity, setBgOpacity] = useState(0);
 
   // Настройки вспомогательной сетки
   const [showGrid, setShowGrid] = useState(true);
@@ -74,7 +73,6 @@ export function VerticalImageAligner() {
     [images]
   );
 
-  // Границы композиции
   const compositionBounds = useMemo(() => {
     if (!images.length) return { width: 0, height: 0 };
     const height = images.length * cellHeight;
@@ -87,7 +85,7 @@ export function VerticalImageAligner() {
     return { width, height };
   }, [images, cellHeight]);
 
-  // --- Обработчики Файлов ---
+  // --- Обработчики ---
 
   const handleFilesChange = useCallback(
     (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -95,6 +93,7 @@ export function VerticalImageAligner() {
       if (!files || files.length === 0) return;
 
       const newImages: AlignImage[] = [];
+      const isListEmpty = images.length === 0;
 
       Array.from(files).forEach((file, index) => {
         if (!file.type.startsWith('image/')) return;
@@ -109,29 +108,19 @@ export function VerticalImageAligner() {
           offsetX: 0,
           offsetY: 0,
           scale: 1,
-          isActive: false,
+          isActive: isListEmpty && index === 0,
           naturalWidth: 0,
           naturalHeight: 0,
         });
       });
-
-      // Проверяем, пуст ли список до добавления (чтобы понять, нужно ли брать цвет с первого фото)
-      // Из-за асинхронности setState используем длину из текущего рендера,
-      // но надежнее проверить внутри onload, зная индекс.
-      const isListEmpty = images.length === 0;
 
       setImages((prev) => [...prev, ...newImages]);
 
       newImages.forEach((item, idx) => {
         const img = new Image();
         img.onload = () => {
-
-          // --- Логика извлечения цвета и размера (только для самого первого фото) ---
           if (isListEmpty && idx === 0) {
-            // 1. Установка высоты слота
             setCellHeight(img.height);
-
-            // 2. Извлечение цвета пикселя (0,0)
             try {
               const canvas = document.createElement('canvas');
               canvas.width = 1;
@@ -140,15 +129,13 @@ export function VerticalImageAligner() {
               if (ctx) {
                 ctx.drawImage(img, 0, 0);
                 const pixelData = ctx.getImageData(0, 0, 1, 1).data;
-                // pixelData = [r, g, b, a] (0-255)
                 const hex = rgbToHex(pixelData[0], pixelData[1], pixelData[2]);
                 const opacity = Number((pixelData[3] / 255).toFixed(2));
-
                 setBgColorHex(hex);
                 setBgOpacity(opacity);
               }
             } catch (e) {
-              console.warn("Не удалось извлечь цвет фона (возможно, CORS)", e);
+              // ignore
             }
           }
 
@@ -189,8 +176,6 @@ export function VerticalImageAligner() {
       prev.forEach(img => revokeObjectURLSafely(img.url));
       return [];
     });
-    // Сбрасываем фон при полной очистке, или оставляем - на усмотрение. 
-    // Обычно лучше сбросить, чтобы следующее первое фото задало новый фон.
     setBgColorHex('#ffffff');
     setBgOpacity(0);
   }, []);
@@ -205,8 +190,6 @@ export function VerticalImageAligner() {
     },
     []
   );
-
-  // --- Drag and Drop ---
 
   const handleDragStart = (e: React.DragEvent<HTMLDivElement>, index: number) => {
     setDraggingIndex(index);
@@ -237,8 +220,6 @@ export function VerticalImageAligner() {
     setDraggingIndex(null);
   };
 
-  // --- Экспорт ---
-
   const handleExport = useCallback(async () => {
     if (!images.length) return;
     setIsExporting(true);
@@ -267,17 +248,12 @@ export function VerticalImageAligner() {
 
       ctx.clearRect(0, 0, finalW, finalH);
 
-      // 1. Заливка фона
-      // Нужно сконвертировать hex + opacity в css строку
-      // Но для canvas fillStyle работает rgba(r,g,b,a) или hex. Hex с альфой #RRGGBBAA поддерживается современными браузерами.
-      // Для совместимости лучше распарсить hex обратно в rgb.
       const r = parseInt(bgColorHex.slice(1, 3), 16);
       const g = parseInt(bgColorHex.slice(3, 5), 16);
       const b = parseInt(bgColorHex.slice(5, 7), 16);
       ctx.fillStyle = `rgba(${r}, ${g}, ${b}, ${bgOpacity})`;
       ctx.fillRect(0, 0, finalW, finalH);
 
-      // 2. Отрисовка изображений
       loaded.forEach(({ meta, img }, index) => {
         const slotY = index * cellHeight;
         ctx.save();
@@ -308,8 +284,6 @@ export function VerticalImageAligner() {
       setIsExporting(false);
     }
   }, [images, cellHeight, compositionBounds, bgColorHex, bgOpacity]);
-
-  // --- Управление камерой ---
 
   const handlePreviewWheel = useCallback(
     (event: React.WheelEvent<HTMLDivElement>) => {
@@ -374,7 +348,6 @@ export function VerticalImageAligner() {
     panStartRef.current = null;
   }, []);
 
-  // CSS-строка цвета фона для использования в style
   const cssBackgroundColor = useMemo(() => {
     const r = parseInt(bgColorHex.slice(1, 3), 16);
     const g = parseInt(bgColorHex.slice(3, 5), 16);
@@ -382,16 +355,22 @@ export function VerticalImageAligner() {
     return `rgba(${r}, ${g}, ${b}, ${bgOpacity})`;
   }, [bgColorHex, bgOpacity]);
 
-  // --- Рендер ---
-
   return (
     <div className="fixed inset-0 flex flex-row overflow-hidden bg-zinc-50 dark:bg-zinc-950 font-sans text-zinc-900 dark:text-zinc-100">
-      {/* --- ЛЕВАЯ ПАНЕЛЬ --- */}
       <aside className="z-20 flex w-80 flex-shrink-0 flex-col border-r border-zinc-200 bg-white shadow-xl dark:border-zinc-800 dark:bg-zinc-900">
         <div className="flex-1 overflow-y-auto p-4 custom-scrollbar">
-          <h2 className="mb-1 text-lg font-bold">Редактор</h2>
+
+          {/* КНОПКА НАЗАД */}
+          <a href="/" className="mb-3 inline-flex items-center gap-2 text-xs font-medium text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-200 transition-colors">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M19 12H5M12 19l-7-7 7-7" />
+            </svg>
+            На главную
+          </a>
+
+          <h2 className="mb-1 text-lg font-bold">Вертикальный склейщик</h2>
           <p className="mb-6 text-xs text-zinc-500 dark:text-zinc-400">
-            Фон определяется первым загруженным изображением.
+            Загрузите изображения для создания вертикальной ленты.
           </p>
 
           <div className="mb-4 flex flex-col gap-2">
@@ -421,7 +400,6 @@ export function VerticalImageAligner() {
                 </button>
               </div>
 
-              {/* Настройки фона (Филлер) */}
               <div className="rounded-lg border border-zinc-200 p-3 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-900/50">
                 <div className="flex items-center justify-between text-xs mb-2">
                   <span className="font-bold text-zinc-600 dark:text-zinc-400">ФОН (ЗАПОЛНИТЕЛЬ)</span>
@@ -451,7 +429,6 @@ export function VerticalImageAligner() {
                 </div>
               </div>
 
-              {/* Настройки высоты слота */}
               <div className="rounded-lg border border-zinc-200 p-3 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-900/50">
                 <div className="flex items-center justify-between text-xs mb-1">
                   <span className="font-bold text-zinc-600 dark:text-zinc-400">ВЫСОТА СЛОТА</span>
@@ -469,7 +446,6 @@ export function VerticalImageAligner() {
                 </div>
               </div>
 
-              {/* Настройки ВСПОМОГАТЕЛЬНОЙ СЕТКИ */}
               <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-3 dark:border-zinc-800 dark:bg-zinc-900/50">
                 <div className="mb-3 flex items-center justify-between">
                   <label className="flex cursor-pointer items-center gap-2 text-xs font-bold uppercase text-zinc-700 dark:text-zinc-300">
@@ -541,7 +517,32 @@ export function VerticalImageAligner() {
                 )}
               </div>
 
-              {/* СПИСОК СЛОЕВ */}
+              {activeImageId && (
+                <div className="rounded bg-zinc-100 p-2 text-xs dark:bg-zinc-800/50 mb-4">
+                  <div className="mb-2 font-bold text-zinc-500">Настройки активного слоя</div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label>Сдвиг Y</label>
+                      <input
+                        type="number"
+                        className="w-full rounded border px-1"
+                        value={images.find(i => i.id === activeImageId)?.offsetY}
+                        onChange={(e) => handleChangeTransform(activeImageId, 'offsetY', Number(e.target.value))}
+                      />
+                    </div>
+                    <div>
+                      <label>Сдвиг X</label>
+                      <input
+                        type="number"
+                        className="w-full rounded border px-1"
+                        value={images.find(i => i.id === activeImageId)?.offsetX}
+                        onChange={(e) => handleChangeTransform(activeImageId, 'offsetX', Number(e.target.value))}
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+
               <div className="flex-1 min-h-0 flex flex-col">
                 <h3 className="mb-1 text-xs font-medium uppercase text-zinc-400">Слои (порядок)</h3>
                 <div className="flex-1 space-y-1 overflow-y-auto rounded border border-zinc-200 p-1 dark:border-zinc-800">
@@ -592,38 +593,11 @@ export function VerticalImageAligner() {
                   ))}
                 </div>
               </div>
-
-              {activeImageId && (
-                <div className="rounded bg-zinc-100 p-2 text-xs dark:bg-zinc-800/50">
-                  <div className="mb-2 font-bold text-zinc-500">Активный слой</div>
-                  <div className="grid grid-cols-2 gap-2">
-                    <div>
-                      <label>Сдвиг Y</label>
-                      <input
-                        type="number"
-                        className="w-full rounded border px-1"
-                        value={images.find(i => i.id === activeImageId)?.offsetY}
-                        onChange={(e) => handleChangeTransform(activeImageId, 'offsetY', Number(e.target.value))}
-                      />
-                    </div>
-                    <div>
-                      <label>Сдвиг X</label>
-                      <input
-                        type="number"
-                        className="w-full rounded border px-1"
-                        value={images.find(i => i.id === activeImageId)?.offsetX}
-                        onChange={(e) => handleChangeTransform(activeImageId, 'offsetX', Number(e.target.value))}
-                      />
-                    </div>
-                  </div>
-                </div>
-              )}
             </div>
           )}
         </div>
       </aside>
 
-      {/* --- ПРАВАЯ ПАНЕЛЬ --- */}
       <main
         ref={viewportRef}
         className="relative flex-1 overflow-hidden bg-[#e5e5e5] dark:bg-[#111] cursor-grab active:cursor-grabbing"
@@ -633,8 +607,6 @@ export function VerticalImageAligner() {
         onPointerUp={stopPanning}
         onPointerLeave={stopPanning}
       >
-
-        {/* 1. МИР */}
         <div
           style={{
             transform: `translate(${cameraOffset.x}px, ${cameraOffset.y}px) scale(${cameraScale})`,
@@ -645,11 +617,6 @@ export function VerticalImageAligner() {
         >
           {images.length > 0 && (
             <>
-              {/* 
-                 ФОН АКТИВНОЙ ЗОНЫ (Заполнитель) 
-                 Этот слой лежит под картинками, но над подложкой мира.
-                 Его размер совпадает с активной областью.
-              */}
               <div
                 className="absolute top-0 left-0 z-0"
                 style={{
@@ -658,8 +625,6 @@ export function VerticalImageAligner() {
                   backgroundColor: cssBackgroundColor
                 }}
               />
-
-              {/* МАСКА (Затемнение внешней зоны) */}
               <div
                 className="absolute top-0 left-0 pointer-events-none z-30"
                 style={{
@@ -668,8 +633,6 @@ export function VerticalImageAligner() {
                   outline: '50000px solid rgba(0, 0, 0, 0.65)'
                 }}
               />
-
-              {/* СЛОТЫ И ИЗОБРАЖЕНИЯ */}
               {images.map((img, i) => (
                 <div
                   key={img.id}
@@ -704,7 +667,6 @@ export function VerticalImageAligner() {
           )}
         </div>
 
-        {/* 2. ВСПОМОГАТЕЛЬНАЯ СЕТКА */}
         {images.length > 0 && showGrid && (
           <div
             className="absolute pointer-events-none z-50"
