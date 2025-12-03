@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useCallback, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useMemo, useRef, useState, useEffect } from 'react';
 
 type AlignImage = {
   id: string;
@@ -46,13 +46,18 @@ export function VerticalImageAligner() {
   const [bgColorHex, setBgColorHex] = useState('#ffffff');
   const [bgOpacity, setBgOpacity] = useState(0);
 
-  // Настройки вспомогательной сетки
+  // Настройки вспомогательной сетки (Линейка)
   const [showGrid, setShowGrid] = useState(true);
   const [gridWidth, setGridWidth] = useState(100);
   const [gridHeight, setGridHeight] = useState(100);
   const [gridOffsetX, setGridOffsetX] = useState(0);
   const [gridOffsetY, setGridOffsetY] = useState(0);
   const [gridColor, setGridColor] = useState('#ff0000');
+
+  // --- НОВЫЕ НАСТРОЙКИ: Границы кадров ---
+  const [showFrameBorders, setShowFrameBorders] = useState(false);
+  const [frameWidth, setFrameWidth] = useState(300); // По умолчанию равно cellHeight
+  const [frameBorderColor, setFrameBorderColor] = useState('#00ff00'); // Зеленый для контраста
 
   // Камера
   const [cameraScale, setCameraScale] = useState(0.4);
@@ -68,6 +73,12 @@ export function VerticalImageAligner() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [isExporting, setIsExporting] = useState(false);
 
+  // При инициализации или загрузке первого изображения, если ширина кадра не менялась пользователем,
+  // можно было бы синхронизировать, но сделаем это через useEffect при первой загрузке
+  // или просто оставим ручное управление.
+  // Логика "по умолчанию шириной, равной высоте слота" реализована в инициализации useState(300)
+  // и кнопке синхронизации.
+
   const activeImageId = useMemo(
     () => images.find((img) => img.isActive)?.id ?? null,
     [images]
@@ -81,9 +92,10 @@ export function VerticalImageAligner() {
       const rightEdge = img.offsetX + (img.naturalWidth * img.scale);
       if (rightEdge > maxRight) maxRight = rightEdge;
     });
-    const width = Math.max(1, maxRight);
+    // Учитываем также ширину кадра для границ, чтобы сетка рисовалась достаточно далеко вправо
+    const width = Math.max(1, maxRight, frameWidth * 2);
     return { width, height };
-  }, [images, cellHeight]);
+  }, [images, cellHeight, frameWidth]);
 
   // --- Обработчики ---
 
@@ -120,7 +132,11 @@ export function VerticalImageAligner() {
         const img = new Image();
         img.onload = () => {
           if (isListEmpty && idx === 0) {
+            // Устанавливаем высоту слота по первому изображению
             setCellHeight(img.height);
+            // Также обновляем дефолтную ширину кадра, если это первая загрузка
+            setFrameWidth(img.height);
+
             try {
               const canvas = document.createElement('canvas');
               canvas.width = 1;
@@ -446,6 +462,7 @@ export function VerticalImageAligner() {
                 </div>
               </div>
 
+              {/* БЛОК НАСТРОЙКИ ЛИНЕЙКИ */}
               <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-3 dark:border-zinc-800 dark:bg-zinc-900/50">
                 <div className="mb-3 flex items-center justify-between">
                   <label className="flex cursor-pointer items-center gap-2 text-xs font-bold uppercase text-zinc-700 dark:text-zinc-300">
@@ -513,6 +530,48 @@ export function VerticalImageAligner() {
                         </div>
                       </div>
                     </div>
+                  </div>
+                )}
+              </div>
+
+              {/* БЛОК НАСТРОЙКИ ГРАНИЦ КАДРОВ (НОВОЕ) */}
+              <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-3 dark:border-zinc-800 dark:bg-zinc-900/50">
+                <div className="flex items-center justify-between mb-2">
+                  <label className="flex cursor-pointer items-center gap-2 text-xs font-bold uppercase text-zinc-700 dark:text-zinc-300">
+                    <input
+                      type="checkbox"
+                      checked={showFrameBorders}
+                      onChange={(e) => setShowFrameBorders(e.target.checked)}
+                      className="h-4 w-4 rounded border-zinc-400"
+                    />
+                    Границы кадров
+                  </label>
+                  {showFrameBorders && (
+                    <input
+                      type="color"
+                      value={frameBorderColor}
+                      onChange={(e) => setFrameBorderColor(e.target.value)}
+                      className="h-5 w-6 cursor-pointer rounded border-none bg-transparent p-0"
+                    />
+                  )}
+                </div>
+                {showFrameBorders && (
+                  <div className="flex gap-2 items-center text-xs">
+                    <span className="text-zinc-500">Ширина:</span>
+                    <input
+                      type="number"
+                      min={10}
+                      value={frameWidth}
+                      onChange={(e) => setFrameWidth(Number(e.target.value))}
+                      className="flex-1 w-full rounded border border-zinc-300 px-1 py-1 dark:border-zinc-700 dark:bg-zinc-800"
+                    />
+                    <button
+                      onClick={() => setFrameWidth(cellHeight)}
+                      className="rounded border border-zinc-300 px-2 py-1 hover:bg-zinc-200 dark:border-zinc-700 dark:hover:bg-zinc-800 text-[10px]"
+                      title="Установить ширину равной высоте слота"
+                    >
+                      =H
+                    </button>
                   </div>
                 )}
               </div>
@@ -667,6 +726,7 @@ export function VerticalImageAligner() {
           )}
         </div>
 
+        {/* ОБЫЧНАЯ ЛИНЕЙКА (Z-50) */}
         {images.length > 0 && showGrid && (
           <div
             className="absolute pointer-events-none z-50"
@@ -682,6 +742,28 @@ export function VerticalImageAligner() {
               backgroundSize: `${gridWidth * cameraScale}px ${gridHeight * cameraScale}px`,
               backgroundPosition: `${gridOffsetX * cameraScale}px ${gridOffsetY * cameraScale}px`,
               overflow: 'hidden'
+            }}
+          />
+        )}
+
+        {/* ГРАНИЦЫ КАДРОВ (Z-60, приоритетнее линейки) */}
+        {images.length > 0 && showFrameBorders && (
+          <div
+            className="absolute pointer-events-none z-[60]"
+            style={{
+              left: cameraOffset.x,
+              top: cameraOffset.y,
+              width: compositionBounds.width * cameraScale,
+              height: compositionBounds.height * cameraScale,
+              backgroundImage: `
+                    linear-gradient(to right, ${frameBorderColor} 2px, transparent 2px),
+                    linear-gradient(to bottom, ${frameBorderColor} 2px, transparent 2px)
+                `,
+              backgroundSize: `${frameWidth * cameraScale}px ${cellHeight * cameraScale}px`,
+              // Границы кадров всегда начинаются от 0,0 относительно холста, без смещения
+              backgroundPosition: `0px 0px`,
+              overflow: 'hidden',
+              opacity: 0.8
             }}
           />
         )}
