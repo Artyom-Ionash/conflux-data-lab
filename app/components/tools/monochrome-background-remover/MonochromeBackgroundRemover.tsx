@@ -34,11 +34,10 @@ export function MonochromeBackgroundRemover() {
   const [imgDimensions, setImgDimensions] = useState({ w: 0, h: 0 });
 
   // --- STATE: Настройки ---
-  // ИЗМЕНЕНИЕ: Храним цвета для каждого режима отдельно
   const [targetColors, setTargetColors] = useState<Record<ProcessingMode, string>>({
     'remove': '#ffffff',
     'keep': '#ffffff',
-    'flood-clear': '#000000' // Для контура обычно черный
+    'flood-clear': '#000000'
   });
 
   const [tolerances, setTolerances] = useState<Record<ProcessingMode, number>>({
@@ -111,10 +110,8 @@ export function MonochromeBackgroundRemover() {
   // -------------------------------------------------------------------------
   const handleModeChange = (mode: ProcessingMode) => {
     setProcessingMode(mode);
-    // Цвет автоматически подтянется из targetColors[mode] в рендере и processImage
   };
 
-  // Хелпер для смены цвета текущего режима
   const handleColorChange = (newColor: string) => {
     setTargetColors(prev => ({
       ...prev,
@@ -207,7 +204,6 @@ export function MonochromeBackgroundRemover() {
         const width = canvas.width;
         const height = canvas.height;
 
-        // ИЗМЕНЕНИЕ: Берем цвет для текущего режима из объекта targetColors
         const currentTargetHex = targetColors[processingMode];
         const targetRGB = hexToRgb(currentTargetHex);
 
@@ -318,6 +314,23 @@ export function MonochromeBackgroundRemover() {
     img.src = url;
 
     img.onload = () => {
+      // ИЗМЕНЕНИЕ: Определяем цвет левого верхнего пикселя (0,0)
+      const canvas = document.createElement('canvas');
+      canvas.width = 1;
+      canvas.height = 1;
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        ctx.drawImage(img, 0, 0);
+        const p = ctx.getImageData(0, 0, 1, 1).data;
+        const topLeftColor = rgbToHex(p[0], p[1], p[2]);
+
+        // Обновляем цвет только для режима 'remove'
+        setTargetColors(prev => ({
+          ...prev,
+          'remove': topLeftColor
+        }));
+      }
+
       setOriginalUrl(url);
       setProcessedUrl(url);
       setImgDimensions({ w: img.width, h: img.height });
@@ -447,7 +460,6 @@ export function MonochromeBackgroundRemover() {
     i.onload = () => {
       ctx.drawImage(i, -Math.floor(x), -Math.floor(y));
       const p = ctx.getImageData(0, 0, 1, 1).data;
-      // ИЗМЕНЕНИЕ: Устанавливаем цвет только для текущего режима
       handleColorChange(rgbToHex(p[0], p[1], p[2]));
     }
   };
@@ -455,7 +467,6 @@ export function MonochromeBackgroundRemover() {
   const removeLastPoint = () => setFloodPoints(prev => prev.slice(0, -1));
   const clearAllPoints = () => setFloodPoints([]);
 
-  // Получаем текущий активный цвет для отображения в инпуте
   const currentActiveColor = targetColors[processingMode];
 
   return (
@@ -602,7 +613,6 @@ export function MonochromeBackgroundRemover() {
           <div className="absolute top-0 left-0 w-full h-full flex items-center justify-center will-change-transform" style={{ transform: `translate(${offset.x}px, ${offset.y}px) scale(${scale})`, transformOrigin: '0 0' }}>
             {processedUrl ? (
               <div className="relative shadow-2xl">
-                {/* 1. imageRendering: 'pixelated' для четкости при зуме */}
                 <img
                   ref={imageRef}
                   src={processedUrl}
@@ -616,9 +626,6 @@ export function MonochromeBackgroundRemover() {
                   <div
                     key={i}
                     onPointerDown={(e) => handlePointPointerDown(e, i)}
-                    // 2. Точки: Используем transform: scale(1/scale) для сохранения визуального размера
-                    // left/top привязаны к пикселям картинки. translate(-50%, -50%) центрирует.
-                    // scale(1/scale) компенсирует увеличение родителя.
                     className={`absolute z-20 cursor-grab active:cursor-grabbing hover:brightness-125 ${draggingPointIndex === i ? 'brightness-150' : ''}`}
                     style={{
                       left: pt.x,
@@ -626,11 +633,9 @@ export function MonochromeBackgroundRemover() {
                       width: '10px',
                       height: '10px',
                       transform: `translate(-50%, -50%) scale(${1 / scale})`,
-                      // Важно: will-change помогает браузеру рендерить это четко
                       willChange: 'transform'
                     }}
                   >
-                    {/* Внутренний круг точки (10x10 px) */}
                     <div className="w-full h-full bg-red-500 border border-white rounded-full shadow-[0_0_2px_rgba(0,0,0,0.8)]" />
                   </div>
                 ))}
