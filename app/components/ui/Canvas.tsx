@@ -14,7 +14,6 @@ export interface CanvasTransform {
 }
 
 export interface CanvasRef {
-  /** Программный сброс вида (например, при загрузке нового файла) */
   resetView: (width?: number, height?: number) => void;
   getTransform: () => CanvasTransform;
   screenToWorld: (clientX: number, clientY: number) => Point;
@@ -27,11 +26,8 @@ interface CanvasProps {
   minScale?: number;
   maxScale?: number;
   initialScale?: number;
-  /** Ширина контента для корректной работы кнопки "Сброс" */
   contentWidth?: number;
-  /** Высота контента для корректной работы кнопки "Сброс" */
   contentHeight?: number;
-  /** Можно принудительно задать тему, если не задано - используется внутренняя с переключателем */
   theme?: 'light' | 'dark';
 }
 
@@ -48,13 +44,12 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(
     theme: propTheme,
   }, ref) => {
     const containerRef = useRef<HTMLDivElement>(null);
-    // Ссылка на слой контента для прямого манипулирования DOM
     const contentRef = useRef<HTMLDivElement>(null);
+    // Ref для прямого обновления текста без ре-рендера React
+    const zoomLabelRef = useRef<HTMLSpanElement>(null);
 
-    // --- Performance Optimization: Refs instead of State ---
     const transform = useRef<CanvasTransform>({ scale: initialScale, x: 0, y: 0 });
 
-    // State для взаимодействия
     const [isPanning, setIsPanning] = useState(false);
     const [internalTheme, setInternalTheme] = useState<'light' | 'dark'>('dark');
     const [isAutoContrast, setIsAutoContrast] = useState(false);
@@ -67,10 +62,15 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(
 
     // --- Direct DOM Update ---
     const updateDOM = useCallback(() => {
+      // 1. Обновляем трансформацию слоя
       if (contentRef.current) {
         const { x, y, scale } = transform.current;
         contentRef.current.style.transform = `translate(${x}px, ${y}px) scale(${scale})`;
         contentRef.current.style.setProperty('--canvas-scale', scale.toString());
+      }
+      // 2. Обновляем текст индикатора масштаба напрямую
+      if (zoomLabelRef.current) {
+        zoomLabelRef.current.innerText = `${Math.round(transform.current.scale * 100)}%`;
       }
     }, []);
 
@@ -108,7 +108,6 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(
       updateDOM();
     }, [contentWidth, contentHeight, updateDOM]);
 
-    // --- API for Parents ---
     useImperativeHandle(ref, () => ({
       resetView: (w, h) => performResetView(w, h),
       getTransform: () => transform.current,
@@ -122,7 +121,6 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(
       }
     }));
 
-    // --- Effect: Auto Contrast ---
     useEffect(() => {
       let interval: NodeJS.Timeout;
       if (isAutoContrast) {
@@ -143,9 +141,10 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(
       const mouseX = e.clientX - rect.left;
       const mouseY = e.clientY - rect.top;
 
-      const zoomIntensity = 0.1;
-      const direction = e.deltaY > 0 ? -1 : 1;
-      const factor = 1 + (direction * zoomIntensity);
+      // ИСПРАВЛЕНИЕ: Используем deltaY для плавного масштабирования
+      // Коэффициент 0.002 подобран эмпирически для комфортного зума на тачпадах и мышках
+      const zoomIntensity = 0.002;
+      const factor = Math.exp(-e.deltaY * zoomIntensity);
 
       const current = transform.current;
       let newScale = current.scale * factor;
@@ -160,7 +159,7 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(
     };
 
     const handlePointerDown = (e: React.PointerEvent) => {
-      if (e.button === 1) { // Middle Mouse Button
+      if (e.button === 1) {
         e.preventDefault();
         if (containerRef.current) containerRef.current.setPointerCapture(e.pointerId);
         setIsPanning(true);
@@ -189,7 +188,6 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(
       }
     };
 
-    // --- Styles ---
     const isDark = activeTheme === 'dark';
     const bgClass = isDark ? 'bg-[#111]' : 'bg-[#e5e5e5]';
     const gridOpacity = isDark ? 'opacity-10' : 'opacity-30';
@@ -229,13 +227,22 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(
           )}
 
           <div className="w-px h-4 bg-zinc-300 dark:bg-zinc-700 mx-1" />
-          <button onClick={() => performResetView()} className="text-xs font-mono px-2 text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-300 transition-colors">Сброс</button>
+
+          {/* Индикатор масштаба */}
+          <span
+            ref={zoomLabelRef}
+            className="text-xs font-mono px-1 min-w-[3ch] text-right text-zinc-500 dark:text-zinc-400 select-none"
+          >
+            {(initialScale * 100).toFixed(0)}%
+          </span>
+
+          <button onClick={() => performResetView()} className="text-xs font-medium px-2 py-1 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-600 dark:text-zinc-300 rounded transition-colors" title="Сбросить вид">Сброс</button>
         </div>
 
         {/* === Background Grid === */}
         <div className={`absolute inset-0 pointer-events-none transition-opacity ease-in-out ${gridOpacity}`} style={{ transitionDuration: `${transitionDuration}ms`, backgroundImage: gridPattern, backgroundSize: '20px 20px', zIndex: 0 }} />
 
-        {/* === Transform Layer (Direct DOM Manipulation) === */}
+        {/* === Transform Layer === */}
         <div
           ref={contentRef}
           className="absolute top-0 left-0 will-change-transform origin-top-left z-10"
@@ -243,7 +250,6 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(
           {children}
         </div>
 
-        {/* === Loading Overlay === */}
         {isLoading && (
           <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/20 backdrop-blur-[2px] pointer-events-none">
             <div className="bg-white dark:bg-zinc-900 rounded-lg p-4 shadow-xl flex flex-col items-center gap-3">
