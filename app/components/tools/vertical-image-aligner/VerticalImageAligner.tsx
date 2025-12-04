@@ -49,7 +49,8 @@ export function VerticalImageAligner() {
       const rightEdge = img.offsetX + img.naturalWidth;
       if (rightEdge > maxRight) maxRight = rightEdge;
     });
-    const width = Math.max(800, maxRight, frameWidth * 1.5);
+    // frameWidth влияет на ширину композиции, если он больше контента
+    const width = Math.max(800, maxRight, frameWidth);
     return { width, height };
   }, [images, cellHeight, frameWidth]);
 
@@ -74,7 +75,11 @@ export function VerticalImageAligner() {
     newImages.forEach((item, idx) => {
       const img = new Image();
       img.onload = () => {
-        if (isListEmpty && idx === 0) { setCellHeight(img.height); setFrameWidth(img.height); }
+        if (isListEmpty && idx === 0) {
+          setCellHeight(img.height);
+          // ИЗМЕНЕНИЕ: Ширина кадра устанавливается равной ВЫСОТЕ первого изображения
+          setFrameWidth(img.height);
+        }
         setImages(current => current.map(ex => ex.id === item.id ? { ...ex, naturalWidth: img.width, naturalHeight: img.height } : ex));
       };
       img.src = item.url;
@@ -156,12 +161,27 @@ export function VerticalImageAligner() {
           {images.length > 0 && (
             <div className="space-y-4">
               <button onClick={handleExport} disabled={isExporting} className="w-full rounded bg-blue-600 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50">{isExporting ? 'Экспорт...' : 'Скачать PNG'}</button>
+
+              {/* Основные размеры */}
               <div className="space-y-2 p-3 bg-zinc-50 dark:bg-zinc-800 rounded border border-zinc-200 dark:border-zinc-700 text-xs">
-                <div className="flex justify-between items-center"><span className="font-bold">Высота слота</span><input type="number" value={cellHeight} onChange={e => setCellHeight(Number(e.target.value))} className="w-16 p-1 border rounded" /></div>
-                <div className="flex justify-between items-center"><span className="font-bold">Сетка</span><input type="checkbox" checked={showGrid} onChange={e => setShowGrid(e.target.checked)} /></div>
-                {showGrid && <div className="grid grid-cols-2 gap-2"><input type="number" placeholder="W" value={gridWidth} onChange={e => setGridWidth(Number(e.target.value))} className="border p-1 rounded" /><input type="number" placeholder="H" value={gridHeight} onChange={e => setGridHeight(Number(e.target.value))} className="border p-1 rounded" /></div>}
-                <div className="flex justify-between items-center"><span className="font-bold">Границы кадров</span><input type="checkbox" checked={showFrameBorders} onChange={e => setShowFrameBorders(e.target.checked)} /></div>
+                <div className="flex justify-between items-center mb-1">
+                  <span className="font-bold">Высота слота</span>
+                  <input type="number" value={cellHeight} onChange={e => setCellHeight(Number(e.target.value))} className="w-16 p-1 border rounded" />
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="font-bold">Ширина кадра</span>
+                  <input type="number" value={frameWidth} onChange={e => setFrameWidth(Number(e.target.value))} className="w-16 p-1 border rounded" />
+                </div>
               </div>
+
+              {/* Настройки визуализации (сетка/границы) */}
+              <div className="space-y-2 p-3 bg-zinc-50 dark:bg-zinc-800 rounded border border-zinc-200 dark:border-zinc-700 text-xs">
+                <div className="flex justify-between items-center"><span className="font-bold">Показать сетку</span><input type="checkbox" checked={showGrid} onChange={e => setShowGrid(e.target.checked)} /></div>
+                {showGrid && <div className="grid grid-cols-2 gap-2 mt-2"><input type="number" placeholder="W" value={gridWidth} onChange={e => setGridWidth(Number(e.target.value))} className="border p-1 rounded" /><input type="number" placeholder="H" value={gridHeight} onChange={e => setGridHeight(Number(e.target.value))} className="border p-1 rounded" /></div>}
+                <div className="flex justify-between items-center mt-2"><span className="font-bold">Показать границы</span><input type="checkbox" checked={showFrameBorders} onChange={e => setShowFrameBorders(e.target.checked)} /></div>
+              </div>
+
+              {/* Список слоев */}
               <div className="space-y-1">
                 {images.map((img, i) => (
                   <div key={img.id} draggable onDragStart={(e) => handleDragStart(e, i)} onDragOver={e => e.preventDefault()} onDrop={(e) => handleDrop(e, i)}
@@ -174,6 +194,8 @@ export function VerticalImageAligner() {
                   </div>
                 ))}
               </div>
+
+              {/* Активный слой */}
               {activeImageId && (
                 <div className="p-2 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded text-xs">
                   <p className="font-bold mb-1">Активный слой:</p>
@@ -191,7 +213,6 @@ export function VerticalImageAligner() {
       <main className="relative flex-1 overflow-hidden">
         <Canvas
           isLoading={isExporting}
-          // Передаем границы композиции для корректной работы кнопки "Сброс"
           contentWidth={compositionBounds.width}
           contentHeight={compositionBounds.height}
         >

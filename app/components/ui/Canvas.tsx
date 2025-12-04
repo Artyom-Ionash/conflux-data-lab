@@ -31,6 +31,8 @@ interface CanvasProps {
   contentWidth?: number;
   /** Высота контента для корректной работы кнопки "Сброс" */
   contentHeight?: number;
+  /** Можно принудительно задать тему, если не задано - используется внутренняя с переключателем */
+  theme?: 'light' | 'dark';
 }
 
 export const Canvas = forwardRef<CanvasRef, CanvasProps>(
@@ -42,16 +44,20 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(
     maxScale = 50,
     initialScale = 1,
     contentWidth,
-    contentHeight
+    contentHeight,
+    theme: propTheme
   }, ref) => {
     const containerRef = useRef<HTMLDivElement>(null);
     const [transform, setTransform] = useState<CanvasTransform>({ scale: initialScale, x: 0, y: 0 });
     const [isPanning, setIsPanning] = useState(false);
 
     // --- State: Тема и Авто-контраст ---
-    const [theme, setTheme] = useState<'light' | 'dark'>('light');
+    // ИЗМЕНЕНИЕ: По умолчанию 'dark'
+    const [internalTheme, setInternalTheme] = useState<'light' | 'dark'>('dark');
     const [isAutoContrast, setIsAutoContrast] = useState(false);
     const [autoContrastPeriod, setAutoContrastPeriod] = useState(5);
+
+    const activeTheme = propTheme || internalTheme;
 
     const panStartRef = useRef<Point | null>(null);
     const transformStartRef = useRef<CanvasTransform | null>(null);
@@ -61,7 +67,6 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(
       if (!containerRef.current) return;
       const { clientWidth, clientHeight } = containerRef.current;
 
-      // Если размеры не переданы в аргументы, пробуем взять из props, иначе дефолт
       const targetW = w || contentWidth || 0;
       const targetH = h || contentHeight || 0;
 
@@ -105,7 +110,7 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(
       if (isAutoContrast) {
         const ms = autoContrastPeriod * 1000;
         interval = setInterval(() => {
-          setTheme(prev => prev === 'light' ? 'dark' : 'light');
+          setInternalTheme(prev => prev === 'light' ? 'dark' : 'light');
         }, ms);
       }
       return () => clearInterval(interval);
@@ -165,7 +170,7 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(
     };
 
     // --- Styles ---
-    const isDark = theme === 'dark';
+    const isDark = activeTheme === 'dark';
     const bgClass = isDark ? 'bg-[#111]' : 'bg-[#e5e5e5]';
     const gridOpacity = isDark ? 'opacity-10' : 'opacity-30';
     const transitionDuration = isAutoContrast ? (autoContrastPeriod * 1000) * 0.9 : 300;
@@ -190,7 +195,6 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(
       >
         {/* === Floating Toolbar (Controls) === */}
         <div className="absolute top-4 left-1/2 -translate-x-1/2 z-30 flex items-center gap-2 bg-white/90 dark:bg-zinc-900/90 backdrop-blur px-3 py-2 rounded-full shadow-lg border border-zinc-200 dark:border-zinc-700">
-          {/* Auto Contrast Toggle */}
           <button
             onClick={() => setIsAutoContrast(!isAutoContrast)}
             className={`p-2 rounded-full transition-colors ${isAutoContrast ? 'bg-blue-100 text-blue-600 dark:bg-blue-900 dark:text-blue-300' : 'hover:bg-zinc-100 text-zinc-500'}`}
@@ -199,7 +203,6 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
           </button>
 
-          {/* Auto Contrast Slider */}
           {isAutoContrast && (
             <div className="flex items-center gap-2 mx-1 animate-fade-in">
               <input
@@ -212,9 +215,8 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(
             </div>
           )}
 
-          {/* Theme Toggle */}
           <button
-            onClick={() => { setIsAutoContrast(false); setTheme(prev => prev === 'dark' ? 'light' : 'dark'); }}
+            onClick={() => { setIsAutoContrast(false); setInternalTheme(prev => prev === 'dark' ? 'light' : 'dark'); }}
             className="p-2 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-500 transition-colors"
             title="Сменить тему фона"
           >
@@ -223,7 +225,6 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(
 
           <div className="w-px h-4 bg-zinc-300 dark:bg-zinc-700 mx-1" />
 
-          {/* Reset View */}
           <button
             onClick={() => performResetView()}
             className="text-xs font-mono px-2 text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-300 transition-colors"
@@ -235,7 +236,6 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(
 
         {/* === Canvas Layers === */}
 
-        {/* Background Grid Layer */}
         <div
           className={`absolute inset-0 pointer-events-none transition-opacity ease-in-out ${gridOpacity}`}
           style={{
@@ -246,7 +246,6 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(
           }}
         />
 
-        {/* Content Transform Layer */}
         <div
           className="absolute top-0 left-0 will-change-transform origin-top-left z-10"
           style={{
@@ -258,7 +257,6 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(
           {children}
         </div>
 
-        {/* Loading Overlay */}
         {isLoading && (
           <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/20 backdrop-blur-[2px] pointer-events-none">
             <div className="bg-white dark:bg-zinc-900 rounded-lg p-4 shadow-xl flex flex-col items-center gap-3">
@@ -271,7 +269,6 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(
           </div>
         )}
 
-        {/* Interaction Hint */}
         <div className="absolute bottom-4 left-1/2 -translate-x-1/2 pointer-events-none opacity-50 text-[10px] text-zinc-500 bg-white/50 dark:bg-black/50 px-2 py-1 rounded backdrop-blur-sm z-50">
           Средняя кнопка мыши для перемещения
         </div>
