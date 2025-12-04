@@ -189,7 +189,12 @@ export function VerticalImageAligner() {
       </aside>
 
       <main className="relative flex-1 overflow-hidden">
-        <Canvas isLoading={isExporting} theme="light">
+        <Canvas
+          isLoading={isExporting}
+          // Передаем границы композиции для корректной работы кнопки "Сброс"
+          contentWidth={compositionBounds.width}
+          contentHeight={compositionBounds.height}
+        >
           <div
             className="relative"
             style={{

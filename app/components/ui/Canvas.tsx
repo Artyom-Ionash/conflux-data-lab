@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useRef, useState, useImperativeHandle, forwardRef, ReactNode } from 'react';
+import React, { useRef, useState, useImperativeHandle, forwardRef, ReactNode, useEffect, useCallback } from 'react';
 
 interface Point {
   x: number;
@@ -14,7 +14,8 @@ export interface CanvasTransform {
 }
 
 export interface CanvasRef {
-  resetView: (contentWidth?: number, contentHeight?: number) => void;
+  /** Программный сброс вида (например, при загрузке нового файла) */
+  resetView: (width?: number, height?: number) => void;
   getTransform: () => CanvasTransform;
   screenToWorld: (clientX: number, clientY: number) => Point;
 }
@@ -26,10 +27,10 @@ interface CanvasProps {
   minScale?: number;
   maxScale?: number;
   initialScale?: number;
-  /** Тема фона полотна: светлая или темная */
-  theme?: 'light' | 'dark';
-  /** Длительность анимации смены темы в мс */
-  transitionDuration?: number;
+  /** Ширина контента для корректной работы кнопки "Сброс" */
+  contentWidth?: number;
+  /** Высота контента для корректной работы кнопки "Сброс" */
+  contentHeight?: number;
 }
 
 export const Canvas = forwardRef<CanvasRef, CanvasProps>(
@@ -40,42 +41,54 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(
     minScale = 0.05,
     maxScale = 50,
     initialScale = 1,
-    theme = 'light',
-    transitionDuration = 300
+    contentWidth,
+    contentHeight
   }, ref) => {
     const containerRef = useRef<HTMLDivElement>(null);
     const [transform, setTransform] = useState<CanvasTransform>({ scale: initialScale, x: 0, y: 0 });
     const [isPanning, setIsPanning] = useState(false);
 
+    // --- State: Тема и Авто-контраст ---
+    const [theme, setTheme] = useState<'light' | 'dark'>('light');
+    const [isAutoContrast, setIsAutoContrast] = useState(false);
+    const [autoContrastPeriod, setAutoContrastPeriod] = useState(5);
+
     const panStartRef = useRef<Point | null>(null);
     const transformStartRef = useRef<CanvasTransform | null>(null);
 
+    // --- Логика Reset View ---
+    const performResetView = useCallback((w?: number, h?: number) => {
+      if (!containerRef.current) return;
+      const { clientWidth, clientHeight } = containerRef.current;
+
+      // Если размеры не переданы в аргументы, пробуем взять из props, иначе дефолт
+      const targetW = w || contentWidth || 0;
+      const targetH = h || contentHeight || 0;
+
+      let newScale = 1;
+      let newX = 0;
+      let newY = 0;
+
+      if (targetW && targetH) {
+        const padding = 40;
+        const scaleX = (clientWidth - padding) / targetW;
+        const scaleY = (clientHeight - padding) / targetH;
+        newScale = Math.min(1, Math.min(scaleX, scaleY));
+        if (newScale <= 0) newScale = 1;
+
+        newX = (clientWidth - targetW * newScale) / 2;
+        newY = (clientHeight - targetH * newScale) / 2;
+      } else {
+        newX = clientWidth / 2;
+        newY = clientHeight / 2;
+      }
+
+      setTransform({ scale: newScale, x: newX, y: newY });
+    }, [contentWidth, contentHeight]);
+
     // --- API for Parents ---
     useImperativeHandle(ref, () => ({
-      resetView: (contentWidth?: number, contentHeight?: number) => {
-        if (!containerRef.current) return;
-        const { clientWidth, clientHeight } = containerRef.current;
-
-        let newScale = 1;
-        let newX = 0;
-        let newY = 0;
-
-        if (contentWidth && contentHeight) {
-          const padding = 40;
-          const scaleX = (clientWidth - padding) / contentWidth;
-          const scaleY = (clientHeight - padding) / contentHeight;
-          newScale = Math.min(1, Math.min(scaleX, scaleY));
-          if (newScale <= 0) newScale = 1;
-
-          newX = (clientWidth - contentWidth * newScale) / 2;
-          newY = (clientHeight - contentHeight * newScale) / 2;
-        } else {
-          newX = clientWidth / 2;
-          newY = clientHeight / 2;
-        }
-
-        setTransform({ scale: newScale, x: newX, y: newY });
-      },
+      resetView: (w, h) => performResetView(w, h),
       getTransform: () => transform,
       screenToWorld: (clientX: number, clientY: number) => {
         if (!containerRef.current) return { x: 0, y: 0 };
@@ -85,6 +98,18 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(
         return { x, y };
       }
     }));
+
+    // --- Effect: Auto Contrast ---
+    useEffect(() => {
+      let interval: NodeJS.Timeout;
+      if (isAutoContrast) {
+        const ms = autoContrastPeriod * 1000;
+        interval = setInterval(() => {
+          setTheme(prev => prev === 'light' ? 'dark' : 'light');
+        }, ms);
+      }
+      return () => clearInterval(interval);
+    }, [isAutoContrast, autoContrastPeriod]);
 
     // --- Event Handlers ---
     const handleWheel = (e: React.WheelEvent) => {
@@ -139,12 +164,13 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(
       }
     };
 
-    // --- Background Styles ---
+    // --- Styles ---
     const isDark = theme === 'dark';
     const bgClass = isDark ? 'bg-[#111]' : 'bg-[#e5e5e5]';
     const gridOpacity = isDark ? 'opacity-10' : 'opacity-30';
+    const transitionDuration = isAutoContrast ? (autoContrastPeriod * 1000) * 0.9 : 300;
 
-    // Grid pattern (Checkerboard)
+    // Grid pattern
     const gridPattern = 'linear-gradient(45deg, #888 25%, transparent 25%), linear-gradient(-45deg, #888 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #888 75%), linear-gradient(-45deg, transparent 75%, #888 75%)';
 
     return (
@@ -162,6 +188,53 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(
           transitionDuration: `${transitionDuration}ms`
         }}
       >
+        {/* === Floating Toolbar (Controls) === */}
+        <div className="absolute top-4 left-1/2 -translate-x-1/2 z-30 flex items-center gap-2 bg-white/90 dark:bg-zinc-900/90 backdrop-blur px-3 py-2 rounded-full shadow-lg border border-zinc-200 dark:border-zinc-700">
+          {/* Auto Contrast Toggle */}
+          <button
+            onClick={() => setIsAutoContrast(!isAutoContrast)}
+            className={`p-2 rounded-full transition-colors ${isAutoContrast ? 'bg-blue-100 text-blue-600 dark:bg-blue-900 dark:text-blue-300' : 'hover:bg-zinc-100 text-zinc-500'}`}
+            title="Авто-контраст"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+          </button>
+
+          {/* Auto Contrast Slider */}
+          {isAutoContrast && (
+            <div className="flex items-center gap-2 mx-1 animate-fade-in">
+              <input
+                type="range" min="1" max="10" step="1"
+                value={autoContrastPeriod}
+                onChange={e => setAutoContrastPeriod(Number(e.target.value))}
+                className="w-16 h-1 bg-zinc-200 rounded-lg appearance-none cursor-pointer dark:bg-zinc-700 accent-blue-600"
+              />
+              <span className="text-xs font-mono font-bold text-zinc-600 dark:text-zinc-300 w-5">{autoContrastPeriod}s</span>
+            </div>
+          )}
+
+          {/* Theme Toggle */}
+          <button
+            onClick={() => { setIsAutoContrast(false); setTheme(prev => prev === 'dark' ? 'light' : 'dark'); }}
+            className="p-2 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-500 transition-colors"
+            title="Сменить тему фона"
+          >
+            {isDark ? "🌙" : "☀️"}
+          </button>
+
+          <div className="w-px h-4 bg-zinc-300 dark:bg-zinc-700 mx-1" />
+
+          {/* Reset View */}
+          <button
+            onClick={() => performResetView()}
+            className="text-xs font-mono px-2 text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-300 transition-colors"
+            title="Сбросить масштаб и позицию"
+          >
+            Сброс
+          </button>
+        </div>
+
+        {/* === Canvas Layers === */}
+
         {/* Background Grid Layer */}
         <div
           className={`absolute inset-0 pointer-events-none transition-opacity ease-in-out ${gridOpacity}`}
@@ -173,7 +246,7 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(
           }}
         />
 
-        {/* Transform Layer */}
+        {/* Content Transform Layer */}
         <div
           className="absolute top-0 left-0 will-change-transform origin-top-left z-10"
           style={{

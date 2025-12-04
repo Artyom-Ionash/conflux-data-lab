@@ -54,10 +54,7 @@ export function MonochromeBackgroundRemover() {
   const [floodPoints, setFloodPoints] = useState<Point[]>([]);
   const [manualTrigger, setManualTrigger] = useState(0);
 
-  // UI
-  const [isDarkBackground, setIsDarkBackground] = useState(true);
-  const [isAutoContrast, setIsAutoContrast] = useState(false);
-  const [autoContrastPeriod, setAutoContrastPeriod] = useState(5);
+  // UI State
   const [isProcessing, setIsProcessing] = useState(false);
   const [draggingPointIndex, setDraggingPointIndex] = useState<number | null>(null);
 
@@ -67,17 +64,7 @@ export function MonochromeBackgroundRemover() {
 
   // --- ЭФФЕКТЫ ---
 
-  // Авто-смена контраста (темы фона)
-  useEffect(() => {
-    let interval: NodeJS.Timeout;
-    if (isAutoContrast) {
-      const ms = autoContrastPeriod * 1000;
-      interval = setInterval(() => { setIsDarkBackground(prev => !prev); }, ms);
-    }
-    return () => clearInterval(interval);
-  }, [isAutoContrast, autoContrastPeriod]);
-
-  // Логика процессинга (без изменений)
+  // Логика процессинга
   const processImage = useCallback(() => {
     if (!originalUrl || !imgDimensions.w) return;
     setIsProcessing(true);
@@ -233,6 +220,7 @@ export function MonochromeBackgroundRemover() {
       setProcessedUrl(url);
       setImgDimensions({ w: img.width, h: img.height });
       setFloodPoints([]);
+      // Программный сброс вида при загрузке
       setTimeout(() => workspaceRef.current?.resetView(img.width, img.height), 50);
     };
   };
@@ -308,7 +296,6 @@ export function MonochromeBackgroundRemover() {
           </div>
           {originalUrl && (
             <div className="space-y-6 animate-fade-in">
-              {/* Режимы */}
               <div className="space-y-2">
                 <label className="block text-xs font-bold uppercase text-zinc-400">Режим</label>
                 <div className="flex flex-col gap-1 bg-zinc-100 dark:bg-zinc-800 p-1 rounded-lg">
@@ -320,7 +307,6 @@ export function MonochromeBackgroundRemover() {
                 </div>
                 {processingMode === 'flood-clear' && <div className="text-[10px] text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 p-2 rounded border border-blue-100 dark:border-blue-800 leading-tight">1. Кликните на холст, чтобы поставить точки.<br />2. Точки можно <b>перетаскивать</b>.<br />3. Заливка обновляется <b>автоматически</b>.</div>}
               </div>
-              {/* Цвета */}
               <div className="space-y-2">
                 <div className="flex flex-col gap-2">
                   <div className="flex gap-3 items-center">
@@ -366,17 +352,6 @@ export function MonochromeBackgroundRemover() {
 
       {/* --- MAIN WORKSPACE --- */}
       <main className="flex-1 relative h-full flex flex-col overflow-hidden">
-        {/* Панель управления (сверху) */}
-        <div className="absolute top-4 left-1/2 -translate-x-1/2 z-30 flex items-center gap-2 bg-white/90 dark:bg-zinc-900/90 backdrop-blur px-3 py-2 rounded-full shadow-lg border border-zinc-200 dark:border-zinc-700">
-          <button onClick={() => setIsAutoContrast(!isAutoContrast)} className={`p-2 rounded-full ${isAutoContrast ? 'bg-blue-100 text-blue-600 dark:bg-blue-900 dark:text-blue-300' : 'hover:bg-zinc-100 text-zinc-500'}`}>
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-          </button>
-          {isAutoContrast && (<div className="flex items-center gap-2 mx-1"><input type="range" min="1" max="10" step="1" value={autoContrastPeriod} onChange={e => setAutoContrastPeriod(Number(e.target.value))} className="w-16 h-1 bg-zinc-200 rounded-lg appearance-none cursor-pointer dark:bg-zinc-700 accent-blue-600" /><span className="text-xs font-mono font-bold text-zinc-600 dark:text-zinc-300 w-5">{autoContrastPeriod}s</span></div>)}
-          <button onClick={() => { setIsAutoContrast(false); setIsDarkBackground(!isDarkBackground) }} className="p-2 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-500">{isDarkBackground ? "🌙" : "☀️"}</button>
-          <div className="w-px h-4 bg-zinc-300 dark:bg-zinc-700 mx-1" />
-          <button onClick={() => workspaceRef.current?.resetView(imgDimensions.w, imgDimensions.h)} className="text-xs font-mono px-2 text-zinc-500 hover:text-zinc-900">Сброс</button>
-        </div>
-
         <div
           className="flex-1 w-full h-full"
           onPointerMove={handleGlobalPointerMove}
@@ -385,8 +360,9 @@ export function MonochromeBackgroundRemover() {
           <Canvas
             ref={workspaceRef}
             isLoading={isProcessing}
-            theme={isDarkBackground ? 'dark' : 'light'}
-            transitionDuration={isAutoContrast ? (autoContrastPeriod * 1000) * 0.9 : 300}
+            // Передаем размеры контента, чтобы внутренняя кнопка "Сброс" знала, как масштабировать
+            contentWidth={imgDimensions.w}
+            contentHeight={imgDimensions.h}
           >
             <div
               className="relative origin-top-left"
