@@ -49,6 +49,10 @@ export function MonochromeBackgroundRemover() {
   const [smoothness, setSmoothness] = useState(10);
   const [processingMode, setProcessingMode] = useState<ProcessingMode>('remove');
 
+  // --- НОВЫЕ STATE: Инструменты против ореолов ---
+  const [edgeChoke, setEdgeChoke] = useState(0); // Сжатие краев
+  const [edgeBlur, setEdgeBlur] = useState(0);   // Смягчение краев
+
   // Точки заливки
   const [floodPoints, setFloodPoints] = useState<Point[]>([]);
   const [manualTrigger, setManualTrigger] = useState(0);
@@ -220,6 +224,10 @@ export function MonochromeBackgroundRemover() {
           (data[i + 2] - targetRGB.b) ** 2
         );
 
+        // 1. Создаем буфер для альфа-канала, чтобы удобно применять эффекты
+        const alphaChannel = new Uint8Array(width * height);
+
+        // --- ШАГ 1: Генерация базовой маски ---
         if (processingMode === 'flood-clear') {
           if (floodPoints.length === 0) {
             setProcessedUrl(originalUrl);
@@ -227,15 +235,16 @@ export function MonochromeBackgroundRemover() {
             return;
           }
 
-          const visited = new Uint8Array(width * height);
+          // Инициализируем альфа-канал полностью непрозрачным (255)
+          alphaChannel.fill(255);
 
+          const visited = new Uint8Array(width * height);
           floodPoints.forEach(pt => {
             const startX = Math.floor(pt.x);
             const startY = Math.floor(pt.y);
             if (startX < 0 || startX >= width || startY < 0 || startY >= height) return;
 
             const stack = [startX, startY];
-
             while (stack.length) {
               const y = stack.pop()!;
               const x = stack.pop()!;
@@ -249,7 +258,8 @@ export function MonochromeBackgroundRemover() {
 
               if (dist <= tolVal) continue;
 
-              data[ptr + 3] = 0;
+              // Помечаем пиксель как прозрачный в нашем буфере
+              alphaChannel[idx] = 0;
 
               if (x > 0) stack.push(x - 1, y);
               if (x < width - 1) stack.push(x + 1, y);
@@ -257,26 +267,116 @@ export function MonochromeBackgroundRemover() {
               if (y < height - 1) stack.push(x, y + 1);
             }
           });
-
         } else {
-          for (let i = 0; i < data.length; i += 4) {
+          // Режимы remove и keep
+          for (let i = 0, idx = 0; i < data.length; i += 4, idx++) {
             const dist = getDist(i);
+            let alpha = 255;
+
             if (processingMode === 'remove') {
               if (dist <= tolVal) {
-                data[i + 3] = 0;
+                alpha = 0;
               } else if (dist <= tolVal + smoothVal && smoothVal > 0) {
                 const factor = (dist - tolVal) / smoothVal;
-                data[i + 3] = Math.floor(data[i + 3] * factor);
+                alpha = Math.floor(255 * factor);
               }
             } else if (processingMode === 'keep') {
               if (dist > tolVal + smoothVal) {
-                data[i + 3] = 0;
+                alpha = 0;
               } else if (dist > tolVal && smoothVal > 0) {
                 const factor = (dist - tolVal) / smoothVal;
-                data[i + 3] = Math.floor(data[i + 3] * (1 - factor));
+                alpha = Math.floor(255 * (1 - factor));
+              }
+            }
+            alphaChannel[idx] = alpha;
+          }
+        }
+
+        // --- ШАГ 2: Сжатие краев (Erode) ---
+        // "Съедаем" непрозрачные пиксели, если рядом есть прозрачные
+        if (edgeChoke > 0) {
+          const erodedBuffer = new Uint8Array(alphaChannel);
+          const radius = edgeChoke;
+
+          for (let y = 0; y < height; y++) {
+            for (let x = 0; x < width; x++) {
+              const idx = y * width + x;
+              if (alphaChannel[idx] === 0) continue; // Уже прозрачный
+
+              let shouldErode = false;
+              // Проверяем соседей в радиусе
+              checkNeighbors:
+              for (let ky = -radius; ky <= radius; ky++) {
+                for (let kx = -radius; kx <= radius; kx++) {
+                  if (kx === 0 && ky === 0) continue;
+
+                  const ny = y + ky;
+                  const nx = x + kx;
+
+                  if (nx >= 0 && nx < width && ny >= 0 && ny < height) {
+                    const nIdx = ny * width + nx;
+                    if (alphaChannel[nIdx] === 0) {
+                      shouldErode = true;
+                      break checkNeighbors;
+                    }
+                  }
+                }
+              }
+
+              if (shouldErode) {
+                erodedBuffer[idx] = 0;
               }
             }
           }
+          alphaChannel.set(erodedBuffer);
+        }
+
+        // --- ШАГ 3: Размытие краев (Blur) ---
+        if (edgeBlur > 0) {
+          const blurredBuffer = new Uint8Array(alphaChannel);
+          // Простое Box Blur для производительности
+          const radius = Math.max(1, edgeBlur);
+
+          for (let y = 0; y < height; y++) {
+            for (let x = 0; x < width; x++) {
+              const idx = y * width + x;
+
+              // Оптимизация: не блюрим там, где все вокруг и так 0 или 255 (далеко от краев)
+              // Но для простоты пройдемся везде или проверим только границы.
+              // Если альфа 0 или 255, проверим, не край ли это.
+
+              let sum = 0;
+              let count = 0;
+
+              for (let ky = -radius; ky <= radius; ky++) {
+                for (let kx = -radius; kx <= radius; kx++) {
+                  const ny = y + ky;
+                  const nx = x + kx;
+
+                  if (nx >= 0 && nx < width && ny >= 0 && ny < height) {
+                    const nIdx = ny * width + nx;
+                    sum += alphaChannel[nIdx];
+                    count++;
+                  }
+                }
+              }
+              blurredBuffer[idx] = Math.floor(sum / count);
+            }
+          }
+          alphaChannel.set(blurredBuffer);
+        }
+
+        // --- ШАГ 4: Применение маски к изображению ---
+        for (let i = 0, idx = 0; i < data.length; i += 4, idx++) {
+          // В режиме flood-clear мы просто ставим прозрачность, 
+          // но сохраняем цвет для антиалиасинга краев? Нет, обычно просто режем альфу.
+
+          // Применяем альфу из нашего обработанного буфера
+          // Если у нас был оригинальный alpha < 255, учитываем это (умножаем)
+          // Но здесь мы предполагаем работу с полностью непрозрачным исходником, 
+          // либо просто заменяем альфу.
+
+          data[i + 3] = alphaChannel[idx];
         }
 
         ctx.putImageData(imageData, 0, 0);
@@ -284,7 +384,7 @@ export function MonochromeBackgroundRemover() {
         setIsProcessing(false);
       }, 50);
     };
-  }, [originalUrl, targetColors, tolerances, smoothness, imgDimensions, processingMode, floodPoints]);
+  }, [originalUrl, targetColors, tolerances, smoothness, imgDimensions, processingMode, floodPoints, edgeChoke, edgeBlur]);
 
   useEffect(() => {
     if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
@@ -294,7 +394,7 @@ export function MonochromeBackgroundRemover() {
     }, 100);
 
     return () => { if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current); }
-  }, [originalUrl, targetColors, tolerances, smoothness, processingMode, floodPoints]);
+  }, [originalUrl, targetColors, tolerances, smoothness, processingMode, floodPoints, edgeChoke, edgeBlur]);
 
   useEffect(() => {
     if (manualTrigger > 0 && processingMode === 'flood-clear') {
@@ -314,7 +414,6 @@ export function MonochromeBackgroundRemover() {
     img.src = url;
 
     img.onload = () => {
-      // ИЗМЕНЕНИЕ: Определяем цвет левого верхнего пикселя (0,0)
       const canvas = document.createElement('canvas');
       canvas.width = 1;
       canvas.height = 1;
@@ -324,7 +423,6 @@ export function MonochromeBackgroundRemover() {
         const p = ctx.getImageData(0, 0, 1, 1).data;
         const topLeftColor = rgbToHex(p[0], p[1], p[2]);
 
-        // Обновляем цвет только для режима 'remove'
         setTargetColors(prev => ({
           ...prev,
           'remove': topLeftColor
@@ -557,6 +655,29 @@ export function MonochromeBackgroundRemover() {
                     <input type="range" min="0" max="50" value={smoothness} onChange={e => setSmoothness(Number(e.target.value))} className="w-full h-1.5 bg-zinc-200 rounded-lg appearance-none cursor-pointer dark:bg-zinc-600 accent-blue-600" />
                   </div>
                 )}
+
+                {/* --- НОВЫЕ ИНСТРУМЕНТЫ --- */}
+                <div className="pt-2 border-t border-zinc-200 dark:border-zinc-700/50">
+                  <div className="flex justify-between text-xs mb-1">
+                    <span className="font-bold text-zinc-500">Удаление ореолов</span>
+                  </div>
+
+                  <div className="mb-2">
+                    <div className="flex justify-between text-[10px] mb-1 text-zinc-500">
+                      <span>Сжатие краев (Choke)</span>
+                      <span className="text-blue-500 font-mono">{edgeChoke}px</span>
+                    </div>
+                    <input type="range" min="0" max="5" step="1" value={edgeChoke} onChange={e => setEdgeChoke(Number(e.target.value))} className="w-full h-1.5 bg-zinc-200 rounded-lg appearance-none cursor-pointer dark:bg-zinc-600 accent-blue-600" />
+                  </div>
+
+                  <div>
+                    <div className="flex justify-between text-[10px] mb-1 text-zinc-500">
+                      <span>Смягчение (Blur)</span>
+                      <span className="text-blue-500 font-mono">{edgeBlur}px</span>
+                    </div>
+                    <input type="range" min="0" max="5" step="1" value={edgeBlur} onChange={e => setEdgeBlur(Number(e.target.value))} className="w-full h-1.5 bg-zinc-200 rounded-lg appearance-none cursor-pointer dark:bg-zinc-600 accent-blue-600" />
+                  </div>
+                </div>
               </div>
 
               {processingMode === 'flood-clear' && (
