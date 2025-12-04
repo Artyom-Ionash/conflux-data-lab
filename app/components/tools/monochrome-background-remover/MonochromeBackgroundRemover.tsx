@@ -1,10 +1,9 @@
 'use client';
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { CanvasWorkspace, CanvasWorkspaceRef } from '../../ui/CanvasWorkspace';
+import { Canvas, CanvasRef } from '../../ui/Canvas';
 
 // --- ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ---
-
 function hexToRgb(hex: string) {
   const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
   return result ? {
@@ -35,81 +34,63 @@ interface Point {
 }
 
 export function MonochromeBackgroundRemover() {
-  // --- STATE: Данные ---
+  // --- STATE ---
   const [originalUrl, setOriginalUrl] = useState<string | null>(null);
   const [processedUrl, setProcessedUrl] = useState<string | null>(null);
   const [imgDimensions, setImgDimensions] = useState({ w: 0, h: 0 });
 
-  // --- STATE: Настройки ---
   const [targetColor, setTargetColor] = useState('#ffffff');
   const [contourColor, setContourColor] = useState('#000000');
-
   const [tolerances, setTolerances] = useState<Record<ProcessingMode, number>>({
-    'remove': 20,
-    'keep': 20,
-    'flood-clear': 20
+    'remove': 20, 'keep': 20, 'flood-clear': 20
   });
-
   const [smoothness, setSmoothness] = useState(10);
   const [processingMode, setProcessingMode] = useState<ProcessingMode>('remove');
 
-  // --- STATE: Инструменты постобработки (Ореолы) ---
+  // Инструменты
   const [edgeChoke, setEdgeChoke] = useState(0);
   const [edgeBlur, setEdgeBlur] = useState(0);
   const [edgePaint, setEdgePaint] = useState(0);
-
-  // Точки заливки
   const [floodPoints, setFloodPoints] = useState<Point[]>([]);
   const [manualTrigger, setManualTrigger] = useState(0);
 
-  // --- STATE: Интерфейс ---
+  // UI
   const [isDarkBackground, setIsDarkBackground] = useState(true);
   const [isAutoContrast, setIsAutoContrast] = useState(false);
   const [autoContrastPeriod, setAutoContrastPeriod] = useState(5);
   const [isProcessing, setIsProcessing] = useState(false);
-
-  // Взаимодействие
   const [draggingPointIndex, setDraggingPointIndex] = useState<number | null>(null);
 
-  // --- REFS ---
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const workspaceRef = useRef<CanvasWorkspaceRef>(null);
+  const workspaceRef = useRef<CanvasRef>(null);
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
 
-  // -------------------------------------------------------------------------
-  // Auto Contrast
-  // -------------------------------------------------------------------------
+  // --- ЭФФЕКТЫ ---
+
+  // Авто-смена контраста (темы фона)
   useEffect(() => {
     let interval: NodeJS.Timeout;
     if (isAutoContrast) {
       const ms = autoContrastPeriod * 1000;
-      interval = setInterval(() => {
-        setIsDarkBackground(prev => !prev);
-      }, ms);
+      interval = setInterval(() => { setIsDarkBackground(prev => !prev); }, ms);
     }
     return () => clearInterval(interval);
   }, [isAutoContrast, autoContrastPeriod]);
 
-  // -------------------------------------------------------------------------
-  // PROCESS IMAGE
-  // -------------------------------------------------------------------------
+  // Логика процессинга (без изменений)
   const processImage = useCallback(() => {
     if (!originalUrl || !imgDimensions.w) return;
-
     setIsProcessing(true);
     const img = new Image();
     img.crossOrigin = "Anonymous";
     img.src = originalUrl;
-
     img.onload = () => {
       const canvas = canvasRef.current;
       if (!canvas) return;
-
       canvas.width = imgDimensions.w;
       canvas.height = imgDimensions.h;
       const ctx = canvas.getContext('2d');
       if (!ctx) return;
-
       ctx.drawImage(img, 0, 0);
 
       setTimeout(() => {
@@ -117,7 +98,6 @@ export function MonochromeBackgroundRemover() {
         const data = imageData.data;
         const width = canvas.width;
         const height = canvas.height;
-
         const targetRGB = hexToRgb(targetColor);
         const contourRGB = hexToRgb(contourColor);
 
@@ -128,51 +108,28 @@ export function MonochromeBackgroundRemover() {
         const tolVal = (currentTolerance / 100) * maxDist;
         const smoothVal = (smoothness / 100) * maxDist;
 
-        const getDistToTarget = (i: number) => Math.sqrt(
-          (data[i] - targetRGB.r) ** 2 +
-          (data[i + 1] - targetRGB.g) ** 2 +
-          (data[i + 2] - targetRGB.b) ** 2
-        );
-
-        const getDistToContour = (i: number) => Math.sqrt(
-          (data[i] - contourRGB.r) ** 2 +
-          (data[i + 1] - contourRGB.g) ** 2 +
-          (data[i + 2] - contourRGB.b) ** 2
-        );
+        const getDistToTarget = (i: number) => Math.sqrt((data[i] - targetRGB.r) ** 2 + (data[i + 1] - targetRGB.g) ** 2 + (data[i + 2] - targetRGB.b) ** 2);
+        const getDistToContour = (i: number) => Math.sqrt((data[i] - contourRGB.r) ** 2 + (data[i + 1] - contourRGB.g) ** 2 + (data[i + 2] - contourRGB.b) ** 2);
 
         const alphaChannel = new Uint8Array(width * height);
 
-        // 1. GENERATE BASE ALPHA MASK
         if (processingMode === 'flood-clear') {
-          if (floodPoints.length === 0) {
-            setProcessedUrl(originalUrl);
-            setIsProcessing(false);
-            return;
-          }
+          if (floodPoints.length === 0) { setProcessedUrl(originalUrl); setIsProcessing(false); return; }
           alphaChannel.fill(255);
           const visited = new Uint8Array(width * height);
-
           floodPoints.forEach(pt => {
-            const startX = Math.floor(pt.x);
-            const startY = Math.floor(pt.y);
+            const startX = Math.floor(pt.x); const startY = Math.floor(pt.y);
             if (startX < 0 || startX >= width || startY < 0 || startY >= height) return;
-
             const stack = [startX, startY];
             while (stack.length) {
-              const y = stack.pop()!;
-              const x = stack.pop()!;
+              const y = stack.pop()!; const x = stack.pop()!;
               const idx = y * width + x;
-
               if (visited[idx]) continue;
               visited[idx] = 1;
-
               const ptr = idx * 4;
               const dist = getDistToContour(ptr);
-
               if (dist <= tolVal) continue;
-
               alphaChannel[idx] = 0;
-
               if (x > 0) stack.push(x - 1, y);
               if (x < width - 1) stack.push(x + 1, y);
               if (y > 0) stack.push(x, y - 1);
@@ -183,121 +140,63 @@ export function MonochromeBackgroundRemover() {
           for (let i = 0, idx = 0; i < data.length; i += 4, idx++) {
             const dist = getDistToTarget(i);
             let alpha = 255;
-
             if (processingMode === 'remove') {
-              if (dist <= tolVal) {
-                alpha = 0;
-              } else if (dist <= tolVal + smoothVal && smoothVal > 0) {
-                const factor = (dist - tolVal) / smoothVal;
-                alpha = Math.floor(255 * factor);
-              }
+              if (dist <= tolVal) alpha = 0;
+              else if (dist <= tolVal + smoothVal && smoothVal > 0) alpha = Math.floor(255 * ((dist - tolVal) / smoothVal));
             } else if (processingMode === 'keep') {
-              if (dist > tolVal + smoothVal) {
-                alpha = 0;
-              } else if (dist > tolVal && smoothVal > 0) {
-                const factor = (dist - tolVal) / smoothVal;
-                alpha = Math.floor(255 * (1 - factor));
-              }
+              if (dist > tolVal + smoothVal) alpha = 0;
+              else if (dist > tolVal && smoothVal > 0) alpha = Math.floor(255 * (1 - ((dist - tolVal) / smoothVal)));
             }
             alphaChannel[idx] = alpha;
           }
         }
 
-        // 2. EDGE CHOKE (Сжатие маски)
+        // Post-processing
         if (edgeChoke > 0) {
-          const erodedBuffer = new Uint8Array(alphaChannel);
-          const radius = edgeChoke;
-          for (let y = 0; y < height; y++) {
-            for (let x = 0; x < width; x++) {
-              const idx = y * width + x;
-              if (alphaChannel[idx] === 0) continue;
-              let shouldErode = false;
-              checkNeighbors:
-              for (let ky = -radius; ky <= radius; ky++) {
-                for (let kx = -radius; kx <= radius; kx++) {
-                  if (kx === 0 && ky === 0) continue;
-                  const ny = y + ky;
-                  const nx = x + kx;
-                  if (nx >= 0 && nx < width && ny >= 0 && ny < height) {
-                    const nIdx = ny * width + nx;
-                    if (alphaChannel[nIdx] === 0) {
-                      shouldErode = true;
-                      break checkNeighbors;
-                    }
-                  }
-                }
-              }
-              if (shouldErode) erodedBuffer[idx] = 0;
+          const eroded = new Uint8Array(alphaChannel);
+          const r = edgeChoke;
+          for (let y = 0; y < height; y++) for (let x = 0; x < width; x++) {
+            const i = y * width + x;
+            if (alphaChannel[i] === 0) continue;
+            let hit = false;
+            l: for (let ky = -r; ky <= r; ky++) for (let kx = -r; kx <= r; kx++) {
+              if (kx === 0 && ky === 0) continue;
+              const ny = y + ky, nx = x + kx;
+              if (nx >= 0 && nx < width && ny >= 0 && ny < height && alphaChannel[ny * width + nx] === 0) { hit = true; break l; }
             }
+            if (hit) eroded[i] = 0;
           }
-          alphaChannel.set(erodedBuffer);
+          alphaChannel.set(eroded);
         }
-
-        // 3. EDGE BLUR (Размытие краев маски)
         if (edgeBlur > 0) {
-          const blurredBuffer = new Uint8Array(alphaChannel);
-          const radius = Math.max(1, edgeBlur);
-          for (let y = 0; y < height; y++) {
-            for (let x = 0; x < width; x++) {
-              const idx = y * width + x;
-              let sum = 0;
-              let count = 0;
-              for (let ky = -radius; ky <= radius; ky++) {
-                for (let kx = -radius; kx <= radius; kx++) {
-                  const ny = y + ky;
-                  const nx = x + kx;
-                  if (nx >= 0 && nx < width && ny >= 0 && ny < height) {
-                    sum += alphaChannel[ny * width + nx];
-                    count++;
-                  }
-                }
-              }
-              blurredBuffer[idx] = Math.floor(sum / count);
+          const blurred = new Uint8Array(alphaChannel);
+          const r = Math.max(1, edgeBlur);
+          for (let y = 0; y < height; y++) for (let x = 0; x < width; x++) {
+            let sum = 0, c = 0;
+            for (let ky = -r; ky <= r; ky++) for (let kx = -r; kx <= r; kx++) {
+              const ny = y + ky, nx = x + kx;
+              if (nx >= 0 && nx < width && ny >= 0 && ny < height) { sum += alphaChannel[ny * width + nx]; c++; }
             }
+            blurred[y * width + x] = Math.floor(sum / c);
           }
-          alphaChannel.set(blurredBuffer);
+          alphaChannel.set(blurred);
         }
-
-        // 4. EDGE PAINT (Окрашивание полупрозрачных краев)
         if (edgePaint > 0) {
-          const radius = edgePaint;
-          for (let y = 0; y < height; y++) {
-            for (let x = 0; x < width; x++) {
-              const idx = y * width + x;
-              if (alphaChannel[idx] === 0) continue;
-
-              let isEdge = false;
-              checkEdge:
-              for (let ky = -radius; ky <= radius; ky++) {
-                for (let kx = -radius; kx <= radius; kx++) {
-                  if (kx === 0 && ky === 0) continue;
-                  const ny = y + ky;
-                  const nx = x + kx;
-                  if (nx >= 0 && nx < width && ny >= 0 && ny < height) {
-                    const nIdx = ny * width + nx;
-                    if (alphaChannel[nIdx] === 0) {
-                      isEdge = true;
-                      break checkEdge;
-                    }
-                  }
-                }
-              }
-
-              if (isEdge) {
-                const ptr = idx * 4;
-                data[ptr] = contourRGB.r;
-                data[ptr + 1] = contourRGB.g;
-                data[ptr + 2] = contourRGB.b;
-              }
+          const r = edgePaint;
+          for (let y = 0; y < height; y++) for (let x = 0; x < width; x++) {
+            const i = y * width + x;
+            if (alphaChannel[i] === 0) continue;
+            let edge = false;
+            l2: for (let ky = -r; ky <= r; ky++) for (let kx = -r; kx <= r; kx++) {
+              if (kx === 0 && ky === 0) continue;
+              const ny = y + ky, nx = x + kx;
+              if (nx >= 0 && nx < width && ny >= 0 && ny < height && alphaChannel[ny * width + nx] === 0) { edge = true; break l2; }
             }
+            if (edge) { const p = i * 4; data[p] = contourRGB.r; data[p + 1] = contourRGB.g; data[p + 2] = contourRGB.b; }
           }
         }
 
-        // 5. COMBINE
-        for (let i = 0, idx = 0; i < data.length; i += 4, idx++) {
-          data[i + 3] = alphaChannel[idx];
-        }
-
+        for (let i = 0, idx = 0; i < data.length; i += 4, idx++) data[i + 3] = alphaChannel[idx];
         ctx.putImageData(imageData, 0, 0);
         setProcessedUrl(canvas.toDataURL('image/png'));
         setIsProcessing(false);
@@ -305,36 +204,23 @@ export function MonochromeBackgroundRemover() {
     };
   }, [originalUrl, targetColor, contourColor, tolerances, smoothness, imgDimensions, processingMode, floodPoints, edgeChoke, edgeBlur, edgePaint]);
 
-  // Debounce processing
   useEffect(() => {
     if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
-    debounceTimerRef.current = setTimeout(() => {
-      if (originalUrl) processImage();
-    }, 100);
+    debounceTimerRef.current = setTimeout(() => { if (originalUrl) processImage(); }, 100);
     return () => { if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current); }
   }, [originalUrl, targetColor, contourColor, tolerances, smoothness, processingMode, floodPoints, edgeChoke, edgeBlur, edgePaint]);
+  useEffect(() => { if (manualTrigger > 0 && processingMode === 'flood-clear') processImage(); }, [manualTrigger]);
 
-  useEffect(() => {
-    if (manualTrigger > 0 && processingMode === 'flood-clear') {
-      processImage();
-    }
-  }, [manualTrigger]);
-
-  // -------------------------------------------------------------------------
-  // HANDLERS
-  // -------------------------------------------------------------------------
+  // --- HANDLERS ---
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
     const url = URL.createObjectURL(file);
     const img = new Image();
     img.src = url;
-
     img.onload = () => {
       const canvas = document.createElement('canvas');
-      canvas.width = 1;
-      canvas.height = 1;
+      canvas.width = 1; canvas.height = 1;
       const ctx = canvas.getContext('2d');
       if (ctx) {
         ctx.drawImage(img, 0, 0);
@@ -343,15 +229,11 @@ export function MonochromeBackgroundRemover() {
         setTargetColor(detectedColor);
         setContourColor(invertHex(detectedColor));
       }
-
       setOriginalUrl(url);
       setProcessedUrl(url);
       setImgDimensions({ w: img.width, h: img.height });
       setFloodPoints([]);
-
-      setTimeout(() => {
-        workspaceRef.current?.resetView(img.width, img.height);
-      }, 50);
+      setTimeout(() => workspaceRef.current?.resetView(img.width, img.height), 50);
     };
   };
 
@@ -360,100 +242,62 @@ export function MonochromeBackgroundRemover() {
     const world = workspaceRef.current.screenToWorld(clientX, clientY);
     const x = Math.floor(world.x);
     const y = Math.floor(world.y);
-
-    if (x >= 0 && x < imgDimensions.w && y >= 0 && y < imgDimensions.h) {
-      return { x, y };
-    }
+    if (x >= 0 && x < imgDimensions.w && y >= 0 && y < imgDimensions.h) return { x, y };
     return null;
   };
 
   const handlePointPointerDown = (e: React.PointerEvent, index: number) => {
-    e.stopPropagation();
-    e.preventDefault();
+    e.stopPropagation(); e.preventDefault();
     if (e.button !== 0) return;
-
     setDraggingPointIndex(index);
-    const target = e.target as HTMLElement;
-    target.setPointerCapture(e.pointerId);
+    (e.target as HTMLElement).setPointerCapture(e.pointerId);
   };
-
   const handleImagePointerDown = (e: React.PointerEvent) => {
     if (e.button !== 0) return;
-
     if (processingMode === 'flood-clear') {
       const coords = getRelativeImageCoords(e.clientX, e.clientY);
-      if (coords) {
-        setFloodPoints(prev => [...prev, coords]);
-      }
+      if (coords) setFloodPoints(prev => [...prev, coords]);
     }
   };
-
   const handleGlobalPointerMove = (e: React.PointerEvent) => {
     if (draggingPointIndex !== null) {
       const newCoords = getRelativeImageCoords(e.clientX, e.clientY);
-      if (newCoords) {
-        setFloodPoints(prev => {
-          const next = [...prev];
-          next[draggingPointIndex] = newCoords;
-          return next;
-        });
-      }
+      if (newCoords) setFloodPoints(prev => { const next = [...prev]; next[draggingPointIndex] = newCoords; return next; });
     }
   };
-
-  const handleGlobalPointerUp = (e: React.PointerEvent) => {
-    if (draggingPointIndex !== null) {
-      setDraggingPointIndex(null);
-    }
-  };
-
+  const handleGlobalPointerUp = () => { if (draggingPointIndex !== null) setDraggingPointIndex(null); };
   const handleEyedropper = (e: React.MouseEvent<HTMLImageElement>) => {
     if (!originalUrl) return;
     const img = e.currentTarget;
     const rect = img.getBoundingClientRect();
     const x = (e.clientX - rect.left) / rect.width * img.naturalWidth;
     const y = (e.clientY - rect.top) / rect.height * img.naturalHeight;
-    const canvas = document.createElement('canvas');
-    canvas.width = 1; canvas.height = 1;
+    const canvas = document.createElement('canvas'); canvas.width = 1; canvas.height = 1;
     const ctx = canvas.getContext('2d');
     if (ctx) {
-      const i = new Image(); i.src = originalUrl;
-      i.onload = () => {
+      const i = new Image(); i.src = originalUrl; i.onload = () => {
         ctx.drawImage(i, -Math.floor(x), -Math.floor(y));
         const p = ctx.getImageData(0, 0, 1, 1).data;
         setTargetColor(rgbToHex(p[0], p[1], p[2]));
       }
     }
   };
-
   const removeLastPoint = () => setFloodPoints(prev => prev.slice(0, -1));
   const clearAllPoints = () => setFloodPoints([]);
   const handleRunFloodFill = () => setManualTrigger(prev => prev + 1);
-
-  const transitionDurationMs = isAutoContrast ? (autoContrastPeriod * 1000) * 0.9 : 300;
-  const bgClass = isDarkBackground ? 'bg-[#111]' : 'bg-[#e5e5e5]';
 
   return (
     <div className="fixed inset-0 flex w-full h-full bg-zinc-50 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 overflow-hidden font-sans">
       <canvas ref={canvasRef} className="hidden" />
 
-      {/* ================= ЛЕВАЯ ПАНЕЛЬ ================= */}
+      {/* --- SIDEBAR --- */}
       <aside className="w-[360px] flex-shrink-0 flex flex-col border-r border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 z-10 shadow-xl h-full">
-        {/* Header */}
         <div className="p-5 border-b border-zinc-200 dark:border-zinc-800">
           <a href="/" className="mb-3 inline-flex items-center gap-2 text-xs font-medium text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-200 transition-colors">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M19 12H5M12 19l-7-7 7-7" />
-            </svg>
-            На главную
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 12H5M12 19l-7-7 7-7" /></svg> На главную
           </a>
-          <h2 className="text-lg font-bold flex items-center gap-2">
-            <span className="text-blue-600">Mono</span>Remover
-          </h2>
-          <p className="text-xs text-zinc-500 mt-1">Инструменты обработки фона</p>
+          <h2 className="text-lg font-bold flex items-center gap-2"><span className="text-blue-600">Mono</span>Remover</h2>
         </div>
-
-        {/* Controls */}
         <div className="flex-1 overflow-y-auto p-5 space-y-6 custom-scrollbar">
           <div className="space-y-2">
             <label className="block text-xs font-bold uppercase text-zinc-400">Исходник</label>
@@ -462,9 +306,9 @@ export function MonochromeBackgroundRemover() {
               <input type="file" className="hidden" accept="image/*" onChange={handleFileUpload} />
             </label>
           </div>
-
           {originalUrl && (
             <div className="space-y-6 animate-fade-in">
+              {/* Режимы */}
               <div className="space-y-2">
                 <label className="block text-xs font-bold uppercase text-zinc-400">Режим</label>
                 <div className="flex flex-col gap-1 bg-zinc-100 dark:bg-zinc-800 p-1 rounded-lg">
@@ -472,161 +316,83 @@ export function MonochromeBackgroundRemover() {
                     <button onClick={() => setProcessingMode('remove')} className={`text-xs font-medium py-2 rounded-md transition-all ${processingMode === 'remove' ? 'bg-white dark:bg-zinc-700 text-blue-600 dark:text-blue-300 shadow-sm' : 'text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300'}`}>Убрать цвет</button>
                     <button onClick={() => setProcessingMode('keep')} className={`text-xs font-medium py-2 rounded-md transition-all ${processingMode === 'keep' ? 'bg-white dark:bg-zinc-700 text-blue-600 dark:text-blue-300 shadow-sm' : 'text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300'}`}>Оставить цвет</button>
                   </div>
-                  <button onClick={() => setProcessingMode('flood-clear')} className={`text-xs font-medium py-2 rounded-md transition-all flex items-center justify-center gap-2 ${processingMode === 'flood-clear' ? 'bg-white dark:bg-zinc-700 text-blue-600 dark:text-blue-300 shadow-sm' : 'text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300'}`}>
-                    Заливка невидимостью
-                  </button>
+                  <button onClick={() => setProcessingMode('flood-clear')} className={`text-xs font-medium py-2 rounded-md transition-all flex items-center justify-center gap-2 ${processingMode === 'flood-clear' ? 'bg-white dark:bg-zinc-700 text-blue-600 dark:text-blue-300 shadow-sm' : 'text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300'}`}>Заливка невидимостью</button>
                 </div>
-                {processingMode === 'flood-clear' && (
-                  <div className="text-[10px] text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 p-2 rounded border border-blue-100 dark:border-blue-800 leading-tight">
-                    1. Кликните на холст, чтобы поставить точки.<br />
-                    2. Точки можно <b>перетаскивать</b>.<br />
-                    3. Заливка обновляется <b>автоматически</b>.
-                  </div>
-                )}
+                {processingMode === 'flood-clear' && <div className="text-[10px] text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 p-2 rounded border border-blue-100 dark:border-blue-800 leading-tight">1. Кликните на холст, чтобы поставить точки.<br />2. Точки можно <b>перетаскивать</b>.<br />3. Заливка обновляется <b>автоматически</b>.</div>}
               </div>
-
-              {/* Color Pickers */}
+              {/* Цвета */}
               <div className="space-y-2">
-                <label className="block text-xs font-bold uppercase text-zinc-400">Цвета</label>
                 <div className="flex flex-col gap-2">
-                  {/* Target Color */}
                   <div className="flex gap-3 items-center">
                     <div className="w-8 h-8 rounded border cursor-crosshair overflow-hidden relative group dark:border-zinc-700 flex-shrink-0">
                       <img src={originalUrl} className="w-full h-full object-cover" onClick={handleEyedropper} alt="picker" />
                     </div>
                     <div className="flex-1 flex items-center gap-2 p-2 border rounded bg-zinc-50 dark:bg-zinc-800 dark:border-zinc-700">
                       <input type="color" value={targetColor} onChange={e => setTargetColor(e.target.value)} className="w-6 h-6 bg-transparent border-none cursor-pointer" />
-                      <div className="flex flex-col">
-                        <span className="font-bold text-[10px] uppercase text-zinc-500">Цель (Фон)</span>
-                        <span className="font-mono text-xs font-bold uppercase">{targetColor}</span>
-                      </div>
+                      <div className="flex flex-col"><span className="font-bold text-[10px] uppercase text-zinc-500">Цель (Фон)</span><span className="font-mono text-xs font-bold uppercase">{targetColor}</span></div>
                     </div>
                   </div>
-                  {/* Contour Color */}
                   <div className="flex gap-3 items-center">
                     <div className="w-8 h-8 flex-shrink-0" />
                     <div className="flex-1 flex items-center gap-2 p-2 border rounded bg-zinc-50 dark:bg-zinc-800 dark:border-zinc-700">
-                      <input
-                        type="color"
-                        value={contourColor}
-                        onChange={e => setContourColor(e.target.value)}
-                        className="w-6 h-6 bg-transparent border-none cursor-pointer"
-                      />
-                      <div className="flex flex-col">
-                        <span className="font-bold text-[10px] uppercase text-zinc-500">Контур / Окрас</span>
-                        <span className="font-mono text-xs font-bold uppercase">{contourColor}</span>
-                      </div>
+                      <input type="color" value={contourColor} onChange={e => setContourColor(e.target.value)} className="w-6 h-6 bg-transparent border-none cursor-pointer" />
+                      <div className="flex flex-col"><span className="font-bold text-[10px] uppercase text-zinc-500">Контур / Окрас</span><span className="font-mono text-xs font-bold uppercase">{contourColor}</span></div>
                     </div>
                   </div>
                 </div>
               </div>
-
-              {/* Sliders */}
               <div className="space-y-4 bg-zinc-50 dark:bg-zinc-800/50 p-3 rounded-lg border border-zinc-100 dark:border-zinc-800">
-                <div>
-                  <div className="flex justify-between text-xs mb-1">
-                    <span>Допуск</span>
-                    <span className="text-blue-500 font-mono">{tolerances[processingMode]}%</span>
-                  </div>
-                  <input type="range" min="0" max="100" value={tolerances[processingMode]} onChange={e => setTolerances(p => ({ ...p, [processingMode]: Number(e.target.value) }))} className="w-full h-1.5 bg-zinc-200 rounded-lg appearance-none cursor-pointer dark:bg-zinc-600 accent-blue-600" />
-                </div>
-                {processingMode !== 'flood-clear' && (
-                  <div>
-                    <div className="flex justify-between text-xs mb-1">
-                      <span>Сглаживание</span>
-                      <span className="text-blue-500 font-mono">{smoothness}%</span>
-                    </div>
-                    <input type="range" min="0" max="50" value={smoothness} onChange={e => setSmoothness(Number(e.target.value))} className="w-full h-1.5 bg-zinc-200 rounded-lg appearance-none cursor-pointer dark:bg-zinc-600 accent-blue-600" />
-                  </div>
-                )}
-
-                {/* --- HALO REMOVAL TOOLS --- */}
+                <div><div className="flex justify-between text-xs mb-1"><span>Допуск</span><span className="text-blue-500 font-mono">{tolerances[processingMode]}%</span></div><input type="range" min="0" max="100" value={tolerances[processingMode]} onChange={e => setTolerances(p => ({ ...p, [processingMode]: Number(e.target.value) }))} className="w-full h-1.5 bg-zinc-200 rounded-lg appearance-none cursor-pointer dark:bg-zinc-600 accent-blue-600" /></div>
+                {processingMode !== 'flood-clear' && (<div><div className="flex justify-between text-xs mb-1"><span>Сглаживание</span><span className="text-blue-500 font-mono">{smoothness}%</span></div><input type="range" min="0" max="50" value={smoothness} onChange={e => setSmoothness(Number(e.target.value))} className="w-full h-1.5 bg-zinc-200 rounded-lg appearance-none cursor-pointer dark:bg-zinc-600 accent-blue-600" /></div>)}
                 <div className="pt-2 border-t border-zinc-200 dark:border-zinc-700/50">
-                  <div className="flex justify-between text-xs mb-1">
-                    <span className="font-bold text-zinc-500">Удаление ореолов</span>
-                  </div>
-                  <div className="mb-2">
-                    <div className="flex justify-between text-[10px] mb-1 text-zinc-500">
-                      <span>Сжатие (Choke)</span>
-                      <span className="text-blue-500 font-mono">{edgeChoke}px</span>
-                    </div>
-                    <input type="range" min="0" max="5" step="1" value={edgeChoke} onChange={e => setEdgeChoke(Number(e.target.value))} className="w-full h-1.5 bg-zinc-200 rounded-lg appearance-none cursor-pointer dark:bg-zinc-600 accent-blue-600" />
-                  </div>
-                  <div className="mb-2">
-                    <div className="flex justify-between text-[10px] mb-1 text-zinc-500">
-                      <span>Смягчение (Blur)</span>
-                      <span className="text-blue-500 font-mono">{edgeBlur}px</span>
-                    </div>
-                    <input type="range" min="0" max="5" step="1" value={edgeBlur} onChange={e => setEdgeBlur(Number(e.target.value))} className="w-full h-1.5 bg-zinc-200 rounded-lg appearance-none cursor-pointer dark:bg-zinc-600 accent-blue-600" />
-                  </div>
-                  <div>
-                    <div className="flex justify-between text-[10px] mb-1 text-zinc-500">
-                      <span>Окрашивание (Paint)</span>
-                      <span className="text-blue-500 font-mono">{edgePaint}px</span>
-                    </div>
-                    <input type="range" min="0" max="5" step="1" value={edgePaint} onChange={e => setEdgePaint(Number(e.target.value))} className="w-full h-1.5 bg-zinc-200 rounded-lg appearance-none cursor-pointer dark:bg-zinc-600 accent-blue-600" />
-                  </div>
+                  <div className="flex justify-between text-xs mb-1"><span className="font-bold text-zinc-500">Удаление ореолов</span></div>
+                  <div className="mb-2"><div className="flex justify-between text-[10px] mb-1 text-zinc-500"><span>Сжатие (Choke)</span><span className="text-blue-500 font-mono">{edgeChoke}px</span></div><input type="range" min="0" max="5" step="1" value={edgeChoke} onChange={e => setEdgeChoke(Number(e.target.value))} className="w-full h-1.5 bg-zinc-200 rounded-lg appearance-none cursor-pointer dark:bg-zinc-600 accent-blue-600" /></div>
+                  <div className="mb-2"><div className="flex justify-between text-[10px] mb-1 text-zinc-500"><span>Смягчение (Blur)</span><span className="text-blue-500 font-mono">{edgeBlur}px</span></div><input type="range" min="0" max="5" step="1" value={edgeBlur} onChange={e => setEdgeBlur(Number(e.target.value))} className="w-full h-1.5 bg-zinc-200 rounded-lg appearance-none cursor-pointer dark:bg-zinc-600 accent-blue-600" /></div>
+                  <div><div className="flex justify-between text-[10px] mb-1 text-zinc-500"><span>Окрашивание (Paint)</span><span className="text-blue-500 font-mono">{edgePaint}px</span></div><input type="range" min="0" max="5" step="1" value={edgePaint} onChange={e => setEdgePaint(Number(e.target.value))} className="w-full h-1.5 bg-zinc-200 rounded-lg appearance-none cursor-pointer dark:bg-zinc-600 accent-blue-600" /></div>
                 </div>
               </div>
-
-              {/* Flood Controls */}
               {processingMode === 'flood-clear' && (
                 <div className="space-y-3 p-3 bg-blue-50 dark:bg-blue-900/10 rounded-lg border border-blue-100 dark:border-blue-900/30">
                   <div className="flex justify-between items-center text-xs font-bold text-blue-800 dark:text-blue-200"><span>Точки: {floodPoints.length}</span></div>
-                  <div className="flex gap-2">
-                    <button onClick={removeLastPoint} disabled={floodPoints.length === 0} className="flex-1 py-2 text-xs bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded hover:bg-zinc-50 disabled:opacity-50">Отменить</button>
-                    <button onClick={clearAllPoints} disabled={floodPoints.length === 0} className="flex-1 py-2 text-xs bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded hover:text-red-500 hover:bg-red-50 disabled:opacity-50">Сбросить</button>
-                  </div>
+                  <div className="flex gap-2"><button onClick={removeLastPoint} disabled={floodPoints.length === 0} className="flex-1 py-2 text-xs bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded hover:bg-zinc-50 disabled:opacity-50">Отменить</button><button onClick={clearAllPoints} disabled={floodPoints.length === 0} className="flex-1 py-2 text-xs bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded hover:text-red-500 hover:bg-red-50 disabled:opacity-50">Сбросить</button></div>
                   <button onClick={handleRunFloodFill} disabled={floodPoints.length === 0 || isProcessing} className="w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded font-bold text-xs shadow-sm uppercase tracking-wide disabled:opacity-50 disabled:cursor-not-allowed">{isProcessing ? 'Обработка...' : 'Принудительно обновить'}</button>
                 </div>
               )}
-
               <button onClick={() => { if (processedUrl) { const a = document.createElement('a'); a.href = processedUrl; a.download = 'result.png'; a.click(); } }} disabled={!processedUrl} className="w-full py-3 bg-zinc-900 dark:bg-white text-white dark:text-black rounded font-bold text-sm shadow hover:opacity-90 transition disabled:opacity-50">Скачать</button>
             </div>
           )}
         </div>
       </aside>
 
-      {/* ================= ПРАВАЯ ПАНЕЛЬ (ПОЛОТНО) ================= */}
-      <main className="flex-1 relative h-full flex flex-col bg-zinc-100 dark:bg-[#0a0a0a] overflow-hidden">
-
-        {/* Floating Controls */}
+      {/* --- MAIN WORKSPACE --- */}
+      <main className="flex-1 relative h-full flex flex-col overflow-hidden">
+        {/* Панель управления (сверху) */}
         <div className="absolute top-4 left-1/2 -translate-x-1/2 z-30 flex items-center gap-2 bg-white/90 dark:bg-zinc-900/90 backdrop-blur px-3 py-2 rounded-full shadow-lg border border-zinc-200 dark:border-zinc-700">
           <button onClick={() => setIsAutoContrast(!isAutoContrast)} className={`p-2 rounded-full ${isAutoContrast ? 'bg-blue-100 text-blue-600 dark:bg-blue-900 dark:text-blue-300' : 'hover:bg-zinc-100 text-zinc-500'}`}>
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
           </button>
-
-          {isAutoContrast && (
-            <div className="flex items-center gap-2 mx-1">
-              <input type="range" min="1" max="10" step="1" value={autoContrastPeriod} onChange={e => setAutoContrastPeriod(Number(e.target.value))} className="w-16 h-1 bg-zinc-200 rounded-lg appearance-none cursor-pointer dark:bg-zinc-700 accent-blue-600" />
-              <span className="text-xs font-mono font-bold text-zinc-600 dark:text-zinc-300 w-5">{autoContrastPeriod}s</span>
-            </div>
-          )}
-
+          {isAutoContrast && (<div className="flex items-center gap-2 mx-1"><input type="range" min="1" max="10" step="1" value={autoContrastPeriod} onChange={e => setAutoContrastPeriod(Number(e.target.value))} className="w-16 h-1 bg-zinc-200 rounded-lg appearance-none cursor-pointer dark:bg-zinc-700 accent-blue-600" /><span className="text-xs font-mono font-bold text-zinc-600 dark:text-zinc-300 w-5">{autoContrastPeriod}s</span></div>)}
           <button onClick={() => { setIsAutoContrast(false); setIsDarkBackground(!isDarkBackground) }} className="p-2 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-500">{isDarkBackground ? "🌙" : "☀️"}</button>
           <div className="w-px h-4 bg-zinc-300 dark:bg-zinc-700 mx-1" />
           <button onClick={() => workspaceRef.current?.resetView(imgDimensions.w, imgDimensions.h)} className="text-xs font-mono px-2 text-zinc-500 hover:text-zinc-900">Сброс</button>
         </div>
 
-        {/* WORKSPACE */}
         <div
-          className={`flex-1 transition-colors ease-in-out ${bgClass}`}
-          style={{ transitionDuration: `${transitionDurationMs}ms` }}
+          className="flex-1 w-full h-full"
           onPointerMove={handleGlobalPointerMove}
           onPointerUp={handleGlobalPointerUp}
         >
-          <div className={`absolute inset-0 pointer-events-none transition-opacity ease-in-out ${isDarkBackground ? 'opacity-10' : 'opacity-30'}`} style={{ transitionDuration: `${transitionDurationMs}ms`, backgroundImage: 'linear-gradient(45deg, #888 25%, transparent 25%), linear-gradient(-45deg, #888 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #888 75%), linear-gradient(-45deg, transparent 75%, #888 75%)', backgroundSize: '20px 20px', zIndex: 0 }} />
-
-          <CanvasWorkspace
+          <Canvas
             ref={workspaceRef}
             isLoading={isProcessing}
+            theme={isDarkBackground ? 'dark' : 'light'}
+            transitionDuration={isAutoContrast ? (autoContrastPeriod * 1000) * 0.9 : 300}
           >
             <div
               className="relative origin-top-left"
               style={{
                 width: imgDimensions.w,
                 height: imgDimensions.h,
-                // Shadow for out-of-bounds
                 boxShadow: processedUrl ? '0 0 0 50000px rgba(0,0,0,0.8)' : 'none'
               }}
             >
@@ -637,25 +403,17 @@ export function MonochromeBackgroundRemover() {
                     alt="Work"
                     draggable={false}
                     className="block max-w-none select-none"
-                    style={{
-                      imageRendering: 'pixelated',
-                      cursor: processingMode === 'flood-clear' ? 'crosshair' : 'default'
-                    }}
+                    style={{ imageRendering: 'pixelated', cursor: processingMode === 'flood-clear' ? 'crosshair' : 'default' }}
                     onPointerDown={handleImagePointerDown}
                   />
-
-                  {/* Flood Points Overlay */}
                   {processingMode === 'flood-clear' && floodPoints.map((pt, i) => (
                     <div
                       key={i}
                       onPointerDown={(e) => handlePointPointerDown(e, i)}
                       className={`absolute z-20 cursor-grab active:cursor-grabbing hover:brightness-125 ${draggingPointIndex === i ? 'brightness-150' : ''}`}
                       style={{
-                        left: pt.x,
-                        top: pt.y,
-                        width: '10px',
-                        height: '10px',
-                        transform: 'translate(-50%, -50%) scale(calc(1 / var(--canvas-scale)))', // Compensate scale
+                        left: pt.x, top: pt.y, width: '10px', height: '10px',
+                        transform: 'translate(-50%, -50%) scale(calc(1 / var(--canvas-scale)))',
                       }}
                     >
                       <div className="w-full h-full bg-red-500 border border-white rounded-full shadow-[0_0_2px_rgba(0,0,0,0.8)]" />
@@ -663,12 +421,10 @@ export function MonochromeBackgroundRemover() {
                   ))}
                 </>
               ) : (
-                <div className="absolute inset-0 flex items-center justify-center text-zinc-400 text-lg opacity-50 whitespace-nowrap border-2 border-dashed border-zinc-500/20 rounded-lg">
-                  Нет изображения
-                </div>
+                <div className="absolute inset-0 flex items-center justify-center text-zinc-400 text-lg opacity-50 whitespace-nowrap border-2 border-dashed border-zinc-500/20 rounded-lg">Нет изображения</div>
               )}
             </div>
-          </CanvasWorkspace>
+          </Canvas>
         </div>
       </main>
     </div>

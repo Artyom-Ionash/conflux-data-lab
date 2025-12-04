@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useCallback, useMemo, useState } from 'react';
-import { CanvasWorkspace } from '../../ui/CanvasWorkspace';
+import { Canvas } from '../../ui/Canvas';
 
 type AlignImage = {
   id: string;
@@ -46,7 +46,6 @@ export function VerticalImageAligner() {
     const height = images.length * cellHeight;
     let maxRight = 0;
     images.forEach((img) => {
-      // Scale убран, используем только naturalWidth
       const rightEdge = img.offsetX + img.naturalWidth;
       if (rightEdge > maxRight) maxRight = rightEdge;
     });
@@ -112,7 +111,6 @@ export function VerticalImageAligner() {
       loaded.forEach(({ meta, img }, index) => {
         const slotY = index * cellHeight;
         ctx.save(); ctx.beginPath(); ctx.rect(0, slotY, finalW, cellHeight); ctx.clip();
-        // Отрисовка без масштабирования
         ctx.drawImage(img, meta.offsetX, slotY + meta.offsetY, img.width, img.height);
         ctx.restore();
       });
@@ -180,7 +178,6 @@ export function VerticalImageAligner() {
                 <div className="p-2 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded text-xs">
                   <p className="font-bold mb-1">Активный слой:</p>
                   <div className="grid grid-cols-2 gap-2">
-                    {/* Scale удален */}
                     <label>Offset Y <input type="number" value={images.find(i => i.id === activeImageId)?.offsetY} onChange={e => setImages(p => p.map(x => x.id === activeImageId ? { ...x, offsetY: Number(e.target.value) } : x))} className="w-full border" /></label>
                     <label>Offset X <input type="number" value={images.find(i => i.id === activeImageId)?.offsetX} onChange={e => setImages(p => p.map(x => x.id === activeImageId ? { ...x, offsetX: Number(e.target.value) } : x))} className="w-full border" /></label>
                   </div>
@@ -191,8 +188,8 @@ export function VerticalImageAligner() {
         </div>
       </aside>
 
-      <main className="relative flex-1 bg-[#e5e5e5] dark:bg-[#111] overflow-hidden">
-        <CanvasWorkspace isLoading={isExporting}>
+      <main className="relative flex-1 overflow-hidden">
+        <Canvas isLoading={isExporting} theme="light">
           <div
             className="relative"
             style={{
@@ -250,8 +247,8 @@ export function VerticalImageAligner() {
                   style={{
                     left: img.offsetX,
                     top: img.offsetY,
-                    width: img.naturalWidth, // Без масштаба
-                    height: img.naturalHeight // Без масштаба
+                    width: img.naturalWidth,
+                    height: img.naturalHeight
                   }}
                 />
                 <div className="absolute left-0 top-0 bg-red-600/80 text-white text-[10px] px-1 pointer-events-none" style={{ transformOrigin: 'top left', transform: 'scale(calc(1 / var(--canvas-scale)))' }}>
@@ -264,7 +261,7 @@ export function VerticalImageAligner() {
               <div className="absolute inset-0 flex items-center justify-center text-zinc-400">Пустой холст</div>
             )}
           </div>
-        </CanvasWorkspace>
+        </Canvas>
       </main>
     </div>
   );
