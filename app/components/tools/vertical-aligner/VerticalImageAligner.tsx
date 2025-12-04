@@ -32,11 +32,26 @@ const DraggableImageSlot = React.memo(({
   img, index, slotHeight, slotWidth, getCanvasScale, onActivate, onUpdatePosition
 }: DraggableImageSlotProps) => {
 
+  // Локальное состояние для управления курсором (чтобы кулак был только при ЛКМ)
+  const [isDragging, setIsDragging] = useState(false);
+
   const handlePointerDown = (e: React.PointerEvent) => {
-    e.stopPropagation();
-    if (e.button !== 0) return;
+    // 1. Если это средняя кнопка мыши (button 1), мы НЕ останавливаем событие.
+    // Оно всплывет до Canvas, и Canvas обработает перемещение камеры.
+    if (e.button === 1) {
+      return;
+    }
+
+    // 2. Если это правая кнопка (button 2), просто игнорируем (контекстное меню браузера).
+    if (e.button !== 0) {
+      return;
+    }
+
+    // 3. Если это ЛЕВАЯ кнопка (button 0) - начинаем перетаскивание картинки.
+    e.stopPropagation(); // Останавливаем, чтобы не двигать холст
 
     onActivate(img.id);
+    setIsDragging(true); // Включаем курсор "кулак"
 
     const target = e.currentTarget;
     target.setPointerCapture(e.pointerId);
@@ -55,6 +70,7 @@ const DraggableImageSlot = React.memo(({
     };
 
     const handlePointerUp = () => {
+      setIsDragging(false); // Выключаем курсор "кулак"
       target.removeEventListener('pointermove', handlePointerMove as any);
       target.removeEventListener('pointerup', handlePointerUp as any);
     };
@@ -66,7 +82,7 @@ const DraggableImageSlot = React.memo(({
   return (
     <div
       className={`absolute left-0 overflow-hidden group border-r border-dashed transition-colors
-        cursor-grab active:cursor-grabbing
+        ${isDragging ? 'cursor-grabbing' : 'cursor-grab'}
         ${img.isActive
           ? 'border-blue-500/50 z-30'
           : 'border-zinc-300/30 z-10 hover:border-zinc-400/50'
@@ -114,7 +130,6 @@ export function VerticalImageAligner() {
   const [images, setImages] = useState<AlignImage[]>([]);
 
   // --- РАЗМЕРЫ СЛОТА (ОБЛАСТЬ ВИДИМОСТИ И ЭКСПОРТА) ---
-  // По умолчанию 1x1, пока не загружено изображение
   const [slotHeight, setSlotHeight] = useState(1);
   const [slotWidth, setSlotWidth] = useState(1);
 
