@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useCallback, useMemo, useState } from 'react';
-import { Canvas } from '../../ui/Canvas';
+import React, { useCallback, useMemo, useState, useRef } from 'react';
+import { Canvas, CanvasRef } from '../../ui/Canvas';
 
 type AlignImage = {
   id: string;
@@ -17,13 +17,106 @@ type AlignImage = {
 
 function revokeObjectURLSafely(url: string) { try { URL.revokeObjectURL(url); } catch { } }
 
+// --- Sub-component for performance and clean drag logic ---
+interface DraggableImageSlotProps {
+  img: AlignImage;
+  index: number;
+  cellHeight: number;
+  frameWidth: number;
+  getCanvasScale: () => number; // Accessor for scale
+  onActivate: (id: string) => void;
+  onUpdatePosition: (id: string, x: number, y: number) => void;
+}
+
+// Wrapped in memo to prevent re-rendering ALL slots when dragging one
+const DraggableImageSlot = React.memo(({
+  img, index, cellHeight, frameWidth, getCanvasScale, onActivate, onUpdatePosition
+}: DraggableImageSlotProps) => {
+
+  const handlePointerDown = (e: React.PointerEvent) => {
+    // 1. Stop propagation so the parent Canvas doesn't start panning
+    e.stopPropagation();
+
+    // 2. Only allow left click
+    if (e.button !== 0) return;
+
+    // 3. Activate this layer
+    onActivate(img.id);
+
+    // 4. Capture the pointer (standard browser API for drag)
+    const target = e.currentTarget;
+    target.setPointerCapture(e.pointerId);
+
+    const startX = e.clientX;
+    const startY = e.clientY;
+    const initialOffsetX = img.offsetX;
+    const initialOffsetY = img.offsetY;
+
+    // 5. Get CURRENT scale once at the start of drag
+    const scale = getCanvasScale();
+
+    const handlePointerMove = (moveEvent: PointerEvent) => {
+      // Calculate delta taking scale into account
+      const dx = (moveEvent.clientX - startX) / scale;
+      const dy = (moveEvent.clientY - startY) / scale;
+
+      onUpdatePosition(img.id, initialOffsetX + dx, initialOffsetY + dy);
+    };
+
+    const handlePointerUp = () => {
+      target.removeEventListener('pointermove', handlePointerMove as any);
+      target.removeEventListener('pointerup', handlePointerUp as any);
+    };
+
+    target.addEventListener('pointermove', handlePointerMove as any);
+    target.addEventListener('pointerup', handlePointerUp as any);
+  };
+
+  return (
+    <div
+      className={`absolute left-0 w-full overflow-hidden group border-r border-dashed ${img.isActive ? 'border-blue-500/50 z-20' : 'border-zinc-300/30 z-10'}`}
+      style={{
+        top: index * cellHeight,
+        height: cellHeight,
+        width: frameWidth, // Clip to frame width
+      }}
+      onPointerDown={handlePointerDown}
+    >
+      {/* Visual cue for dragging */}
+      <div className={`absolute inset-0 transition-colors pointer-events-none ${img.isActive ? 'bg-blue-500/5' : 'group-hover:bg-blue-500/5'}`} />
+
+      {/* Helper text only visible on hover */}
+      <div className="absolute top-1 left-1 bg-black/50 text-white text-[10px] px-1 rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none select-none z-30">
+        Drag to move
+      </div>
+
+      <img
+        src={img.url}
+        draggable={false}
+        alt=""
+        className="absolute select-none origin-top-left max-w-none will-change-transform"
+        style={{
+          left: 0,
+          top: 0,
+          // Using translate3d for better GPU performance during drag
+          transform: `translate3d(${img.offsetX}px, ${img.offsetY}px, 0)`,
+          width: img.naturalWidth,
+          height: img.naturalHeight
+        }}
+      />
+    </div>
+  );
+});
+DraggableImageSlot.displayName = 'DraggableImageSlot';
+
+
 export function VerticalImageAligner() {
   const [images, setImages] = useState<AlignImage[]>([]);
   const [cellHeight, setCellHeight] = useState(300);
   const [bgColorHex, setBgColorHex] = useState('#ffffff');
   const [bgOpacity, setBgOpacity] = useState(0);
 
-  // Настройки сетки
+  // Grid & Frame
   const [showGrid, setShowGrid] = useState(true);
   const [gridWidth, setGridWidth] = useState(100);
   const [gridHeight, setGridHeight] = useState(100);
@@ -31,30 +124,43 @@ export function VerticalImageAligner() {
   const [gridOffsetY, setGridOffsetY] = useState(0);
   const [gridColor, setGridColor] = useState('#ff0000');
 
-  // Настройки границ
   const [showFrameBorders, setShowFrameBorders] = useState(false);
   const [frameWidth, setFrameWidth] = useState(300);
   const [frameBorderColor, setFrameBorderColor] = useState('#00ff00');
 
-  const [draggingIndex, setDraggingIndex] = useState<number | null>(null);
+  const [draggingListIndex, setDraggingListIndex] = useState<number | null>(null);
   const [isExporting, setIsExporting] = useState(false);
+
+  // Refs
+  const workspaceRef = useRef<CanvasRef>(null);
 
   const activeImageId = useMemo(() => images.find((img) => img.isActive)?.id ?? null, [images]);
 
   const compositionBounds = useMemo(() => {
     if (!images.length) return { width: 800, height: 600 };
     const height = images.length * cellHeight;
-    let maxRight = 0;
-    images.forEach((img) => {
-      const rightEdge = img.offsetX + img.naturalWidth;
-      if (rightEdge > maxRight) maxRight = rightEdge;
-    });
-    // frameWidth влияет на ширину композиции, если он больше контента
-    const width = Math.max(800, maxRight, frameWidth);
+    // Bounds are determined by frameWidth now, as we clip to it
+    const width = Math.max(800, frameWidth);
     return { width, height };
-  }, [images, cellHeight, frameWidth]);
+  }, [images.length, cellHeight, frameWidth]);
 
-  // --- Handlers (Upload, Export, etc) ---
+  // --- Callbacks ---
+
+  // Helper to get scale inside the child component without prop drilling state
+  const getCanvasScale = useCallback(() => {
+    return workspaceRef.current?.getTransform().scale || 1;
+  }, []);
+
+  const handleUpdatePosition = useCallback((id: string, x: number, y: number) => {
+    setImages(prev => prev.map(img =>
+      img.id === id ? { ...img, offsetX: x, offsetY: y } : img
+    ));
+  }, []);
+
+  const handleActivate = useCallback((id: string) => {
+    setImages(prev => prev.map(x => ({ ...x, isActive: x.id === id })));
+  }, []);
+
   const handleFilesChange = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;
     if (!files || files.length === 0) return;
@@ -77,8 +183,7 @@ export function VerticalImageAligner() {
       img.onload = () => {
         if (isListEmpty && idx === 0) {
           setCellHeight(img.height);
-          // ИЗМЕНЕНИЕ: Ширина кадра устанавливается равной ВЫСОТЕ первого изображения
-          setFrameWidth(img.height);
+          setFrameWidth(img.width); // Match frame to first image width
         }
         setImages(current => current.map(ex => ex.id === item.id ? { ...ex, naturalWidth: img.width, naturalHeight: img.height } : ex));
       };
@@ -102,27 +207,34 @@ export function VerticalImageAligner() {
       const loaded = await Promise.all(images.map((item) => new Promise<{ meta: AlignImage; img: HTMLImageElement }>((resolve, reject) => {
         const i = new Image(); i.onload = () => resolve({ meta: item, img: i }); i.onerror = () => reject(); i.src = item.url;
       })));
-      const finalW = Math.ceil(compositionBounds.width);
-      const finalH = compositionBounds.height;
+
+      // Export exact frame size
+      const finalW = frameWidth;
+      const finalH = images.length * cellHeight;
+
       const canvas = document.createElement('canvas');
       canvas.width = finalW; canvas.height = finalH;
       const ctx = canvas.getContext('2d');
       if (!ctx) return;
+
       const r = parseInt(bgColorHex.slice(1, 3), 16);
       const g = parseInt(bgColorHex.slice(3, 5), 16);
       const b = parseInt(bgColorHex.slice(5, 7), 16);
       ctx.fillStyle = `rgba(${r}, ${g}, ${b}, ${bgOpacity})`;
       ctx.fillRect(0, 0, finalW, finalH);
+
       loaded.forEach(({ meta, img }, index) => {
         const slotY = index * cellHeight;
-        ctx.save(); ctx.beginPath(); ctx.rect(0, slotY, finalW, cellHeight); ctx.clip();
+        ctx.save();
+        // Clip to slot area
+        ctx.beginPath(); ctx.rect(0, slotY, frameWidth, cellHeight); ctx.clip();
         ctx.drawImage(img, meta.offsetX, slotY + meta.offsetY, img.width, img.height);
         ctx.restore();
       });
       const a = document.createElement('a'); a.href = canvas.toDataURL('image/png'); a.download = 'aligned-export.png';
       document.body.appendChild(a); a.click(); document.body.removeChild(a);
     } finally { setIsExporting(false); }
-  }, [images, cellHeight, compositionBounds, bgColorHex, bgOpacity]);
+  }, [images, cellHeight, frameWidth, bgColorHex, bgOpacity]);
 
   const cssBackgroundColor = useMemo(() => {
     const r = parseInt(bgColorHex.slice(1, 3), 16);
@@ -131,17 +243,18 @@ export function VerticalImageAligner() {
     return `rgba(${r}, ${g}, ${b}, ${bgOpacity})`;
   }, [bgColorHex, bgOpacity]);
 
-  const handleDragStart = (e: React.DragEvent, index: number) => { setDraggingIndex(index); };
+  // List Drag & Drop Handlers
+  const handleDragStart = (e: React.DragEvent, index: number) => { setDraggingListIndex(index); };
   const handleDrop = (e: React.DragEvent, targetIndex: number) => {
     e.preventDefault();
-    if (draggingIndex === null || draggingIndex === targetIndex) { setDraggingIndex(null); return; }
+    if (draggingListIndex === null || draggingListIndex === targetIndex) { setDraggingListIndex(null); return; }
     setImages(prev => {
       const copy = [...prev];
-      const [item] = copy.splice(draggingIndex, 1);
+      const [item] = copy.splice(draggingListIndex, 1);
       copy.splice(targetIndex, 0, item);
       return copy;
     });
-    setDraggingIndex(null);
+    setDraggingListIndex(null);
   };
 
   return (
@@ -162,31 +275,28 @@ export function VerticalImageAligner() {
             <div className="space-y-4">
               <button onClick={handleExport} disabled={isExporting} className="w-full rounded bg-blue-600 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50">{isExporting ? 'Экспорт...' : 'Скачать PNG'}</button>
 
-              {/* Основные размеры */}
               <div className="space-y-2 p-3 bg-zinc-50 dark:bg-zinc-800 rounded border border-zinc-200 dark:border-zinc-700 text-xs">
                 <div className="flex justify-between items-center mb-1">
-                  <span className="font-bold">Высота слота</span>
+                  <span className="font-bold">Высота слота (px)</span>
                   <input type="number" value={cellHeight} onChange={e => setCellHeight(Number(e.target.value))} className="w-16 p-1 border rounded" />
                 </div>
                 <div className="flex justify-between items-center">
-                  <span className="font-bold">Ширина кадра</span>
+                  <span className="font-bold">Ширина кадра (px)</span>
                   <input type="number" value={frameWidth} onChange={e => setFrameWidth(Number(e.target.value))} className="w-16 p-1 border rounded" />
                 </div>
               </div>
 
-              {/* Настройки визуализации (сетка/границы) */}
               <div className="space-y-2 p-3 bg-zinc-50 dark:bg-zinc-800 rounded border border-zinc-200 dark:border-zinc-700 text-xs">
-                <div className="flex justify-between items-center"><span className="font-bold">Показать сетку</span><input type="checkbox" checked={showGrid} onChange={e => setShowGrid(e.target.checked)} /></div>
+                <div className="flex justify-between items-center"><span className="font-bold">Сетка</span><input type="checkbox" checked={showGrid} onChange={e => setShowGrid(e.target.checked)} /></div>
                 {showGrid && <div className="grid grid-cols-2 gap-2 mt-2"><input type="number" placeholder="W" value={gridWidth} onChange={e => setGridWidth(Number(e.target.value))} className="border p-1 rounded" /><input type="number" placeholder="H" value={gridHeight} onChange={e => setGridHeight(Number(e.target.value))} className="border p-1 rounded" /></div>}
-                <div className="flex justify-between items-center mt-2"><span className="font-bold">Показать границы</span><input type="checkbox" checked={showFrameBorders} onChange={e => setShowFrameBorders(e.target.checked)} /></div>
+                <div className="flex justify-between items-center mt-2"><span className="font-bold">Границы</span><input type="checkbox" checked={showFrameBorders} onChange={e => setShowFrameBorders(e.target.checked)} /></div>
               </div>
 
-              {/* Список слоев */}
               <div className="space-y-1">
                 {images.map((img, i) => (
                   <div key={img.id} draggable onDragStart={(e) => handleDragStart(e, i)} onDragOver={e => e.preventDefault()} onDrop={(e) => handleDrop(e, i)}
                     className={`flex items-center gap-2 p-2 text-xs rounded border cursor-pointer ${img.isActive ? 'bg-blue-50 border-blue-200 text-blue-800' : 'bg-white border-zinc-200'}`}
-                    onClick={() => setImages(p => p.map(x => ({ ...x, isActive: x.id === img.id })))}
+                    onClick={() => handleActivate(img.id)}
                   >
                     <span className="font-mono text-zinc-400">#{i + 1}</span>
                     <span className="truncate flex-1">{img.name}</span>
@@ -195,13 +305,12 @@ export function VerticalImageAligner() {
                 ))}
               </div>
 
-              {/* Активный слой */}
               {activeImageId && (
                 <div className="p-2 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded text-xs">
-                  <p className="font-bold mb-1">Активный слой:</p>
+                  <p className="font-bold mb-1">Координаты:</p>
                   <div className="grid grid-cols-2 gap-2">
-                    <label>Offset Y <input type="number" value={images.find(i => i.id === activeImageId)?.offsetY} onChange={e => setImages(p => p.map(x => x.id === activeImageId ? { ...x, offsetY: Number(e.target.value) } : x))} className="w-full border" /></label>
-                    <label>Offset X <input type="number" value={images.find(i => i.id === activeImageId)?.offsetX} onChange={e => setImages(p => p.map(x => x.id === activeImageId ? { ...x, offsetX: Number(e.target.value) } : x))} className="w-full border" /></label>
+                    <label>Y <input type="number" value={Math.round(images.find(i => i.id === activeImageId)?.offsetY || 0)} onChange={e => handleUpdatePosition(activeImageId, (images.find(i => i.id === activeImageId)?.offsetX || 0), Number(e.target.value))} className="w-full border" /></label>
+                    <label>X <input type="number" value={Math.round(images.find(i => i.id === activeImageId)?.offsetX || 0)} onChange={e => handleUpdatePosition(activeImageId, Number(e.target.value), (images.find(i => i.id === activeImageId)?.offsetY || 0))} className="w-full border" /></label>
                   </div>
                 </div>
               )}
@@ -212,6 +321,7 @@ export function VerticalImageAligner() {
 
       <main className="relative flex-1 overflow-hidden">
         <Canvas
+          ref={workspaceRef}
           isLoading={isExporting}
           contentWidth={compositionBounds.width}
           contentHeight={compositionBounds.height}
@@ -224,10 +334,10 @@ export function VerticalImageAligner() {
               boxShadow: images.length ? '0 0 0 50000px rgba(0,0,0,0.5)' : 'none'
             }}
           >
-            {/* Фон */}
+            {/* Background */}
             <div className="absolute inset-0" style={{ backgroundColor: cssBackgroundColor }} />
 
-            {/* Сетка */}
+            {/* Grid */}
             {showGrid && (
               <div className="absolute inset-0 pointer-events-none z-50 opacity-50"
                 style={{
@@ -241,7 +351,7 @@ export function VerticalImageAligner() {
               />
             )}
 
-            {/* Границы кадров */}
+            {/* Frame Borders */}
             {showFrameBorders && (
               <div className="absolute inset-0 pointer-events-none z-[60] opacity-80"
                 style={{
@@ -254,33 +364,18 @@ export function VerticalImageAligner() {
               />
             )}
 
-            {/* Изображения */}
+            {/* Render Slots */}
             {images.map((img, i) => (
-              <div key={img.id}
-                className="absolute left-0 w-full overflow-hidden"
-                style={{ top: i * cellHeight, height: cellHeight, zIndex: img.isActive ? 20 : 10 }}
-              >
-                <div className="absolute top-full left-0 w-full border-b border-dashed border-red-500/30"
-                  style={{
-                    borderBottomWidth: 'calc(1px / var(--canvas-scale))'
-                  }}
-                />
-                <img
-                  src={img.url}
-                  alt=""
-                  draggable={false}
-                  className="absolute select-none origin-top-left"
-                  style={{
-                    left: img.offsetX,
-                    top: img.offsetY,
-                    width: img.naturalWidth,
-                    height: img.naturalHeight
-                  }}
-                />
-                <div className="absolute left-0 top-0 bg-red-600/80 text-white text-[10px] px-1 pointer-events-none" style={{ transformOrigin: 'top left', transform: 'scale(calc(1 / var(--canvas-scale)))' }}>
-                  {i + 1}
-                </div>
-              </div>
+              <DraggableImageSlot
+                key={img.id}
+                img={img}
+                index={i}
+                cellHeight={cellHeight}
+                frameWidth={frameWidth}
+                getCanvasScale={getCanvasScale}
+                onActivate={handleActivate}
+                onUpdatePosition={handleUpdatePosition}
+              />
             ))}
 
             {!images.length && (
