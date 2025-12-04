@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useRef, useState, useImperativeHandle, forwardRef, ReactNode, useEffect, useCallback } from 'react';
+import React, { useRef, useState, useImperativeHandle, forwardRef, ReactNode, useEffect, useCallback, useLayoutEffect } from 'react';
 
 interface Point {
   x: number;
@@ -45,14 +45,17 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(
     initialScale = 1,
     contentWidth,
     contentHeight,
-    theme: propTheme
+    theme: propTheme,
   }, ref) => {
     const containerRef = useRef<HTMLDivElement>(null);
-    const [transform, setTransform] = useState<CanvasTransform>({ scale: initialScale, x: 0, y: 0 });
-    const [isPanning, setIsPanning] = useState(false);
+    // Ссылка на слой контента для прямого манипулирования DOM
+    const contentRef = useRef<HTMLDivElement>(null);
 
-    // --- State: Тема и Авто-контраст ---
-    // ИЗМЕНЕНИЕ: По умолчанию 'dark'
+    // --- Performance Optimization: Refs instead of State ---
+    const transform = useRef<CanvasTransform>({ scale: initialScale, x: 0, y: 0 });
+
+    // State для взаимодействия
+    const [isPanning, setIsPanning] = useState(false);
     const [internalTheme, setInternalTheme] = useState<'light' | 'dark'>('dark');
     const [isAutoContrast, setIsAutoContrast] = useState(false);
     const [autoContrastPeriod, setAutoContrastPeriod] = useState(5);
@@ -62,7 +65,20 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(
     const panStartRef = useRef<Point | null>(null);
     const transformStartRef = useRef<CanvasTransform | null>(null);
 
-    // --- Логика Reset View ---
+    // --- Direct DOM Update ---
+    const updateDOM = useCallback(() => {
+      if (contentRef.current) {
+        const { x, y, scale } = transform.current;
+        contentRef.current.style.transform = `translate(${x}px, ${y}px) scale(${scale})`;
+        contentRef.current.style.setProperty('--canvas-scale', scale.toString());
+      }
+    }, []);
+
+    useLayoutEffect(() => {
+      updateDOM();
+    }, [updateDOM]);
+
+    // --- Logic: Reset View ---
     const performResetView = useCallback((w?: number, h?: number) => {
       if (!containerRef.current) return;
       const { clientWidth, clientHeight } = containerRef.current;
@@ -88,19 +104,21 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(
         newY = clientHeight / 2;
       }
 
-      setTransform({ scale: newScale, x: newX, y: newY });
-    }, [contentWidth, contentHeight]);
+      transform.current = { scale: newScale, x: newX, y: newY };
+      updateDOM();
+    }, [contentWidth, contentHeight, updateDOM]);
 
     // --- API for Parents ---
     useImperativeHandle(ref, () => ({
       resetView: (w, h) => performResetView(w, h),
-      getTransform: () => transform,
+      getTransform: () => transform.current,
       screenToWorld: (clientX: number, clientY: number) => {
         if (!containerRef.current) return { x: 0, y: 0 };
         const rect = containerRef.current.getBoundingClientRect();
-        const x = (clientX - rect.left - transform.x) / transform.scale;
-        const y = (clientY - rect.top - transform.y) / transform.scale;
-        return { x, y };
+        const { x, y, scale } = transform.current;
+        const worldX = (clientX - rect.left - x) / scale;
+        const worldY = (clientY - rect.top - y) / scale;
+        return { x: worldX, y: worldY };
       }
     }));
 
@@ -129,14 +147,16 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(
       const direction = e.deltaY > 0 ? -1 : 1;
       const factor = 1 + (direction * zoomIntensity);
 
-      let newScale = transform.scale * factor;
+      const current = transform.current;
+      let newScale = current.scale * factor;
       newScale = Math.max(minScale, Math.min(newScale, maxScale));
 
-      const scaleRatio = newScale / transform.scale;
-      const newX = mouseX - (mouseX - transform.x) * scaleRatio;
-      const newY = mouseY - (mouseY - transform.y) * scaleRatio;
+      const scaleRatio = newScale / current.scale;
+      const newX = mouseX - (mouseX - current.x) * scaleRatio;
+      const newY = mouseY - (mouseY - current.y) * scaleRatio;
 
-      setTransform({ scale: newScale, x: newX, y: newY });
+      transform.current = { scale: newScale, x: newX, y: newY };
+      updateDOM();
     };
 
     const handlePointerDown = (e: React.PointerEvent) => {
@@ -145,7 +165,7 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(
         if (containerRef.current) containerRef.current.setPointerCapture(e.pointerId);
         setIsPanning(true);
         panStartRef.current = { x: e.clientX, y: e.clientY };
-        transformStartRef.current = { ...transform };
+        transformStartRef.current = { ...transform.current };
       }
     };
 
@@ -153,11 +173,11 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(
       if (isPanning && panStartRef.current && transformStartRef.current) {
         const dx = e.clientX - panStartRef.current.x;
         const dy = e.clientY - panStartRef.current.y;
-        setTransform({
-          ...transform,
-          x: transformStartRef.current.x + dx,
-          y: transformStartRef.current.y + dy
-        });
+
+        transform.current.x = transformStartRef.current.x + dx;
+        transform.current.y = transformStartRef.current.y + dy;
+
+        updateDOM();
       }
     };
 
@@ -174,8 +194,6 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(
     const bgClass = isDark ? 'bg-[#111]' : 'bg-[#e5e5e5]';
     const gridOpacity = isDark ? 'opacity-10' : 'opacity-30';
     const transitionDuration = isAutoContrast ? (autoContrastPeriod * 1000) * 0.9 : 300;
-
-    // Grid pattern
     const gridPattern = 'linear-gradient(45deg, #888 25%, transparent 25%), linear-gradient(-45deg, #888 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #888 75%), linear-gradient(-45deg, transparent 75%, #888 75%)';
 
     return (
@@ -193,85 +211,49 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(
           transitionDuration: `${transitionDuration}ms`
         }}
       >
-        {/* === Floating Toolbar (Controls) === */}
+        {/* === Floating Toolbar === */}
         <div className="absolute top-4 left-1/2 -translate-x-1/2 z-30 flex items-center gap-2 bg-white/90 dark:bg-zinc-900/90 backdrop-blur px-3 py-2 rounded-full shadow-lg border border-zinc-200 dark:border-zinc-700">
-          <button
-            onClick={() => setIsAutoContrast(!isAutoContrast)}
-            className={`p-2 rounded-full transition-colors ${isAutoContrast ? 'bg-blue-100 text-blue-600 dark:bg-blue-900 dark:text-blue-300' : 'hover:bg-zinc-100 text-zinc-500'}`}
-            title="Авто-контраст"
-          >
+          <button onClick={() => { setIsAutoContrast(false); setInternalTheme(prev => prev === 'dark' ? 'light' : 'dark'); }} className="p-2 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-500 transition-colors" title="Сменить тему фона">
+            {isDark ? "🌙" : "☀️"}
+          </button>
+
+          <button onClick={() => setIsAutoContrast(!isAutoContrast)} className={`p-2 rounded-full transition-colors ${isAutoContrast ? 'bg-blue-100 text-blue-600 dark:bg-blue-900 dark:text-blue-300' : 'hover:bg-zinc-100 text-zinc-500'}`} title="Авто-контраст">
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
           </button>
 
           {isAutoContrast && (
             <div className="flex items-center gap-2 mx-1 animate-fade-in">
-              <input
-                type="range" min="1" max="10" step="1"
-                value={autoContrastPeriod}
-                onChange={e => setAutoContrastPeriod(Number(e.target.value))}
-                className="w-16 h-1 bg-zinc-200 rounded-lg appearance-none cursor-pointer dark:bg-zinc-700 accent-blue-600"
-              />
+              <input type="range" min="1" max="10" step="1" value={autoContrastPeriod} onChange={e => setAutoContrastPeriod(Number(e.target.value))} className="w-16 h-1 bg-zinc-200 rounded-lg appearance-none cursor-pointer dark:bg-zinc-700 accent-blue-600" />
               <span className="text-xs font-mono font-bold text-zinc-600 dark:text-zinc-300 w-5">{autoContrastPeriod}s</span>
             </div>
           )}
 
-          <button
-            onClick={() => { setIsAutoContrast(false); setInternalTheme(prev => prev === 'dark' ? 'light' : 'dark'); }}
-            className="p-2 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-500 transition-colors"
-            title="Сменить тему фона"
-          >
-            {isDark ? "🌙" : "☀️"}
-          </button>
-
           <div className="w-px h-4 bg-zinc-300 dark:bg-zinc-700 mx-1" />
-
-          <button
-            onClick={() => performResetView()}
-            className="text-xs font-mono px-2 text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-300 transition-colors"
-            title="Сбросить масштаб и позицию"
-          >
-            Сброс
-          </button>
+          <button onClick={() => performResetView()} className="text-xs font-mono px-2 text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-300 transition-colors">Сброс</button>
         </div>
 
-        {/* === Canvas Layers === */}
+        {/* === Background Grid === */}
+        <div className={`absolute inset-0 pointer-events-none transition-opacity ease-in-out ${gridOpacity}`} style={{ transitionDuration: `${transitionDuration}ms`, backgroundImage: gridPattern, backgroundSize: '20px 20px', zIndex: 0 }} />
 
+        {/* === Transform Layer (Direct DOM Manipulation) === */}
         <div
-          className={`absolute inset-0 pointer-events-none transition-opacity ease-in-out ${gridOpacity}`}
-          style={{
-            transitionDuration: `${transitionDuration}ms`,
-            backgroundImage: gridPattern,
-            backgroundSize: '20px 20px',
-            zIndex: 0
-          }}
-        />
-
-        <div
+          ref={contentRef}
           className="absolute top-0 left-0 will-change-transform origin-top-left z-10"
-          style={{
-            transform: `translate(${transform.x}px, ${transform.y}px) scale(${transform.scale})`,
-            // @ts-ignore - CSS Custom Property for children scaling compensation
-            '--canvas-scale': transform.scale
-          }}
         >
           {children}
         </div>
 
+        {/* === Loading Overlay === */}
         {isLoading && (
           <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/20 backdrop-blur-[2px] pointer-events-none">
             <div className="bg-white dark:bg-zinc-900 rounded-lg p-4 shadow-xl flex flex-col items-center gap-3">
-              <svg className="animate-spin h-8 w-8 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-              </svg>
+              <svg className="animate-spin h-8 w-8 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
               <span className="text-xs font-bold uppercase tracking-wider text-zinc-600 dark:text-zinc-300">Обработка...</span>
             </div>
           </div>
         )}
 
-        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 pointer-events-none opacity-50 text-[10px] text-zinc-500 bg-white/50 dark:bg-black/50 px-2 py-1 rounded backdrop-blur-sm z-50">
-          Средняя кнопка мыши для перемещения
-        </div>
+        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 pointer-events-none opacity-50 text-[10px] text-zinc-500 bg-white/50 dark:bg-black/50 px-2 py-1 rounded backdrop-blur-sm z-50">Средняя кнопка мыши для перемещения</div>
       </div>
     );
   }
