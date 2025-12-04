@@ -21,29 +21,23 @@ function revokeObjectURLSafely(url: string) { try { URL.revokeObjectURL(url); } 
 interface DraggableImageSlotProps {
   img: AlignImage;
   index: number;
-  cellHeight: number;
-  frameWidth: number;
-  getCanvasScale: () => number; // Accessor for scale
+  slotHeight: number;
+  slotWidth: number;
+  getCanvasScale: () => number;
   onActivate: (id: string) => void;
   onUpdatePosition: (id: string, x: number, y: number) => void;
 }
 
-// Wrapped in memo to prevent re-rendering ALL slots when dragging one
 const DraggableImageSlot = React.memo(({
-  img, index, cellHeight, frameWidth, getCanvasScale, onActivate, onUpdatePosition
+  img, index, slotHeight, slotWidth, getCanvasScale, onActivate, onUpdatePosition
 }: DraggableImageSlotProps) => {
 
   const handlePointerDown = (e: React.PointerEvent) => {
-    // 1. Stop propagation so the parent Canvas doesn't start panning
     e.stopPropagation();
-
-    // 2. Only allow left click
     if (e.button !== 0) return;
 
-    // 3. Activate this layer
     onActivate(img.id);
 
-    // 4. Capture the pointer (standard browser API for drag)
     const target = e.currentTarget;
     target.setPointerCapture(e.pointerId);
 
@@ -52,14 +46,11 @@ const DraggableImageSlot = React.memo(({
     const initialOffsetX = img.offsetX;
     const initialOffsetY = img.offsetY;
 
-    // 5. Get CURRENT scale once at the start of drag
     const scale = getCanvasScale();
 
     const handlePointerMove = (moveEvent: PointerEvent) => {
-      // Calculate delta taking scale into account
       const dx = (moveEvent.clientX - startX) / scale;
       const dy = (moveEvent.clientY - startY) / scale;
-
       onUpdatePosition(img.id, initialOffsetX + dx, initialOffsetY + dy);
     };
 
@@ -74,34 +65,43 @@ const DraggableImageSlot = React.memo(({
 
   return (
     <div
-      className={`absolute left-0 w-full overflow-hidden group border-r border-dashed ${img.isActive ? 'border-blue-500/50 z-20' : 'border-zinc-300/30 z-10'}`}
+      className={`absolute left-0 overflow-hidden group border-r border-dashed transition-colors
+        cursor-grab active:cursor-grabbing
+        ${img.isActive
+          ? 'border-blue-500/50 z-30'
+          : 'border-zinc-300/30 z-10 hover:border-zinc-400/50'
+        }
+      `}
       style={{
-        top: index * cellHeight,
-        height: cellHeight,
-        width: frameWidth, // Clip to frame width
+        top: index * slotHeight,
+        height: slotHeight,
+        width: slotWidth,
       }}
       onPointerDown={handlePointerDown}
     >
-      {/* Visual cue for dragging */}
-      <div className={`absolute inset-0 transition-colors pointer-events-none ${img.isActive ? 'bg-blue-500/5' : 'group-hover:bg-blue-500/5'}`} />
+      <div className={`absolute inset-0 transition-colors pointer-events-none ${img.isActive ? 'bg-blue-500/10' : 'group-hover:bg-blue-500/5'}`} />
 
-      {/* Helper text only visible on hover */}
-      <div className="absolute top-1 left-1 bg-black/50 text-white text-[10px] px-1 rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none select-none z-30">
-        Drag to move
+      <div className={`
+        absolute top-1 left-1 bg-black/60 text-white text-[10px] px-1.5 py-0.5 rounded 
+        pointer-events-none select-none z-40 backdrop-blur-sm transition-opacity duration-200
+        ${img.isActive ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}
+      `}>
+        {Math.round(img.offsetX)}, {Math.round(img.offsetY)}
       </div>
 
       <img
         src={img.url}
         draggable={false}
         alt=""
-        className="absolute select-none origin-top-left max-w-none will-change-transform"
+        className="absolute select-none origin-top-left max-w-none"
         style={{
           left: 0,
           top: 0,
-          // Using translate3d for better GPU performance during drag
           transform: `translate3d(${img.offsetX}px, ${img.offsetY}px, 0)`,
           width: img.naturalWidth,
-          height: img.naturalHeight
+          height: img.naturalHeight,
+          backfaceVisibility: 'hidden',
+          imageRendering: 'inherit'
         }}
       />
     </div>
@@ -112,41 +112,49 @@ DraggableImageSlot.displayName = 'DraggableImageSlot';
 
 export function VerticalImageAligner() {
   const [images, setImages] = useState<AlignImage[]>([]);
-  const [cellHeight, setCellHeight] = useState(300);
+
+  // --- РАЗМЕРЫ СЛОТА (ОБЛАСТЬ ВИДИМОСТИ И ЭКСПОРТА) ---
+  // По умолчанию 1x1, пока не загружено изображение
+  const [slotHeight, setSlotHeight] = useState(1);
+  const [slotWidth, setSlotWidth] = useState(1);
+
+  // --- ЗЕЛЕНАЯ СЕТКА (ВИЗУАЛЬНАЯ РАМКА) ---
+  const [showFrameGrid, setShowFrameGrid] = useState(true);
+  const [frameStepX, setFrameStepX] = useState(1); // Шаг X визуальной сетки
+  const [frameBorderColor, setFrameBorderColor] = useState('#00ff00');
+
+  // --- КРАСНАЯ СЕТКА (ВСПОМОГАТЕЛЬНАЯ) ---
+  const [showRedGrid, setShowRedGrid] = useState(true);
+  const [redGridOffsetX, setRedGridOffsetX] = useState(0);
+  const [redGridOffsetY, setRedGridOffsetY] = useState(0);
+  const [redGridColor, setRedGridColor] = useState('#ff0000');
+
   const [bgColorHex, setBgColorHex] = useState('#ffffff');
   const [bgOpacity, setBgOpacity] = useState(0);
-
-  // Grid & Frame
-  const [showGrid, setShowGrid] = useState(true);
-  const [gridWidth, setGridWidth] = useState(100);
-  const [gridHeight, setGridHeight] = useState(100);
-  const [gridOffsetX, setGridOffsetX] = useState(0);
-  const [gridOffsetY, setGridOffsetY] = useState(0);
-  const [gridColor, setGridColor] = useState('#ff0000');
-
-  const [showFrameBorders, setShowFrameBorders] = useState(false);
-  const [frameWidth, setFrameWidth] = useState(300);
-  const [frameBorderColor, setFrameBorderColor] = useState('#00ff00');
 
   const [draggingListIndex, setDraggingListIndex] = useState<number | null>(null);
   const [isExporting, setIsExporting] = useState(false);
 
-  // Refs
   const workspaceRef = useRef<CanvasRef>(null);
 
   const activeImageId = useMemo(() => images.find((img) => img.isActive)?.id ?? null, [images]);
 
+  // --- COMPOSITION BOUNDS ---
   const compositionBounds = useMemo(() => {
-    if (!images.length) return { width: 800, height: 600 };
-    const height = images.length * cellHeight;
-    // Bounds are determined by frameWidth now, as we clip to it
-    const width = Math.max(800, frameWidth);
+    // Если изображений нет, возвращаем 1x1
+    if (!images.length) return { width: 1, height: 1 };
+
+    // Ширина холста строго равна ширине слота (которая может быть расширена вручную или авто)
+    const width = slotWidth;
+
+    // Высота = сумма высот всех слотов
+    const height = Math.max(1, images.length * slotHeight);
+
     return { width, height };
-  }, [images.length, cellHeight, frameWidth]);
+  }, [images.length, slotHeight, slotWidth]);
 
   // --- Callbacks ---
 
-  // Helper to get scale inside the child component without prop drilling state
   const getCanvasScale = useCallback(() => {
     return workspaceRef.current?.getTransform().scale || 1;
   }, []);
@@ -166,6 +174,7 @@ export function VerticalImageAligner() {
     if (!files || files.length === 0) return;
     const newImages: AlignImage[] = [];
     const isListEmpty = images.length === 0;
+
     Array.from(files).forEach((file, index) => {
       if (!file.type.startsWith('image/')) return;
       const url = URL.createObjectURL(file);
@@ -178,13 +187,25 @@ export function VerticalImageAligner() {
       });
     });
     setImages((prev) => [...prev, ...newImages]);
+
+    // Асинхронная загрузка параметров изображений
     newImages.forEach((item, idx) => {
       const img = new Image();
       img.onload = () => {
+        // Логика инициализации при первой загрузке (когда список был пуст)
         if (isListEmpty && idx === 0) {
-          setCellHeight(img.height);
-          setFrameWidth(img.width); // Match frame to first image width
+          setSlotHeight(img.height);
+          setFrameStepX(img.height); // Зеленая сетка по умолчанию квадратная относительно высоты
         }
+
+        // АВТО-РАСШИРЕНИЕ СЛОТА:
+        // Если это первое изображение, ширина слота становится равной его ширине.
+        // Если добавляем новые, расширяем слот только если новое фото шире текущего слота.
+        setSlotWidth(prev => {
+          if (isListEmpty && idx === 0) return img.width;
+          return Math.max(prev, img.width);
+        });
+
         setImages(current => current.map(ex => ex.id === item.id ? { ...ex, naturalWidth: img.width, naturalHeight: img.height } : ex));
       };
       img.src = item.url;
@@ -208,9 +229,8 @@ export function VerticalImageAligner() {
         const i = new Image(); i.onload = () => resolve({ meta: item, img: i }); i.onerror = () => reject(); i.src = item.url;
       })));
 
-      // Export exact frame size
-      const finalW = frameWidth;
-      const finalH = images.length * cellHeight;
+      const finalW = slotWidth;
+      const finalH = images.length * slotHeight;
 
       const canvas = document.createElement('canvas');
       canvas.width = finalW; canvas.height = finalH;
@@ -224,17 +244,16 @@ export function VerticalImageAligner() {
       ctx.fillRect(0, 0, finalW, finalH);
 
       loaded.forEach(({ meta, img }, index) => {
-        const slotY = index * cellHeight;
+        const slotY = index * slotHeight;
         ctx.save();
-        // Clip to slot area
-        ctx.beginPath(); ctx.rect(0, slotY, frameWidth, cellHeight); ctx.clip();
+        ctx.beginPath(); ctx.rect(0, slotY, slotWidth, slotHeight); ctx.clip();
         ctx.drawImage(img, meta.offsetX, slotY + meta.offsetY, img.width, img.height);
         ctx.restore();
       });
       const a = document.createElement('a'); a.href = canvas.toDataURL('image/png'); a.download = 'aligned-export.png';
       document.body.appendChild(a); a.click(); document.body.removeChild(a);
     } finally { setIsExporting(false); }
-  }, [images, cellHeight, frameWidth, bgColorHex, bgOpacity]);
+  }, [images, slotHeight, slotWidth, bgColorHex, bgOpacity]);
 
   const cssBackgroundColor = useMemo(() => {
     const r = parseInt(bgColorHex.slice(1, 3), 16);
@@ -243,7 +262,6 @@ export function VerticalImageAligner() {
     return `rgba(${r}, ${g}, ${b}, ${bgOpacity})`;
   }, [bgColorHex, bgOpacity]);
 
-  // List Drag & Drop Handlers
   const handleDragStart = (e: React.DragEvent, index: number) => { setDraggingListIndex(index); };
   const handleDrop = (e: React.DragEvent, targetIndex: number) => {
     e.preventDefault();
@@ -275,42 +293,86 @@ export function VerticalImageAligner() {
             <div className="space-y-4">
               <button onClick={handleExport} disabled={isExporting} className="w-full rounded bg-blue-600 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50">{isExporting ? 'Экспорт...' : 'Скачать PNG'}</button>
 
-              <div className="space-y-2 p-3 bg-zinc-50 dark:bg-zinc-800 rounded border border-zinc-200 dark:border-zinc-700 text-xs">
-                <div className="flex justify-between items-center mb-1">
-                  <span className="font-bold">Высота слота (px)</span>
-                  <input type="number" value={cellHeight} onChange={e => setCellHeight(Number(e.target.value))} className="w-16 p-1 border rounded" />
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="font-bold">Ширина кадра (px)</span>
-                  <input type="number" value={frameWidth} onChange={e => setFrameWidth(Number(e.target.value))} className="w-16 p-1 border rounded" />
+              {/* --- GROUP 1: SLOT DIMENSIONS (EXPORT & VIEW) --- */}
+              <div className="p-3 bg-zinc-50 dark:bg-zinc-800 rounded border border-zinc-200 dark:border-zinc-700">
+                <div className="text-xs font-bold text-zinc-500 mb-2 uppercase tracking-wide">Размеры слота</div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="flex flex-col gap-1">
+                    <label className="text-[10px] uppercase font-bold text-zinc-400">Ширина</label>
+                    <input type="number" value={slotWidth} onChange={e => setSlotWidth(Number(e.target.value))} className="w-full h-8 px-2 text-xs border border-zinc-300 dark:border-zinc-600 rounded bg-white dark:bg-zinc-700" />
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <label className="text-[10px] uppercase font-bold text-zinc-400">Высота</label>
+                    <input type="number" value={slotHeight} onChange={e => setSlotHeight(Number(e.target.value))} className="w-full h-8 px-2 text-xs border border-zinc-300 dark:border-zinc-600 rounded bg-white dark:bg-zinc-700" />
+                  </div>
                 </div>
               </div>
 
-              <div className="space-y-2 p-3 bg-zinc-50 dark:bg-zinc-800 rounded border border-zinc-200 dark:border-zinc-700 text-xs">
-                <div className="flex justify-between items-center"><span className="font-bold">Сетка</span><input type="checkbox" checked={showGrid} onChange={e => setShowGrid(e.target.checked)} /></div>
-                {showGrid && <div className="grid grid-cols-2 gap-2 mt-2"><input type="number" placeholder="W" value={gridWidth} onChange={e => setGridWidth(Number(e.target.value))} className="border p-1 rounded" /><input type="number" placeholder="H" value={gridHeight} onChange={e => setGridHeight(Number(e.target.value))} className="border p-1 rounded" /></div>}
-                <div className="flex justify-between items-center mt-2"><span className="font-bold">Границы</span><input type="checkbox" checked={showFrameBorders} onChange={e => setShowFrameBorders(e.target.checked)} /></div>
+              {/* --- GROUP 2: GREEN GRID (FRAME GUIDE) --- */}
+              <div className="p-3 bg-zinc-50 dark:bg-zinc-800 rounded border border-zinc-200 dark:border-zinc-700">
+                <div className="flex justify-between items-center mb-2">
+                  <div className="text-xs font-bold text-green-600 dark:text-green-400 uppercase tracking-wide">Зелёная сетка (Кадр)</div>
+                  <input type="checkbox" checked={showFrameGrid} onChange={e => setShowFrameGrid(e.target.checked)} />
+                </div>
+                {showFrameGrid && (
+                  <div className="grid grid-cols-1 gap-3">
+                    <div className="flex flex-col gap-1">
+                      <label className="text-[10px] text-zinc-400">Шаг X</label>
+                      <input type="number" value={frameStepX} onChange={e => setFrameStepX(Number(e.target.value))} className="w-full h-8 px-2 text-xs border rounded dark:bg-zinc-700 dark:border-zinc-600" />
+                    </div>
+                  </div>
+                )}
               </div>
 
+              {/* --- GROUP 3: RED GRID (OFFSETS) --- */}
+              <div className="p-3 bg-zinc-50 dark:bg-zinc-800 rounded border border-zinc-200 dark:border-zinc-700">
+                <div className="flex justify-between items-center mb-2">
+                  <div className="text-xs font-bold text-red-600 dark:text-red-400 uppercase tracking-wide">Красная сетка (Сдвиг)</div>
+                  <input type="checkbox" checked={showRedGrid} onChange={e => setShowRedGrid(e.target.checked)} />
+                </div>
+                {showRedGrid && (
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="flex flex-col gap-1">
+                      <label className="text-[10px] text-zinc-400">Сдвиг X</label>
+                      <input type="number" value={redGridOffsetX} onChange={e => setRedGridOffsetX(Number(e.target.value))} className="w-full h-8 px-2 text-xs border rounded dark:bg-zinc-700 dark:border-zinc-600" />
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      <label className="text-[10px] text-zinc-400">Сдвиг Y</label>
+                      <input type="number" value={redGridOffsetY} onChange={e => setRedGridOffsetY(Number(e.target.value))} className="w-full h-8 px-2 text-xs border rounded dark:bg-zinc-700 dark:border-zinc-600" />
+                    </div>
+                    <div className="col-span-2 text-[10px] text-zinc-400 italic text-center mt-1">
+                      Шаг сетки соответствует Зелёной сетке
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* --- LAYERS --- */}
               <div className="space-y-1">
                 {images.map((img, i) => (
                   <div key={img.id} draggable onDragStart={(e) => handleDragStart(e, i)} onDragOver={e => e.preventDefault()} onDrop={(e) => handleDrop(e, i)}
                     className={`flex items-center gap-2 p-2 text-xs rounded border cursor-pointer ${img.isActive ? 'bg-blue-50 border-blue-200 text-blue-800' : 'bg-white border-zinc-200'}`}
                     onClick={() => handleActivate(img.id)}
                   >
-                    <span className="font-mono text-zinc-400">#{i + 1}</span>
-                    <span className="truncate flex-1">{img.name}</span>
-                    <button onClick={(e) => { e.stopPropagation(); handleRemoveImage(img.id); }} className="text-red-500 px-2">✕</button>
+                    <span className="font-mono text-zinc-400 w-5">#{i + 1}</span>
+                    <span className="truncate flex-1 font-medium">{img.name}</span>
+                    <button onClick={(e) => { e.stopPropagation(); handleRemoveImage(img.id); }} className="text-red-500 hover:bg-red-50 p-1 rounded transition-colors">✕</button>
                   </div>
                 ))}
               </div>
 
               {activeImageId && (
-                <div className="p-2 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded text-xs">
-                  <p className="font-bold mb-1">Координаты:</p>
-                  <div className="grid grid-cols-2 gap-2">
-                    <label>Y <input type="number" value={Math.round(images.find(i => i.id === activeImageId)?.offsetY || 0)} onChange={e => handleUpdatePosition(activeImageId, (images.find(i => i.id === activeImageId)?.offsetX || 0), Number(e.target.value))} className="w-full border" /></label>
-                    <label>X <input type="number" value={Math.round(images.find(i => i.id === activeImageId)?.offsetX || 0)} onChange={e => handleUpdatePosition(activeImageId, Number(e.target.value), (images.find(i => i.id === activeImageId)?.offsetY || 0))} className="w-full border" /></label>
+                <div className="p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded">
+                  <p className="font-bold text-xs mb-2 text-yellow-800 dark:text-yellow-200 uppercase">Смещение слоя</p>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="flex flex-col gap-1">
+                      <label className="text-[10px] text-zinc-500">X (px)</label>
+                      <input type="number" value={Math.round(images.find(i => i.id === activeImageId)?.offsetX || 0)} onChange={e => handleUpdatePosition(activeImageId, Number(e.target.value), (images.find(i => i.id === activeImageId)?.offsetY || 0))} className="w-full h-8 px-2 text-xs border border-yellow-300 rounded bg-white" />
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      <label className="text-[10px] text-zinc-500">Y (px)</label>
+                      <input type="number" value={Math.round(images.find(i => i.id === activeImageId)?.offsetY || 0)} onChange={e => handleUpdatePosition(activeImageId, (images.find(i => i.id === activeImageId)?.offsetX || 0), Number(e.target.value))} className="w-full h-8 px-2 text-xs border border-yellow-300 rounded bg-white" />
+                    </div>
                   </div>
                 </div>
               )}
@@ -337,29 +399,31 @@ export function VerticalImageAligner() {
             {/* Background */}
             <div className="absolute inset-0" style={{ backgroundColor: cssBackgroundColor }} />
 
-            {/* Grid */}
-            {showGrid && (
+            {/* RED GRID */}
+            {showRedGrid && (
               <div className="absolute inset-0 pointer-events-none z-50 opacity-50"
                 style={{
                   backgroundImage: `
-                        linear-gradient(to right, ${gridColor} calc(1px / var(--canvas-scale)), transparent 0),
-                        linear-gradient(to bottom, ${gridColor} calc(1px / var(--canvas-scale)), transparent 0)
+                        linear-gradient(to right, ${redGridColor} 1px, transparent 1px),
+                        linear-gradient(to bottom, ${redGridColor} 1px, transparent 1px)
                     `,
-                  backgroundSize: `${gridWidth}px ${gridHeight}px`,
-                  backgroundPosition: `${gridOffsetX}px ${gridOffsetY}px`
+                  // Используем slotHeight как шаг Y, frameStepX как шаг X
+                  backgroundSize: `${frameStepX}px ${slotHeight}px`,
+                  backgroundPosition: `${redGridOffsetX}px ${redGridOffsetY}px`
                 }}
               />
             )}
 
-            {/* Frame Borders */}
-            {showFrameBorders && (
+            {/* GREEN GRID: Frame Borders (10px, offset -5px) */}
+            {showFrameGrid && (
               <div className="absolute inset-0 pointer-events-none z-[60] opacity-80"
                 style={{
                   backgroundImage: `
-                        linear-gradient(to right, ${frameBorderColor} calc(2px / var(--canvas-scale)), transparent 0),
-                        linear-gradient(to bottom, ${frameBorderColor} calc(2px / var(--canvas-scale)), transparent 0)
+                        linear-gradient(to right, ${frameBorderColor} 10px, transparent 10px),
+                        linear-gradient(to bottom, ${frameBorderColor} 10px, transparent 10px)
                      `,
-                  backgroundSize: `${frameWidth}px ${cellHeight}px`
+                  backgroundSize: `${frameStepX}px ${slotHeight}px`,
+                  backgroundPosition: '-5px -5px'
                 }}
               />
             )}
@@ -370,8 +434,8 @@ export function VerticalImageAligner() {
                 key={img.id}
                 img={img}
                 index={i}
-                cellHeight={cellHeight}
-                frameWidth={frameWidth}
+                slotHeight={slotHeight}
+                slotWidth={slotWidth}
                 getCanvasScale={getCanvasScale}
                 onActivate={handleActivate}
                 onUpdatePosition={handleUpdatePosition}
