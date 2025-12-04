@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { CanvasWorkspace, CanvasWorkspaceRef } from '../../ui/CanvasWorkspace';
 
 // --- ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ---
 
@@ -20,7 +21,6 @@ function rgbToHex(r: number, g: number, b: number) {
   }).join("");
 }
 
-// Функция инверсии цвета
 function invertHex(hex: string) {
   const rgb = hexToRgb(hex);
   if (!rgb) return '#000000';
@@ -53,7 +53,7 @@ export function MonochromeBackgroundRemover() {
   const [smoothness, setSmoothness] = useState(10);
   const [processingMode, setProcessingMode] = useState<ProcessingMode>('remove');
 
-  // --- STATE: Инструменты постобработки ---
+  // --- STATE: Инструменты постобработки (Ореолы) ---
   const [edgeChoke, setEdgeChoke] = useState(0);
   const [edgeBlur, setEdgeBlur] = useState(0);
   const [edgePaint, setEdgePaint] = useState(0);
@@ -68,96 +68,13 @@ export function MonochromeBackgroundRemover() {
   const [autoContrastPeriod, setAutoContrastPeriod] = useState(5);
   const [isProcessing, setIsProcessing] = useState(false);
 
-  // --- STATE: Viewport ---
-  const [scale, setScale] = useState(1);
-  const [offset, setOffset] = useState({ x: 0, y: 0 });
-
   // Взаимодействие
-  const [isPanning, setIsPanning] = useState(false);
   const [draggingPointIndex, setDraggingPointIndex] = useState<number | null>(null);
 
   // --- REFS ---
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const imageRef = useRef<HTMLImageElement>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
-
-  const panStartRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
-  const dragDistanceRef = useRef<number>(0);
+  const workspaceRef = useRef<CanvasWorkspaceRef>(null);
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
-
-  const scaleRef = useRef(scale);
-  const offsetRef = useRef(offset);
-  const processedUrlRef = useRef(processedUrl);
-
-  useEffect(() => { scaleRef.current = scale; }, [scale]);
-  useEffect(() => { offsetRef.current = offset; }, [offset]);
-  useEffect(() => { processedUrlRef.current = processedUrl; }, [processedUrl]);
-
-  // -------------------------------------------------------------------------
-  // УТИЛИТА: КООРДИНАТЫ
-  // -------------------------------------------------------------------------
-  const getImageCoords = (clientX: number, clientY: number): Point | null => {
-    if (!imageRef.current) return null;
-    const rect = imageRef.current.getBoundingClientRect();
-    const visualX = clientX - rect.left;
-    const visualY = clientY - rect.top;
-
-    const ratioX = imageRef.current.naturalWidth / rect.width;
-    const ratioY = imageRef.current.naturalHeight / rect.height;
-
-    const x = Math.floor(visualX * ratioX);
-    const y = Math.floor(visualY * ratioY);
-
-    if (x >= 0 && x < imageRef.current.naturalWidth && y >= 0 && y < imageRef.current.naturalHeight) {
-      return { x, y };
-    }
-    return null;
-  };
-
-  const handleModeChange = (mode: ProcessingMode) => {
-    setProcessingMode(mode);
-  };
-
-  const handleToleranceChange = (value: number) => {
-    setTolerances(prev => ({
-      ...prev,
-      [processingMode]: value
-    }));
-  };
-
-  // -------------------------------------------------------------------------
-  // Zoom
-  // -------------------------------------------------------------------------
-  useEffect(() => {
-    const container = containerRef.current;
-    if (!container) return;
-
-    const onWheel = (e: WheelEvent) => {
-      e.preventDefault();
-      if (!processedUrlRef.current) return;
-
-      const zoomSpeed = 0.1;
-      const direction = e.deltaY > 0 ? -1 : 1;
-      const currentScale = scaleRef.current;
-      let newScale = currentScale + direction * zoomSpeed * currentScale;
-      newScale = Math.max(0.05, Math.min(newScale, 40));
-
-      const rect = container.getBoundingClientRect();
-      const mouseX = e.clientX - rect.left;
-      const mouseY = e.clientY - rect.top;
-
-      const currentOffset = offsetRef.current;
-      const scaleRatio = newScale / currentScale;
-      const newOffsetX = mouseX - (mouseX - currentOffset.x) * scaleRatio;
-      const newOffsetY = mouseY - (mouseY - currentOffset.y) * scaleRatio;
-
-      setScale(newScale);
-      setOffset({ x: newOffsetX, y: newOffsetY });
-    };
-
-    container.addEventListener('wheel', onWheel, { passive: false });
-    return () => container.removeEventListener('wheel', onWheel);
-  }, []);
 
   // -------------------------------------------------------------------------
   // Auto Contrast
@@ -172,8 +89,6 @@ export function MonochromeBackgroundRemover() {
     }
     return () => clearInterval(interval);
   }, [isAutoContrast, autoContrastPeriod]);
-
-  const transitionDurationMs = isAutoContrast ? (autoContrastPeriod * 1000) * 0.9 : 300;
 
   // -------------------------------------------------------------------------
   // PROCESS IMAGE
@@ -227,6 +142,7 @@ export function MonochromeBackgroundRemover() {
 
         const alphaChannel = new Uint8Array(width * height);
 
+        // 1. GENERATE BASE ALPHA MASK
         if (processingMode === 'flood-clear') {
           if (floodPoints.length === 0) {
             setProcessedUrl(originalUrl);
@@ -287,6 +203,7 @@ export function MonochromeBackgroundRemover() {
           }
         }
 
+        // 2. EDGE CHOKE (Сжатие маски)
         if (edgeChoke > 0) {
           const erodedBuffer = new Uint8Array(alphaChannel);
           const radius = edgeChoke;
@@ -316,6 +233,7 @@ export function MonochromeBackgroundRemover() {
           alphaChannel.set(erodedBuffer);
         }
 
+        // 3. EDGE BLUR (Размытие краев маски)
         if (edgeBlur > 0) {
           const blurredBuffer = new Uint8Array(alphaChannel);
           const radius = Math.max(1, edgeBlur);
@@ -340,6 +258,7 @@ export function MonochromeBackgroundRemover() {
           alphaChannel.set(blurredBuffer);
         }
 
+        // 4. EDGE PAINT (Окрашивание полупрозрачных краев)
         if (edgePaint > 0) {
           const radius = edgePaint;
           for (let y = 0; y < height; y++) {
@@ -374,6 +293,7 @@ export function MonochromeBackgroundRemover() {
           }
         }
 
+        // 5. COMBINE
         for (let i = 0, idx = 0; i < data.length; i += 4, idx++) {
           data[i + 3] = alphaChannel[idx];
         }
@@ -385,6 +305,7 @@ export function MonochromeBackgroundRemover() {
     };
   }, [originalUrl, targetColor, contourColor, tolerances, smoothness, imgDimensions, processingMode, floodPoints, edgeChoke, edgeBlur, edgePaint]);
 
+  // Debounce processing
   useEffect(() => {
     if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
     debounceTimerRef.current = setTimeout(() => {
@@ -428,18 +349,22 @@ export function MonochromeBackgroundRemover() {
       setImgDimensions({ w: img.width, h: img.height });
       setFloodPoints([]);
 
-      if (containerRef.current) {
-        const contW = containerRef.current.clientWidth;
-        const contH = containerRef.current.clientHeight;
-        const scaleFactor = Math.min(1, Math.min((contW - 40) / img.width, (contH - 40) / img.height));
-        const initialScale = scaleFactor > 0 ? scaleFactor : 1;
-        setScale(initialScale);
-        setOffset({
-          x: (contW - img.width * initialScale) / 2,
-          y: (contH - img.height * initialScale) / 2
-        });
-      }
+      setTimeout(() => {
+        workspaceRef.current?.resetView(img.width, img.height);
+      }, 50);
     };
+  };
+
+  const getRelativeImageCoords = (clientX: number, clientY: number): Point | null => {
+    if (!workspaceRef.current || !imgDimensions.w) return null;
+    const world = workspaceRef.current.screenToWorld(clientX, clientY);
+    const x = Math.floor(world.x);
+    const y = Math.floor(world.y);
+
+    if (x >= 0 && x < imgDimensions.w && y >= 0 && y < imgDimensions.h) {
+      return { x, y };
+    }
+    return null;
   };
 
   const handlePointPointerDown = (e: React.PointerEvent, index: number) => {
@@ -448,25 +373,24 @@ export function MonochromeBackgroundRemover() {
     if (e.button !== 0) return;
 
     setDraggingPointIndex(index);
-    if (containerRef.current) {
-      containerRef.current.setPointerCapture(e.pointerId);
-    }
+    const target = e.target as HTMLElement;
+    target.setPointerCapture(e.pointerId);
   };
 
-  const handleCanvasPointerDown = (e: React.PointerEvent) => {
-    if (!originalUrl) return;
+  const handleImagePointerDown = (e: React.PointerEvent) => {
     if (e.button !== 0) return;
-    if (containerRef.current) {
-      containerRef.current.setPointerCapture(e.pointerId);
+
+    if (processingMode === 'flood-clear') {
+      const coords = getRelativeImageCoords(e.clientX, e.clientY);
+      if (coords) {
+        setFloodPoints(prev => [...prev, coords]);
+      }
     }
-    setIsPanning(true);
-    panStartRef.current = { x: e.clientX - offset.x, y: e.clientY - offset.y };
-    dragDistanceRef.current = 0;
   };
 
-  const handlePointerMove = (e: React.PointerEvent) => {
+  const handleGlobalPointerMove = (e: React.PointerEvent) => {
     if (draggingPointIndex !== null) {
-      const newCoords = getImageCoords(e.clientX, e.clientY);
+      const newCoords = getRelativeImageCoords(e.clientX, e.clientY);
       if (newCoords) {
         setFloodPoints(prev => {
           const next = [...prev];
@@ -474,55 +398,12 @@ export function MonochromeBackgroundRemover() {
           return next;
         });
       }
-      return;
-    }
-    if (isPanning) {
-      const deltaX = Math.abs(e.clientX - (panStartRef.current.x + offset.x));
-      const deltaY = Math.abs(e.clientY - (panStartRef.current.y + offset.y));
-      dragDistanceRef.current += deltaX + deltaY;
-      const newX = e.clientX - panStartRef.current.x;
-      const newY = e.clientY - panStartRef.current.y;
-      setOffset({ x: newX, y: newY });
     }
   };
 
-  const handlePointerUp = (e: React.PointerEvent) => {
-    if (e.button !== 0) return;
+  const handleGlobalPointerUp = (e: React.PointerEvent) => {
     if (draggingPointIndex !== null) {
       setDraggingPointIndex(null);
-      return;
-    }
-    if (isPanning) {
-      setIsPanning(false);
-      if (dragDistanceRef.current < 5 && processingMode === 'flood-clear') {
-        const newCoords = getImageCoords(e.clientX, e.clientY);
-        if (newCoords) {
-          setFloodPoints(prev => [...prev, newCoords]);
-        }
-      }
-    }
-  };
-
-  const handleRunFloodFill = () => setManualTrigger(prev => prev + 1);
-  const handleDownload = () => {
-    if (!processedUrl) return;
-    const a = document.createElement('a');
-    a.href = processedUrl;
-    a.download = 'result.png';
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-  };
-  const handleResetView = () => {
-    if (containerRef.current && imgDimensions.w > 0) {
-      const contW = containerRef.current.clientWidth;
-      const contH = containerRef.current.clientHeight;
-      const scaleFactor = Math.min(1, Math.min((contW - 40) / imgDimensions.w, (contH - 40) / imgDimensions.h));
-      const finalScale = scaleFactor > 0 ? scaleFactor : 1;
-      setScale(finalScale);
-      setOffset({ x: (contW - imgDimensions.w * finalScale) / 2, y: (contH - imgDimensions.h * finalScale) / 2 });
-    } else {
-      setScale(1); setOffset({ x: 0, y: 0 });
     }
   };
 
@@ -547,16 +428,18 @@ export function MonochromeBackgroundRemover() {
 
   const removeLastPoint = () => setFloodPoints(prev => prev.slice(0, -1));
   const clearAllPoints = () => setFloodPoints([]);
+  const handleRunFloodFill = () => setManualTrigger(prev => prev + 1);
 
-  const currentActiveColor = targetColor;
+  const transitionDurationMs = isAutoContrast ? (autoContrastPeriod * 1000) * 0.9 : 300;
+  const bgClass = isDarkBackground ? 'bg-[#111]' : 'bg-[#e5e5e5]';
 
   return (
-    // ИЗМЕНЕНИЕ 1: fixed inset-0 на корневом элементе
     <div className="fixed inset-0 flex w-full h-full bg-zinc-50 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 overflow-hidden font-sans">
       <canvas ref={canvasRef} className="hidden" />
 
       {/* ================= ЛЕВАЯ ПАНЕЛЬ ================= */}
       <aside className="w-[360px] flex-shrink-0 flex flex-col border-r border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 z-10 shadow-xl h-full">
+        {/* Header */}
         <div className="p-5 border-b border-zinc-200 dark:border-zinc-800">
           <a href="/" className="mb-3 inline-flex items-center gap-2 text-xs font-medium text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-200 transition-colors">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -564,21 +447,18 @@ export function MonochromeBackgroundRemover() {
             </svg>
             На главную
           </a>
-
-
           <h2 className="text-lg font-bold flex items-center gap-2">
             <span className="text-blue-600">Mono</span>Remover
           </h2>
           <p className="text-xs text-zinc-500 mt-1">Инструменты обработки фона</p>
         </div>
 
+        {/* Controls */}
         <div className="flex-1 overflow-y-auto p-5 space-y-6 custom-scrollbar">
           <div className="space-y-2">
             <label className="block text-xs font-bold uppercase text-zinc-400">Исходник</label>
             <label className="flex flex-col items-center justify-center w-full h-24 border-2 border-dashed rounded-lg cursor-pointer bg-zinc-50 hover:bg-zinc-100 border-zinc-300 dark:bg-zinc-800/50 dark:border-zinc-700 dark:hover:bg-zinc-800 transition-all group">
-              <div className="flex flex-col items-center justify-center">
-                <p className="text-xs text-zinc-500">Загрузить изображение</p>
-              </div>
+              <span className="text-xs text-zinc-500">Загрузить изображение</span>
               <input type="file" className="hidden" accept="image/*" onChange={handleFileUpload} />
             </label>
           </div>
@@ -589,10 +469,10 @@ export function MonochromeBackgroundRemover() {
                 <label className="block text-xs font-bold uppercase text-zinc-400">Режим</label>
                 <div className="flex flex-col gap-1 bg-zinc-100 dark:bg-zinc-800 p-1 rounded-lg">
                   <div className="grid grid-cols-2 gap-1">
-                    <button onClick={() => handleModeChange('remove')} className={`text-xs font-medium py-2 rounded-md transition-all ${processingMode === 'remove' ? 'bg-white dark:bg-zinc-700 text-blue-600 dark:text-blue-300 shadow-sm' : 'text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300'}`}>Убрать цвет</button>
-                    <button onClick={() => handleModeChange('keep')} className={`text-xs font-medium py-2 rounded-md transition-all ${processingMode === 'keep' ? 'bg-white dark:bg-zinc-700 text-blue-600 dark:text-blue-300 shadow-sm' : 'text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300'}`}>Оставить цвет</button>
+                    <button onClick={() => setProcessingMode('remove')} className={`text-xs font-medium py-2 rounded-md transition-all ${processingMode === 'remove' ? 'bg-white dark:bg-zinc-700 text-blue-600 dark:text-blue-300 shadow-sm' : 'text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300'}`}>Убрать цвет</button>
+                    <button onClick={() => setProcessingMode('keep')} className={`text-xs font-medium py-2 rounded-md transition-all ${processingMode === 'keep' ? 'bg-white dark:bg-zinc-700 text-blue-600 dark:text-blue-300 shadow-sm' : 'text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300'}`}>Оставить цвет</button>
                   </div>
-                  <button onClick={() => handleModeChange('flood-clear')} className={`text-xs font-medium py-2 rounded-md transition-all flex items-center justify-center gap-2 ${processingMode === 'flood-clear' ? 'bg-white dark:bg-zinc-700 text-blue-600 dark:text-blue-300 shadow-sm' : 'text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300'}`}>
+                  <button onClick={() => setProcessingMode('flood-clear')} className={`text-xs font-medium py-2 rounded-md transition-all flex items-center justify-center gap-2 ${processingMode === 'flood-clear' ? 'bg-white dark:bg-zinc-700 text-blue-600 dark:text-blue-300 shadow-sm' : 'text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300'}`}>
                     Заливка невидимостью
                   </button>
                 </div>
@@ -605,26 +485,24 @@ export function MonochromeBackgroundRemover() {
                 )}
               </div>
 
+              {/* Color Pickers */}
               <div className="space-y-2">
                 <label className="block text-xs font-bold uppercase text-zinc-400">Цвета</label>
                 <div className="flex flex-col gap-2">
+                  {/* Target Color */}
                   <div className="flex gap-3 items-center">
                     <div className="w-8 h-8 rounded border cursor-crosshair overflow-hidden relative group dark:border-zinc-700 flex-shrink-0">
                       <img src={originalUrl} className="w-full h-full object-cover" onClick={handleEyedropper} alt="picker" />
                     </div>
                     <div className="flex-1 flex items-center gap-2 p-2 border rounded bg-zinc-50 dark:bg-zinc-800 dark:border-zinc-700">
-                      <input
-                        type="color"
-                        value={targetColor}
-                        onChange={e => setTargetColor(e.target.value)}
-                        className="w-6 h-6 bg-transparent border-none cursor-pointer"
-                      />
+                      <input type="color" value={targetColor} onChange={e => setTargetColor(e.target.value)} className="w-6 h-6 bg-transparent border-none cursor-pointer" />
                       <div className="flex flex-col">
                         <span className="font-bold text-[10px] uppercase text-zinc-500">Цель (Фон)</span>
                         <span className="font-mono text-xs font-bold uppercase">{targetColor}</span>
                       </div>
                     </div>
                   </div>
+                  {/* Contour Color */}
                   <div className="flex gap-3 items-center">
                     <div className="w-8 h-8 flex-shrink-0" />
                     <div className="flex-1 flex items-center gap-2 p-2 border rounded bg-zinc-50 dark:bg-zinc-800 dark:border-zinc-700">
@@ -643,20 +521,14 @@ export function MonochromeBackgroundRemover() {
                 </div>
               </div>
 
+              {/* Sliders */}
               <div className="space-y-4 bg-zinc-50 dark:bg-zinc-800/50 p-3 rounded-lg border border-zinc-100 dark:border-zinc-800">
                 <div>
                   <div className="flex justify-between text-xs mb-1">
                     <span>Допуск</span>
                     <span className="text-blue-500 font-mono">{tolerances[processingMode]}%</span>
                   </div>
-                  <input
-                    type="range"
-                    min="0"
-                    max="100"
-                    value={tolerances[processingMode]}
-                    onChange={e => handleToleranceChange(Number(e.target.value))}
-                    className="w-full h-1.5 bg-zinc-200 rounded-lg appearance-none cursor-pointer dark:bg-zinc-600 accent-blue-600"
-                  />
+                  <input type="range" min="0" max="100" value={tolerances[processingMode]} onChange={e => setTolerances(p => ({ ...p, [processingMode]: Number(e.target.value) }))} className="w-full h-1.5 bg-zinc-200 rounded-lg appearance-none cursor-pointer dark:bg-zinc-600 accent-blue-600" />
                 </div>
                 {processingMode !== 'flood-clear' && (
                   <div>
@@ -668,6 +540,7 @@ export function MonochromeBackgroundRemover() {
                   </div>
                 )}
 
+                {/* --- HALO REMOVAL TOOLS --- */}
                 <div className="pt-2 border-t border-zinc-200 dark:border-zinc-700/50">
                   <div className="flex justify-between text-xs mb-1">
                     <span className="font-bold text-zinc-500">Удаление ореолов</span>
@@ -696,6 +569,7 @@ export function MonochromeBackgroundRemover() {
                 </div>
               </div>
 
+              {/* Flood Controls */}
               {processingMode === 'flood-clear' && (
                 <div className="space-y-3 p-3 bg-blue-50 dark:bg-blue-900/10 rounded-lg border border-blue-100 dark:border-blue-900/30">
                   <div className="flex justify-between items-center text-xs font-bold text-blue-800 dark:text-blue-200"><span>Точки: {floodPoints.length}</span></div>
@@ -706,17 +580,17 @@ export function MonochromeBackgroundRemover() {
                   <button onClick={handleRunFloodFill} disabled={floodPoints.length === 0 || isProcessing} className="w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded font-bold text-xs shadow-sm uppercase tracking-wide disabled:opacity-50 disabled:cursor-not-allowed">{isProcessing ? 'Обработка...' : 'Принудительно обновить'}</button>
                 </div>
               )}
-              <button onClick={handleDownload} disabled={!processedUrl} className="w-full py-3 bg-zinc-900 dark:bg-white text-white dark:text-black rounded font-bold text-sm shadow hover:opacity-90 transition disabled:opacity-50">Скачать</button>
+
+              <button onClick={() => { if (processedUrl) { const a = document.createElement('a'); a.href = processedUrl; a.download = 'result.png'; a.click(); } }} disabled={!processedUrl} className="w-full py-3 bg-zinc-900 dark:bg-white text-white dark:text-black rounded font-bold text-sm shadow hover:opacity-90 transition disabled:opacity-50">Скачать</button>
             </div>
           )}
         </div>
       </aside>
 
-      {/* ================= ПРАВАЯ ПАНЕЛЬ ================= */}
-      {/* ИЗМЕНЕНИЕ 2: h-full relative для контейнера правой части */}
+      {/* ================= ПРАВАЯ ПАНЕЛЬ (ПОЛОТНО) ================= */}
       <main className="flex-1 relative h-full flex flex-col bg-zinc-100 dark:bg-[#0a0a0a] overflow-hidden">
 
-        {/* Кнопки управления (Абсолютное позиционирование поверх холста) */}
+        {/* Floating Controls */}
         <div className="absolute top-4 left-1/2 -translate-x-1/2 z-30 flex items-center gap-2 bg-white/90 dark:bg-zinc-900/90 backdrop-blur px-3 py-2 rounded-full shadow-lg border border-zinc-200 dark:border-zinc-700">
           <button onClick={() => setIsAutoContrast(!isAutoContrast)} className={`p-2 rounded-full ${isAutoContrast ? 'bg-blue-100 text-blue-600 dark:bg-blue-900 dark:text-blue-300' : 'hover:bg-zinc-100 text-zinc-500'}`}>
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
@@ -731,69 +605,70 @@ export function MonochromeBackgroundRemover() {
 
           <button onClick={() => { setIsAutoContrast(false); setIsDarkBackground(!isDarkBackground) }} className="p-2 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-500">{isDarkBackground ? "🌙" : "☀️"}</button>
           <div className="w-px h-4 bg-zinc-300 dark:bg-zinc-700 mx-1" />
-          <button onClick={handleResetView} className="text-xs font-mono px-2 text-zinc-500">{(scale * 100).toFixed(0)}%</button>
+          <button onClick={() => workspaceRef.current?.resetView(imgDimensions.w, imgDimensions.h)} className="text-xs font-mono px-2 text-zinc-500 hover:text-zinc-900">Сброс</button>
         </div>
 
-        {/* ИЗМЕНЕНИЕ 3: Холст занимает все доступное пространство (absolute inset-0) */}
+        {/* WORKSPACE */}
         <div
-          ref={containerRef}
-          className={`absolute inset-0 w-full h-full select-none transition-colors ease-in-out ${isDarkBackground ? 'bg-[#111]' : 'bg-[#e5e5e5]'}`}
-          style={{
-            transitionDuration: `${transitionDurationMs}ms`,
-            cursor: draggingPointIndex !== null ? 'grabbing' : (isPanning ? 'grabbing' : (processingMode === 'flood-clear' ? 'crosshair' : 'grab'))
-          }}
-          onPointerDown={handleCanvasPointerDown}
-          onPointerMove={handlePointerMove}
-          onPointerUp={handlePointerUp}
-          onContextMenu={(e) => e.preventDefault()}
-          onDragStart={(e) => e.preventDefault()}
+          className={`flex-1 transition-colors ease-in-out ${bgClass}`}
+          style={{ transitionDuration: `${transitionDurationMs}ms` }}
+          onPointerMove={handleGlobalPointerMove}
+          onPointerUp={handleGlobalPointerUp}
         >
-          <div className={`absolute inset-0 pointer-events-none transition-opacity ease-in-out ${isDarkBackground ? 'opacity-10' : 'opacity-30'}`} style={{ transitionDuration: `${transitionDurationMs}ms`, backgroundImage: 'linear-gradient(45deg, #888 25%, transparent 25%), linear-gradient(-45deg, #888 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #888 75%), linear-gradient(-45deg, transparent 75%, #888 75%)', backgroundSize: '20px 20px' }} />
+          <div className={`absolute inset-0 pointer-events-none transition-opacity ease-in-out ${isDarkBackground ? 'opacity-10' : 'opacity-30'}`} style={{ transitionDuration: `${transitionDurationMs}ms`, backgroundImage: 'linear-gradient(45deg, #888 25%, transparent 25%), linear-gradient(-45deg, #888 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #888 75%), linear-gradient(-45deg, transparent 75%, #888 75%)', backgroundSize: '20px 20px', zIndex: 0 }} />
 
-          <div className="absolute top-0 left-0 w-full h-full flex items-center justify-center will-change-transform" style={{ transform: `translate(${offset.x}px, ${offset.y}px) scale(${scale})`, transformOrigin: '0 0' }}>
-            {processedUrl ? (
-              <div className="relative shadow-2xl">
-                <img
-                  ref={imageRef}
-                  src={processedUrl}
-                  alt="Work"
-                  draggable={false}
-                  className="max-w-none block"
-                  style={{ imageRendering: 'pixelated' }}
-                />
-
-                {processingMode === 'flood-clear' && floodPoints.map((pt, i) => (
-                  <div
-                    key={i}
-                    onPointerDown={(e) => handlePointPointerDown(e, i)}
-                    className={`absolute z-20 cursor-grab active:cursor-grabbing hover:brightness-125 ${draggingPointIndex === i ? 'brightness-150' : ''}`}
+          <CanvasWorkspace
+            ref={workspaceRef}
+            isLoading={isProcessing}
+          >
+            <div
+              className="relative origin-top-left"
+              style={{
+                width: imgDimensions.w,
+                height: imgDimensions.h,
+                // Shadow for out-of-bounds
+                boxShadow: processedUrl ? '0 0 0 50000px rgba(0,0,0,0.8)' : 'none'
+              }}
+            >
+              {processedUrl ? (
+                <>
+                  <img
+                    src={processedUrl}
+                    alt="Work"
+                    draggable={false}
+                    className="block max-w-none select-none"
                     style={{
-                      left: pt.x,
-                      top: pt.y,
-                      width: '10px',
-                      height: '10px',
-                      transform: `translate(-50%, -50%) scale(${1 / scale})`,
-                      willChange: 'transform'
+                      imageRendering: 'pixelated',
+                      cursor: processingMode === 'flood-clear' ? 'crosshair' : 'default'
                     }}
-                  >
-                    <div className="w-full h-full bg-red-500 border border-white rounded-full shadow-[0_0_2px_rgba(0,0,0,0.8)]" />
-                  </div>
-                ))}
+                    onPointerDown={handleImagePointerDown}
+                  />
 
-                {isProcessing && (
-                  <div className="absolute inset-0 bg-black/60 backdrop-blur-[3px] flex flex-col items-center justify-center z-50 text-white rounded-sm">
-                    <svg className="animate-spin h-10 w-10 mb-3 text-blue-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                    </svg>
-                    <span className="text-xs font-bold uppercase tracking-widest">Обработка...</span>
-                  </div>
-                )}
-              </div>
-            ) : (
-              <div className="text-zinc-400 text-sm opacity-50 pointer-events-none">Нет изображения</div>
-            )}
-          </div>
+                  {/* Flood Points Overlay */}
+                  {processingMode === 'flood-clear' && floodPoints.map((pt, i) => (
+                    <div
+                      key={i}
+                      onPointerDown={(e) => handlePointPointerDown(e, i)}
+                      className={`absolute z-20 cursor-grab active:cursor-grabbing hover:brightness-125 ${draggingPointIndex === i ? 'brightness-150' : ''}`}
+                      style={{
+                        left: pt.x,
+                        top: pt.y,
+                        width: '10px',
+                        height: '10px',
+                        transform: 'translate(-50%, -50%) scale(calc(1 / var(--canvas-scale)))', // Compensate scale
+                      }}
+                    >
+                      <div className="w-full h-full bg-red-500 border border-white rounded-full shadow-[0_0_2px_rgba(0,0,0,0.8)]" />
+                    </div>
+                  ))}
+                </>
+              ) : (
+                <div className="absolute inset-0 flex items-center justify-center text-zinc-400 text-lg opacity-50 whitespace-nowrap border-2 border-dashed border-zinc-500/20 rounded-lg">
+                  Нет изображения
+                </div>
+              )}
+            </div>
+          </CanvasWorkspace>
         </div>
       </main>
     </div>
