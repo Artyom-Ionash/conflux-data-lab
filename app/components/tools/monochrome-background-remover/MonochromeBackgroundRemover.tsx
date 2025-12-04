@@ -49,9 +49,10 @@ export function MonochromeBackgroundRemover() {
   const [smoothness, setSmoothness] = useState(10);
   const [processingMode, setProcessingMode] = useState<ProcessingMode>('remove');
 
-  // --- НОВЫЕ STATE: Инструменты против ореолов ---
-  const [edgeChoke, setEdgeChoke] = useState(0); // Сжатие краев
-  const [edgeBlur, setEdgeBlur] = useState(0);   // Смягчение краев
+  // --- STATE: Инструменты постобработки ---
+  const [edgeChoke, setEdgeChoke] = useState(0); // Сжатие (Erode)
+  const [edgeBlur, setEdgeBlur] = useState(0);   // Смягчение (Blur)
+  const [edgePaint, setEdgePaint] = useState(0); // Окрашивание (Paint) - НОВОЕ
 
   // Точки заливки
   const [floodPoints, setFloodPoints] = useState<Point[]>([]);
@@ -224,21 +225,19 @@ export function MonochromeBackgroundRemover() {
           (data[i + 2] - targetRGB.b) ** 2
         );
 
-        // 1. Создаем буфер для альфа-канала, чтобы удобно применять эффекты
+        // Создаем буфер альфа-канала
         const alphaChannel = new Uint8Array(width * height);
 
-        // --- ШАГ 1: Генерация базовой маски ---
+        // --- ШАГ 1: Генерация маски (Альфа) ---
         if (processingMode === 'flood-clear') {
           if (floodPoints.length === 0) {
             setProcessedUrl(originalUrl);
             setIsProcessing(false);
             return;
           }
-
-          // Инициализируем альфа-канал полностью непрозрачным (255)
           alphaChannel.fill(255);
-
           const visited = new Uint8Array(width * height);
+
           floodPoints.forEach(pt => {
             const startX = Math.floor(pt.x);
             const startY = Math.floor(pt.y);
@@ -258,7 +257,6 @@ export function MonochromeBackgroundRemover() {
 
               if (dist <= tolVal) continue;
 
-              // Помечаем пиксель как прозрачный в нашем буфере
               alphaChannel[idx] = 0;
 
               if (x > 0) stack.push(x - 1, y);
@@ -268,7 +266,6 @@ export function MonochromeBackgroundRemover() {
             }
           });
         } else {
-          // Режимы remove и keep
           for (let i = 0, idx = 0; i < data.length; i += 4, idx++) {
             const dist = getDist(i);
             let alpha = 255;
@@ -293,26 +290,21 @@ export function MonochromeBackgroundRemover() {
         }
 
         // --- ШАГ 2: Сжатие краев (Erode) ---
-        // "Съедаем" непрозрачные пиксели, если рядом есть прозрачные
         if (edgeChoke > 0) {
           const erodedBuffer = new Uint8Array(alphaChannel);
           const radius = edgeChoke;
-
           for (let y = 0; y < height; y++) {
             for (let x = 0; x < width; x++) {
               const idx = y * width + x;
-              if (alphaChannel[idx] === 0) continue; // Уже прозрачный
+              if (alphaChannel[idx] === 0) continue;
 
               let shouldErode = false;
-              // Проверяем соседей в радиусе
               checkNeighbors:
               for (let ky = -radius; ky <= radius; ky++) {
                 for (let kx = -radius; kx <= radius; kx++) {
                   if (kx === 0 && ky === 0) continue;
-
                   const ny = y + ky;
                   const nx = x + kx;
-
                   if (nx >= 0 && nx < width && ny >= 0 && ny < height) {
                     const nIdx = ny * width + nx;
                     if (alphaChannel[nIdx] === 0) {
@@ -322,10 +314,7 @@ export function MonochromeBackgroundRemover() {
                   }
                 }
               }
-
-              if (shouldErode) {
-                erodedBuffer[idx] = 0;
-              }
+              if (shouldErode) erodedBuffer[idx] = 0;
             }
           }
           alphaChannel.set(erodedBuffer);
@@ -334,25 +323,17 @@ export function MonochromeBackgroundRemover() {
         // --- ШАГ 3: Размытие краев (Blur) ---
         if (edgeBlur > 0) {
           const blurredBuffer = new Uint8Array(alphaChannel);
-          // Простое Box Blur для производительности
           const radius = Math.max(1, edgeBlur);
 
           for (let y = 0; y < height; y++) {
             for (let x = 0; x < width; x++) {
               const idx = y * width + x;
-
-              // Оптимизация: не блюрим там, где все вокруг и так 0 или 255 (далеко от краев)
-              // Но для простоты пройдемся везде или проверим только границы.
-              // Если альфа 0 или 255, проверим, не край ли это.
-
               let sum = 0;
               let count = 0;
-
               for (let ky = -radius; ky <= radius; ky++) {
                 for (let kx = -radius; kx <= radius; kx++) {
                   const ny = y + ky;
                   const nx = x + kx;
-
                   if (nx >= 0 && nx < width && ny >= 0 && ny < height) {
                     const nIdx = ny * width + nx;
                     sum += alphaChannel[nIdx];
@@ -366,16 +347,49 @@ export function MonochromeBackgroundRemover() {
           alphaChannel.set(blurredBuffer);
         }
 
-        // --- ШАГ 4: Применение маски к изображению ---
+        // --- ШАГ 4: Окрашивание краев (Edge Paint) ---
+        // Находим границы (где альфа > 0, но рядом альфа == 0) и красим их в targetRGB
+        if (edgePaint > 0) {
+          const radius = edgePaint;
+          // Работаем напрямую с RGB данными (data), но проверяем маску alphaChannel
+          for (let y = 0; y < height; y++) {
+            for (let x = 0; x < width; x++) {
+              const idx = y * width + x;
+              // Если пиксель полностью прозрачный (фон), не трогаем его (или трогаем? Обычно ореол на объекте)
+              // Ореолы находятся на видимой части.
+              if (alphaChannel[idx] === 0) continue;
+
+              let isEdge = false;
+              checkEdge:
+              for (let ky = -radius; ky <= radius; ky++) {
+                for (let kx = -radius; kx <= radius; kx++) {
+                  if (kx === 0 && ky === 0) continue;
+                  const ny = y + ky;
+                  const nx = x + kx;
+                  if (nx >= 0 && nx < width && ny >= 0 && ny < height) {
+                    const nIdx = ny * width + nx;
+                    // Если сосед прозрачный, значит этот пиксель граничный
+                    if (alphaChannel[nIdx] === 0) {
+                      isEdge = true;
+                      break checkEdge;
+                    }
+                  }
+                }
+              }
+
+              if (isEdge) {
+                const ptr = idx * 4;
+                data[ptr] = targetRGB.r;
+                data[ptr + 1] = targetRGB.g;
+                data[ptr + 2] = targetRGB.b;
+                // Альфу оставляем как есть (или можно делать 255, но blur уже отработал)
+              }
+            }
+          }
+        }
+
+        // --- Финальная сборка ---
         for (let i = 0, idx = 0; i < data.length; i += 4, idx++) {
-          // В режиме flood-clear мы просто ставим прозрачность, 
-          // но сохраняем цвет для антиалиасинга краев? Нет, обычно просто режем альфу.
-
-          // Применяем альфу из нашего обработанного буфера
-          // Если у нас был оригинальный alpha < 255, учитываем это (умножаем)
-          // Но здесь мы предполагаем работу с полностью непрозрачным исходником, 
-          // либо просто заменяем альфу.
-
           data[i + 3] = alphaChannel[idx];
         }
 
@@ -384,7 +398,7 @@ export function MonochromeBackgroundRemover() {
         setIsProcessing(false);
       }, 50);
     };
-  }, [originalUrl, targetColors, tolerances, smoothness, imgDimensions, processingMode, floodPoints, edgeChoke, edgeBlur]);
+  }, [originalUrl, targetColors, tolerances, smoothness, imgDimensions, processingMode, floodPoints, edgeChoke, edgeBlur, edgePaint]);
 
   useEffect(() => {
     if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
@@ -394,7 +408,7 @@ export function MonochromeBackgroundRemover() {
     }, 100);
 
     return () => { if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current); }
-  }, [originalUrl, targetColors, tolerances, smoothness, processingMode, floodPoints, edgeChoke, edgeBlur]);
+  }, [originalUrl, targetColors, tolerances, smoothness, processingMode, floodPoints, edgeChoke, edgeBlur, edgePaint]);
 
   useEffect(() => {
     if (manualTrigger > 0 && processingMode === 'flood-clear') {
@@ -614,7 +628,8 @@ export function MonochromeBackgroundRemover() {
               </div>
 
               <div className="space-y-2">
-                <label className="block text-xs font-bold uppercase text-zinc-400">{processingMode === 'flood-clear' ? 'Цвет контура' : 'Целевой цвет'}</label>
+                {/* ИЗМЕНЕНИЕ: Общее название для всех режимов */}
+                <label className="block text-xs font-bold uppercase text-zinc-400">Цвет (Цель / Контур / Окраска)</label>
                 <div className="flex gap-3 items-center">
                   <div className="w-12 h-12 rounded border cursor-crosshair overflow-hidden relative group dark:border-zinc-700">
                     <img src={originalUrl} className="w-full h-full object-cover" onClick={handleEyedropper} alt="picker" />
@@ -656,7 +671,6 @@ export function MonochromeBackgroundRemover() {
                   </div>
                 )}
 
-                {/* --- НОВЫЕ ИНСТРУМЕНТЫ --- */}
                 <div className="pt-2 border-t border-zinc-200 dark:border-zinc-700/50">
                   <div className="flex justify-between text-xs mb-1">
                     <span className="font-bold text-zinc-500">Удаление ореолов</span>
@@ -670,12 +684,21 @@ export function MonochromeBackgroundRemover() {
                     <input type="range" min="0" max="5" step="1" value={edgeChoke} onChange={e => setEdgeChoke(Number(e.target.value))} className="w-full h-1.5 bg-zinc-200 rounded-lg appearance-none cursor-pointer dark:bg-zinc-600 accent-blue-600" />
                   </div>
 
-                  <div>
+                  <div className="mb-2">
                     <div className="flex justify-between text-[10px] mb-1 text-zinc-500">
                       <span>Смягчение (Blur)</span>
                       <span className="text-blue-500 font-mono">{edgeBlur}px</span>
                     </div>
                     <input type="range" min="0" max="5" step="1" value={edgeBlur} onChange={e => setEdgeBlur(Number(e.target.value))} className="w-full h-1.5 bg-zinc-200 rounded-lg appearance-none cursor-pointer dark:bg-zinc-600 accent-blue-600" />
+                  </div>
+
+                  {/* ИЗМЕНЕНИЕ: Новый инструмент Окрашивание */}
+                  <div>
+                    <div className="flex justify-between text-[10px] mb-1 text-zinc-500">
+                      <span>Окрашивание (Paint)</span>
+                      <span className="text-blue-500 font-mono">{edgePaint}px</span>
+                    </div>
+                    <input type="range" min="0" max="5" step="1" value={edgePaint} onChange={e => setEdgePaint(Number(e.target.value))} className="w-full h-1.5 bg-zinc-200 rounded-lg appearance-none cursor-pointer dark:bg-zinc-600 accent-blue-600" />
                   </div>
                 </div>
               </div>
