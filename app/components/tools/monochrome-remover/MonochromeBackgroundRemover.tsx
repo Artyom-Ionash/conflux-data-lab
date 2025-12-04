@@ -36,7 +36,6 @@ interface Point {
 export function MonochromeBackgroundRemover() {
   // --- STATE ---
   const [originalUrl, setOriginalUrl] = useState<string | null>(null);
-  const [processedUrl, setProcessedUrl] = useState<string | null>(null);
   const [imgDimensions, setImgDimensions] = useState({ w: 0, h: 0 });
 
   const [targetColor, setTargetColor] = useState('#ffffff');
@@ -58,144 +57,193 @@ export function MonochromeBackgroundRemover() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [draggingPointIndex, setDraggingPointIndex] = useState<number | null>(null);
 
-  const canvasRef = useRef<HTMLCanvasElement>(null);
+  // REFS
   const workspaceRef = useRef<CanvasRef>(null);
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
 
+  // Canvas Refs:
+  // sourceCanvas - хранит оригинал (скрыт)
+  // previewCanvas - отображает результат (виден)
+  const sourceCanvasRef = useRef<HTMLCanvasElement>(null);
+  const previewCanvasRef = useRef<HTMLCanvasElement>(null);
+
   // --- ЭФФЕКТЫ ---
 
-  // Логика процессинга
-  const processImage = useCallback(() => {
-    if (!originalUrl || !imgDimensions.w) return;
-    setIsProcessing(true);
+  // 1. Загрузка изображения в Source Canvas
+  const loadOriginalToCanvas = (url: string) => {
     const img = new Image();
     img.crossOrigin = "Anonymous";
-    img.src = originalUrl;
+    img.src = url;
     img.onload = () => {
-      const canvas = canvasRef.current;
-      if (!canvas) return;
-      canvas.width = imgDimensions.w;
-      canvas.height = imgDimensions.h;
-      const ctx = canvas.getContext('2d');
-      if (!ctx) return;
-      ctx.drawImage(img, 0, 0);
+      setImgDimensions({ w: img.width, h: img.height });
 
-      setTimeout(() => {
-        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-        const data = imageData.data;
-        const width = canvas.width;
-        const height = canvas.height;
-        const targetRGB = hexToRgb(targetColor);
-        const contourRGB = hexToRgb(contourColor);
+      // Инициализация Source Canvas
+      if (sourceCanvasRef.current) {
+        sourceCanvasRef.current.width = img.width;
+        sourceCanvasRef.current.height = img.height;
+        const ctx = sourceCanvasRef.current.getContext('2d', { willReadFrequently: true });
+        ctx?.drawImage(img, 0, 0);
+      }
 
-        if (!targetRGB || !contourRGB) { setIsProcessing(false); return; }
+      // Инициализация Preview Canvas (копия оригинала)
+      if (previewCanvasRef.current) {
+        previewCanvasRef.current.width = img.width;
+        previewCanvasRef.current.height = img.height;
+        const ctx = previewCanvasRef.current.getContext('2d');
+        ctx?.drawImage(img, 0, 0);
+      }
 
-        const maxDist = 441.67;
-        const currentTolerance = tolerances[processingMode];
-        const tolVal = (currentTolerance / 100) * maxDist;
-        const smoothVal = (smoothness / 100) * maxDist;
+      // Сброс зума
+      setTimeout(() => workspaceRef.current?.resetView(img.width, img.height), 50);
 
-        const getDistToTarget = (i: number) => Math.sqrt((data[i] - targetRGB.r) ** 2 + (data[i + 1] - targetRGB.g) ** 2 + (data[i + 2] - targetRGB.b) ** 2);
-        const getDistToContour = (i: number) => Math.sqrt((data[i] - contourRGB.r) ** 2 + (data[i + 1] - contourRGB.g) ** 2 + (data[i + 2] - contourRGB.b) ** 2);
-
-        const alphaChannel = new Uint8Array(width * height);
-
-        if (processingMode === 'flood-clear') {
-          if (floodPoints.length === 0) { setProcessedUrl(originalUrl); setIsProcessing(false); return; }
-          alphaChannel.fill(255);
-          const visited = new Uint8Array(width * height);
-          floodPoints.forEach(pt => {
-            const startX = Math.floor(pt.x); const startY = Math.floor(pt.y);
-            if (startX < 0 || startX >= width || startY < 0 || startY >= height) return;
-            const stack = [startX, startY];
-            while (stack.length) {
-              const y = stack.pop()!; const x = stack.pop()!;
-              const idx = y * width + x;
-              if (visited[idx]) continue;
-              visited[idx] = 1;
-              const ptr = idx * 4;
-              const dist = getDistToContour(ptr);
-              if (dist <= tolVal) continue;
-              alphaChannel[idx] = 0;
-              if (x > 0) stack.push(x - 1, y);
-              if (x < width - 1) stack.push(x + 1, y);
-              if (y > 0) stack.push(x, y - 1);
-              if (y < height - 1) stack.push(x, y + 1);
-            }
-          });
-        } else {
-          for (let i = 0, idx = 0; i < data.length; i += 4, idx++) {
-            const dist = getDistToTarget(i);
-            let alpha = 255;
-            if (processingMode === 'remove') {
-              if (dist <= tolVal) alpha = 0;
-              else if (dist <= tolVal + smoothVal && smoothVal > 0) alpha = Math.floor(255 * ((dist - tolVal) / smoothVal));
-            } else if (processingMode === 'keep') {
-              if (dist > tolVal + smoothVal) alpha = 0;
-              else if (dist > tolVal && smoothVal > 0) alpha = Math.floor(255 * (1 - ((dist - tolVal) / smoothVal)));
-            }
-            alphaChannel[idx] = alpha;
-          }
-        }
-
-        // Post-processing
-        if (edgeChoke > 0) {
-          const eroded = new Uint8Array(alphaChannel);
-          const r = edgeChoke;
-          for (let y = 0; y < height; y++) for (let x = 0; x < width; x++) {
-            const i = y * width + x;
-            if (alphaChannel[i] === 0) continue;
-            let hit = false;
-            l: for (let ky = -r; ky <= r; ky++) for (let kx = -r; kx <= r; kx++) {
-              if (kx === 0 && ky === 0) continue;
-              const ny = y + ky, nx = x + kx;
-              if (nx >= 0 && nx < width && ny >= 0 && ny < height && alphaChannel[ny * width + nx] === 0) { hit = true; break l; }
-            }
-            if (hit) eroded[i] = 0;
-          }
-          alphaChannel.set(eroded);
-        }
-        if (edgeBlur > 0) {
-          const blurred = new Uint8Array(alphaChannel);
-          const r = Math.max(1, edgeBlur);
-          for (let y = 0; y < height; y++) for (let x = 0; x < width; x++) {
-            let sum = 0, c = 0;
-            for (let ky = -r; ky <= r; ky++) for (let kx = -r; kx <= r; kx++) {
-              const ny = y + ky, nx = x + kx;
-              if (nx >= 0 && nx < width && ny >= 0 && ny < height) { sum += alphaChannel[ny * width + nx]; c++; }
-            }
-            blurred[y * width + x] = Math.floor(sum / c);
-          }
-          alphaChannel.set(blurred);
-        }
-        if (edgePaint > 0) {
-          const r = edgePaint;
-          for (let y = 0; y < height; y++) for (let x = 0; x < width; x++) {
-            const i = y * width + x;
-            if (alphaChannel[i] === 0) continue;
-            let edge = false;
-            l2: for (let ky = -r; ky <= r; ky++) for (let kx = -r; kx <= r; kx++) {
-              if (kx === 0 && ky === 0) continue;
-              const ny = y + ky, nx = x + kx;
-              if (nx >= 0 && nx < width && ny >= 0 && ny < height && alphaChannel[ny * width + nx] === 0) { edge = true; break l2; }
-            }
-            if (edge) { const p = i * 4; data[p] = contourRGB.r; data[p + 1] = contourRGB.g; data[p + 2] = contourRGB.b; }
-          }
-        }
-
-        for (let i = 0, idx = 0; i < data.length; i += 4, idx++) data[i + 3] = alphaChannel[idx];
-        ctx.putImageData(imageData, 0, 0);
-        setProcessedUrl(canvas.toDataURL('image/png'));
-        setIsProcessing(false);
-      }, 50);
+      // Запуск первой обработки
+      processImage();
     };
-  }, [originalUrl, targetColor, contourColor, tolerances, smoothness, imgDimensions, processingMode, floodPoints, edgeChoke, edgeBlur, edgePaint]);
+  };
 
+  // 2. Логика процессинга (Pixel Manipulation)
+  const processImage = useCallback(() => {
+    if (!originalUrl || !sourceCanvasRef.current || !previewCanvasRef.current) return;
+
+    setIsProcessing(true);
+
+    // Используем setTimeout, чтобы UI успел показать спиннер загрузки
+    setTimeout(() => {
+      const sourceCtx = sourceCanvasRef.current!.getContext('2d', { willReadFrequently: true });
+      const previewCtx = previewCanvasRef.current!.getContext('2d');
+
+      if (!sourceCtx || !previewCtx) return;
+
+      const width = sourceCanvasRef.current!.width;
+      const height = sourceCanvasRef.current!.height;
+
+      // Берем данные из Source (быстро благодаря willReadFrequently)
+      const imageData = sourceCtx.getImageData(0, 0, width, height);
+      const data = imageData.data;
+
+      const targetRGB = hexToRgb(targetColor);
+      const contourRGB = hexToRgb(contourColor);
+
+      if (!targetRGB || !contourRGB) { setIsProcessing(false); return; }
+
+      const maxDist = 441.67;
+      const currentTolerance = tolerances[processingMode];
+      const tolVal = (currentTolerance / 100) * maxDist;
+      const smoothVal = (smoothness / 100) * maxDist;
+
+      const getDistToTarget = (i: number) => Math.sqrt((data[i] - targetRGB.r) ** 2 + (data[i + 1] - targetRGB.g) ** 2 + (data[i + 2] - targetRGB.b) ** 2);
+      const getDistToContour = (i: number) => Math.sqrt((data[i] - contourRGB.r) ** 2 + (data[i + 1] - contourRGB.g) ** 2 + (data[i + 2] - contourRGB.b) ** 2);
+
+      const alphaChannel = new Uint8Array(width * height);
+
+      // --- ALGORITHM START ---
+      if (processingMode === 'flood-clear') {
+        if (floodPoints.length === 0) {
+          // Если точек нет, просто рисуем оригинал
+          previewCtx.putImageData(imageData, 0, 0);
+          setIsProcessing(false);
+          return;
+        }
+        alphaChannel.fill(255);
+        const visited = new Uint8Array(width * height);
+        floodPoints.forEach(pt => {
+          const startX = Math.floor(pt.x); const startY = Math.floor(pt.y);
+          if (startX < 0 || startX >= width || startY < 0 || startY >= height) return;
+          const stack = [startX, startY];
+          while (stack.length) {
+            const y = stack.pop()!; const x = stack.pop()!;
+            const idx = y * width + x;
+            if (visited[idx]) continue;
+            visited[idx] = 1;
+            const ptr = idx * 4;
+            const dist = getDistToContour(ptr);
+            if (dist <= tolVal) continue;
+            alphaChannel[idx] = 0;
+            if (x > 0) stack.push(x - 1, y);
+            if (x < width - 1) stack.push(x + 1, y);
+            if (y > 0) stack.push(x, y - 1);
+            if (y < height - 1) stack.push(x, y + 1);
+          }
+        });
+      } else {
+        for (let i = 0, idx = 0; i < data.length; i += 4, idx++) {
+          const dist = getDistToTarget(i);
+          let alpha = 255;
+          if (processingMode === 'remove') {
+            if (dist <= tolVal) alpha = 0;
+            else if (dist <= tolVal + smoothVal && smoothVal > 0) alpha = Math.floor(255 * ((dist - tolVal) / smoothVal));
+          } else if (processingMode === 'keep') {
+            if (dist > tolVal + smoothVal) alpha = 0;
+            else if (dist > tolVal && smoothVal > 0) alpha = Math.floor(255 * (1 - ((dist - tolVal) / smoothVal)));
+          }
+          alphaChannel[idx] = alpha;
+        }
+      }
+
+      // Post-processing
+      if (edgeChoke > 0) {
+        const eroded = new Uint8Array(alphaChannel);
+        const r = edgeChoke;
+        for (let y = 0; y < height; y++) for (let x = 0; x < width; x++) {
+          const i = y * width + x;
+          if (alphaChannel[i] === 0) continue;
+          let hit = false;
+          l: for (let ky = -r; ky <= r; ky++) for (let kx = -r; kx <= r; kx++) {
+            if (kx === 0 && ky === 0) continue;
+            const ny = y + ky, nx = x + kx;
+            if (nx >= 0 && nx < width && ny >= 0 && ny < height && alphaChannel[ny * width + nx] === 0) { hit = true; break l; }
+          }
+          if (hit) eroded[i] = 0;
+        }
+        alphaChannel.set(eroded);
+      }
+      if (edgeBlur > 0) {
+        const blurred = new Uint8Array(alphaChannel);
+        const r = Math.max(1, edgeBlur);
+        for (let y = 0; y < height; y++) for (let x = 0; x < width; x++) {
+          let sum = 0, c = 0;
+          for (let ky = -r; ky <= r; ky++) for (let kx = -r; kx <= r; kx++) {
+            const ny = y + ky, nx = x + kx;
+            if (nx >= 0 && nx < width && ny >= 0 && ny < height) { sum += alphaChannel[ny * width + nx]; c++; }
+          }
+          blurred[y * width + x] = Math.floor(sum / c);
+        }
+        alphaChannel.set(blurred);
+      }
+      if (edgePaint > 0) {
+        const r = edgePaint;
+        for (let y = 0; y < height; y++) for (let x = 0; x < width; x++) {
+          const i = y * width + x;
+          if (alphaChannel[i] === 0) continue;
+          let edge = false;
+          l2: for (let ky = -r; ky <= r; ky++) for (let kx = -r; kx <= r; kx++) {
+            if (kx === 0 && ky === 0) continue;
+            const ny = y + ky, nx = x + kx;
+            if (nx >= 0 && nx < width && ny >= 0 && ny < height && alphaChannel[ny * width + nx] === 0) { edge = true; break l2; }
+          }
+          if (edge) { const p = i * 4; data[p] = contourRGB.r; data[p + 1] = contourRGB.g; data[p + 2] = contourRGB.b; }
+        }
+      }
+
+      // Apply Alpha
+      for (let i = 0, idx = 0; i < data.length; i += 4, idx++) data[i + 3] = alphaChannel[idx];
+
+      // --- ALGORITHM END ---
+
+      // Прямая отрисовка результата (без Base64!)
+      previewCtx.putImageData(imageData, 0, 0);
+      setIsProcessing(false);
+    }, 10);
+  }, [originalUrl, targetColor, contourColor, tolerances, smoothness, processingMode, floodPoints, edgeChoke, edgeBlur, edgePaint]);
+
+  // Debounce for processing
   useEffect(() => {
+    if (!originalUrl) return;
     if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
-    debounceTimerRef.current = setTimeout(() => { if (originalUrl) processImage(); }, 100);
+    debounceTimerRef.current = setTimeout(() => { processImage(); }, 50);
     return () => { if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current); }
   }, [originalUrl, targetColor, contourColor, tolerances, smoothness, processingMode, floodPoints, edgeChoke, edgeBlur, edgePaint]);
+
   useEffect(() => { if (manualTrigger > 0 && processingMode === 'flood-clear') processImage(); }, [manualTrigger]);
 
   // --- HANDLERS ---
@@ -203,26 +251,37 @@ export function MonochromeBackgroundRemover() {
     const file = e.target.files?.[0];
     if (!file) return;
     const url = URL.createObjectURL(file);
+    setOriginalUrl(url);
+
+    // Сброс состояния
+    setFloodPoints([]);
+
+    // Загрузка
+    loadOriginalToCanvas(url);
+
+    // Авто-детект цвета (упрощенно: берем верхний левый пиксель)
     const img = new Image();
     img.src = url;
     img.onload = () => {
-      const canvas = document.createElement('canvas');
-      canvas.width = 1; canvas.height = 1;
-      const ctx = canvas.getContext('2d');
-      if (ctx) {
-        ctx.drawImage(img, 0, 0);
-        const p = ctx.getImageData(0, 0, 1, 1).data;
-        const detectedColor = rgbToHex(p[0], p[1], p[2]);
-        setTargetColor(detectedColor);
-        setContourColor(invertHex(detectedColor));
+      const c = document.createElement('canvas'); c.width = 1; c.height = 1;
+      const cx = c.getContext('2d');
+      if (cx) {
+        cx.drawImage(img, 0, 0);
+        const p = cx.getImageData(0, 0, 1, 1).data;
+        const hex = rgbToHex(p[0], p[1], p[2]);
+        setTargetColor(hex);
+        setContourColor(invertHex(hex));
       }
-      setOriginalUrl(url);
-      setProcessedUrl(url);
-      setImgDimensions({ w: img.width, h: img.height });
-      setFloodPoints([]);
-      // Программный сброс вида при загрузке
-      setTimeout(() => workspaceRef.current?.resetView(img.width, img.height), 50);
-    };
+    }
+  };
+
+  const handleDownload = () => {
+    if (previewCanvasRef.current) {
+      const link = document.createElement('a');
+      link.download = 'removed_bg.png';
+      link.href = previewCanvasRef.current.toDataURL('image/png');
+      link.click();
+    }
   };
 
   const getRelativeImageCoords = (clientX: number, clientY: number): Point | null => {
@@ -254,29 +313,26 @@ export function MonochromeBackgroundRemover() {
     }
   };
   const handleGlobalPointerUp = () => { if (draggingPointIndex !== null) setDraggingPointIndex(null); };
-  const handleEyedropper = (e: React.MouseEvent<HTMLImageElement>) => {
-    if (!originalUrl) return;
-    const img = e.currentTarget;
-    const rect = img.getBoundingClientRect();
-    const x = (e.clientX - rect.left) / rect.width * img.naturalWidth;
-    const y = (e.clientY - rect.top) / rect.height * img.naturalHeight;
-    const canvas = document.createElement('canvas'); canvas.width = 1; canvas.height = 1;
-    const ctx = canvas.getContext('2d');
+
+  const handleEyedropper = (e: React.MouseEvent) => {
+    // Пипетка берет цвет из Source Canvas (оригинал)
+    if (!sourceCanvasRef.current) return;
+    const rect = (e.target as HTMLElement).getBoundingClientRect();
+    const x = (e.clientX - rect.left) / rect.width * sourceCanvasRef.current.width;
+    const y = (e.clientY - rect.top) / rect.height * sourceCanvasRef.current.height;
+    const ctx = sourceCanvasRef.current.getContext('2d', { willReadFrequently: true });
     if (ctx) {
-      const i = new Image(); i.src = originalUrl; i.onload = () => {
-        ctx.drawImage(i, -Math.floor(x), -Math.floor(y));
-        const p = ctx.getImageData(0, 0, 1, 1).data;
-        setTargetColor(rgbToHex(p[0], p[1], p[2]));
-      }
+      const p = ctx.getImageData(x, y, 1, 1).data;
+      setTargetColor(rgbToHex(p[0], p[1], p[2]));
     }
   };
+
   const removeLastPoint = () => setFloodPoints(prev => prev.slice(0, -1));
   const clearAllPoints = () => setFloodPoints([]);
   const handleRunFloodFill = () => setManualTrigger(prev => prev + 1);
 
   return (
     <div className="fixed inset-0 flex w-full h-full bg-zinc-50 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 overflow-hidden font-sans">
-      <canvas ref={canvasRef} className="hidden" />
 
       {/* --- SIDEBAR --- */}
       <aside className="w-[360px] flex-shrink-0 flex flex-col border-r border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 z-10 shadow-xl h-full">
@@ -296,6 +352,7 @@ export function MonochromeBackgroundRemover() {
           </div>
           {originalUrl && (
             <div className="space-y-6 animate-fade-in">
+              {/* Controls */}
               <div className="space-y-2">
                 <label className="block text-xs font-bold uppercase text-zinc-400">Режим</label>
                 <div className="flex flex-col gap-1 bg-zinc-100 dark:bg-zinc-800 p-1 rounded-lg">
@@ -310,7 +367,9 @@ export function MonochromeBackgroundRemover() {
               <div className="space-y-2">
                 <div className="flex flex-col gap-2">
                   <div className="flex gap-3 items-center">
-                    <div className="w-8 h-8 rounded border cursor-crosshair overflow-hidden relative group dark:border-zinc-700 flex-shrink-0">
+                    {/* Eyedropper Preview from Source Canvas */}
+                    <div className="w-8 h-8 rounded border cursor-crosshair overflow-hidden relative group dark:border-zinc-700 flex-shrink-0 bg-white">
+                      {/* We use a tiny separate image for the eyedropper UI button to avoid heavy canvas reads here */}
                       <img src={originalUrl} className="w-full h-full object-cover" onClick={handleEyedropper} alt="picker" />
                     </div>
                     <div className="flex-1 flex items-center gap-2 p-2 border rounded bg-zinc-50 dark:bg-zinc-800 dark:border-zinc-700">
@@ -344,7 +403,7 @@ export function MonochromeBackgroundRemover() {
                   <button onClick={handleRunFloodFill} disabled={floodPoints.length === 0 || isProcessing} className="w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded font-bold text-xs shadow-sm uppercase tracking-wide disabled:opacity-50 disabled:cursor-not-allowed">{isProcessing ? 'Обработка...' : 'Принудительно обновить'}</button>
                 </div>
               )}
-              <button onClick={() => { if (processedUrl) { const a = document.createElement('a'); a.href = processedUrl; a.download = 'result.png'; a.click(); } }} disabled={!processedUrl} className="w-full py-3 bg-zinc-900 dark:bg-white text-white dark:text-black rounded font-bold text-sm shadow hover:opacity-90 transition disabled:opacity-50">Скачать</button>
+              <button onClick={handleDownload} disabled={!originalUrl} className="w-full py-3 bg-zinc-900 dark:bg-white text-white dark:text-black rounded font-bold text-sm shadow hover:opacity-90 transition disabled:opacity-50">Скачать</button>
             </div>
           )}
         </div>
@@ -360,7 +419,6 @@ export function MonochromeBackgroundRemover() {
           <Canvas
             ref={workspaceRef}
             isLoading={isProcessing}
-            // Передаем размеры контента, чтобы внутренняя кнопка "Сброс" знала, как масштабировать
             contentWidth={imgDimensions.w}
             contentHeight={imgDimensions.h}
           >
@@ -369,34 +427,41 @@ export function MonochromeBackgroundRemover() {
               style={{
                 width: imgDimensions.w,
                 height: imgDimensions.h,
-                boxShadow: processedUrl ? '0 0 0 50000px rgba(0,0,0,0.8)' : 'none'
+                boxShadow: originalUrl ? '0 0 0 50000px rgba(0,0,0,0.8)' : 'none'
               }}
             >
-              {processedUrl ? (
-                <>
-                  <img
-                    src={processedUrl}
-                    alt="Work"
-                    draggable={false}
-                    className="block max-w-none select-none"
-                    style={{ imageRendering: 'pixelated', cursor: processingMode === 'flood-clear' ? 'crosshair' : 'default' }}
-                    onPointerDown={handleImagePointerDown}
-                  />
-                  {processingMode === 'flood-clear' && floodPoints.map((pt, i) => (
-                    <div
-                      key={i}
-                      onPointerDown={(e) => handlePointPointerDown(e, i)}
-                      className={`absolute z-20 cursor-grab active:cursor-grabbing hover:brightness-125 ${draggingPointIndex === i ? 'brightness-150' : ''}`}
-                      style={{
-                        left: pt.x, top: pt.y, width: '10px', height: '10px',
-                        transform: 'translate(-50%, -50%) scale(calc(1 / var(--canvas-scale)))',
-                      }}
-                    >
-                      <div className="w-full h-full bg-red-500 border border-white rounded-full shadow-[0_0_2px_rgba(0,0,0,0.8)]" />
-                    </div>
-                  ))}
-                </>
-              ) : (
+              {/* HIDDEN SOURCE CANVAS */}
+              <canvas ref={sourceCanvasRef} className="hidden" />
+
+              {/* VISIBLE PREVIEW CANVAS */}
+              <canvas
+                ref={previewCanvasRef}
+                className="block select-none"
+                onPointerDown={handleImagePointerDown}
+                style={{
+                  width: '100%',
+                  height: '100%',
+                  imageRendering: 'pixelated',
+                  cursor: processingMode === 'flood-clear' ? 'crosshair' : 'default',
+                  display: originalUrl ? 'block' : 'none'
+                }}
+              />
+
+              {processingMode === 'flood-clear' && floodPoints.map((pt, i) => (
+                <div
+                  key={i}
+                  onPointerDown={(e) => handlePointPointerDown(e, i)}
+                  className={`absolute z-20 cursor-grab active:cursor-grabbing hover:brightness-125 ${draggingPointIndex === i ? 'brightness-150' : ''}`}
+                  style={{
+                    left: pt.x, top: pt.y, width: '10px', height: '10px',
+                    transform: 'translate(-50%, -50%) scale(calc(1 / var(--canvas-scale)))',
+                  }}
+                >
+                  <div className="w-full h-full bg-red-500 border border-white rounded-full shadow-[0_0_2px_rgba(0,0,0,0.8)]" />
+                </div>
+              ))}
+
+              {!originalUrl && (
                 <div className="absolute inset-0 flex items-center justify-center text-zinc-400 text-lg opacity-50 whitespace-nowrap border-2 border-dashed border-zinc-500/20 rounded-lg">Нет изображения</div>
               )}
             </div>
