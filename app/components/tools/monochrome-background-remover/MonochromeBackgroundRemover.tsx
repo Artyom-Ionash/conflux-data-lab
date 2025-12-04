@@ -20,6 +20,13 @@ function rgbToHex(r: number, g: number, b: number) {
   }).join("");
 }
 
+// Функция инверсии цвета
+function invertHex(hex: string) {
+  const rgb = hexToRgb(hex);
+  if (!rgb) return '#000000';
+  return rgbToHex(255 - rgb.r, 255 - rgb.g, 255 - rgb.b);
+}
+
 type ProcessingMode = 'remove' | 'keep' | 'flood-clear';
 
 interface Point {
@@ -34,11 +41,9 @@ export function MonochromeBackgroundRemover() {
   const [imgDimensions, setImgDimensions] = useState({ w: 0, h: 0 });
 
   // --- STATE: Настройки ---
-  const [targetColors, setTargetColors] = useState<Record<ProcessingMode, string>>({
-    'remove': '#ffffff',
-    'keep': '#ffffff',
-    'flood-clear': '#000000'
-  });
+  // Теперь у нас два независимых цвета, общих для всех режимов
+  const [targetColor, setTargetColor] = useState('#ffffff');   // Цвет фона (для удаления)
+  const [contourColor, setContourColor] = useState('#000000'); // Цвет контура (для заливки и окраски)
 
   const [tolerances, setTolerances] = useState<Record<ProcessingMode, number>>({
     'remove': 20,
@@ -50,9 +55,9 @@ export function MonochromeBackgroundRemover() {
   const [processingMode, setProcessingMode] = useState<ProcessingMode>('remove');
 
   // --- STATE: Инструменты постобработки ---
-  const [edgeChoke, setEdgeChoke] = useState(0); // Сжатие (Erode)
-  const [edgeBlur, setEdgeBlur] = useState(0);   // Смягчение (Blur)
-  const [edgePaint, setEdgePaint] = useState(0); // Окрашивание (Paint) - НОВОЕ
+  const [edgeChoke, setEdgeChoke] = useState(0); // Сжатие
+  const [edgeBlur, setEdgeBlur] = useState(0);   // Смягчение
+  const [edgePaint, setEdgePaint] = useState(0); // Окрашивание
 
   // Точки заливки
   const [floodPoints, setFloodPoints] = useState<Point[]>([]);
@@ -110,18 +115,8 @@ export function MonochromeBackgroundRemover() {
     return null;
   };
 
-  // -------------------------------------------------------------------------
-  // Смена режима и цвета
-  // -------------------------------------------------------------------------
   const handleModeChange = (mode: ProcessingMode) => {
     setProcessingMode(mode);
-  };
-
-  const handleColorChange = (newColor: string) => {
-    setTargetColors(prev => ({
-      ...prev,
-      [processingMode]: newColor
-    }));
   };
 
   const handleToleranceChange = (value: number) => {
@@ -209,20 +204,29 @@ export function MonochromeBackgroundRemover() {
         const width = canvas.width;
         const height = canvas.height;
 
-        const currentTargetHex = targetColors[processingMode];
-        const targetRGB = hexToRgb(currentTargetHex);
+        // Цвета
+        const targetRGB = hexToRgb(targetColor);
+        const contourRGB = hexToRgb(contourColor);
 
-        if (!targetRGB) { setIsProcessing(false); return; }
+        if (!targetRGB || !contourRGB) { setIsProcessing(false); return; }
 
         const maxDist = 441.67;
         const currentTolerance = tolerances[processingMode];
         const tolVal = (currentTolerance / 100) * maxDist;
         const smoothVal = (smoothness / 100) * maxDist;
 
-        const getDist = (i: number) => Math.sqrt(
+        // Функция дистанции до TargetColor (для удаления)
+        const getDistToTarget = (i: number) => Math.sqrt(
           (data[i] - targetRGB.r) ** 2 +
           (data[i + 1] - targetRGB.g) ** 2 +
           (data[i + 2] - targetRGB.b) ** 2
+        );
+
+        // Функция дистанции до ContourColor (для flood-clear барьера)
+        const getDistToContour = (i: number) => Math.sqrt(
+          (data[i] - contourRGB.r) ** 2 +
+          (data[i + 1] - contourRGB.g) ** 2 +
+          (data[i + 2] - contourRGB.b) ** 2
         );
 
         // Создаем буфер альфа-канала
@@ -253,11 +257,12 @@ export function MonochromeBackgroundRemover() {
               visited[idx] = 1;
 
               const ptr = idx * 4;
-              const dist = getDist(ptr);
+              // Для flood-clear используем ContourColor как границу
+              const dist = getDistToContour(ptr);
 
-              if (dist <= tolVal) continue;
+              if (dist <= tolVal) continue; // Останавливаемся на контуре
 
-              alphaChannel[idx] = 0;
+              alphaChannel[idx] = 0; // Делаем прозрачным
 
               if (x > 0) stack.push(x - 1, y);
               if (x < width - 1) stack.push(x + 1, y);
@@ -266,8 +271,9 @@ export function MonochromeBackgroundRemover() {
             }
           });
         } else {
+          // Remove / Keep используют TargetColor
           for (let i = 0, idx = 0; i < data.length; i += 4, idx++) {
-            const dist = getDist(i);
+            const dist = getDistToTarget(i);
             let alpha = 255;
 
             if (processingMode === 'remove') {
@@ -348,15 +354,13 @@ export function MonochromeBackgroundRemover() {
         }
 
         // --- ШАГ 4: Окрашивание краев (Edge Paint) ---
-        // Находим границы (где альфа > 0, но рядом альфа == 0) и красим их в targetRGB
+        // Используем contourRGB для закраски
         if (edgePaint > 0) {
           const radius = edgePaint;
-          // Работаем напрямую с RGB данными (data), но проверяем маску alphaChannel
           for (let y = 0; y < height; y++) {
             for (let x = 0; x < width; x++) {
               const idx = y * width + x;
-              // Если пиксель полностью прозрачный (фон), не трогаем его (или трогаем? Обычно ореол на объекте)
-              // Ореолы находятся на видимой части.
+              // Красим только если это часть объекта (alpha > 0)
               if (alphaChannel[idx] === 0) continue;
 
               let isEdge = false;
@@ -368,7 +372,6 @@ export function MonochromeBackgroundRemover() {
                   const nx = x + kx;
                   if (nx >= 0 && nx < width && ny >= 0 && ny < height) {
                     const nIdx = ny * width + nx;
-                    // Если сосед прозрачный, значит этот пиксель граничный
                     if (alphaChannel[nIdx] === 0) {
                       isEdge = true;
                       break checkEdge;
@@ -379,10 +382,11 @@ export function MonochromeBackgroundRemover() {
 
               if (isEdge) {
                 const ptr = idx * 4;
-                data[ptr] = targetRGB.r;
-                data[ptr + 1] = targetRGB.g;
-                data[ptr + 2] = targetRGB.b;
-                // Альфу оставляем как есть (или можно делать 255, но blur уже отработал)
+                data[ptr] = contourRGB.r;
+                data[ptr + 1] = contourRGB.g;
+                data[ptr + 2] = contourRGB.b;
+                // Делаем пиксель полностью непрозрачным, чтобы перекрыть ореол
+                alphaChannel[idx] = 255;
               }
             }
           }
@@ -398,7 +402,7 @@ export function MonochromeBackgroundRemover() {
         setIsProcessing(false);
       }, 50);
     };
-  }, [originalUrl, targetColors, tolerances, smoothness, imgDimensions, processingMode, floodPoints, edgeChoke, edgeBlur, edgePaint]);
+  }, [originalUrl, targetColor, contourColor, tolerances, smoothness, imgDimensions, processingMode, floodPoints, edgeChoke, edgeBlur, edgePaint]);
 
   useEffect(() => {
     if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
@@ -408,7 +412,7 @@ export function MonochromeBackgroundRemover() {
     }, 100);
 
     return () => { if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current); }
-  }, [originalUrl, targetColors, tolerances, smoothness, processingMode, floodPoints, edgeChoke, edgeBlur, edgePaint]);
+  }, [originalUrl, targetColor, contourColor, tolerances, smoothness, processingMode, floodPoints, edgeChoke, edgeBlur, edgePaint]);
 
   useEffect(() => {
     if (manualTrigger > 0 && processingMode === 'flood-clear') {
@@ -428,6 +432,7 @@ export function MonochromeBackgroundRemover() {
     img.src = url;
 
     img.onload = () => {
+      // 1. Определяем цвет пикселя (0,0)
       const canvas = document.createElement('canvas');
       canvas.width = 1;
       canvas.height = 1;
@@ -435,12 +440,12 @@ export function MonochromeBackgroundRemover() {
       if (ctx) {
         ctx.drawImage(img, 0, 0);
         const p = ctx.getImageData(0, 0, 1, 1).data;
-        const topLeftColor = rgbToHex(p[0], p[1], p[2]);
+        const detectedColor = rgbToHex(p[0], p[1], p[2]);
 
-        setTargetColors(prev => ({
-          ...prev,
-          'remove': topLeftColor
-        }));
+        // 2. Устанавливаем TargetColor (фон)
+        setTargetColor(detectedColor);
+        // 3. Устанавливаем ContourColor (инверсия)
+        setContourColor(invertHex(detectedColor));
       }
 
       setOriginalUrl(url);
@@ -572,14 +577,13 @@ export function MonochromeBackgroundRemover() {
     i.onload = () => {
       ctx.drawImage(i, -Math.floor(x), -Math.floor(y));
       const p = ctx.getImageData(0, 0, 1, 1).data;
-      handleColorChange(rgbToHex(p[0], p[1], p[2]));
+      // Пипетка меняет целевой цвет (фон)
+      setTargetColor(rgbToHex(p[0], p[1], p[2]));
     }
   };
 
   const removeLastPoint = () => setFloodPoints(prev => prev.slice(0, -1));
   const clearAllPoints = () => setFloodPoints([]);
-
-  const currentActiveColor = targetColors[processingMode];
 
   return (
     <div className="flex h-screen w-full bg-zinc-50 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 overflow-hidden font-sans">
@@ -628,20 +632,43 @@ export function MonochromeBackgroundRemover() {
               </div>
 
               <div className="space-y-2">
-                {/* ИЗМЕНЕНИЕ: Общее название для всех режимов */}
-                <label className="block text-xs font-bold uppercase text-zinc-400">Цвет (Цель / Контур / Окраска)</label>
-                <div className="flex gap-3 items-center">
-                  <div className="w-12 h-12 rounded border cursor-crosshair overflow-hidden relative group dark:border-zinc-700">
-                    <img src={originalUrl} className="w-full h-full object-cover" onClick={handleEyedropper} alt="picker" />
+                <label className="block text-xs font-bold uppercase text-zinc-400">Цвета</label>
+
+                {/* Выбор цвета фона (Целевой) */}
+                <div className="flex flex-col gap-2">
+                  <div className="flex gap-3 items-center">
+                    <div className="w-8 h-8 rounded border cursor-crosshair overflow-hidden relative group dark:border-zinc-700 flex-shrink-0">
+                      <img src={originalUrl} className="w-full h-full object-cover" onClick={handleEyedropper} alt="picker" />
+                    </div>
+                    <div className="flex-1 flex items-center gap-2 p-2 border rounded bg-zinc-50 dark:bg-zinc-800 dark:border-zinc-700">
+                      <input
+                        type="color"
+                        value={targetColor}
+                        onChange={e => setTargetColor(e.target.value)}
+                        className="w-6 h-6 bg-transparent border-none cursor-pointer"
+                      />
+                      <div className="flex flex-col">
+                        <span className="font-bold text-[10px] uppercase text-zinc-500">Цель (Фон)</span>
+                        <span className="font-mono text-xs font-bold uppercase">{targetColor}</span>
+                      </div>
+                    </div>
                   </div>
-                  <div className="flex-1 flex items-center gap-2 p-2 border rounded bg-zinc-50 dark:bg-zinc-800 dark:border-zinc-700">
-                    <input
-                      type="color"
-                      value={currentActiveColor}
-                      onChange={e => handleColorChange(e.target.value)}
-                      className="w-8 h-8 bg-transparent border-none cursor-pointer"
-                    />
-                    <span className="font-mono text-xs font-bold uppercase">{currentActiveColor}</span>
+
+                  {/* Выбор цвета контура */}
+                  <div className="flex gap-3 items-center">
+                    <div className="w-8 h-8 flex-shrink-0" /> {/* Spacer */}
+                    <div className="flex-1 flex items-center gap-2 p-2 border rounded bg-zinc-50 dark:bg-zinc-800 dark:border-zinc-700">
+                      <input
+                        type="color"
+                        value={contourColor}
+                        onChange={e => setContourColor(e.target.value)}
+                        className="w-6 h-6 bg-transparent border-none cursor-pointer"
+                      />
+                      <div className="flex flex-col">
+                        <span className="font-bold text-[10px] uppercase text-zinc-500">Контур / Окраска</span>
+                        <span className="font-mono text-xs font-bold uppercase">{contourColor}</span>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -692,7 +719,6 @@ export function MonochromeBackgroundRemover() {
                     <input type="range" min="0" max="5" step="1" value={edgeBlur} onChange={e => setEdgeBlur(Number(e.target.value))} className="w-full h-1.5 bg-zinc-200 rounded-lg appearance-none cursor-pointer dark:bg-zinc-600 accent-blue-600" />
                   </div>
 
-                  {/* ИЗМЕНЕНИЕ: Новый инструмент Окрашивание */}
                   <div>
                     <div className="flex justify-between text-[10px] mb-1 text-zinc-500">
                       <span>Окрашивание (Paint)</span>
