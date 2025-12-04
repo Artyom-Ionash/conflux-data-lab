@@ -5,43 +5,48 @@
 ```
 conflux-data-lab/
 │
-├── app/                          # Next.js App Router
-│   ├── components/              # React компоненты
-│   │   ├── layout/             # Компоненты макета
-│   │   │   ├── Header.tsx      # Шапка сайта
-│   │   │   └── Footer.tsx      # Подвал сайта
-│   │   ├── tools/              # Компоненты инструментов
-│   │   │   ├── ToolCard.tsx    # Карточка инструмента
-│   │   │   ├── ToolGrid.tsx    # Сетка инструментов
-│   │   │   └── json-to-csv/    # Пример инструмента
-│   │   │       └── JsonToCsvConverter.tsx
-│   │   └── ui/                 # UI компоненты
-│   │       ├── Card.tsx        # Карточка
-│   │       └── Badge.tsx       # Бейдж/тег
+├── app/                                        # Next.js App Router
+│   ├── components/                             # React компоненты
+│   │   ├── layout/                             # Компоненты макета
+│   │   │   ├── Header.tsx                      # Шапка сайта
+│   │   │   └── Footer.tsx                      # Подвал сайта
+│   │   ├── tools/                              # Компоненты инструментов
+│   │   │   ├── ToolCard.tsx                    # Карточка инструмента
+│   │   │   ├── ToolGrid.tsx                    # Сетка инструментов
+│   │   │   ├── json-to-csv/                    # Инструмент конвертации
+│   │   │   │   └── JsonToCsvConverter.tsx
+│   │   │   ├── monochrome-remover/             # Инструмент удаления фона
+│   │   │   │   └── MonochromeBackgroundRemover.tsx
+│   │   │   └── vertical-aligner/               # Инструмент склейки изображений
+│   │   │       └── VerticalImageAligner.tsx
+│   │   └── ui/                                 # UI компоненты
+│   │       ├── Canvas.tsx                      # Универсальное полотно (Zoom/Pan/Theme)
+│   │       ├── Card.tsx                        # Карточка
+│   │       └── Badge.tsx                       # Бейдж/тег
 │   │
-│   ├── tools/                  # Маршруты инструментов
-│   │   └── [category]/         # Динамический маршрут категории
-│   │       ├── page.tsx        # Страница категории
-│   │       └── [toolId]/       # Динамический маршрут инструмента
-│   │           └── page.tsx   # Страница инструмента
+│   ├── tools/                                  # Маршруты инструментов
+│   │   └── [category]/                         # Динамический маршрут категории
+│   │       ├── page.tsx                        # Страница категории
+│   │       └── [toolId]/                       # Динамический маршрут инструмента
+│   │           └── page.tsx                    # Страница инструмента
 │   │
-│   ├── layout.tsx              # Корневой layout
-│   ├── page.tsx                # Главная страница
-│   └── globals.css             # Глобальные стили
+│   ├── layout.tsx                              # Корневой layout
+│   ├── page.tsx                                # Главная страница
+│   └── globals.css                             # Глобальные стили
 │
-├── lib/                        # Библиотека и утилиты
+├── lib/                                        # Библиотека и утилиты
 │   ├── config/
-│   │   └── tools.ts           # Конфигурация всех инструментов
+│   │   └── tools.ts                            # Конфигурация всех инструментов
 │   ├── types/
-│   │   └── tools.ts           # TypeScript типы
+│   │   └── tools.ts                            # TypeScript типы
 │   └── utils/
-│       └── tool-loader.tsx    # Загрузчик компонентов
+│       └── tool-loader.tsx                     # Загрузчик компонентов
 │
-├── public/                     # Статические файлы
+├── public/                                     # Статические файлы
 │
-├── ARCHITECTURE.md            # Детальное описание архитектуры
-├── README.md                  # Основная документация
-└── STRUCTURE.md               # Этот файл
+├── ARCHITECTURE.md                             # Детальное описание архитектуры
+├── README.md                                   # Основная документация
+└── STRUCTURE.md                                # Этот файл
 ```
 
 ## Ключевые особенности структуры
