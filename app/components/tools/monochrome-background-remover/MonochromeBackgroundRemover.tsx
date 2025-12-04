@@ -41,9 +41,8 @@ export function MonochromeBackgroundRemover() {
   const [imgDimensions, setImgDimensions] = useState({ w: 0, h: 0 });
 
   // --- STATE: Настройки ---
-  // Теперь у нас два независимых цвета, общих для всех режимов
-  const [targetColor, setTargetColor] = useState('#ffffff');   // Цвет фона (для удаления)
-  const [contourColor, setContourColor] = useState('#000000'); // Цвет контура (для заливки и окраски)
+  const [targetColor, setTargetColor] = useState('#ffffff');
+  const [contourColor, setContourColor] = useState('#000000');
 
   const [tolerances, setTolerances] = useState<Record<ProcessingMode, number>>({
     'remove': 20,
@@ -55,9 +54,9 @@ export function MonochromeBackgroundRemover() {
   const [processingMode, setProcessingMode] = useState<ProcessingMode>('remove');
 
   // --- STATE: Инструменты постобработки ---
-  const [edgeChoke, setEdgeChoke] = useState(0); // Сжатие
-  const [edgeBlur, setEdgeBlur] = useState(0);   // Смягчение
-  const [edgePaint, setEdgePaint] = useState(0); // Окрашивание
+  const [edgeChoke, setEdgeChoke] = useState(0);
+  const [edgeBlur, setEdgeBlur] = useState(0);
+  const [edgePaint, setEdgePaint] = useState(0);
 
   // Точки заливки
   const [floodPoints, setFloodPoints] = useState<Point[]>([]);
@@ -204,7 +203,6 @@ export function MonochromeBackgroundRemover() {
         const width = canvas.width;
         const height = canvas.height;
 
-        // Цвета
         const targetRGB = hexToRgb(targetColor);
         const contourRGB = hexToRgb(contourColor);
 
@@ -215,24 +213,20 @@ export function MonochromeBackgroundRemover() {
         const tolVal = (currentTolerance / 100) * maxDist;
         const smoothVal = (smoothness / 100) * maxDist;
 
-        // Функция дистанции до TargetColor (для удаления)
         const getDistToTarget = (i: number) => Math.sqrt(
           (data[i] - targetRGB.r) ** 2 +
           (data[i + 1] - targetRGB.g) ** 2 +
           (data[i + 2] - targetRGB.b) ** 2
         );
 
-        // Функция дистанции до ContourColor (для flood-clear барьера)
         const getDistToContour = (i: number) => Math.sqrt(
           (data[i] - contourRGB.r) ** 2 +
           (data[i + 1] - contourRGB.g) ** 2 +
           (data[i + 2] - contourRGB.b) ** 2
         );
 
-        // Создаем буфер альфа-канала
         const alphaChannel = new Uint8Array(width * height);
 
-        // --- ШАГ 1: Генерация маски (Альфа) ---
         if (processingMode === 'flood-clear') {
           if (floodPoints.length === 0) {
             setProcessedUrl(originalUrl);
@@ -257,12 +251,11 @@ export function MonochromeBackgroundRemover() {
               visited[idx] = 1;
 
               const ptr = idx * 4;
-              // Для flood-clear используем ContourColor как границу
               const dist = getDistToContour(ptr);
 
-              if (dist <= tolVal) continue; // Останавливаемся на контуре
+              if (dist <= tolVal) continue;
 
-              alphaChannel[idx] = 0; // Делаем прозрачным
+              alphaChannel[idx] = 0;
 
               if (x > 0) stack.push(x - 1, y);
               if (x < width - 1) stack.push(x + 1, y);
@@ -271,7 +264,6 @@ export function MonochromeBackgroundRemover() {
             }
           });
         } else {
-          // Remove / Keep используют TargetColor
           for (let i = 0, idx = 0; i < data.length; i += 4, idx++) {
             const dist = getDistToTarget(i);
             let alpha = 255;
@@ -295,7 +287,6 @@ export function MonochromeBackgroundRemover() {
           }
         }
 
-        // --- ШАГ 2: Сжатие краев (Erode) ---
         if (edgeChoke > 0) {
           const erodedBuffer = new Uint8Array(alphaChannel);
           const radius = edgeChoke;
@@ -303,7 +294,6 @@ export function MonochromeBackgroundRemover() {
             for (let x = 0; x < width; x++) {
               const idx = y * width + x;
               if (alphaChannel[idx] === 0) continue;
-
               let shouldErode = false;
               checkNeighbors:
               for (let ky = -radius; ky <= radius; ky++) {
@@ -326,11 +316,9 @@ export function MonochromeBackgroundRemover() {
           alphaChannel.set(erodedBuffer);
         }
 
-        // --- ШАГ 3: Размытие краев (Blur) ---
         if (edgeBlur > 0) {
           const blurredBuffer = new Uint8Array(alphaChannel);
           const radius = Math.max(1, edgeBlur);
-
           for (let y = 0; y < height; y++) {
             for (let x = 0; x < width; x++) {
               const idx = y * width + x;
@@ -341,8 +329,7 @@ export function MonochromeBackgroundRemover() {
                   const ny = y + ky;
                   const nx = x + kx;
                   if (nx >= 0 && nx < width && ny >= 0 && ny < height) {
-                    const nIdx = ny * width + nx;
-                    sum += alphaChannel[nIdx];
+                    sum += alphaChannel[ny * width + nx];
                     count++;
                   }
                 }
@@ -353,14 +340,11 @@ export function MonochromeBackgroundRemover() {
           alphaChannel.set(blurredBuffer);
         }
 
-        // --- ШАГ 4: Окрашивание краев (Edge Paint) ---
-        // Используем contourRGB для закраски
         if (edgePaint > 0) {
           const radius = edgePaint;
           for (let y = 0; y < height; y++) {
             for (let x = 0; x < width; x++) {
               const idx = y * width + x;
-              // Красим только если это часть объекта (alpha > 0)
               if (alphaChannel[idx] === 0) continue;
 
               let isEdge = false;
@@ -385,14 +369,11 @@ export function MonochromeBackgroundRemover() {
                 data[ptr] = contourRGB.r;
                 data[ptr + 1] = contourRGB.g;
                 data[ptr + 2] = contourRGB.b;
-                // Делаем пиксель полностью непрозрачным, чтобы перекрыть ореол
-                alphaChannel[idx] = 255;
               }
             }
           }
         }
 
-        // --- Финальная сборка ---
         for (let i = 0, idx = 0; i < data.length; i += 4, idx++) {
           data[i + 3] = alphaChannel[idx];
         }
@@ -406,11 +387,9 @@ export function MonochromeBackgroundRemover() {
 
   useEffect(() => {
     if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
-
     debounceTimerRef.current = setTimeout(() => {
       if (originalUrl) processImage();
     }, 100);
-
     return () => { if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current); }
   }, [originalUrl, targetColor, contourColor, tolerances, smoothness, processingMode, floodPoints, edgeChoke, edgeBlur, edgePaint]);
 
@@ -432,7 +411,6 @@ export function MonochromeBackgroundRemover() {
     img.src = url;
 
     img.onload = () => {
-      // 1. Определяем цвет пикселя (0,0)
       const canvas = document.createElement('canvas');
       canvas.width = 1;
       canvas.height = 1;
@@ -441,10 +419,7 @@ export function MonochromeBackgroundRemover() {
         ctx.drawImage(img, 0, 0);
         const p = ctx.getImageData(0, 0, 1, 1).data;
         const detectedColor = rgbToHex(p[0], p[1], p[2]);
-
-        // 2. Устанавливаем TargetColor (фон)
         setTargetColor(detectedColor);
-        // 3. Устанавливаем ContourColor (инверсия)
         setContourColor(invertHex(detectedColor));
       }
 
@@ -481,7 +456,6 @@ export function MonochromeBackgroundRemover() {
   const handleCanvasPointerDown = (e: React.PointerEvent) => {
     if (!originalUrl) return;
     if (e.button !== 0) return;
-
     if (containerRef.current) {
       containerRef.current.setPointerCapture(e.pointerId);
     }
@@ -502,12 +476,10 @@ export function MonochromeBackgroundRemover() {
       }
       return;
     }
-
     if (isPanning) {
       const deltaX = Math.abs(e.clientX - (panStartRef.current.x + offset.x));
       const deltaY = Math.abs(e.clientY - (panStartRef.current.y + offset.y));
       dragDistanceRef.current += deltaX + deltaY;
-
       const newX = e.clientX - panStartRef.current.x;
       const newY = e.clientY - panStartRef.current.y;
       setOffset({ x: newX, y: newY });
@@ -516,12 +488,10 @@ export function MonochromeBackgroundRemover() {
 
   const handlePointerUp = (e: React.PointerEvent) => {
     if (e.button !== 0) return;
-
     if (draggingPointIndex !== null) {
       setDraggingPointIndex(null);
       return;
     }
-
     if (isPanning) {
       setIsPanning(false);
       if (dragDistanceRef.current < 5 && processingMode === 'flood-clear') {
@@ -534,7 +504,6 @@ export function MonochromeBackgroundRemover() {
   };
 
   const handleRunFloodFill = () => setManualTrigger(prev => prev + 1);
-
   const handleDownload = () => {
     if (!processedUrl) return;
     const a = document.createElement('a');
@@ -544,7 +513,6 @@ export function MonochromeBackgroundRemover() {
     a.click();
     document.body.removeChild(a);
   };
-
   const handleResetView = () => {
     if (containerRef.current && imgDimensions.w > 0) {
       const contW = containerRef.current.clientWidth;
@@ -552,13 +520,9 @@ export function MonochromeBackgroundRemover() {
       const scaleFactor = Math.min(1, Math.min((contW - 40) / imgDimensions.w, (contH - 40) / imgDimensions.h));
       const finalScale = scaleFactor > 0 ? scaleFactor : 1;
       setScale(finalScale);
-      setOffset({
-        x: (contW - imgDimensions.w * finalScale) / 2,
-        y: (contH - imgDimensions.h * finalScale) / 2
-      });
+      setOffset({ x: (contW - imgDimensions.w * finalScale) / 2, y: (contH - imgDimensions.h * finalScale) / 2 });
     } else {
-      setScale(1);
-      setOffset({ x: 0, y: 0 });
+      setScale(1); setOffset({ x: 0, y: 0 });
     }
   };
 
@@ -571,27 +535,37 @@ export function MonochromeBackgroundRemover() {
     const canvas = document.createElement('canvas');
     canvas.width = 1; canvas.height = 1;
     const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-    const i = new Image();
-    i.src = originalUrl;
-    i.onload = () => {
-      ctx.drawImage(i, -Math.floor(x), -Math.floor(y));
-      const p = ctx.getImageData(0, 0, 1, 1).data;
-      // Пипетка меняет целевой цвет (фон)
-      setTargetColor(rgbToHex(p[0], p[1], p[2]));
+    if (ctx) {
+      const i = new Image(); i.src = originalUrl;
+      i.onload = () => {
+        ctx.drawImage(i, -Math.floor(x), -Math.floor(y));
+        const p = ctx.getImageData(0, 0, 1, 1).data;
+        setTargetColor(rgbToHex(p[0], p[1], p[2]));
+      }
     }
   };
 
   const removeLastPoint = () => setFloodPoints(prev => prev.slice(0, -1));
   const clearAllPoints = () => setFloodPoints([]);
 
+  const currentActiveColor = targetColor;
+
   return (
-    <div className="flex h-screen w-full bg-zinc-50 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 overflow-hidden font-sans">
+    // ИЗМЕНЕНИЕ 1: fixed inset-0 на корневом элементе
+    <div className="fixed inset-0 flex w-full h-full bg-zinc-50 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 overflow-hidden font-sans">
       <canvas ref={canvasRef} className="hidden" />
 
       {/* ================= ЛЕВАЯ ПАНЕЛЬ ================= */}
-      <aside className="w-[360px] flex-shrink-0 flex flex-col border-r border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 z-10 shadow-xl">
+      <aside className="w-[360px] flex-shrink-0 flex flex-col border-r border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 z-10 shadow-xl h-full">
         <div className="p-5 border-b border-zinc-200 dark:border-zinc-800">
+          <a href="/" className="mb-3 inline-flex items-center gap-2 text-xs font-medium text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-200 transition-colors">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M19 12H5M12 19l-7-7 7-7" />
+            </svg>
+            На главную
+          </a>
+
+
           <h2 className="text-lg font-bold flex items-center gap-2">
             <span className="text-blue-600">Mono</span>Remover
           </h2>
@@ -633,8 +607,6 @@ export function MonochromeBackgroundRemover() {
 
               <div className="space-y-2">
                 <label className="block text-xs font-bold uppercase text-zinc-400">Цвета</label>
-
-                {/* Выбор цвета фона (Целевой) */}
                 <div className="flex flex-col gap-2">
                   <div className="flex gap-3 items-center">
                     <div className="w-8 h-8 rounded border cursor-crosshair overflow-hidden relative group dark:border-zinc-700 flex-shrink-0">
@@ -653,10 +625,8 @@ export function MonochromeBackgroundRemover() {
                       </div>
                     </div>
                   </div>
-
-                  {/* Выбор цвета контура */}
                   <div className="flex gap-3 items-center">
-                    <div className="w-8 h-8 flex-shrink-0" /> {/* Spacer */}
+                    <div className="w-8 h-8 flex-shrink-0" />
                     <div className="flex-1 flex items-center gap-2 p-2 border rounded bg-zinc-50 dark:bg-zinc-800 dark:border-zinc-700">
                       <input
                         type="color"
@@ -665,7 +635,7 @@ export function MonochromeBackgroundRemover() {
                         className="w-6 h-6 bg-transparent border-none cursor-pointer"
                       />
                       <div className="flex flex-col">
-                        <span className="font-bold text-[10px] uppercase text-zinc-500">Контур / Окраска</span>
+                        <span className="font-bold text-[10px] uppercase text-zinc-500">Контур / Окрас</span>
                         <span className="font-mono text-xs font-bold uppercase">{contourColor}</span>
                       </div>
                     </div>
@@ -702,15 +672,13 @@ export function MonochromeBackgroundRemover() {
                   <div className="flex justify-between text-xs mb-1">
                     <span className="font-bold text-zinc-500">Удаление ореолов</span>
                   </div>
-
                   <div className="mb-2">
                     <div className="flex justify-between text-[10px] mb-1 text-zinc-500">
-                      <span>Сжатие краев (Choke)</span>
+                      <span>Сжатие (Choke)</span>
                       <span className="text-blue-500 font-mono">{edgeChoke}px</span>
                     </div>
                     <input type="range" min="0" max="5" step="1" value={edgeChoke} onChange={e => setEdgeChoke(Number(e.target.value))} className="w-full h-1.5 bg-zinc-200 rounded-lg appearance-none cursor-pointer dark:bg-zinc-600 accent-blue-600" />
                   </div>
-
                   <div className="mb-2">
                     <div className="flex justify-between text-[10px] mb-1 text-zinc-500">
                       <span>Смягчение (Blur)</span>
@@ -718,7 +686,6 @@ export function MonochromeBackgroundRemover() {
                     </div>
                     <input type="range" min="0" max="5" step="1" value={edgeBlur} onChange={e => setEdgeBlur(Number(e.target.value))} className="w-full h-1.5 bg-zinc-200 rounded-lg appearance-none cursor-pointer dark:bg-zinc-600 accent-blue-600" />
                   </div>
-
                   <div>
                     <div className="flex justify-between text-[10px] mb-1 text-zinc-500">
                       <span>Окрашивание (Paint)</span>
@@ -746,13 +713,15 @@ export function MonochromeBackgroundRemover() {
       </aside>
 
       {/* ================= ПРАВАЯ ПАНЕЛЬ ================= */}
-      <main className="flex-1 relative flex flex-col bg-zinc-100 dark:bg-[#0a0a0a] overflow-hidden">
+      {/* ИЗМЕНЕНИЕ 2: h-full relative для контейнера правой части */}
+      <main className="flex-1 relative h-full flex flex-col bg-zinc-100 dark:bg-[#0a0a0a] overflow-hidden">
+
+        {/* Кнопки управления (Абсолютное позиционирование поверх холста) */}
         <div className="absolute top-4 left-1/2 -translate-x-1/2 z-30 flex items-center gap-2 bg-white/90 dark:bg-zinc-900/90 backdrop-blur px-3 py-2 rounded-full shadow-lg border border-zinc-200 dark:border-zinc-700">
           <button onClick={() => setIsAutoContrast(!isAutoContrast)} className={`p-2 rounded-full ${isAutoContrast ? 'bg-blue-100 text-blue-600 dark:bg-blue-900 dark:text-blue-300' : 'hover:bg-zinc-100 text-zinc-500'}`}>
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
           </button>
 
-          {/* Индикатор секунд */}
           {isAutoContrast && (
             <div className="flex items-center gap-2 mx-1">
               <input type="range" min="1" max="10" step="1" value={autoContrastPeriod} onChange={e => setAutoContrastPeriod(Number(e.target.value))} className="w-16 h-1 bg-zinc-200 rounded-lg appearance-none cursor-pointer dark:bg-zinc-700 accent-blue-600" />
@@ -765,9 +734,10 @@ export function MonochromeBackgroundRemover() {
           <button onClick={handleResetView} className="text-xs font-mono px-2 text-zinc-500">{(scale * 100).toFixed(0)}%</button>
         </div>
 
+        {/* ИЗМЕНЕНИЕ 3: Холст занимает все доступное пространство (absolute inset-0) */}
         <div
           ref={containerRef}
-          className={`flex-1 relative overflow-hidden select-none transition-colors ease-in-out ${isDarkBackground ? 'bg-[#111]' : 'bg-[#e5e5e5]'}`}
+          className={`absolute inset-0 w-full h-full select-none transition-colors ease-in-out ${isDarkBackground ? 'bg-[#111]' : 'bg-[#e5e5e5]'}`}
           style={{
             transitionDuration: `${transitionDurationMs}ms`,
             cursor: draggingPointIndex !== null ? 'grabbing' : (isPanning ? 'grabbing' : (processingMode === 'flood-clear' ? 'crosshair' : 'grab'))
