@@ -1,9 +1,9 @@
 "use client";
 
 import { Card } from "../../ui/Card";
+import { RangeSlider } from "../../ui/RangeSlider";
 import { RangeVideoPlayer } from "./RangeVideoPlayer";
 import { FrameDiffOverlay } from "./FrameDiffOverlay";
-import { TimeRangeSlider } from "./TimeRangeSlider";
 
 import React, {
   useCallback,
@@ -624,6 +624,20 @@ function useVideoFrameExtraction() {
     setExtractionParams(prev => ({ ...prev, ...updates }));
   }, [videoDuration, effectiveEnd, extractionParams.startTime]);
 
+  // Хелпер для обработки изменений от слайдера (принимает массив)
+  const handleRangeChange = useCallback((values: [number, number]) => {
+    if (!videoDuration) return;
+    const [newStart, newEnd] = values;
+
+    // Оптимизируем вызовы setState, проверяя что реально изменилось
+    if (Math.abs(newStart - extractionParams.startTime) > 0.001) {
+      handleTimeChange("start", newStart);
+    }
+    if (Math.abs(newEnd - effectiveEnd) > 0.001) {
+      handleTimeChange("end", newEnd);
+    }
+  }, [videoDuration, extractionParams.startTime, effectiveEnd, handleTimeChange]);
+
   const getButtonText = () => {
     if (status.isProcessing) {
       return status.currentStep === "extracting"
@@ -654,7 +668,7 @@ function useVideoFrameExtraction() {
     extractFramesAndGenerateGif,
     downloadFrame,
     downloadGif,
-    handleTimeChange,
+    handleRangeChange,
     setExtractionParams,
     setGifParams,
     getButtonText,
@@ -681,7 +695,7 @@ export function VideoFrameExtractor() {
     extractFramesAndGenerateGif,
     downloadFrame,
     downloadGif,
-    handleTimeChange,
+    handleRangeChange,
     setExtractionParams,
     setGifParams,
     getButtonText,
@@ -733,15 +747,31 @@ export function VideoFrameExtractor() {
               </div>
             )}
 
-            {/* Заменили класс "no-select" на стандартный Tailwind класс */}
-            <div className="select-none">
-              <TimeRangeSlider
-                startTime={extractionParams.startTime}
-                endTime={effectiveEnd}
-                duration={videoDuration}
-                onTimeChange={handleTimeChange}
-              />
-            </div>
+            {/* Блок слайдера времени с использованием нового универсального RangeSlider */}
+            {videoDuration && videoDuration > 0 && (
+              <div className="space-y-2 pt-2 select-none">
+                <div className="flex items-center justify-between text-xs font-medium text-zinc-700 dark:text-zinc-300">
+                  <span>Диапазон (сек)</span>
+                  <span>
+                    {extractionParams.startTime.toFixed(2)}s – {effectiveEnd.toFixed(2)}s
+                  </span>
+                </div>
+
+                <RangeSlider
+                  min={0}
+                  max={videoDuration}
+                  step={0.01}
+                  value={[extractionParams.startTime, effectiveEnd]}
+                  onValueChange={handleRangeChange}
+                  minStepsBetweenThumbs={0.1}
+                />
+
+                <div className="flex justify-between text-[10px] text-zinc-500 dark:text-zinc-400">
+                  <span>0s</span>
+                  <span>{videoDuration.toFixed(1)}s</span>
+                </div>
+              </div>
+            )}
 
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
@@ -838,7 +868,7 @@ export function VideoFrameExtractor() {
         </div>
       </Card>
 
-      {/* Спрайт-лист */}
+      {/* Спрайт-лист - ВОССТАНОВЛЕНО */}
       {frames.length > 0 && (
         <Card>
           <div className="space-y-3">

@@ -17,12 +17,17 @@ conflux-data-lab/
 │   │   │   │   └── JsonToCsvConverter.tsx
 │   │   │   ├── monochrome-remover/             # Инструмент удаления фона
 │   │   │   │   └── MonochromeBackgroundRemover.tsx
-│   │   │   └── vertical-aligner/               # Инструмент склейки изображений
-│   │   │       └── VerticalImageAligner.tsx
+│   │   │   ├── vertical-aligner/               # Инструмент склейки изображений
+│   │   │   │   └── VerticalImageAligner.tsx
+│   │   │   └── video-frame-extractor/          # Инструмент извлечения кадров
+│   │   │       ├── FrameDiffOverlay.tsx
+│   │   │       ├── RangeVideoPlayer.tsx
+│   │   │       └── VideoFrameExtractor.tsx
 │   │   └── ui/                                 # UI компоненты
+│   │       ├── Badge.tsx                       # Бейдж/тег
 │   │       ├── Canvas.tsx                      # Универсальное полотно (Zoom/Pan/Theme)
 │   │       ├── Card.tsx                        # Карточка
-│   │       └── Badge.tsx                       # Бейдж/тег
+│   │       └── RangeSlider.tsx                 # Слайдер с двумя курсорами
 │   │
 │   ├── tools/                                  # Маршруты инструментов
 │   │   └── [category]/                         # Динамический маршрут категории
