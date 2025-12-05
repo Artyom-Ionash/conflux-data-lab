@@ -29,6 +29,8 @@ interface CanvasProps {
   contentWidth?: number;
   contentHeight?: number;
   theme?: 'light' | 'dark';
+  // Новый проп для управления прозрачностью затемнения вокруг рабочей области
+  shadowOverlayOpacity?: number;
 }
 
 export const Canvas = forwardRef<CanvasRef, CanvasProps>(
@@ -42,18 +44,14 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(
     contentWidth,
     contentHeight,
     theme: propTheme,
+    shadowOverlayOpacity = 0,
   }, ref) => {
     const containerRef = useRef<HTMLDivElement>(null);
     const contentRef = useRef<HTMLDivElement>(null);
     const zoomLabelRef = useRef<HTMLSpanElement>(null);
 
-    // Храним состояние трансформации в ref (без ререндеров React при каждом кадре)
     const transform = useRef<CanvasTransform>({ scale: initialScale, x: 0, y: 0 });
-
-    // Таймер для отслеживания окончания взаимодействия
     const interactionTimer = useRef<NodeJS.Timeout | null>(null);
-
-    // Флаг для RAF (Request Animation Frame)
     const rafId = useRef<number | null>(null);
 
     const [isPanning, setIsPanning] = useState(false);
@@ -65,25 +63,16 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(
     const panStartRef = useRef<Point | null>(null);
     const transformStartRef = useRef<CanvasTransform | null>(null);
 
-    // --- Core Rendering Logic ---
     const updateDOM = useCallback((isInteracting: boolean) => {
       if (!contentRef.current) return;
       const { x, y, scale } = transform.current;
 
-      // 1. Применяем трансформацию
       contentRef.current.style.transform = `translate3d(${x}px, ${y}px, 0) scale(${scale})`;
 
-      // 2. Управление качеством и производительностью
-      // Если пользователь взаимодействует (зумит/двигает) -> включаем оптимизацию (will-change)
-      // Если остановился -> выключаем, чтобы браузер перерисовал четко
       if (isInteracting) {
         contentRef.current.style.willChange = 'transform';
-        // Во время движения можно форсировать "auto" для скорости, или оставить как есть
-        // contentRef.current.style.imageRendering = 'auto'; 
       } else {
         contentRef.current.style.willChange = 'auto';
-
-        // Логика пикселизации: если масштаб > 400%, включаем пикселизацию
         const renderingMode = scale > 4 ? 'pixelated' : 'auto';
         if (contentRef.current.style.imageRendering !== renderingMode) {
           contentRef.current.style.imageRendering = renderingMode;
@@ -95,38 +84,19 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(
       }
     }, []);
 
-    // --- "Force Reflow" Strategy ---
-    // Это ключевая функция. Она вызывается, когда пользователь перестал зумить.
-    // Она заставляет браузер забыть старые текстуры GPU и перерисовать DOM начисто.
     const stabilizeView = useCallback(() => {
       if (!contentRef.current) return;
-
-      // 1. Убираем оптимизацию GPU, возвращая браузер к стандартному рендерингу
       updateDOM(false);
-
-      // 2. FORCE REFLOW HACK
-      // Чтение свойства offsetHeight заставляет браузер синхронно пересчитать геометрию.
-      // Это предотвращает "залипание" размытых текстур или пустых экранов после гигантского зума.
-      // Мы делаем микро-изменение, чтобы спровоцировать перерисовку, если нужно.
       /* eslint-disable-next-line @typescript-eslint/no-unused-vars */
       const _force = contentRef.current.offsetHeight;
-
-      // В редких случаях (WebKit) этого мало, можно на 1 кадр скрыть/показать, 
-      // но обычно снятие will-change достаточно.
     }, [updateDOM]);
 
-    // Планировщик обновлений
     const scheduleUpdate = useCallback((interacting: boolean) => {
       if (rafId.current) cancelAnimationFrame(rafId.current);
-
       rafId.current = requestAnimationFrame(() => {
         updateDOM(interacting);
       });
-
-      // Сбрасываем таймер стабилизации
       if (interactionTimer.current) clearTimeout(interactionTimer.current);
-
-      // Если это взаимодействие, планируем стабилизацию через 150мс после его окончания
       if (interacting) {
         interactionTimer.current = setTimeout(() => {
           stabilizeView();
@@ -135,21 +105,15 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(
       }
     }, [updateDOM, stabilizeView]);
 
-
     useLayoutEffect(() => {
-      // Инициализация
       updateDOM(false);
     }, [updateDOM]);
 
-
-    // --- Logic: Reset View ---
     const performResetView = useCallback((w?: number, h?: number) => {
       if (!containerRef.current) return;
       const { clientWidth, clientHeight } = containerRef.current;
-
       const targetW = w || contentWidth || 0;
       const targetH = h || contentHeight || 0;
-
       let newScale = 1;
       let newX = 0;
       let newY = 0;
@@ -160,7 +124,6 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(
         const scaleY = (clientHeight - padding) / targetH;
         newScale = Math.min(1, Math.min(scaleX, scaleY));
         if (newScale <= 0) newScale = 1;
-
         newX = (clientWidth - targetW * newScale) / 2;
         newY = (clientHeight - targetH * newScale) / 2;
       } else {
@@ -169,10 +132,9 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(
       }
 
       transform.current = { scale: newScale, x: newX, y: newY };
-      scheduleUpdate(false); // Сразу стабилизируем
+      scheduleUpdate(false);
     }, [contentWidth, contentHeight, scheduleUpdate]);
 
-    // --- API ---
     useImperativeHandle(ref, () => ({
       resetView: (w, h) => performResetView(w, h),
       getTransform: () => transform.current,
@@ -186,7 +148,6 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(
       }
     }));
 
-    // --- Effects ---
     useEffect(() => {
       let interval: NodeJS.Timeout;
       if (isAutoContrast) {
@@ -198,43 +159,32 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(
       return () => clearInterval(interval);
     }, [isAutoContrast, autoContrastPeriod]);
 
-    // --- Event Handlers ---
     const handleWheel = (e: React.WheelEvent) => {
       e.preventDefault();
-      // Если идет паннинг, не зумим (или зумим, по желанию)
       if (!containerRef.current) return;
-
       const rect = containerRef.current.getBoundingClientRect();
       const mouseX = e.clientX - rect.left;
       const mouseY = e.clientY - rect.top;
-
       const zoomIntensity = 0.002;
-      // Ограничиваем дельту, чтобы на тачпадах не улетало слишком быстро
       const delta = Math.max(-100, Math.min(100, e.deltaY));
       const factor = Math.exp(-delta * zoomIntensity);
-
       const current = transform.current;
       let newScale = current.scale * factor;
       newScale = Math.max(minScale, Math.min(newScale, maxScale));
-
       const scaleRatio = newScale / current.scale;
       const newX = mouseX - (mouseX - current.x) * scaleRatio;
       const newY = mouseY - (mouseY - current.y) * scaleRatio;
-
       transform.current = { scale: newScale, x: newX, y: newY };
-
-      // Вызываем обновление с флагом "interacting = true"
       scheduleUpdate(true);
     };
 
     const handlePointerDown = (e: React.PointerEvent) => {
-      if (e.button === 1) { // Middle button
+      if (e.button === 1) {
         e.preventDefault();
         if (containerRef.current) containerRef.current.setPointerCapture(e.pointerId);
         setIsPanning(true);
         panStartRef.current = { x: e.clientX, y: e.clientY };
         transformStartRef.current = { ...transform.current };
-        // Включаем режим взаимодействия (GPU слой)
         scheduleUpdate(true);
       }
     };
@@ -243,10 +193,8 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(
       if (isPanning && panStartRef.current && transformStartRef.current) {
         const dx = e.clientX - panStartRef.current.x;
         const dy = e.clientY - panStartRef.current.y;
-
         transform.current.x = transformStartRef.current.x + dx;
         transform.current.y = transformStartRef.current.y + dy;
-
         scheduleUpdate(true);
       }
     };
@@ -256,13 +204,10 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(
         setIsPanning(false);
         panStartRef.current = null;
         transformStartRef.current = null;
-        // Завершаем взаимодействие -> стабилизация через таймер сработает сама
-        // Но можно вызвать принудительно таймер на 0
-        scheduleUpdate(true); // Таймер запустит стабилизацию
+        scheduleUpdate(true);
       }
     };
 
-    // --- Styles ---
     const isDark = activeTheme === 'dark';
     const bgClass = isDark ? 'bg-[#111]' : 'bg-[#e5e5e5]';
     const gridOpacity = isDark ? 'opacity-10' : 'opacity-30';
@@ -284,7 +229,6 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(
           transitionDuration: `${transitionDuration}ms`
         }}
       >
-        {/* Toolbar */}
         <div className="absolute top-4 left-1/2 -translate-x-1/2 z-30 flex items-center gap-2 bg-white/90 dark:bg-zinc-900/90 backdrop-blur px-3 py-2 rounded-full shadow-lg border border-zinc-200 dark:border-zinc-700">
           <button onClick={() => { setIsAutoContrast(false); setInternalTheme(prev => prev === 'dark' ? 'light' : 'dark'); }} className="p-2 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-500 transition-colors">
             {isDark ? "🌙" : "☀️"}
@@ -307,18 +251,32 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(
 
         <div className={`absolute inset-0 pointer-events-none transition-opacity ease-in-out ${gridOpacity}`} style={{ transitionDuration: `${transitionDuration}ms`, backgroundImage: gridPattern, backgroundSize: '20px 20px', zIndex: 0 }} />
 
-        {/* Content Wrapper */}
         <div
           ref={contentRef}
           className="absolute top-0 left-0 origin-top-left z-10"
           style={{
-            // Начальные стили. Остальное управляется через updateDOM
             transform: `translate3d(${initialScale}px, 0px, 0) scale(${initialScale})`,
-            // backfaceVisibility помогает избежать мерцания в некоторых браузерах
             backfaceVisibility: 'hidden',
           }}
         >
-          {children}
+          {/* Shadow Overlay / Граница рабочей области */}
+          {!!contentWidth && !!contentHeight && shadowOverlayOpacity > 0 && (
+            <div
+              className="absolute top-0 left-0 pointer-events-none"
+              style={{
+                width: contentWidth,
+                height: contentHeight,
+                // Создаем "внешнюю" тень через box-shadow, выходящую за пределы контейнера
+                boxShadow: `0 0 0 50000px rgba(0,0,0,${shadowOverlayOpacity})`,
+                zIndex: 0 // Помещаем под контент (children будут иметь z-index context по умолчанию или выше)
+              }}
+            />
+          )}
+
+          {/* User Content */}
+          <div className="relative z-10">
+            {children}
+          </div>
         </div>
 
         {isLoading && (

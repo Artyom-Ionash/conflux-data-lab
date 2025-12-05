@@ -723,13 +723,14 @@ export function VerticalImageAligner() {
           isLoading={isExporting}
           contentWidth={bounds.width}
           contentHeight={bounds.height}
+          shadowOverlayOpacity={images.length ? 0.5 : 0}
         >
           <div
             className="relative"
             style={{
               width: bounds.width,
               height: bounds.height,
-              boxShadow: images.length ? '0 0 0 50000px rgba(0,0,0,0.5)' : 'none'
+              // Shadow managed by Canvas component now
             }}
           >
             {/* Checkerboard Pattern for Transparency */}

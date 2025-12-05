@@ -421,13 +421,14 @@ export function MonochromeBackgroundRemover() {
             isLoading={isProcessing}
             contentWidth={imgDimensions.w}
             contentHeight={imgDimensions.h}
+            shadowOverlayOpacity={originalUrl ? 0.8 : 0}
           >
             <div
               className="relative origin-top-left"
               style={{
                 width: imgDimensions.w,
                 height: imgDimensions.h,
-                boxShadow: originalUrl ? '0 0 0 50000px rgba(0,0,0,0.8)' : 'none'
+                // Shadow managed by Canvas
               }}
             >
               {/* HIDDEN SOURCE CANVAS */}
