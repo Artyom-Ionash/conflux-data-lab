@@ -1,11 +1,15 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { ExtractedFrame } from "./types";
 
 interface FrameDiffOverlayProps {
   frames: ExtractedFrame[];
   isExtracting: boolean;
+}
+
+interface ExtractedFrame {
+  time: number;
+  dataUrl: string;
 }
 
 export function FrameDiffOverlay({ frames, isExtracting }: FrameDiffOverlayProps) {

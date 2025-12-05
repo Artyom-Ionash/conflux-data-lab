@@ -1,3 +1,0 @@
-export { VideoFrameExtractor } from "./VideoFrameExtractor";
-
-
