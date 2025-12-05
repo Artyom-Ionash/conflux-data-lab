@@ -112,21 +112,6 @@ function FileInput({ onChange }: FileInputProps) {
   );
 }
 
-// --- RECONSTRUCTED MISSING COMPONENTS ---
-
-interface RangeVideoPlayerProps {
-  src: string;
-  startTime: number;
-  endTime: number;
-}
-
-interface TimeRangeSliderProps {
-  startTime: number;
-  endTime: number;
-  duration: number | null;
-  onTimeChange: (type: "start" | "end", value: number) => void;
-}
-
 // --- FEATURE COMPONENTS ---
 
 interface FrameItemProps {
@@ -154,11 +139,6 @@ function FrameItem({ frame, index, onDownload }: FrameItemProps) {
       </div>
     </div>
   );
-}
-
-interface FrameDiffOverlayProps {
-  frames: ExtractedFrame[];
-  isExtracting: boolean;
 }
 
 // --- SPRITE SHEET LOGIC & COMPONENT ---
@@ -753,7 +733,8 @@ export function VideoFrameExtractor() {
               </div>
             )}
 
-            <div className="no-select">
+            {/* Заменили класс "no-select" на стандартный Tailwind класс */}
+            <div className="select-none">
               <TimeRangeSlider
                 startTime={extractionParams.startTime}
                 endTime={effectiveEnd}
@@ -812,14 +793,13 @@ export function VideoFrameExtractor() {
         </Card>
       </div>
 
-      {/* СЕКЦИЯ: Разница кадров (Обновленная логика показа) */}
+      {/* СЕКЦИЯ: Разница кадров */}
       {showDiffOverlay && (
         <Card>
           <div className="space-y-3">
             <h3 className="text-sm font-medium text-zinc-900 dark:text-zinc-100">
               Анализ изменений между кадрами
             </h3>
-            {/* Передаем флаг isExtracting для отображения лоадера поверх старого изображения */}
             <FrameDiffOverlay
               frames={frames}
               isExtracting={status.isProcessing && status.currentStep === 'extracting'}
