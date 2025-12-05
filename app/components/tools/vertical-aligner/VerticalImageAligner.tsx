@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useCallback, useMemo, useState, useRef } from 'react';
+import React, { useCallback, useMemo, useState, useRef, useEffect, ReactNode } from 'react';
 import * as Switch from '@radix-ui/react-switch';
 import * as Slider from '@radix-ui/react-slider';
 import * as ScrollArea from '@radix-ui/react-scroll-area';
@@ -8,9 +8,11 @@ import * as Tooltip from '@radix-ui/react-tooltip';
 import { Canvas, CanvasRef } from '../../ui/Canvas';
 
 // --- Constants (Limits relevant for 2025) ---
-const LIMIT_SAFE_MOBILE = 4096;     // Максимум для широкой поддержки мобильных устройств
-const LIMIT_SAFE_PC = 8192;         // Стандарт для ПК/Консолей
-const LIMIT_MAX_BROWSER = 16384;    // Жесткий лимит HTML5 Canvas (Chrome/Safari)
+const LIMIT_SAFE_MOBILE = 4096;
+const LIMIT_SAFE_PC = 8192;
+const LIMIT_MAX_BROWSER = 16384;
+
+// --- Types & Utilities ---
 
 type AlignImage = {
   id: string;
@@ -55,6 +57,8 @@ interface LabelledSliderProps {
   limitBrowser?: number;
 }
 
+type SliderStatus = 'safe' | 'warning' | 'danger' | 'critical';
+
 const LabelledSlider = ({
   value,
   onChange,
@@ -67,22 +71,47 @@ const LabelledSlider = ({
   limitBrowser
 }: LabelledSliderProps) => {
 
-  // Determine status & message
-  let status: 'safe' | 'warning' | 'danger' | 'critical' = 'safe';
-  let message = '';
+  // Memoize status to satisfy TypeScript strict checks
+  const { status, message } = useMemo<{ status: SliderStatus; message: ReactNode }>(() => {
+    if (limitBrowser && value > limitBrowser) {
+      return {
+        status: 'critical',
+        message: (
+          <>
+            <div className="font-bold text-red-200 mb-1">⛔ Технический лимит браузера</div>
+            <div className="mb-1">Сторона превышает 16 384 пикселя. Canvas не может отрисовать такое изображение, экспорт заблокирован.</div>
+            <div className="opacity-60 text-[10px] uppercase tracking-wider">Ограничение движков (2025 г.)</div>
+          </>
+        )
+      };
+    }
+    if (limitPC && value > limitPC) {
+      return {
+        status: 'danger',
+        message: (
+          <>
+            <div className="font-bold text-orange-200 mb-1">☢️ Только для мощного железа</div>
+            <div className="mb-1">Сторона {'>'} 8K (8192px). Поддерживается только на High-End ПК и современных консолях. Не подходит для мобильных игр.</div>
+            <div className="opacity-60 text-[10px] uppercase tracking-wider">Стандарт 2025 г.</div>
+          </>
+        )
+      };
+    }
+    if (limitMobile && value > limitMobile) {
+      return {
+        status: 'warning',
+        message: (
+          <>
+            <div className="font-bold text-yellow-200 mb-1">⚠️ Риск для мобильных устройств</div>
+            <div className="mb-1">Сторона {'>'} 4K (4096px). Возможны вылеты приложений на бюджетных и старых смартфонах из-за нехватки памяти.</div>
+            <div className="opacity-60 text-[10px] uppercase tracking-wider">Стандарт 2025 г.</div>
+          </>
+        )
+      };
+    }
+    return { status: 'safe', message: null };
+  }, [value, limitBrowser, limitPC, limitMobile]);
 
-  if (limitBrowser && value > limitBrowser) {
-    status = 'critical';
-    message = '⛔ ОШИБКА: Сторона > 16384px. Превышен тех. лимит браузеров (актуально на 2025 г.). Экспорт заблокирован.';
-  } else if (limitPC && value > limitPC) {
-    status = 'danger';
-    message = '☢️ ВНИМАНИЕ: Сторона > 8192px. Поддержка только на High-End ПК и консолях (данные 2025 г.). Не для мобильных игр.';
-  } else if (limitMobile && value > limitMobile) {
-    status = 'warning';
-    message = '⚠️ ПРЕДУПРЕЖДЕНИЕ: Сторона > 4096px. Риск вылета приложений на средних/бюджетных смартфонах (статистика 2025 г.).';
-  }
-
-  // Styles based on status
   const styles = {
     safe: {
       track: 'bg-blue-500 dark:bg-blue-600',
@@ -118,26 +147,25 @@ const LabelledSlider = ({
             {label}
           </label>
 
-          {/* TOOLTIP LOGIC */}
           {status !== 'safe' && (
-            <Tooltip.Provider delayDuration={100}>
+            <Tooltip.Provider delayDuration={0}>
               <Tooltip.Root>
                 <Tooltip.Trigger asChild>
-                  <button className="cursor-help transition-transform hover:scale-110 focus:outline-none">
-                    {status === 'warning' && <span className="text-sm">⚠️</span>}
-                    {status === 'danger' && <span className="text-sm">☢️</span>}
-                    {status === 'critical' && <span className="text-sm">⛔</span>}
+                  <button className="cursor-help transition-transform hover:scale-110 focus:outline-none p-0.5 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800">
+                    {status === 'warning' && <span className="text-sm leading-none">⚠️</span>}
+                    {status === 'danger' && <span className="text-sm leading-none">☢️</span>}
+                    {status === 'critical' && <span className="text-sm leading-none">⛔</span>}
                   </button>
                 </Tooltip.Trigger>
                 <Tooltip.Portal>
                   <Tooltip.Content
-                    className="z-50 max-w-[240px] bg-zinc-800 dark:bg-zinc-100 text-white dark:text-zinc-900 text-xs p-3 rounded-md shadow-xl select-none animate-in fade-in zoom-in-95 duration-200 leading-relaxed font-medium"
+                    className="z-50 max-w-[260px] bg-zinc-900 text-zinc-100 text-xs p-3 rounded-lg shadow-xl select-none animate-in fade-in zoom-in-95 duration-200 leading-relaxed border border-zinc-700"
                     sideOffset={5}
                     side="top"
                     align="start"
                   >
                     {message}
-                    <Tooltip.Arrow className="fill-zinc-800 dark:fill-zinc-100" />
+                    <Tooltip.Arrow className="fill-zinc-900" />
                   </Tooltip.Content>
                 </Tooltip.Portal>
               </Tooltip.Root>
@@ -191,7 +219,8 @@ const DraggableImageSlot = React.memo(({
 
   const [isDragging, setIsDragging] = useState(false);
 
-  const handlePointerDown = (e: React.PointerEvent) => {
+  const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    // Only accept left mouse button (0)
     if (e.button !== 0) return;
     e.stopPropagation();
 
@@ -207,7 +236,8 @@ const DraggableImageSlot = React.memo(({
     const initialOffsetY = img.offsetY;
     const scale = getCanvasScale();
 
-    const handlePointerMove = (moveEvent: PointerEvent) => {
+    // Use globalThis.PointerEvent for the native DOM event listener
+    const handlePointerMove = (moveEvent: globalThis.PointerEvent) => {
       const dx = (moveEvent.clientX - startX) / scale;
       const dy = (moveEvent.clientY - startY) / scale;
       onUpdatePosition(img.id, initialOffsetX + dx, initialOffsetY + dy);
@@ -215,12 +245,13 @@ const DraggableImageSlot = React.memo(({
 
     const handlePointerUp = () => {
       setIsDragging(false);
-      target.removeEventListener('pointermove', handlePointerMove as any);
-      target.removeEventListener('pointerup', handlePointerUp as any);
+      target.removeEventListener('pointermove', handlePointerMove as EventListener);
+      target.removeEventListener('pointerup', handlePointerUp as EventListener);
     };
 
-    target.addEventListener('pointermove', handlePointerMove as any);
-    target.addEventListener('pointerup', handlePointerUp as any);
+    // Cast to EventListener to satisfy TS strict checks
+    target.addEventListener('pointermove', handlePointerMove as EventListener);
+    target.addEventListener('pointerup', handlePointerUp as EventListener);
   };
 
   return (
@@ -274,6 +305,8 @@ DraggableImageSlot.displayName = 'DraggableImageSlot';
 
 export function VerticalImageAligner() {
   const [images, setImages] = useState<AlignImage[]>([]);
+  const imagesRef = useRef(images);
+  useEffect(() => { imagesRef.current = images; }, [images]);
 
   // Dimensions
   const [slotHeight, setSlotHeight] = useState(1);
@@ -301,6 +334,13 @@ export function VerticalImageAligner() {
 
   const activeImageId = useMemo(() => images.find((img) => img.isActive)?.id ?? null, [images]);
 
+  // Cleanup
+  useEffect(() => {
+    return () => {
+      imagesRef.current.forEach(img => URL.revokeObjectURL(img.url));
+    };
+  }, []);
+
   // Composition Bounds & Limits Check
   const { bounds, totalHeight, isCriticalHeight } = useMemo(() => {
     if (!images.length) return { bounds: { width: 1, height: 1 }, totalHeight: 0, isCriticalHeight: false };
@@ -326,6 +366,21 @@ export function VerticalImageAligner() {
       img.id === id ? { ...img, offsetX: x, offsetY: y } : img
     ));
   }, []);
+
+  // Batch Alignment
+  const handleCenterAllX = useCallback(() => {
+    setImages(prev => prev.map(img => ({
+      ...img,
+      offsetX: Math.round((slotWidth - img.naturalWidth) / 2)
+    })));
+  }, [slotWidth]);
+
+  const handleCenterAllY = useCallback(() => {
+    setImages(prev => prev.map(img => ({
+      ...img,
+      offsetY: Math.round((slotHeight - img.naturalHeight) / 2)
+    })));
+  }, [slotHeight]);
 
   const handleActivate = useCallback((id: string) => {
     setImages(prev => prev.map(x => ({ ...x, isActive: x.id === id })));
@@ -405,8 +460,46 @@ export function VerticalImageAligner() {
         ctx.drawImage(img, meta.offsetX, slotY + meta.offsetY, img.width, img.height);
         ctx.restore();
       });
-      const a = document.createElement('a'); a.href = canvas.toDataURL('image/png'); a.download = 'aligned-export.png';
-      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+
+      const atlasData = {
+        meta: {
+          app: "VerticalImageAligner",
+          version: "1.0",
+          size: { w: finalW, h: finalH },
+          scale: 1,
+          generated: new Date().toISOString()
+        },
+        frames: images.reduce((acc, img, index) => {
+          acc[img.name] = {
+            frame: { x: 0, y: index * slotHeight, w: slotWidth, h: slotHeight },
+            spriteSourceSize: { x: Math.round(img.offsetX), y: Math.round(img.offsetY), w: img.naturalWidth, h: img.naturalHeight },
+            sourceSize: { w: slotWidth, h: slotHeight },
+            rotated: false,
+            trimmed: false
+          };
+          return acc;
+        }, {} as Record<string, any>)
+      };
+
+      const pngLink = document.createElement('a');
+      pngLink.href = canvas.toDataURL('image/png');
+      pngLink.download = 'aligned-export.png';
+      document.body.appendChild(pngLink);
+      pngLink.click();
+      document.body.removeChild(pngLink);
+
+      setTimeout(() => {
+        const jsonString = JSON.stringify(atlasData, null, 2);
+        const jsonBlob = new Blob([jsonString], { type: "application/json" });
+        const jsonLink = document.createElement('a');
+        jsonLink.href = URL.createObjectURL(jsonBlob);
+        jsonLink.download = 'aligned-export.json';
+        document.body.appendChild(jsonLink);
+        jsonLink.click();
+        document.body.removeChild(jsonLink);
+        URL.revokeObjectURL(jsonLink.href);
+      }, 100);
+
     } finally { setIsExporting(false); }
   }, [images, slotHeight, slotWidth, bgColorHex, bgOpacity, isCriticalHeight]);
 
@@ -465,12 +558,13 @@ export function VerticalImageAligner() {
                         : 'bg-blue-600 hover:bg-blue-700 disabled:opacity-50 hover:shadow-md'
                       }`}
                   >
-                    {isExporting ? 'Экспорт...' : isCriticalHeight ? 'Размер превышен!' : 'Скачать PNG'}
+                    {isExporting ? 'Экспорт...' : isCriticalHeight ? 'Размер превышен!' : 'Скачать PNG + JSON'}
                   </button>
 
                   {isCriticalHeight && (
                     <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md text-xs leading-relaxed text-red-700 dark:text-red-200">
-                      <strong>Ошибка:</strong> Общая высота {totalHeight}px превышает аппаратный лимит браузера ({LIMIT_MAX_BROWSER}px). Уменьшите высоту слота или количество кадров. (Лимиты актуальны на 2025 г.)
+                      <strong>⛔ ОШИБКА:</strong> Общая высота {totalHeight}px превышает аппаратный лимит браузера ({LIMIT_MAX_BROWSER}px). Уменьшите высоту слота или количество кадров.
+                      <div className="opacity-60 text-[10px] uppercase tracking-wider">Стандарт 2025 г.</div>
                     </div>
                   )}
                 </div>
@@ -552,6 +646,36 @@ export function VerticalImageAligner() {
 
                 {/* --- LAYERS --- */}
                 <div className="space-y-1.5">
+                  <div className="flex items-center justify-between pb-1 px-1">
+                    <span className="text-xs font-bold text-zinc-500 uppercase tracking-wide">Слои</span>
+                    <div className="flex gap-2">
+                      <Tooltip.Provider delayDuration={100}>
+                        <Tooltip.Root>
+                          <Tooltip.Trigger asChild>
+                            <button onClick={handleCenterAllX} className="p-1 hover:bg-zinc-100 dark:hover:bg-zinc-700 rounded text-zinc-500 transition-colors">
+                              <span className="text-xs font-mono font-bold">|X|</span>
+                            </button>
+                          </Tooltip.Trigger>
+                          <Tooltip.Portal>
+                            <Tooltip.Content className="z-50 bg-zinc-800 text-white text-[10px] p-2 rounded mb-1 border border-zinc-700 shadow-xl" side="top">Центрировать все по X</Tooltip.Content>
+                          </Tooltip.Portal>
+                        </Tooltip.Root>
+                      </Tooltip.Provider>
+                      <Tooltip.Provider delayDuration={100}>
+                        <Tooltip.Root>
+                          <Tooltip.Trigger asChild>
+                            <button onClick={handleCenterAllY} className="p-1 hover:bg-zinc-100 dark:hover:bg-zinc-700 rounded text-zinc-500 transition-colors">
+                              <span className="text-xs font-mono font-bold">≡Y≡</span>
+                            </button>
+                          </Tooltip.Trigger>
+                          <Tooltip.Portal>
+                            <Tooltip.Content className="z-50 bg-zinc-800 text-white text-[10px] p-2 rounded mb-1 border border-zinc-700 shadow-xl" side="top">Центрировать все по Y</Tooltip.Content>
+                          </Tooltip.Portal>
+                        </Tooltip.Root>
+                      </Tooltip.Provider>
+                    </div>
+                  </div>
+
                   {images.map((img, i) => (
                     <div key={img.id} draggable onDragStart={(e) => handleDragStart(e, i)} onDragOver={e => e.preventDefault()} onDrop={(e) => handleDrop(e, i)}
                       className={`flex items-center gap-3 p-2.5 text-sm rounded-md border cursor-pointer select-none transition-colors ${img.isActive ? 'bg-blue-50 border-blue-200 text-blue-800 dark:bg-blue-900/30 dark:border-blue-800 dark:text-blue-100 shadow-sm' : 'bg-white dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 hover:border-zinc-300'}`}
@@ -608,7 +732,23 @@ export function VerticalImageAligner() {
               boxShadow: images.length ? '0 0 0 50000px rgba(0,0,0,0.5)' : 'none'
             }}
           >
-            {/* Background */}
+            {/* Checkerboard Pattern for Transparency */}
+            <div
+              className="absolute inset-0 pointer-events-none z-0"
+              style={{
+                backgroundImage: `
+                  linear-gradient(45deg, #ccc 25%, transparent 25%), 
+                  linear-gradient(-45deg, #ccc 25%, transparent 25%), 
+                  linear-gradient(45deg, transparent 75%, #ccc 75%), 
+                  linear-gradient(-45deg, transparent 75%, #ccc 75%)
+                `,
+                backgroundSize: '20px 20px',
+                backgroundPosition: '0 0, 0 10px, 10px -10px, -10px 0px',
+                backgroundColor: 'white'
+              }}
+            />
+
+            {/* User Selected Background Color */}
             <div className="absolute inset-0" style={{ backgroundColor: cssBackgroundColor }} />
 
             {/* RED GRID */}
@@ -654,7 +794,7 @@ export function VerticalImageAligner() {
             ))}
 
             {!images.length && (
-              <div className="absolute inset-0 flex items-center justify-center text-zinc-400">Пустой холст</div>
+              <div className="absolute inset-0 flex items-center justify-center text-zinc-400 bg-white/50 backdrop-blur-sm z-10">Пустой холст</div>
             )}
           </div>
         </Canvas>
