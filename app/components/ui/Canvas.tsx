@@ -29,8 +29,8 @@ interface CanvasProps {
   contentWidth?: number;
   contentHeight?: number;
   theme?: 'light' | 'dark';
-  // Новый проп для управления прозрачностью затемнения вокруг рабочей области
   shadowOverlayOpacity?: number;
+  showTransparencyGrid?: boolean;
 }
 
 export const Canvas = forwardRef<CanvasRef, CanvasProps>(
@@ -45,6 +45,7 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(
     contentHeight,
     theme: propTheme,
     shadowOverlayOpacity = 0,
+    showTransparencyGrid = false,
   }, ref) => {
     const containerRef = useRef<HTMLDivElement>(null);
     const contentRef = useRef<HTMLDivElement>(null);
@@ -214,6 +215,8 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(
     const transitionDuration = isAutoContrast ? (autoContrastPeriod * 1000) * 0.9 : 300;
     const gridPattern = 'linear-gradient(45deg, #888 25%, transparent 25%), linear-gradient(-45deg, #888 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #888 75%), linear-gradient(-45deg, transparent 75%, #888 75%)';
 
+    const hasDimensions = !!contentWidth && !!contentHeight;
+
     return (
       <div
         ref={containerRef}
@@ -251,6 +254,7 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(
 
         <div className={`absolute inset-0 pointer-events-none transition-opacity ease-in-out ${gridOpacity}`} style={{ transitionDuration: `${transitionDuration}ms`, backgroundImage: gridPattern, backgroundSize: '20px 20px', zIndex: 0 }} />
 
+        {/* TRANSFORMATION LAYER */}
         <div
           ref={contentRef}
           className="absolute top-0 left-0 origin-top-left z-10"
@@ -259,23 +263,52 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(
             backfaceVisibility: 'hidden',
           }}
         >
-          {/* Shadow Overlay / Граница рабочей области */}
-          {!!contentWidth && !!contentHeight && shadowOverlayOpacity > 0 && (
+          {/* 1. SHADOW OVERLAY */}
+          {hasDimensions && shadowOverlayOpacity > 0 && (
             <div
               className="absolute top-0 left-0 pointer-events-none"
               style={{
                 width: contentWidth,
                 height: contentHeight,
-                // Создаем "внешнюю" тень через box-shadow, выходящую за пределы контейнера
                 boxShadow: `0 0 0 50000px rgba(0,0,0,${shadowOverlayOpacity})`,
-                zIndex: 0 // Помещаем под контент (children будут иметь z-index context по умолчанию или выше)
+                zIndex: 0
               }}
             />
           )}
 
-          {/* User Content */}
-          <div className="relative z-10">
-            {children}
+          {/* 2. UNIFIED STAGE WRAPPER */}
+          {/* Мы всегда рендерим эту обертку, чтобы React не пересоздавал children (Canvas элементы) при появлении размеров */}
+          <div
+            className="relative"
+            style={{
+              width: hasDimensions ? contentWidth : undefined,
+              height: hasDimensions ? contentHeight : undefined,
+              overflow: hasDimensions ? 'hidden' : 'visible',
+              zIndex: 1
+            }}
+          >
+            {/* 3. TRANSPARENCY GRID */}
+            {hasDimensions && showTransparencyGrid && (
+              <div
+                className="absolute inset-0 pointer-events-none z-0"
+                style={{
+                  backgroundImage: `
+                      linear-gradient(45deg, #ccc 25%, transparent 25%), 
+                      linear-gradient(-45deg, #ccc 25%, transparent 25%), 
+                      linear-gradient(45deg, transparent 75%, #ccc 75%), 
+                      linear-gradient(-45deg, transparent 75%, #ccc 75%)
+                    `,
+                  backgroundSize: '20px 20px',
+                  backgroundPosition: '0 0, 0 10px, 10px -10px, -10px 0px',
+                  backgroundColor: 'white'
+                }}
+              />
+            )}
+
+            {/* CONTENT PRESERVATION WRAPPER */}
+            <div className="relative z-10 w-full h-full">
+              {children}
+            </div>
           </div>
         </div>
 

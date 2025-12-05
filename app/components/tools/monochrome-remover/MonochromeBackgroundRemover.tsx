@@ -62,14 +62,12 @@ export function MonochromeBackgroundRemover() {
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   // Canvas Refs:
-  // sourceCanvas - хранит оригинал (скрыт)
-  // previewCanvas - отображает результат (виден)
   const sourceCanvasRef = useRef<HTMLCanvasElement>(null);
   const previewCanvasRef = useRef<HTMLCanvasElement>(null);
 
   // --- ЭФФЕКТЫ ---
 
-  // 1. Загрузка изображения в Source Canvas
+  // 1. Загрузка изображения
   const loadOriginalToCanvas = (url: string) => {
     const img = new Image();
     img.crossOrigin = "Anonymous";
@@ -77,7 +75,6 @@ export function MonochromeBackgroundRemover() {
     img.onload = () => {
       setImgDimensions({ w: img.width, h: img.height });
 
-      // Инициализация Source Canvas
       if (sourceCanvasRef.current) {
         sourceCanvasRef.current.width = img.width;
         sourceCanvasRef.current.height = img.height;
@@ -85,7 +82,6 @@ export function MonochromeBackgroundRemover() {
         ctx?.drawImage(img, 0, 0);
       }
 
-      // Инициализация Preview Canvas (копия оригинала)
       if (previewCanvasRef.current) {
         previewCanvasRef.current.width = img.width;
         previewCanvasRef.current.height = img.height;
@@ -93,21 +89,17 @@ export function MonochromeBackgroundRemover() {
         ctx?.drawImage(img, 0, 0);
       }
 
-      // Сброс зума
       setTimeout(() => workspaceRef.current?.resetView(img.width, img.height), 50);
-
-      // Запуск первой обработки
       processImage();
     };
   };
 
-  // 2. Логика процессинга (Pixel Manipulation)
+  // 2. Логика процессинга
   const processImage = useCallback(() => {
     if (!originalUrl || !sourceCanvasRef.current || !previewCanvasRef.current) return;
 
     setIsProcessing(true);
 
-    // Используем setTimeout, чтобы UI успел показать спиннер загрузки
     setTimeout(() => {
       const sourceCtx = sourceCanvasRef.current!.getContext('2d', { willReadFrequently: true });
       const previewCtx = previewCanvasRef.current!.getContext('2d');
@@ -116,8 +108,6 @@ export function MonochromeBackgroundRemover() {
 
       const width = sourceCanvasRef.current!.width;
       const height = sourceCanvasRef.current!.height;
-
-      // Берем данные из Source (быстро благодаря willReadFrequently)
       const imageData = sourceCtx.getImageData(0, 0, width, height);
       const data = imageData.data;
 
@@ -139,7 +129,6 @@ export function MonochromeBackgroundRemover() {
       // --- ALGORITHM START ---
       if (processingMode === 'flood-clear') {
         if (floodPoints.length === 0) {
-          // Если точек нет, просто рисуем оригинал
           previewCtx.putImageData(imageData, 0, 0);
           setIsProcessing(false);
           return;
@@ -225,18 +214,14 @@ export function MonochromeBackgroundRemover() {
         }
       }
 
-      // Apply Alpha
       for (let i = 0, idx = 0; i < data.length; i += 4, idx++) data[i + 3] = alphaChannel[idx];
 
-      // --- ALGORITHM END ---
-
-      // Прямая отрисовка результата (без Base64!)
       previewCtx.putImageData(imageData, 0, 0);
       setIsProcessing(false);
     }, 10);
   }, [originalUrl, targetColor, contourColor, tolerances, smoothness, processingMode, floodPoints, edgeChoke, edgeBlur, edgePaint]);
 
-  // Debounce for processing
+  // Debounce
   useEffect(() => {
     if (!originalUrl) return;
     if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
@@ -252,14 +237,9 @@ export function MonochromeBackgroundRemover() {
     if (!file) return;
     const url = URL.createObjectURL(file);
     setOriginalUrl(url);
-
-    // Сброс состояния
     setFloodPoints([]);
-
-    // Загрузка
     loadOriginalToCanvas(url);
 
-    // Авто-детект цвета (упрощенно: берем верхний левый пиксель)
     const img = new Image();
     img.src = url;
     img.onload = () => {
@@ -315,7 +295,6 @@ export function MonochromeBackgroundRemover() {
   const handleGlobalPointerUp = () => { if (draggingPointIndex !== null) setDraggingPointIndex(null); };
 
   const handleEyedropper = (e: React.MouseEvent) => {
-    // Пипетка берет цвет из Source Canvas (оригинал)
     if (!sourceCanvasRef.current) return;
     const rect = (e.target as HTMLElement).getBoundingClientRect();
     const x = (e.clientX - rect.left) / rect.width * sourceCanvasRef.current.width;
@@ -333,9 +312,8 @@ export function MonochromeBackgroundRemover() {
 
   return (
     <div className="fixed inset-0 flex w-full h-full bg-zinc-50 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 overflow-hidden font-sans">
-
-      {/* --- SIDEBAR --- */}
       <aside className="w-[360px] flex-shrink-0 flex flex-col border-r border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 z-10 shadow-xl h-full">
+        {/* ... Sidebar content (No changes needed) ... */}
         <div className="p-5 border-b border-zinc-200 dark:border-zinc-800">
           <a href="/" className="mb-3 inline-flex items-center gap-2 text-xs font-medium text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-200 transition-colors">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 12H5M12 19l-7-7 7-7" /></svg> На главную
@@ -367,9 +345,7 @@ export function MonochromeBackgroundRemover() {
               <div className="space-y-2">
                 <div className="flex flex-col gap-2">
                   <div className="flex gap-3 items-center">
-                    {/* Eyedropper Preview from Source Canvas */}
                     <div className="w-8 h-8 rounded border cursor-crosshair overflow-hidden relative group dark:border-zinc-700 flex-shrink-0 bg-white">
-                      {/* We use a tiny separate image for the eyedropper UI button to avoid heavy canvas reads here */}
                       <img src={originalUrl} className="w-full h-full object-cover" onClick={handleEyedropper} alt="picker" />
                     </div>
                     <div className="flex-1 flex items-center gap-2 p-2 border rounded bg-zinc-50 dark:bg-zinc-800 dark:border-zinc-700">
@@ -409,7 +385,6 @@ export function MonochromeBackgroundRemover() {
         </div>
       </aside>
 
-      {/* --- MAIN WORKSPACE --- */}
       <main className="flex-1 relative h-full flex flex-col overflow-hidden">
         <div
           className="flex-1 w-full h-full"
@@ -422,51 +397,45 @@ export function MonochromeBackgroundRemover() {
             contentWidth={imgDimensions.w}
             contentHeight={imgDimensions.h}
             shadowOverlayOpacity={originalUrl ? 0.8 : 0}
+            showTransparencyGrid={true}
           >
-            <div
-              className="relative origin-top-left"
+            {/* HIDDEN SOURCE CANVAS */}
+            <canvas ref={sourceCanvasRef} className="hidden" />
+
+            {/* VISIBLE PREVIEW CANVAS */}
+            <canvas
+              ref={previewCanvasRef}
+              className="block select-none"
+              onPointerDown={handleImagePointerDown}
               style={{
-                width: imgDimensions.w,
-                height: imgDimensions.h,
-                // Shadow managed by Canvas
+                width: '100%',
+                height: '100%',
+                imageRendering: 'pixelated',
+                cursor: processingMode === 'flood-clear' ? 'crosshair' : 'default',
+                display: originalUrl ? 'block' : 'none'
               }}
-            >
-              {/* HIDDEN SOURCE CANVAS */}
-              <canvas ref={sourceCanvasRef} className="hidden" />
+            />
 
-              {/* VISIBLE PREVIEW CANVAS */}
-              <canvas
-                ref={previewCanvasRef}
-                className="block select-none"
-                onPointerDown={handleImagePointerDown}
+            {processingMode === 'flood-clear' && floodPoints.map((pt, i) => (
+              <div
+                key={i}
+                onPointerDown={(e) => handlePointPointerDown(e, i)}
+                className={`absolute z-20 cursor-grab active:cursor-grabbing hover:brightness-125 ${draggingPointIndex === i ? 'brightness-150' : ''}`}
                 style={{
-                  width: '100%',
-                  height: '100%',
-                  imageRendering: 'pixelated',
-                  cursor: processingMode === 'flood-clear' ? 'crosshair' : 'default',
-                  display: originalUrl ? 'block' : 'none'
+                  left: pt.x, top: pt.y, width: '10px', height: '10px',
+                  transform: 'translate(-50%, -50%) scale(calc(1 / var(--canvas-scale)))',
                 }}
-              />
-
-              {processingMode === 'flood-clear' && floodPoints.map((pt, i) => (
-                <div
-                  key={i}
-                  onPointerDown={(e) => handlePointPointerDown(e, i)}
-                  className={`absolute z-20 cursor-grab active:cursor-grabbing hover:brightness-125 ${draggingPointIndex === i ? 'brightness-150' : ''}`}
-                  style={{
-                    left: pt.x, top: pt.y, width: '10px', height: '10px',
-                    transform: 'translate(-50%, -50%) scale(calc(1 / var(--canvas-scale)))',
-                  }}
-                >
-                  <div className="w-full h-full bg-red-500 border border-white rounded-full shadow-[0_0_2px_rgba(0,0,0,0.8)]" />
-                </div>
-              ))}
-
-              {!originalUrl && (
-                <div className="absolute inset-0 flex items-center justify-center text-zinc-400 text-lg opacity-50 whitespace-nowrap border-2 border-dashed border-zinc-500/20 rounded-lg">Нет изображения</div>
-              )}
-            </div>
+              >
+                <div className="w-full h-full bg-red-500 border border-white rounded-full shadow-[0_0_2px_rgba(0,0,0,0.8)]" />
+              </div>
+            ))}
           </Canvas>
+
+          {!originalUrl && (
+            <div className="absolute inset-0 flex items-center justify-center text-zinc-400 text-lg opacity-50 whitespace-nowrap border-2 border-dashed border-zinc-500/20 rounded-lg pointer-events-none">
+              Нет изображения
+            </div>
+          )}
         </div>
       </main>
     </div>

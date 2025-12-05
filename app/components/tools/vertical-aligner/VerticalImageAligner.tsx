@@ -724,81 +724,60 @@ export function VerticalImageAligner() {
           contentWidth={bounds.width}
           contentHeight={bounds.height}
           shadowOverlayOpacity={images.length ? 0.5 : 0}
+          showTransparencyGrid={true}
         >
-          <div
-            className="relative"
-            style={{
-              width: bounds.width,
-              height: bounds.height,
-              // Shadow managed by Canvas component now
-            }}
-          >
-            {/* Checkerboard Pattern for Transparency */}
-            <div
-              className="absolute inset-0 pointer-events-none z-0"
+          {/* User Selected Background Color (Overlays the Canvas Transparency Grid) */}
+          <div className="absolute inset-0" style={{ backgroundColor: cssBackgroundColor }} />
+
+          {/* RED GRID */}
+          {showRedGrid && (
+            <div className="absolute inset-0 pointer-events-none z-50 opacity-50"
               style={{
                 backgroundImage: `
-                  linear-gradient(45deg, #ccc 25%, transparent 25%), 
-                  linear-gradient(-45deg, #ccc 25%, transparent 25%), 
-                  linear-gradient(45deg, transparent 75%, #ccc 75%), 
-                  linear-gradient(-45deg, transparent 75%, #ccc 75%)
-                `,
-                backgroundSize: '20px 20px',
-                backgroundPosition: '0 0, 0 10px, 10px -10px, -10px 0px',
-                backgroundColor: 'white'
+                      linear-gradient(to right, ${redGridColor} 1px, transparent 1px),
+                      linear-gradient(to bottom, ${redGridColor} 1px, transparent 1px)
+                  `,
+                backgroundSize: `${frameStepX}px ${slotHeight}px`,
+                backgroundPosition: `${redGridOffsetX}px ${redGridOffsetY}px`
               }}
             />
+          )}
 
-            {/* User Selected Background Color */}
-            <div className="absolute inset-0" style={{ backgroundColor: cssBackgroundColor }} />
+          {/* GREEN GRID */}
+          {showFrameGrid && (
+            <div className="absolute inset-0 pointer-events-none z-[60] opacity-80"
+              style={{
+                backgroundImage: `
+                      linear-gradient(to right, ${frameBorderColor} 10px, transparent 10px),
+                      linear-gradient(to bottom, ${frameBorderColor} 10px, transparent 10px)
+                   `,
+                backgroundSize: `${frameStepX}px ${slotHeight}px`,
+                backgroundPosition: '-5px -5px'
+              }}
+            />
+          )}
 
-            {/* RED GRID */}
-            {showRedGrid && (
-              <div className="absolute inset-0 pointer-events-none z-50 opacity-50"
-                style={{
-                  backgroundImage: `
-                        linear-gradient(to right, ${redGridColor} 1px, transparent 1px),
-                        linear-gradient(to bottom, ${redGridColor} 1px, transparent 1px)
-                    `,
-                  backgroundSize: `${frameStepX}px ${slotHeight}px`,
-                  backgroundPosition: `${redGridOffsetX}px ${redGridOffsetY}px`
-                }}
-              />
-            )}
-
-            {/* GREEN GRID */}
-            {showFrameGrid && (
-              <div className="absolute inset-0 pointer-events-none z-[60] opacity-80"
-                style={{
-                  backgroundImage: `
-                        linear-gradient(to right, ${frameBorderColor} 10px, transparent 10px),
-                        linear-gradient(to bottom, ${frameBorderColor} 10px, transparent 10px)
-                     `,
-                  backgroundSize: `${frameStepX}px ${slotHeight}px`,
-                  backgroundPosition: '-5px -5px'
-                }}
-              />
-            )}
-
-            {/* Render Slots */}
-            {images.map((img, i) => (
-              <DraggableImageSlot
-                key={img.id}
-                img={img}
-                index={i}
-                slotHeight={slotHeight}
-                slotWidth={slotWidth}
-                getCanvasScale={getCanvasScale}
-                onActivate={handleActivate}
-                onUpdatePosition={handleUpdatePosition}
-              />
-            ))}
-
-            {!images.length && (
-              <div className="absolute inset-0 flex items-center justify-center text-zinc-400 bg-white/50 backdrop-blur-sm z-10">Пустой холст</div>
-            )}
-          </div>
+          {/* Render Slots */}
+          {images.map((img, i) => (
+            <DraggableImageSlot
+              key={img.id}
+              img={img}
+              index={i}
+              slotHeight={slotHeight}
+              slotWidth={slotWidth}
+              getCanvasScale={getCanvasScale}
+              onActivate={handleActivate}
+              onUpdatePosition={handleUpdatePosition}
+            />
+          ))}
         </Canvas>
+
+        {/* Empty State Overlay (Outside Canvas to avoid scaling issues with 1x1 stage) */}
+        {!images.length && (
+          <div className="absolute inset-0 flex items-center justify-center text-zinc-400 bg-white/50 backdrop-blur-sm z-10 pointer-events-none">
+            <span className="bg-white/80 dark:bg-black/80 px-4 py-2 rounded-lg shadow-sm">Пустой холст</span>
+          </div>
+        )}
       </main>
     </div>
   );
