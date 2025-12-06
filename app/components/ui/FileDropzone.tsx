@@ -2,6 +2,7 @@
 
 import React, { useState, useRef, useEffect, ReactNode } from 'react';
 
+// --- Base Component Props ---
 interface FileDropzoneProps {
   onFilesSelected: (files: File[]) => void;
   multiple?: boolean;
@@ -12,6 +13,7 @@ interface FileDropzoneProps {
   children?: ReactNode;
 }
 
+// --- Base Component ---
 export const FileDropzone = ({
   onFilesSelected,
   multiple = false,
@@ -137,7 +139,6 @@ export const FileDropzone = ({
         />
       </div>
 
-      {/* Глобальная индикация перетаскивания */}
       {enableWindowDrop && isDragActive && (
         <div className="fixed inset-0 z-[100] pointer-events-none border-4 border-blue-500/50 bg-blue-500/10 animate-pulse" />
       )}
@@ -145,34 +146,42 @@ export const FileDropzone = ({
   );
 };
 
-// --- Helper Component: Стандартная заглушка для Canvas ---
-interface CanvasFilePlaceholderProps {
+// --- Specialized Component: Full Size Placeholder ---
+// Это "стандартная реализация" для заглушек на весь экран/канвас
+
+interface FileDropzonePlaceholderProps {
   onUpload: (files: File[]) => void;
   multiple?: boolean;
-  text?: string;
-  subText?: string;
+  enableWindowDrop?: boolean;
+  className?: string;
+  title?: string;
+  subTitle?: string;
 }
 
-export const CanvasFilePlaceholder = ({
+export const FileDropzonePlaceholder = ({
   onUpload,
   multiple = false,
-  text = "Перетащите изображения сюда",
-  subText = "или кликните для выбора"
-}: CanvasFilePlaceholderProps) => (
-  <FileDropzone
-    onFilesSelected={onUpload}
-    multiple={multiple}
-    className="w-full h-full border-none bg-transparent hover:bg-zinc-50/50 dark:hover:bg-zinc-900/50 transition-colors"
-    enableWindowDrop={false} // Обычно в Canvas мы хотим локальный дроп, но можно включить если надо
-  >
-    <div className="flex flex-col items-center justify-center text-zinc-400 animate-in fade-in zoom-in-95 duration-300 pointer-events-none">
-      <div className="p-4 rounded-full bg-zinc-100 dark:bg-zinc-800 mb-4 transition-transform group-hover:scale-110 duration-200">
-        <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-        </svg>
+  enableWindowDrop = false, // По умолчанию false, чтобы не конфликтовать с сайдбарами
+  className = "",
+  title = "Перетащите изображения сюда",
+  subTitle = "или кликните для выбора"
+}: FileDropzonePlaceholderProps) => {
+  return (
+    <FileDropzone
+      onFilesSelected={onUpload}
+      multiple={multiple}
+      enableWindowDrop={enableWindowDrop}
+      className={`w-full h-full border-none bg-transparent hover:bg-zinc-50/50 dark:hover:bg-zinc-900/50 transition-colors ${className}`}
+    >
+      <div className="flex flex-col items-center justify-center text-zinc-400 animate-in fade-in zoom-in-95 duration-300">
+        <div className="p-4 rounded-full bg-zinc-100 dark:bg-zinc-800 mb-4 transition-transform group-hover:scale-110 duration-200">
+          <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+          </svg>
+        </div>
+        <p className="text-lg font-medium mb-1 text-zinc-600 dark:text-zinc-300 text-center">{title}</p>
+        <p className="text-sm opacity-60 text-center">{subTitle}</p>
       </div>
-      <p className="text-lg font-medium mb-1 text-zinc-600 dark:text-zinc-300">{text}</p>
-      <p className="text-sm opacity-60">{subText}</p>
-    </div>
-  </FileDropzone>
-);
+    </FileDropzone>
+  );
+};

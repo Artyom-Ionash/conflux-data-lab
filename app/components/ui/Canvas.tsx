@@ -10,7 +10,7 @@ const ZOOM_INTENSITY = 0.002;
 const PAN_BUTTON_CODE = 1; // Middle mouse button
 const STABILIZATION_DELAY = 150; // ms
 const AUTO_CONTRAST_PERIOD_DEFAULT = 5; // seconds
-const OVERLAY_SPREAD_SIZE = 50000; // px
+const OVERLAY_SPREAD_SIZE = 50000;
 
 const THEME_DARK_BG = 'bg-[#111]';
 const THEME_LIGHT_BG = 'bg-[#e5e5e5]';
@@ -53,7 +53,7 @@ interface CanvasProps {
   shadowOverlayOpacity?: number;
   showTransparencyGrid?: boolean;
   backgroundColor?: string;
-  placeholder?: ReactNode; // Теперь это просто ReactNode
+  placeholder?: ReactNode; // <-- Полностью развязано, просто принимаем компонент
 }
 
 export const Canvas = forwardRef<CanvasRef, CanvasProps>(
@@ -113,7 +113,6 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(
     const stabilizeView = useCallback(() => {
       if (!contentRef.current) return;
       updateDOM(false);
-      // Force reflow
       /* eslint-disable-next-line @typescript-eslint/no-unused-vars */
       const _force = contentRef.current.offsetHeight;
     }, [updateDOM]);
@@ -322,10 +321,11 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(
           </div>
         </div>
 
-        {/* Placeholder Area: Rendered only if content is missing (no width/height) and placeholder prop exists */}
-        {!hasDimensions && placeholder && (
-          <div className="absolute inset-0 z-20 flex items-center justify-center pointer-events-auto">
-            {placeholder}
+        {placeholder && (
+          <div className="absolute inset-0 z-20 flex items-center justify-center pointer-events-none">
+            <div className="w-full h-full pointer-events-auto">
+              {placeholder}
+            </div>
           </div>
         )}
 

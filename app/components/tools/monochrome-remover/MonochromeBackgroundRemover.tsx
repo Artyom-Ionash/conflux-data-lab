@@ -2,14 +2,15 @@
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Canvas, CanvasRef } from '../../ui/Canvas';
-import { FileDropzone, CanvasFilePlaceholder } from '../../ui/FileDropzone';
+// Импортируем оба компонента из одного файла
+import { FileDropzone, FileDropzonePlaceholder } from '../../ui/FileDropzone';
 import { ToolLayout } from '../ToolLayout';
 import { Slider } from '../../ui/Slider';
 
 // --- CONSTANTS & CONFIG ---
-const DEBOUNCE_DELAY = 50; // ms
-const VIEW_RESET_DELAY = 50; // ms
-const MAX_RGB_DISTANCE = Math.sqrt(3 * 255 ** 2); // ~441.67
+const DEBOUNCE_DELAY = 50;
+const VIEW_RESET_DELAY = 50;
+const MAX_RGB_DISTANCE = Math.sqrt(3 * 255 ** 2);
 const DOWNLOAD_FILENAME = 'removed_bg.png';
 
 const DEFAULT_SETTINGS = {
@@ -579,7 +580,12 @@ export function MonochromeBackgroundRemover() {
           contentHeight={imgDimensions.h}
           shadowOverlayOpacity={originalUrl ? 0.8 : 0}
           showTransparencyGrid={true}
-          placeholder={<CanvasFilePlaceholder onUpload={handleFilesSelected} />}
+          // Передача компонента-заглушки
+          placeholder={
+            !originalUrl ? (
+              <FileDropzonePlaceholder onUpload={handleFilesSelected} />
+            ) : null
+          }
         >
           {/* HIDDEN SOURCE CANVAS */}
           <canvas ref={sourceCanvasRef} className="hidden" />

@@ -2,7 +2,8 @@
 
 import React, { useCallback, useMemo, useState, useRef, useEffect } from 'react';
 import { Canvas, CanvasRef } from '../../ui/Canvas';
-import { FileDropzone, CanvasFilePlaceholder } from '../../ui/FileDropzone';
+// Импортируем оба компонента
+import { FileDropzone, FileDropzonePlaceholder } from '../../ui/FileDropzone';
 import { ToolLayout } from '../ToolLayout';
 import { Switch } from '../../ui/Switch';
 import { TextureDimensionSlider } from '../../domain/graphics/TextureDimensionSlider';
@@ -326,11 +327,14 @@ export function VerticalImageAligner() {
         shadowOverlayOpacity={images.length ? 0.5 : 0}
         showTransparencyGrid={true}
         backgroundColor={cssBackgroundColor}
-        placeholder={<CanvasFilePlaceholder onUpload={processFiles} multiple={true} />}
+        // Передача специализированной заглушки
+        placeholder={
+          !images.length ? (
+            <FileDropzonePlaceholder onUpload={processFiles} multiple={true} title="Перетащите изображения для склейки" />
+          ) : null
+        }
       >
-        {/* User Selected Background Color */}
         <div className="absolute inset-0" style={{ backgroundColor: cssBackgroundColor }} />
-
         {showRedGrid && (
           <div className="absolute inset-0 pointer-events-none z-50 opacity-50"
             style={{
