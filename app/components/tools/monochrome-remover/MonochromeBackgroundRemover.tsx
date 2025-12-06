@@ -3,6 +3,8 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Canvas, CanvasRef } from '../../ui/Canvas';
 import { FileDropzone } from '../../ui/FileDropzone';
+import { ToolLayout } from '../ToolLayout';
+import { Slider } from '../../ui/Slider';
 
 // --- ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ---
 function hexToRgb(hex: string) {
@@ -311,130 +313,150 @@ export function MonochromeBackgroundRemover() {
   const clearAllPoints = () => setFloodPoints([]);
   const handleRunFloodFill = () => setManualTrigger(prev => prev + 1);
 
-  return (
-    <div className="fixed inset-0 flex w-full h-full bg-zinc-50 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 overflow-hidden font-sans">
-      <aside className="w-[360px] flex-shrink-0 flex flex-col border-r border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 z-10 shadow-xl h-full">
-        {/* ... Sidebar content ... */}
-        <div className="p-5 border-b border-zinc-200 dark:border-zinc-800">
-          <a href="/" className="mb-3 inline-flex items-center gap-2 text-xs font-medium text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-200 transition-colors">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 12H5M12 19l-7-7 7-7" /></svg> На главную
-          </a>
-          <h2 className="text-lg font-bold flex items-center gap-2"><span className="text-blue-600">Mono</span>Remover</h2>
-        </div>
-        <div className="flex-1 overflow-y-auto p-5 space-y-6 custom-scrollbar">
+  // --- SIDEBAR CONTENT ---
+  const sidebarContent = (
+    <div className="flex flex-col gap-6 pb-4">
+      {/* 1. File Input */}
+      <div className="space-y-2">
+        <label className="block text-xs font-bold uppercase text-zinc-400">Исходник</label>
+        <FileDropzone
+          onFilesSelected={handleFilesSelected}
+          multiple={false}
+          label="Загрузить изображение"
+        />
+      </div>
+
+      {originalUrl && (
+        <div className="space-y-6 animate-fade-in">
+
+          {/* 2. Mode Selection */}
           <div className="space-y-2">
-            <label className="block text-xs font-bold uppercase text-zinc-400">Исходник</label>
-            <FileDropzone
-              onFilesSelected={handleFilesSelected}
-              multiple={false}
-              label="Загрузить изображение"
-            />
+            <label className="block text-xs font-bold uppercase text-zinc-400">Режим</label>
+            <div className="flex flex-col gap-1 bg-zinc-100 dark:bg-zinc-800 p-1 rounded-lg">
+              <div className="grid grid-cols-2 gap-1">
+                <button onClick={() => setProcessingMode('remove')} className={`text-xs font-medium py-2 rounded-md transition-all ${processingMode === 'remove' ? 'bg-white dark:bg-zinc-700 text-blue-600 dark:text-blue-300 shadow-sm' : 'text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300'}`}>Убрать цвет</button>
+                <button onClick={() => setProcessingMode('keep')} className={`text-xs font-medium py-2 rounded-md transition-all ${processingMode === 'keep' ? 'bg-white dark:bg-zinc-700 text-blue-600 dark:text-blue-300 shadow-sm' : 'text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300'}`}>Оставить цвет</button>
+              </div>
+              <button onClick={() => setProcessingMode('flood-clear')} className={`text-xs font-medium py-2 rounded-md transition-all flex items-center justify-center gap-2 ${processingMode === 'flood-clear' ? 'bg-white dark:bg-zinc-700 text-blue-600 dark:text-blue-300 shadow-sm' : 'text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300'}`}>Заливка невидимостью</button>
+            </div>
+            {processingMode === 'flood-clear' && <div className="text-[10px] text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 p-2 rounded border border-blue-100 dark:border-blue-800 leading-tight">1. Кликните на холст, чтобы поставить точки.<br />2. Точки можно <b>перетаскивать</b>.<br />3. Заливка обновляется <b>автоматически</b>.</div>}
           </div>
-          {originalUrl && (
-            <div className="space-y-6 animate-fade-in">
-              {/* Controls */}
-              <div className="space-y-2">
-                <label className="block text-xs font-bold uppercase text-zinc-400">Режим</label>
-                <div className="flex flex-col gap-1 bg-zinc-100 dark:bg-zinc-800 p-1 rounded-lg">
-                  <div className="grid grid-cols-2 gap-1">
-                    <button onClick={() => setProcessingMode('remove')} className={`text-xs font-medium py-2 rounded-md transition-all ${processingMode === 'remove' ? 'bg-white dark:bg-zinc-700 text-blue-600 dark:text-blue-300 shadow-sm' : 'text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300'}`}>Убрать цвет</button>
-                    <button onClick={() => setProcessingMode('keep')} className={`text-xs font-medium py-2 rounded-md transition-all ${processingMode === 'keep' ? 'bg-white dark:bg-zinc-700 text-blue-600 dark:text-blue-300 shadow-sm' : 'text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300'}`}>Оставить цвет</button>
-                  </div>
-                  <button onClick={() => setProcessingMode('flood-clear')} className={`text-xs font-medium py-2 rounded-md transition-all flex items-center justify-center gap-2 ${processingMode === 'flood-clear' ? 'bg-white dark:bg-zinc-700 text-blue-600 dark:text-blue-300 shadow-sm' : 'text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300'}`}>Заливка невидимостью</button>
+
+          {/* 3. Color Pickers */}
+          <div className="space-y-2">
+            <div className="flex flex-col gap-2">
+              <div className="flex gap-3 items-center">
+                <div className="w-8 h-8 rounded border cursor-crosshair overflow-hidden relative group dark:border-zinc-700 flex-shrink-0 bg-white">
+                  {/* Eyedropper Preview uses small separate image */}
+                  <img src={originalUrl} className="w-full h-full object-cover" onClick={handleEyedropper} alt="picker" />
                 </div>
-                {processingMode === 'flood-clear' && <div className="text-[10px] text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 p-2 rounded border border-blue-100 dark:border-blue-800 leading-tight">1. Кликните на холст, чтобы поставить точки.<br />2. Точки можно <b>перетаскивать</b>.<br />3. Заливка обновляется <b>автоматически</b>.</div>}
-              </div>
-              <div className="space-y-2">
-                <div className="flex flex-col gap-2">
-                  <div className="flex gap-3 items-center">
-                    <div className="w-8 h-8 rounded border cursor-crosshair overflow-hidden relative group dark:border-zinc-700 flex-shrink-0 bg-white">
-                      <img src={originalUrl} className="w-full h-full object-cover" onClick={handleEyedropper} alt="picker" />
-                    </div>
-                    <div className="flex-1 flex items-center gap-2 p-2 border rounded bg-zinc-50 dark:bg-zinc-800 dark:border-zinc-700">
-                      <input type="color" value={targetColor} onChange={e => setTargetColor(e.target.value)} className="w-6 h-6 bg-transparent border-none cursor-pointer" />
-                      <div className="flex flex-col"><span className="font-bold text-[10px] uppercase text-zinc-500">Цель (Фон)</span><span className="font-mono text-xs font-bold uppercase">{targetColor}</span></div>
-                    </div>
-                  </div>
-                  <div className="flex gap-3 items-center">
-                    <div className="w-8 h-8 flex-shrink-0" />
-                    <div className="flex-1 flex items-center gap-2 p-2 border rounded bg-zinc-50 dark:bg-zinc-800 dark:border-zinc-700">
-                      <input type="color" value={contourColor} onChange={e => setContourColor(e.target.value)} className="w-6 h-6 bg-transparent border-none cursor-pointer" />
-                      <div className="flex flex-col"><span className="font-bold text-[10px] uppercase text-zinc-500">Контур / Окрас</span><span className="font-mono text-xs font-bold uppercase">{contourColor}</span></div>
-                    </div>
-                  </div>
+                <div className="flex-1 flex items-center gap-2 p-2 border rounded bg-zinc-50 dark:bg-zinc-800 dark:border-zinc-700">
+                  <input type="color" value={targetColor} onChange={e => setTargetColor(e.target.value)} className="w-6 h-6 bg-transparent border-none cursor-pointer" />
+                  <div className="flex flex-col"><span className="font-bold text-[10px] uppercase text-zinc-500">Цель (Фон)</span><span className="font-mono text-xs font-bold uppercase">{targetColor}</span></div>
                 </div>
               </div>
-              <div className="space-y-4 bg-zinc-50 dark:bg-zinc-800/50 p-3 rounded-lg border border-zinc-100 dark:border-zinc-800">
-                <div><div className="flex justify-between text-xs mb-1"><span>Допуск</span><span className="text-blue-500 font-mono">{tolerances[processingMode]}%</span></div><input type="range" min="0" max="100" value={tolerances[processingMode]} onChange={e => setTolerances(p => ({ ...p, [processingMode]: Number(e.target.value) }))} className="w-full h-1.5 bg-zinc-200 rounded-lg appearance-none cursor-pointer dark:bg-zinc-600 accent-blue-600" /></div>
-                {processingMode !== 'flood-clear' && (<div><div className="flex justify-between text-xs mb-1"><span>Сглаживание</span><span className="text-blue-500 font-mono">{smoothness}%</span></div><input type="range" min="0" max="50" value={smoothness} onChange={e => setSmoothness(Number(e.target.value))} className="w-full h-1.5 bg-zinc-200 rounded-lg appearance-none cursor-pointer dark:bg-zinc-600 accent-blue-600" /></div>)}
-                <div className="pt-2 border-t border-zinc-200 dark:border-zinc-700/50">
-                  <div className="flex justify-between text-xs mb-1"><span className="font-bold text-zinc-500">Удаление ореолов</span></div>
-                  <div className="mb-2"><div className="flex justify-between text-[10px] mb-1 text-zinc-500"><span>Сжатие (Choke)</span><span className="text-blue-500 font-mono">{edgeChoke}px</span></div><input type="range" min="0" max="5" step="1" value={edgeChoke} onChange={e => setEdgeChoke(Number(e.target.value))} className="w-full h-1.5 bg-zinc-200 rounded-lg appearance-none cursor-pointer dark:bg-zinc-600 accent-blue-600" /></div>
-                  <div className="mb-2"><div className="flex justify-between text-[10px] mb-1 text-zinc-500"><span>Смягчение (Blur)</span><span className="text-blue-500 font-mono">{edgeBlur}px</span></div><input type="range" min="0" max="5" step="1" value={edgeBlur} onChange={e => setEdgeBlur(Number(e.target.value))} className="w-full h-1.5 bg-zinc-200 rounded-lg appearance-none cursor-pointer dark:bg-zinc-600 accent-blue-600" /></div>
-                  <div><div className="flex justify-between text-[10px] mb-1 text-zinc-500"><span>Окрашивание (Paint)</span><span className="text-blue-500 font-mono">{edgePaint}px</span></div><input type="range" min="0" max="5" step="1" value={edgePaint} onChange={e => setEdgePaint(Number(e.target.value))} className="w-full h-1.5 bg-zinc-200 rounded-lg appearance-none cursor-pointer dark:bg-zinc-600 accent-blue-600" /></div>
+              <div className="flex gap-3 items-center">
+                <div className="w-8 h-8 flex-shrink-0" />
+                <div className="flex-1 flex items-center gap-2 p-2 border rounded bg-zinc-50 dark:bg-zinc-800 dark:border-zinc-700">
+                  <input type="color" value={contourColor} onChange={e => setContourColor(e.target.value)} className="w-6 h-6 bg-transparent border-none cursor-pointer" />
+                  <div className="flex flex-col"><span className="font-bold text-[10px] uppercase text-zinc-500">Контур / Окрас</span><span className="font-mono text-xs font-bold uppercase">{contourColor}</span></div>
                 </div>
               </div>
-              {processingMode === 'flood-clear' && (
-                <div className="space-y-3 p-3 bg-blue-50 dark:bg-blue-900/10 rounded-lg border border-blue-100 dark:border-blue-900/30">
-                  <div className="flex justify-between items-center text-xs font-bold text-blue-800 dark:text-blue-200"><span>Точки: {floodPoints.length}</span></div>
-                  <div className="flex gap-2"><button onClick={removeLastPoint} disabled={floodPoints.length === 0} className="flex-1 py-2 text-xs bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded hover:bg-zinc-50 disabled:opacity-50">Отменить</button><button onClick={clearAllPoints} disabled={floodPoints.length === 0} className="flex-1 py-2 text-xs bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded hover:text-red-500 hover:bg-red-50 disabled:opacity-50">Сбросить</button></div>
-                  <button onClick={handleRunFloodFill} disabled={floodPoints.length === 0 || isProcessing} className="w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded font-bold text-xs shadow-sm uppercase tracking-wide disabled:opacity-50 disabled:cursor-not-allowed">{isProcessing ? 'Обработка...' : 'Принудительно обновить'}</button>
-                </div>
-              )}
-              <button onClick={handleDownload} disabled={!originalUrl} className="w-full py-3 bg-zinc-900 dark:bg-white text-white dark:text-black rounded font-bold text-sm shadow hover:opacity-90 transition disabled:opacity-50">Скачать</button>
+            </div>
+          </div>
+
+          {/* 4. Main Sliders */}
+          <div className="space-y-4 bg-zinc-50 dark:bg-zinc-800/50 p-3 rounded-lg border border-zinc-100 dark:border-zinc-800">
+            <Slider
+              label="Допуск (%)"
+              value={tolerances[processingMode]}
+              onChange={(val) => setTolerances(p => ({ ...p, [processingMode]: val }))}
+              min={0} max={100}
+            />
+
+            {processingMode !== 'flood-clear' && (
+              <Slider
+                label="Сглаживание"
+                value={smoothness}
+                onChange={setSmoothness}
+                min={0} max={50}
+              />
+            )}
+
+            {/* 5. Edge Post-processing */}
+            <div className="pt-2 border-t border-zinc-200 dark:border-zinc-700/50">
+              <div className="flex justify-between text-xs mb-3"><span className="font-bold text-zinc-500 uppercase tracking-wide">Удаление ореолов</span></div>
+              <Slider label="Сжатие (Choke)" value={edgeChoke} onChange={setEdgeChoke} min={0} max={5} step={1} />
+              <Slider label="Смягчение (Blur)" value={edgeBlur} onChange={setEdgeBlur} min={0} max={5} step={1} />
+              <Slider label="Окрашивание (Paint)" value={edgePaint} onChange={setEdgePaint} min={0} max={5} step={1} />
+            </div>
+          </div>
+
+          {/* 6. Flood Fill Controls */}
+          {processingMode === 'flood-clear' && (
+            <div className="space-y-3 p-3 bg-blue-50 dark:bg-blue-900/10 rounded-lg border border-blue-100 dark:border-blue-900/30">
+              <div className="flex justify-between items-center text-xs font-bold text-blue-800 dark:text-blue-200"><span>Точки: {floodPoints.length}</span></div>
+              <div className="flex gap-2"><button onClick={removeLastPoint} disabled={floodPoints.length === 0} className="flex-1 py-2 text-xs bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded hover:bg-zinc-50 disabled:opacity-50">Отменить</button><button onClick={clearAllPoints} disabled={floodPoints.length === 0} className="flex-1 py-2 text-xs bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded hover:text-red-500 hover:bg-red-50 disabled:opacity-50">Сбросить</button></div>
+              <button onClick={handleRunFloodFill} disabled={floodPoints.length === 0 || isProcessing} className="w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded font-bold text-xs shadow-sm uppercase tracking-wide disabled:opacity-50 disabled:cursor-not-allowed">{isProcessing ? 'Обработка...' : 'Принудительно обновить'}</button>
             </div>
           )}
+
+          {/* 7. Download Button */}
+          <button onClick={handleDownload} disabled={!originalUrl} className="w-full py-3 bg-zinc-900 dark:bg-white text-white dark:text-black rounded font-bold text-sm shadow hover:opacity-90 transition disabled:opacity-50">Скачать</button>
         </div>
-      </aside>
-
-      <main className="flex-1 relative h-full flex flex-col overflow-hidden">
-        <div
-          className="flex-1 w-full h-full"
-          onPointerMove={handleGlobalPointerMove}
-          onPointerUp={handleGlobalPointerUp}
-        >
-          <Canvas
-            ref={workspaceRef}
-            isLoading={isProcessing}
-            contentWidth={imgDimensions.w}
-            contentHeight={imgDimensions.h}
-            shadowOverlayOpacity={originalUrl ? 0.8 : 0}
-            showTransparencyGrid={true}
-            placeholder={!originalUrl}
-          >
-            {/* HIDDEN SOURCE CANVAS */}
-            <canvas ref={sourceCanvasRef} className="hidden" />
-
-            {/* VISIBLE PREVIEW CANVAS */}
-            <canvas
-              ref={previewCanvasRef}
-              className="block select-none"
-              onPointerDown={handleImagePointerDown}
-              style={{
-                width: '100%',
-                height: '100%',
-                imageRendering: 'pixelated',
-                cursor: processingMode === 'flood-clear' ? 'crosshair' : 'default',
-                display: originalUrl ? 'block' : 'none'
-              }}
-            />
-
-            {processingMode === 'flood-clear' && floodPoints.map((pt, i) => (
-              <div
-                key={i}
-                onPointerDown={(e) => handlePointPointerDown(e, i)}
-                className={`absolute z-20 cursor-grab active:cursor-grabbing hover:brightness-125 ${draggingPointIndex === i ? 'brightness-150' : ''}`}
-                style={{
-                  left: pt.x, top: pt.y, width: '10px', height: '10px',
-                  transform: 'translate(-50%, -50%) scale(calc(1 / var(--canvas-scale)))',
-                }}
-              >
-                <div className="w-full h-full bg-red-500 border border-white rounded-full shadow-[0_0_2px_rgba(0,0,0,0.8)]" />
-              </div>
-            ))}
-          </Canvas>
-        </div>
-      </main>
+      )}
     </div>
+  );
+
+  return (
+    <ToolLayout title="MonoRemover" sidebar={sidebarContent}>
+      <div
+        className="w-full h-full relative"
+        onPointerMove={handleGlobalPointerMove}
+        onPointerUp={handleGlobalPointerUp}
+      >
+        <Canvas
+          ref={workspaceRef}
+          isLoading={isProcessing}
+          contentWidth={imgDimensions.w}
+          contentHeight={imgDimensions.h}
+          shadowOverlayOpacity={originalUrl ? 0.8 : 0}
+          showTransparencyGrid={true}
+          placeholder={!originalUrl}
+        >
+          {/* HIDDEN SOURCE CANVAS */}
+          <canvas ref={sourceCanvasRef} className="hidden" />
+
+          {/* VISIBLE PREVIEW CANVAS */}
+          <canvas
+            ref={previewCanvasRef}
+            className="block select-none"
+            onPointerDown={handleImagePointerDown}
+            style={{
+              width: '100%',
+              height: '100%',
+              imageRendering: 'pixelated',
+              cursor: processingMode === 'flood-clear' ? 'crosshair' : 'default',
+              display: originalUrl ? 'block' : 'none'
+            }}
+          />
+
+          {/* FLOOD FILL POINTS OVERLAY */}
+          {processingMode === 'flood-clear' && floodPoints.map((pt, i) => (
+            <div
+              key={i}
+              onPointerDown={(e) => handlePointPointerDown(e, i)}
+              className={`absolute z-20 cursor-grab active:cursor-grabbing hover:brightness-125 ${draggingPointIndex === i ? 'brightness-150' : ''}`}
+              style={{
+                left: pt.x, top: pt.y, width: '10px', height: '10px',
+                transform: 'translate(-50%, -50%) scale(calc(1 / var(--canvas-scale)))',
+              }}
+            >
+              <div className="w-full h-full bg-red-500 border border-white rounded-full shadow-[0_0_2px_rgba(0,0,0,0.8)]" />
+            </div>
+          ))}
+        </Canvas>
+      </div>
+    </ToolLayout>
   );
 }
