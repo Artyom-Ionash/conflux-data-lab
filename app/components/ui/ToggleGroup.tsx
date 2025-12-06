@@ -25,7 +25,7 @@ type ToggleGroupItemProps = React.ComponentPropsWithoutRef<typeof ToggleGroupPri
 // --- Components ---
 
 const ToggleGroup = React.forwardRef<
-  React.ElementRef<typeof ToggleGroupPrimitive.Root>,
+  HTMLDivElement,
   ToggleGroupProps
 >(({ className, children, gridCols, style, onKeyDown, ...props }, ref) => {
 
@@ -75,7 +75,7 @@ const ToggleGroup = React.forwardRef<
 ToggleGroup.displayName = ToggleGroupPrimitive.Root.displayName;
 
 const ToggleGroupItem = React.forwardRef<
-  React.ElementRef<typeof ToggleGroupPrimitive.Item>,
+  HTMLButtonElement,
   ToggleGroupItemProps
 >(({ className, children, fullWidth, ...props }, ref) => (
   <ToggleGroupPrimitive.Item
