@@ -313,7 +313,7 @@ export function MonochromeBackgroundRemover() {
   return (
     <div className="fixed inset-0 flex w-full h-full bg-zinc-50 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 overflow-hidden font-sans">
       <aside className="w-[360px] flex-shrink-0 flex flex-col border-r border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 z-10 shadow-xl h-full">
-        {/* ... Sidebar content (No changes needed) ... */}
+        {/* ... Sidebar content ... */}
         <div className="p-5 border-b border-zinc-200 dark:border-zinc-800">
           <a href="/" className="mb-3 inline-flex items-center gap-2 text-xs font-medium text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-200 transition-colors">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 12H5M12 19l-7-7 7-7" /></svg> На главную
@@ -398,6 +398,7 @@ export function MonochromeBackgroundRemover() {
             contentHeight={imgDimensions.h}
             shadowOverlayOpacity={originalUrl ? 0.8 : 0}
             showTransparencyGrid={true}
+            placeholder={!originalUrl} // <-- Используем true, Canvas подставит "Пустой холст"
           >
             {/* HIDDEN SOURCE CANVAS */}
             <canvas ref={sourceCanvasRef} className="hidden" />
@@ -430,12 +431,6 @@ export function MonochromeBackgroundRemover() {
               </div>
             ))}
           </Canvas>
-
-          {!originalUrl && (
-            <div className="absolute inset-0 flex items-center justify-center text-zinc-400 text-lg opacity-50 whitespace-nowrap border-2 border-dashed border-zinc-500/20 rounded-lg pointer-events-none">
-              Нет изображения
-            </div>
-          )}
         </div>
       </main>
     </div>

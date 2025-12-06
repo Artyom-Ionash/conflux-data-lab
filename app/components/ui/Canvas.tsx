@@ -31,6 +31,9 @@ interface CanvasProps {
   theme?: 'light' | 'dark';
   shadowOverlayOpacity?: number;
   showTransparencyGrid?: boolean;
+  backgroundColor?: string;
+  // Если true -> показывает "Пустой холст". Если строка -> показывает строку в стиле. Если ReactNode -> рендерит как есть.
+  placeholder?: ReactNode | boolean;
 }
 
 export const Canvas = forwardRef<CanvasRef, CanvasProps>(
@@ -46,6 +49,8 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(
     theme: propTheme,
     shadowOverlayOpacity = 0,
     showTransparencyGrid = false,
+    backgroundColor,
+    placeholder,
   }, ref) => {
     const containerRef = useRef<HTMLDivElement>(null);
     const contentRef = useRef<HTMLDivElement>(null);
@@ -217,6 +222,12 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(
 
     const hasDimensions = !!contentWidth && !!contentHeight;
 
+    // Logic for placeholder content
+    let placeholderContent = placeholder;
+    if (placeholder === true) {
+      placeholderContent = "Пустой холст";
+    }
+
     return (
       <div
         ref={containerRef}
@@ -276,8 +287,8 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(
             />
           )}
 
-          {/* 2. UNIFIED STAGE WRAPPER */}
-          {/* Мы всегда рендерим эту обертку, чтобы React не пересоздавал children (Canvas элементы) при появлении размеров */}
+          {/* 2. STAGE WRAPPER */}
+          {/* Always rendered to prevent children unmount/remount */}
           <div
             className="relative"
             style={{
@@ -305,12 +316,33 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(
               />
             )}
 
-            {/* CONTENT PRESERVATION WRAPPER */}
+            {/* 4. BACKGROUND COLOR */}
+            {hasDimensions && backgroundColor && (
+              <div
+                className="absolute inset-0 z-0"
+                style={{ backgroundColor }}
+              />
+            )}
+
+            {/* 5. USER CONTENT */}
             <div className="relative z-10 w-full h-full">
               {children}
             </div>
           </div>
         </div>
+
+        {/* PLACEHOLDER / EMPTY STATE (Outside transforms, centered) */}
+        {placeholderContent && (
+          <div className="absolute inset-0 z-20 flex items-center justify-center pointer-events-none">
+            {typeof placeholderContent === 'string' ? (
+              <span className="bg-white/80 dark:bg-black/80 px-4 py-2 rounded-lg shadow-sm backdrop-blur-sm text-zinc-400 select-none font-medium text-sm border border-zinc-200/50 dark:border-zinc-700/50">
+                {placeholderContent}
+              </span>
+            ) : (
+              placeholderContent
+            )}
+          </div>
+        )}
 
         {isLoading && (
           <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/20 backdrop-blur-[2px] pointer-events-none">

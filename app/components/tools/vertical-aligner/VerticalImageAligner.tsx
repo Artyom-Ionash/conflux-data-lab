@@ -71,7 +71,6 @@ const LabelledSlider = ({
   limitBrowser
 }: LabelledSliderProps) => {
 
-  // Memoize status to satisfy TypeScript strict checks
   const { status, message } = useMemo<{ status: SliderStatus; message: ReactNode }>(() => {
     if (limitBrowser && value > limitBrowser) {
       return {
@@ -725,10 +724,9 @@ export function VerticalImageAligner() {
           contentHeight={bounds.height}
           shadowOverlayOpacity={images.length ? 0.5 : 0}
           showTransparencyGrid={true}
+          backgroundColor={cssBackgroundColor}
+          placeholder={!images.length} // <-- Используем true, Canvas подставит "Пустой холст"
         >
-          {/* User Selected Background Color (Overlays the Canvas Transparency Grid) */}
-          <div className="absolute inset-0" style={{ backgroundColor: cssBackgroundColor }} />
-
           {/* RED GRID */}
           {showRedGrid && (
             <div className="absolute inset-0 pointer-events-none z-50 opacity-50"
@@ -771,13 +769,6 @@ export function VerticalImageAligner() {
             />
           ))}
         </Canvas>
-
-        {/* Empty State Overlay (Outside Canvas to avoid scaling issues with 1x1 stage) */}
-        {!images.length && (
-          <div className="absolute inset-0 flex items-center justify-center text-zinc-400 bg-white/50 backdrop-blur-sm z-10 pointer-events-none">
-            <span className="bg-white/80 dark:bg-black/80 px-4 py-2 rounded-lg shadow-sm">Пустой холст</span>
-          </div>
-        )}
       </main>
     </div>
   );
