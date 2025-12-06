@@ -3,27 +3,25 @@
 import { useEffect, useRef, useState } from "react";
 
 interface FrameDiffOverlayProps {
-  frames: ExtractedFrame[];
-  isExtracting: boolean;
+  image1: string | null;
+  image2: string | null;
+  isProcessing: boolean;
+  label?: string;
 }
 
-interface ExtractedFrame {
-  time: number;
-  dataUrl: string;
-}
-
-export function FrameDiffOverlay({ frames, isExtracting }: FrameDiffOverlayProps) {
+export function FrameDiffOverlay({ image1, image2, isProcessing, label }: FrameDiffOverlayProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [overlayDataUrl, setOverlayDataUrl] = useState<string | null>(null);
-  const [isProcessing, setIsProcessing] = useState(false);
+  const [processingDiff, setProcessingDiff] = useState(false);
 
   useEffect(() => {
-    if (frames.length < 2) {
+    if (!image1 || !image2) {
+      setOverlayDataUrl(null);
       return;
     }
 
     const processFrames = async () => {
-      setIsProcessing(true);
+      setProcessingDiff(true);
       try {
         const canvas = canvasRef.current;
         const ctx = canvas?.getContext("2d");
@@ -33,19 +31,20 @@ export function FrameDiffOverlay({ frames, isExtracting }: FrameDiffOverlayProps
         const lastImg = new Image();
 
         await Promise.all([
-          new Promise<void>((resolve) => {
+          new Promise<void>((resolve, reject) => {
             firstImg.onload = () => resolve();
-            firstImg.src = frames[0].dataUrl;
+            firstImg.onerror = reject;
+            firstImg.src = image1;
           }),
-          new Promise<void>((resolve) => {
+          new Promise<void>((resolve, reject) => {
             lastImg.onload = () => resolve();
-            lastImg.src = frames[frames.length - 1].dataUrl;
+            lastImg.onerror = reject;
+            lastImg.src = image2;
           }),
         ]);
 
         canvas.width = firstImg.width;
         canvas.height = firstImg.height;
-
         ctx.clearRect(0, 0, canvas.width, canvas.height);
 
         ctx.drawImage(firstImg, 0, 0);
@@ -103,89 +102,73 @@ export function FrameDiffOverlay({ frames, isExtracting }: FrameDiffOverlayProps
         ctx.putImageData(resultImageData, 0, 0);
         setOverlayDataUrl(canvas.toDataURL("image/png"));
       } catch (error) {
-        console.error("Error processing frames:", error);
+        console.error("Error processing diff:", error);
       } finally {
-        setIsProcessing(false);
+        setProcessingDiff(false);
       }
     };
 
     processFrames();
-  }, [frames]);
+  }, [image1, image2]);
 
-  const isLoading = isProcessing || isExtracting;
+  const isLoading = processingDiff || isProcessing;
 
-  if (frames.length < 2 && !overlayDataUrl && !isLoading) {
-    return null;
+  if (!image1 || !image2) {
+    return (
+      <div className="flex h-full min-h-[150px] items-center justify-center rounded-md bg-zinc-100 dark:bg-zinc-800">
+        <p className="text-[10px] text-zinc-400">Нет данных для сравнения</p>
+      </div>
+    );
   }
 
   return (
-    <div className="space-y-3">
+    <div className="flex flex-col h-full overflow-hidden">
       <canvas ref={canvasRef} className="hidden" />
 
-      <div className="relative overflow-hidden rounded-md bg-zinc-100 dark:bg-zinc-800 min-h-[200px] flex items-center justify-center">
+      {/* Image Container: flex-1 ensures it takes available space, min-h-0 prevents overflow */}
+      <div className="relative flex-1 min-h-0 overflow-hidden rounded-md bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center group">
         {overlayDataUrl && (
           <img
             src={overlayDataUrl}
-            alt="Frame difference overlay"
-            className="w-full object-contain transition-opacity duration-300"
-            style={{ maxHeight: "300px" }}
+            alt="Diff Overlay"
+            className="w-full h-full object-contain max-h-full"
           />
         )}
 
         {isLoading && (
-          <div
-            className={`absolute inset-0 z-10 flex flex-col items-center justify-center 
-            ${overlayDataUrl ? "bg-white/60 dark:bg-black/60 backdrop-blur-[2px]" : "bg-transparent"}`}
-          >
-            <div className="h-8 w-8 animate-spin rounded-full border-4 border-zinc-300 border-t-blue-600"></div>
-            <p className="mt-2 text-xs font-medium text-zinc-700 dark:text-zinc-300">
-              {isExtracting ? "Извлечение кадров..." : "Обработка разницы..."}
+          <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-white/60 dark:bg-black/60 backdrop-blur-[2px]">
+            <div className="h-5 w-5 animate-spin rounded-full border-2 border-zinc-300 border-t-blue-600"></div>
+            <p className="mt-2 text-[10px] font-medium text-zinc-700 dark:text-zinc-300">
+              {label || "Анализ..."}
             </p>
           </div>
-        )}
-
-        {!overlayDataUrl && !isLoading && (
-          <p className="text-xs text-zinc-600 dark:text-zinc-400">
-            Извлеките минимум 2 кадра для отображения наложения
-          </p>
         )}
       </div>
 
+      {/* Legend: flex-shrink-0 ensures it never gets squashed */}
       {overlayDataUrl && (
-        <>
-          <div className="space-y-2 text-xs text-zinc-600 dark:text-zinc-400">
-            <div className="flex items-center gap-2">
-              <div className="h-3 w-3 rounded bg-red-600"></div>
-              <span>Только в первом кадре ({frames[0]?.time.toFixed(1) ?? "?"}s)</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="h-3 w-3 rounded bg-blue-600"></div>
-              <span>Только в последнем кадре ({frames[frames.length - 1]?.time.toFixed(1) ?? "?"}s)</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="h-3 w-3 rounded bg-purple-600"></div>
-              <span>В обоих кадрах</span>
-            </div>
-            <p className="mt-2 text-[10px]">
-              Фон определяется по цвету левого верхнего пикселя
-            </p>
+        <div className="flex-shrink-0 mt-2 flex items-center justify-between text-[10px] text-zinc-600 dark:text-zinc-400 px-1">
+          <div className="flex gap-3">
+            <span className="flex items-center gap-1">
+              <div className="h-2 w-2 rounded-full bg-red-600" /> Старт
+            </span>
+            <span className="flex items-center gap-1">
+              <div className="h-2 w-2 rounded-full bg-blue-600" /> Финиш
+            </span>
           </div>
           <button
             onClick={() => {
-              if (!overlayDataUrl) return;
               const a = document.createElement("a");
               a.href = overlayDataUrl;
-              a.download = "frame-diff-overlay.png";
+              a.download = "diff-overlay.png";
               a.click();
             }}
-            className="rounded-md border border-blue-600 px-3 py-1.5 text-xs font-medium text-blue-600 hover:bg-blue-50 dark:border-blue-500 dark:text-blue-400 dark:hover:bg-blue-950/30"
+            className="text-blue-600 hover:text-blue-700 hover:underline"
           >
-            Скачать наложение
+            Скачать
           </button>
-        </>
+        </div>
       )}
     </div>
   );
 }
-
-

@@ -6,13 +6,15 @@ interface RangeVideoPlayerProps {
   src: string | null;
   startTime: number;
   endTime: number;
+  className?: string;
 }
 
-export function RangeVideoPlayer({ src, startTime, endTime }: RangeVideoPlayerProps) {
+export function RangeVideoPlayer({ src, startTime, endTime, className = "" }: RangeVideoPlayerProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(startTime);
 
+  // Sync start time when changed externally
   useEffect(() => {
     if (videoRef.current && Math.abs(videoRef.current.currentTime - startTime) > 0.5) {
       videoRef.current.currentTime = startTime;
@@ -20,6 +22,7 @@ export function RangeVideoPlayer({ src, startTime, endTime }: RangeVideoPlayerPr
     }
   }, [startTime]);
 
+  // Loop logic
   useEffect(() => {
     const video = videoRef.current;
     if (!video) return;
@@ -67,8 +70,9 @@ export function RangeVideoPlayer({ src, startTime, endTime }: RangeVideoPlayerPr
   if (!src) return null;
 
   return (
-    <div className="space-y-2 mb-4">
-      <div className="relative overflow-hidden rounded-md bg-black aspect-video">
+    <div className={`flex flex-col gap-2 ${className}`}>
+      {/* Container forced to take available height or aspect ratio defined by parent/class */}
+      <div className="relative overflow-hidden rounded-md bg-black flex-1 group w-full h-full">
         <video
           ref={videoRef}
           src={src}
@@ -79,7 +83,8 @@ export function RangeVideoPlayer({ src, startTime, endTime }: RangeVideoPlayerPr
           onPause={() => setIsPlaying(false)}
         />
 
-        <div className="absolute inset-0 flex items-center justify-center bg-black/10 opacity-0 hover:opacity-100 transition-opacity group">
+        {/* Play/Pause Overlay */}
+        <div className="absolute inset-0 flex items-center justify-center bg-black/10 opacity-0 group-hover:opacity-100 transition-opacity z-10">
           <button
             onClick={togglePlay}
             className="rounded-full bg-white/90 p-3 text-black shadow-lg hover:bg-white hover:scale-110 transition-all"
@@ -93,25 +98,25 @@ export function RangeVideoPlayer({ src, startTime, endTime }: RangeVideoPlayerPr
         </div>
 
         {!isPlaying && (
-          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+          <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-0">
             <div className="rounded-full bg-black/50 p-3 text-white backdrop-blur-sm">
               <svg className="w-8 h-8 translate-x-0.5" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z" /></svg>
             </div>
           </div>
         )}
 
-        <div className="absolute bottom-2 right-2 bg-black/70 backdrop-blur-sm rounded px-2 py-1 text-xs text-white font-mono">
+        <div className="absolute bottom-2 right-2 bg-black/70 backdrop-blur-sm rounded px-2 py-1 text-xs text-white font-mono pointer-events-none z-20">
           {formatTime(elapsedTime)} / {formatTime(duration)}
         </div>
       </div>
 
-      <div className="space-y-1">
+      {/* Progress Bar */}
+      <div className="h-4 flex flex-col justify-end space-y-1 flex-shrink-0">
         <div className="relative h-2 bg-zinc-200 dark:bg-zinc-800 rounded-full overflow-hidden">
           <div
             className="absolute inset-y-0 left-0 bg-blue-600 transition-all duration-100 ease-linear"
             style={{ width: `${progressSafe}%` }}
           />
-
           <button
             className="absolute inset-0 cursor-pointer"
             onClick={(e) => {
@@ -124,22 +129,7 @@ export function RangeVideoPlayer({ src, startTime, endTime }: RangeVideoPlayerPr
             }}
           />
         </div>
-
-        <div className="flex items-center justify-between text-xs text-zinc-600 dark:text-zinc-400">
-          <div className="flex items-center gap-2">
-            <span className="font-mono">{formatTime(elapsedTime)}</span>
-            <span className="text-zinc-400 dark:text-zinc-600">•</span>
-            <span>Позиция: {currentTime.toFixed(2)}s</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <span>Осталось: {formatTime(remainingTime)}</span>
-            <span className="text-zinc-400 dark:text-zinc-600">•</span>
-            <span className="font-mono">{formatTime(duration)}</span>
-          </div>
-        </div>
       </div>
     </div>
   );
 }
-
-
