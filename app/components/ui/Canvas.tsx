@@ -32,7 +32,6 @@ interface CanvasProps {
   shadowOverlayOpacity?: number;
   showTransparencyGrid?: boolean;
   backgroundColor?: string;
-  // Если true -> показывает "Пустой холст". Если строка -> показывает строку в стиле. Если ReactNode -> рендерит как есть.
   placeholder?: ReactNode | boolean;
 }
 
@@ -218,11 +217,16 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(
     const bgClass = isDark ? 'bg-[#111]' : 'bg-[#e5e5e5]';
     const gridOpacity = isDark ? 'opacity-10' : 'opacity-30';
     const transitionDuration = isAutoContrast ? (autoContrastPeriod * 1000) * 0.9 : 300;
+
+    // Фоновая бесконечная сетка
     const gridPattern = 'linear-gradient(45deg, #888 25%, transparent 25%), linear-gradient(-45deg, #888 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #888 75%), linear-gradient(-45deg, transparent 75%, #888 75%)';
+
+    // Цвета для "шашечек" (прозрачность контента) в зависимости от темы
+    const checkerColor = isDark ? '#333' : '#ccc';
+    const checkerBg = isDark ? '#111' : '#fff';
 
     const hasDimensions = !!contentWidth && !!contentHeight;
 
-    // Logic for placeholder content
     let placeholderContent = placeholder;
     if (placeholder === true) {
       placeholderContent = "Пустой холст";
@@ -288,7 +292,6 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(
           )}
 
           {/* 2. STAGE WRAPPER */}
-          {/* Always rendered to prevent children unmount/remount */}
           <div
             className="relative"
             style={{
@@ -298,20 +301,20 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(
               zIndex: 1
             }}
           >
-            {/* 3. TRANSPARENCY GRID */}
+            {/* 3. TRANSPARENCY GRID (Adaptive Colors) */}
             {hasDimensions && showTransparencyGrid && (
               <div
-                className="absolute inset-0 pointer-events-none z-0"
+                className="absolute inset-0 pointer-events-none z-0 transition-colors duration-300"
                 style={{
                   backgroundImage: `
-                      linear-gradient(45deg, #ccc 25%, transparent 25%), 
-                      linear-gradient(-45deg, #ccc 25%, transparent 25%), 
-                      linear-gradient(45deg, transparent 75%, #ccc 75%), 
-                      linear-gradient(-45deg, transparent 75%, #ccc 75%)
+                      linear-gradient(45deg, ${checkerColor} 25%, transparent 25%), 
+                      linear-gradient(-45deg, ${checkerColor} 25%, transparent 25%), 
+                      linear-gradient(45deg, transparent 75%, ${checkerColor} 75%), 
+                      linear-gradient(-45deg, transparent 75%, ${checkerColor} 75%)
                     `,
                   backgroundSize: '20px 20px',
                   backgroundPosition: '0 0, 0 10px, 10px -10px, -10px 0px',
-                  backgroundColor: 'white'
+                  backgroundColor: checkerBg
                 }}
               />
             )}
@@ -331,7 +334,7 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(
           </div>
         </div>
 
-        {/* PLACEHOLDER / EMPTY STATE (Outside transforms, centered) */}
+        {/* PLACEHOLDER / EMPTY STATE */}
         {placeholderContent && (
           <div className="absolute inset-0 z-20 flex items-center justify-center pointer-events-none">
             {typeof placeholderContent === 'string' ? (
