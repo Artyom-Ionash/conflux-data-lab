@@ -8,9 +8,9 @@ import { Slider } from '../../ui/Slider';
 import { ToggleGroup, ToggleGroupItem } from '../../ui/ToggleGroup';
 
 // --- CONSTANTS & CONFIG ---
-const DEBOUNCE_DELAY = 50; // ms
-const VIEW_RESET_DELAY = 50; // ms
-const MAX_RGB_DISTANCE = Math.sqrt(3 * 255 ** 2); // ~441.67
+const DEBOUNCE_DELAY = 50;
+const VIEW_RESET_DELAY = 50;
+const MAX_RGB_DISTANCE = Math.sqrt(3 * 255 ** 2);
 const DOWNLOAD_FILENAME = 'removed_bg.png';
 
 const DEFAULT_SETTINGS = {
@@ -96,7 +96,6 @@ export function MonochromeBackgroundRemover() {
     img.onload = () => {
       setImgDimensions({ w: img.width, h: img.height });
 
-      // Init Source Canvas
       if (sourceCanvasRef.current) {
         sourceCanvasRef.current.width = img.width;
         sourceCanvasRef.current.height = img.height;
@@ -104,7 +103,6 @@ export function MonochromeBackgroundRemover() {
         ctx?.drawImage(img, 0, 0);
       }
 
-      // Init Preview Canvas
       if (previewCanvasRef.current) {
         previewCanvasRef.current.width = img.width;
         previewCanvasRef.current.height = img.height;
@@ -122,7 +120,6 @@ export function MonochromeBackgroundRemover() {
 
     setIsProcessing(true);
 
-    // Use timeout to allow UI update (loader)
     setTimeout(() => {
       const sourceCtx = sourceCanvasRef.current!.getContext('2d', { willReadFrequently: true });
       const previewCtx = previewCanvasRef.current!.getContext('2d');
@@ -150,7 +147,6 @@ export function MonochromeBackgroundRemover() {
 
       const alphaChannel = new Uint8Array(width * height);
 
-      // --- ALGORITHM START ---
       if (processingMode === 'flood-clear') {
         if (floodPoints.length === 0) {
           previewCtx.putImageData(imageData, 0, 0);
@@ -175,7 +171,6 @@ export function MonochromeBackgroundRemover() {
             if (visited[idx]) continue;
             visited[idx] = 1;
 
-            // Stop at contour color within tolerance
             if (getDist(idx * 4, contourRGB) <= tolVal) continue;
 
             alphaChannel[idx] = 0;
@@ -187,7 +182,6 @@ export function MonochromeBackgroundRemover() {
           }
         });
       } else {
-        // Standard linear scan (Remove / Keep)
         for (let i = 0, idx = 0; i < data.length; i += 4, idx++) {
           const dist = getDist(i, targetRGB);
           let alpha = 255;
@@ -207,9 +201,6 @@ export function MonochromeBackgroundRemover() {
         }
       }
 
-      // --- POST-PROCESSING ---
-
-      // 1. Choke (Erosion)
       if (edgeChoke > 0) {
         const eroded = new Uint8Array(alphaChannel);
         const r = edgeChoke;
@@ -219,7 +210,6 @@ export function MonochromeBackgroundRemover() {
             if (alphaChannel[i] === 0) continue;
 
             let hit = false;
-            // Check neighbors
             loop: for (let ky = -r; ky <= r; ky++) {
               for (let kx = -r; kx <= r; kx++) {
                 const ny = y + ky;
@@ -236,7 +226,6 @@ export function MonochromeBackgroundRemover() {
         alphaChannel.set(eroded);
       }
 
-      // 2. Blur
       if (edgeBlur > 0) {
         const blurred = new Uint8Array(alphaChannel);
         const r = Math.max(1, edgeBlur);
@@ -259,7 +248,6 @@ export function MonochromeBackgroundRemover() {
         alphaChannel.set(blurred);
       }
 
-      // 3. Paint Edges
       if (edgePaint > 0) {
         const r = edgePaint;
         for (let y = 0; y < height; y++) {
@@ -288,7 +276,6 @@ export function MonochromeBackgroundRemover() {
         }
       }
 
-      // Apply Alpha Channel to output data
       for (let i = 0, idx = 0; i < data.length; i += 4, idx++) {
         data[i + 3] = alphaChannel[idx];
       }
@@ -298,30 +285,20 @@ export function MonochromeBackgroundRemover() {
     }, 10);
   }, [originalUrl, targetColor, contourColor, tolerances, smoothness, processingMode, floodPoints, edgeChoke, edgeBlur, edgePaint]);
 
-  // --- EFFECTS ---
-
-  // Debounce processing to avoid freezing UI on every slider move
   useEffect(() => {
     if (!originalUrl) return;
     if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
-
     debounceTimerRef.current = setTimeout(() => {
       processImage();
     }, DEBOUNCE_DELAY);
-
-    return () => {
-      if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
-    };
+    return () => { if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current); };
   }, [originalUrl, targetColor, contourColor, tolerances, smoothness, processingMode, floodPoints, edgeChoke, edgeBlur, edgePaint]);
 
-  // Manual trigger for Flood Fill force update
   useEffect(() => {
     if (manualTrigger > 0 && processingMode === 'flood-clear') {
       processImage();
     }
   }, [manualTrigger]);
-
-  // --- HANDLERS ---
 
   const handleFilesSelected = (files: File[]) => {
     const file = files[0];
@@ -331,7 +308,6 @@ export function MonochromeBackgroundRemover() {
     setFloodPoints([]);
     loadOriginalToCanvas(url);
 
-    // Auto-detect color from top-left pixel
     const img = new Image();
     img.src = url;
     img.onload = () => {
@@ -367,11 +343,10 @@ export function MonochromeBackgroundRemover() {
     return null;
   };
 
-  // Point Interaction (Flood Fill)
   const handlePointPointerDown = (e: React.PointerEvent, index: number) => {
     e.stopPropagation();
     e.preventDefault();
-    if (e.button !== 0) return; // Only Left Click
+    if (e.button !== 0) return;
     setDraggingPointIndex(index);
     (e.target as HTMLElement).setPointerCapture(e.pointerId);
   };
@@ -418,11 +393,8 @@ export function MonochromeBackgroundRemover() {
   const clearAllPoints = () => setFloodPoints([]);
   const handleRunFloodFill = () => setManualTrigger(prev => prev + 1);
 
-  // --- RENDER ---
-
   const sidebarContent = (
     <div className="flex flex-col gap-6 pb-4">
-      {/* 1. File Input */}
       <div className="space-y-2">
         <label className="block text-xs font-bold uppercase text-zinc-400">Исходник</label>
         <FileDropzone
@@ -434,15 +406,12 @@ export function MonochromeBackgroundRemover() {
 
       {originalUrl && (
         <div className="space-y-6 animate-fade-in">
-
-          {/* 2. Mode Selection */}
           <div className="space-y-2">
             <label className="block text-xs font-bold uppercase text-zinc-400">Режим</label>
-
             <ToggleGroup
               type="single"
               value={processingMode}
-              gridCols={2} // <-- Используем встроенную сетку
+              gridCols={2}
               onValueChange={(val) => {
                 if (val) setProcessingMode(val as ProcessingMode);
               }}
@@ -450,14 +419,12 @@ export function MonochromeBackgroundRemover() {
               <ToggleGroupItem value="remove">
                 Убрать цвет
               </ToggleGroupItem>
-
               <ToggleGroupItem value="keep">
                 Оставить цвет
               </ToggleGroupItem>
-
               <ToggleGroupItem
                 value="flood-clear"
-                fullWidth // <-- Растягиваем на всю ширину
+                fullWidth
                 className="flex items-center justify-center gap-2"
               >
                 Заливка невидимостью
@@ -473,10 +440,8 @@ export function MonochromeBackgroundRemover() {
             )}
           </div>
 
-          {/* 3. Color Pickers */}
           <div className="space-y-2">
             <div className="flex flex-col gap-2">
-              {/* Target Color */}
               <div className="flex gap-3 items-center">
                 <div className="w-8 h-8 rounded border cursor-crosshair overflow-hidden relative group dark:border-zinc-700 flex-shrink-0 bg-white">
                   <img src={originalUrl} className="w-full h-full object-cover" onClick={handleEyedropper} alt="picker" />
@@ -490,7 +455,6 @@ export function MonochromeBackgroundRemover() {
                 </div>
               </div>
 
-              {/* Contour Color */}
               <div className="flex gap-3 items-center">
                 <div className="w-8 h-8 flex-shrink-0" />
                 <div className="flex-1 flex items-center gap-2 p-2 border rounded bg-zinc-50 dark:bg-zinc-800 dark:border-zinc-700">
@@ -504,25 +468,9 @@ export function MonochromeBackgroundRemover() {
             </div>
           </div>
 
-          {/* 4. Main Sliders */}
           <div className="space-y-4 bg-zinc-50 dark:bg-zinc-800/50 p-3 rounded-lg border border-zinc-100 dark:border-zinc-800">
-            <Slider
-              label="Допуск (%)"
-              value={tolerances[processingMode]}
-              onChange={(val) => setTolerances(p => ({ ...p, [processingMode]: val }))}
-              min={0} max={100}
-            />
-
-            {processingMode !== 'flood-clear' && (
-              <Slider
-                label="Сглаживание"
-                value={smoothness}
-                onChange={setSmoothness}
-                min={0} max={50}
-              />
-            )}
-
-            {/* 5. Edge Post-processing */}
+            <Slider label="Допуск (%)" value={tolerances[processingMode]} onChange={(val) => setTolerances(p => ({ ...p, [processingMode]: val }))} min={0} max={100} />
+            {processingMode !== 'flood-clear' && (<Slider label="Сглаживание" value={smoothness} onChange={setSmoothness} min={0} max={50} />)}
             <div className="pt-2 border-t border-zinc-200 dark:border-zinc-700/50">
               <div className="flex justify-between text-xs mb-3">
                 <span className="font-bold text-zinc-500 uppercase tracking-wide">Удаление ореолов</span>
@@ -533,38 +481,20 @@ export function MonochromeBackgroundRemover() {
             </div>
           </div>
 
-          {/* 6. Flood Fill Controls */}
           {processingMode === 'flood-clear' && (
             <div className="space-y-3 p-3 bg-blue-50 dark:bg-blue-900/10 rounded-lg border border-blue-100 dark:border-blue-900/30">
               <div className="flex justify-between items-center text-xs font-bold text-blue-800 dark:text-blue-200">
                 <span>Точки: {floodPoints.length}</span>
               </div>
               <div className="flex gap-2">
-                <button onClick={removeLastPoint} disabled={floodPoints.length === 0} className="flex-1 py-2 text-xs bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded hover:bg-zinc-50 disabled:opacity-50">
-                  Отменить
-                </button>
-                <button onClick={clearAllPoints} disabled={floodPoints.length === 0} className="flex-1 py-2 text-xs bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded hover:text-red-500 hover:bg-red-50 disabled:opacity-50">
-                  Сбросить
-                </button>
+                <button onClick={removeLastPoint} disabled={floodPoints.length === 0} className="flex-1 py-2 text-xs bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded hover:bg-zinc-50 disabled:opacity-50">Отменить</button>
+                <button onClick={clearAllPoints} disabled={floodPoints.length === 0} className="flex-1 py-2 text-xs bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded hover:text-red-500 hover:bg-red-50 disabled:opacity-50">Сбросить</button>
               </div>
-              <button
-                onClick={handleRunFloodFill}
-                disabled={floodPoints.length === 0 || isProcessing}
-                className="w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded font-bold text-xs shadow-sm uppercase tracking-wide disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {isProcessing ? 'Обработка...' : 'Принудительно обновить'}
-              </button>
+              <button onClick={handleRunFloodFill} disabled={floodPoints.length === 0 || isProcessing} className="w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded font-bold text-xs shadow-sm uppercase tracking-wide disabled:opacity-50 disabled:cursor-not-allowed">{isProcessing ? 'Обработка...' : 'Принудительно обновить'}</button>
             </div>
           )}
 
-          {/* 7. Download Button */}
-          <button
-            onClick={handleDownload}
-            disabled={!originalUrl}
-            className="w-full py-3 bg-zinc-900 dark:bg-white text-white dark:text-black rounded font-bold text-sm shadow hover:opacity-90 transition disabled:opacity-50"
-          >
-            Скачать
-          </button>
+          <button onClick={handleDownload} disabled={!originalUrl} className="w-full py-3 bg-zinc-900 dark:bg-white text-white dark:text-black rounded font-bold text-sm shadow hover:opacity-90 transition disabled:opacity-50">Скачать</button>
         </div>
       )}
     </div>
@@ -590,10 +520,7 @@ export function MonochromeBackgroundRemover() {
             ) : null
           }
         >
-          {/* HIDDEN SOURCE CANVAS */}
           <canvas ref={sourceCanvasRef} className="hidden" />
-
-          {/* VISIBLE PREVIEW CANVAS */}
           <canvas
             ref={previewCanvasRef}
             className="block select-none"
@@ -606,8 +533,6 @@ export function MonochromeBackgroundRemover() {
               display: originalUrl ? 'block' : 'none'
             }}
           />
-
-          {/* FLOOD FILL POINTS OVERLAY */}
           {processingMode === 'flood-clear' && floodPoints.map((pt, i) => (
             <div
               key={i}

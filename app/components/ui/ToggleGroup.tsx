@@ -3,20 +3,20 @@
 import * as React from 'react';
 import * as ToggleGroupPrimitive from '@radix-ui/react-toggle-group';
 
-// Хелпер для объединения классов без зависимостей
+// Хелпер для объединения классов
 function cx(...classes: (string | undefined | null | false)[]) {
   return classes.filter(Boolean).join(' ');
 }
 
 // --- Props ---
 
-// FIX: Changed from interface to type to avoid "statically known members" error
+// FIX: Используем type вместо interface, чтобы избежать ошибки "statically known members"
 type ToggleGroupProps = React.ComponentPropsWithoutRef<typeof ToggleGroupPrimitive.Root> & {
   /** Количество колонок в сетке. Если указано, включается display: grid. */
   gridCols?: number;
 };
 
-// FIX: Changed from interface to type
+// FIX: Используем type вместо interface
 type ToggleGroupItemProps = React.ComponentPropsWithoutRef<typeof ToggleGroupPrimitive.Item> & {
   /** Растянуть элемент на всю ширину сетки (col-span-full) */
   fullWidth?: boolean;
@@ -27,17 +27,11 @@ type ToggleGroupItemProps = React.ComponentPropsWithoutRef<typeof ToggleGroupPri
 const ToggleGroup = React.forwardRef<
   React.ElementRef<typeof ToggleGroupPrimitive.Root>,
   ToggleGroupProps
->(({ className, children, gridCols, style, ...props }, ref) => {
+>(({ className, children, gridCols, style, onKeyDown, ...props }, ref) => {
 
-  // Базовые стили контейнера
   const baseStyles = "bg-zinc-100 dark:bg-zinc-800 p-1 rounded-lg gap-1";
+  const layoutStyles = gridCols ? "grid" : "inline-flex flex-row";
 
-  // Если gridCols задан, используем Grid, иначе Flex
-  const layoutStyles = gridCols
-    ? "grid"
-    : "inline-flex flex-row";
-
-  // Динамически создаем стиль для колонок
   const dynamicStyle: React.CSSProperties = gridCols
     ? {
       ...style,
@@ -45,11 +39,32 @@ const ToggleGroup = React.forwardRef<
     }
     : style || {};
 
+  // FIX: Хак для поддержки навигации Вверх/Вниз в режиме сетки.
+  // Radix поддерживает только 1D навигацию (либо гор., либо верт.).
+  // В сетке мы перенаправляем Вверх->Влево и Вниз->Вправо, чтобы фокус перемещался линейно.
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    if (gridCols) {
+      if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        const event = new KeyboardEvent('keydown', { key: 'ArrowLeft', bubbles: true });
+        e.currentTarget.dispatchEvent(event);
+      }
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        const event = new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true });
+        e.currentTarget.dispatchEvent(event);
+      }
+    }
+    if (onKeyDown) onKeyDown(e);
+  };
+
   return (
     <ToggleGroupPrimitive.Root
       ref={ref}
       className={cx(baseStyles, layoutStyles, className)}
       style={dynamicStyle}
+      onKeyDown={handleKeyDown}
+      loop={true} // Включаем зацикливание навигации
       {...props}
     >
       {children}
@@ -76,7 +91,7 @@ const ToggleGroupItem = React.forwardRef<
       "data-[state=on]:bg-white data-[state=on]:text-zinc-950 data-[state=on]:shadow-sm",
       "dark:data-[state=on]:bg-zinc-700 dark:data-[state=on]:text-zinc-100",
 
-      // Утилита для растягивания на всю ширину грида
+      // Утилита для растягивания
       fullWidth ? "col-span-full" : undefined,
 
       className
