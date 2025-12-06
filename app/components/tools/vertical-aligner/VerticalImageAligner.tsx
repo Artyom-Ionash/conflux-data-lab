@@ -6,6 +6,7 @@ import * as Slider from '@radix-ui/react-slider';
 import * as ScrollArea from '@radix-ui/react-scroll-area';
 import * as Tooltip from '@radix-ui/react-tooltip';
 import { Canvas, CanvasRef } from '../../ui/Canvas';
+import { FileDropzone } from '../../ui/FileDropzone';
 
 // --- Constants (Limits relevant for 2025) ---
 const LIMIT_SAFE_MOBILE = 4096;
@@ -219,7 +220,6 @@ const DraggableImageSlot = React.memo(({
   const [isDragging, setIsDragging] = useState(false);
 
   const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
-    // Only accept left mouse button (0)
     if (e.button !== 0) return;
     e.stopPropagation();
 
@@ -235,7 +235,6 @@ const DraggableImageSlot = React.memo(({
     const initialOffsetY = img.offsetY;
     const scale = getCanvasScale();
 
-    // Use globalThis.PointerEvent for the native DOM event listener
     const handlePointerMove = (moveEvent: globalThis.PointerEvent) => {
       const dx = (moveEvent.clientX - startX) / scale;
       const dy = (moveEvent.clientY - startY) / scale;
@@ -248,7 +247,6 @@ const DraggableImageSlot = React.memo(({
       target.removeEventListener('pointerup', handlePointerUp as EventListener);
     };
 
-    // Cast to EventListener to satisfy TS strict checks
     target.addEventListener('pointermove', handlePointerMove as EventListener);
     target.addEventListener('pointerup', handlePointerUp as EventListener);
   };
@@ -385,8 +383,8 @@ export function VerticalImageAligner() {
     setImages(prev => prev.map(x => ({ ...x, isActive: x.id === id })));
   }, []);
 
-  const handleFilesChange = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
-    const files = event.target.files;
+  // Updated to accept File[] directly from Dropzone
+  const processFiles = useCallback((files: File[]) => {
     if (!files || files.length === 0) return;
     const newImages: AlignImage[] = [];
     const isListEmpty = images.length === 0;
@@ -419,7 +417,6 @@ export function VerticalImageAligner() {
       };
       img.src = item.url;
     });
-    event.target.value = '';
   }, [images.length]);
 
   const handleRemoveImage = useCallback((id: string) => {
@@ -537,16 +534,19 @@ export function VerticalImageAligner() {
             <h2 className="mb-2 text-xl font-bold">Вертикальный склейщик</h2>
 
             <div className="mb-6 flex flex-col gap-2">
-              <label className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed border-zinc-300 bg-zinc-50 p-5 transition hover:bg-zinc-100 dark:border-zinc-700 dark:bg-zinc-800/50 dark:hover:bg-zinc-800">
-                <span className="text-sm font-medium">Добавить изображения</span>
-                <input type="file" multiple accept="image/*" className="hidden" onChange={handleFilesChange} />
-              </label>
+              <FileDropzone
+                onFilesSelected={processFiles}
+                multiple={true}
+                label="Добавить изображения"
+              />
             </div>
 
             {images.length > 0 && (
               <div className="space-y-6 pb-4">
+                {/* Controls... */}
+                {/* ... (остальной код панели управления без изменений) ... */}
 
-                {/* Export Button with Warning Logic */}
+                {/* Export Button */}
                 <div className="space-y-2">
                   <button
                     onClick={handleExport}
@@ -725,7 +725,7 @@ export function VerticalImageAligner() {
           shadowOverlayOpacity={images.length ? 0.5 : 0}
           showTransparencyGrid={true}
           backgroundColor={cssBackgroundColor}
-          placeholder={!images.length} // <-- Используем true, Canvas подставит "Пустой холст"
+          placeholder={!images.length}
         >
           {/* RED GRID */}
           {showRedGrid && (

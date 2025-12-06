@@ -2,6 +2,7 @@
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Canvas, CanvasRef } from '../../ui/Canvas';
+import { FileDropzone } from '../../ui/FileDropzone';
 
 // --- ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ---
 function hexToRgb(hex: string) {
@@ -232,8 +233,8 @@ export function MonochromeBackgroundRemover() {
   useEffect(() => { if (manualTrigger > 0 && processingMode === 'flood-clear') processImage(); }, [manualTrigger]);
 
   // --- HANDLERS ---
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
+  const handleFilesSelected = (files: File[]) => {
+    const file = files[0];
     if (!file) return;
     const url = URL.createObjectURL(file);
     setOriginalUrl(url);
@@ -323,10 +324,11 @@ export function MonochromeBackgroundRemover() {
         <div className="flex-1 overflow-y-auto p-5 space-y-6 custom-scrollbar">
           <div className="space-y-2">
             <label className="block text-xs font-bold uppercase text-zinc-400">Исходник</label>
-            <label className="flex flex-col items-center justify-center w-full h-24 border-2 border-dashed rounded-lg cursor-pointer bg-zinc-50 hover:bg-zinc-100 border-zinc-300 dark:bg-zinc-800/50 dark:border-zinc-700 dark:hover:bg-zinc-800 transition-all group">
-              <span className="text-xs text-zinc-500">Загрузить изображение</span>
-              <input type="file" className="hidden" accept="image/*" onChange={handleFileUpload} />
-            </label>
+            <FileDropzone
+              onFilesSelected={handleFilesSelected}
+              multiple={false}
+              label="Загрузить изображение"
+            />
           </div>
           {originalUrl && (
             <div className="space-y-6 animate-fade-in">
@@ -398,7 +400,7 @@ export function MonochromeBackgroundRemover() {
             contentHeight={imgDimensions.h}
             shadowOverlayOpacity={originalUrl ? 0.8 : 0}
             showTransparencyGrid={true}
-            placeholder={!originalUrl} // <-- Используем true, Canvas подставит "Пустой холст"
+            placeholder={!originalUrl}
           >
             {/* HIDDEN SOURCE CANVAS */}
             <canvas ref={sourceCanvasRef} className="hidden" />
