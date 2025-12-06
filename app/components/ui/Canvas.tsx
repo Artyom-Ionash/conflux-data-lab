@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useRef, useState, useImperativeHandle, forwardRef, ReactNode, useEffect, useCallback, useLayoutEffect } from 'react';
-import { FileDropzone } from './FileDropzone';
 
 // --- CONSTANTS ---
 const DEFAULT_SCALE_MIN = 0.05;
@@ -11,7 +10,7 @@ const ZOOM_INTENSITY = 0.002;
 const PAN_BUTTON_CODE = 1; // Middle mouse button
 const STABILIZATION_DELAY = 150; // ms
 const AUTO_CONTRAST_PERIOD_DEFAULT = 5; // seconds
-const OVERLAY_SPREAD_SIZE = 50000; // px (достаточно большое число, чтобы перекрыть экран)
+const OVERLAY_SPREAD_SIZE = 50000; // px
 
 const THEME_DARK_BG = 'bg-[#111]';
 const THEME_LIGHT_BG = 'bg-[#e5e5e5]';
@@ -54,28 +53,8 @@ interface CanvasProps {
   shadowOverlayOpacity?: number;
   showTransparencyGrid?: boolean;
   backgroundColor?: string;
-  placeholder?: ReactNode | boolean;
-  onUpload?: (files: File[]) => void;
+  placeholder?: ReactNode; // Теперь это просто ReactNode
 }
-
-const UploadPlaceholder = ({ onUpload }: { onUpload: (files: File[]) => void }) => (
-  <FileDropzone
-    onFilesSelected={onUpload}
-    multiple={true}
-    className="w-full h-full border-none bg-transparent hover:bg-zinc-50/50 dark:hover:bg-zinc-900/50 transition-colors"
-    enableWindowDrop={false}
-  >
-    <div className="flex flex-col items-center justify-center text-zinc-400 animate-in fade-in zoom-in-95 duration-300">
-      <div className="p-4 rounded-full bg-zinc-100 dark:bg-zinc-800 mb-4 transition-transform group-hover:scale-110 duration-200">
-        <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-        </svg>
-      </div>
-      <p className="text-lg font-medium mb-1 text-zinc-600 dark:text-zinc-300">Перетащите изображения сюда</p>
-      <p className="text-sm opacity-60">или кликните для выбора</p>
-    </div>
-  </FileDropzone>
-);
 
 export const Canvas = forwardRef<CanvasRef, CanvasProps>(
   ({
@@ -92,7 +71,6 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(
     showTransparencyGrid = false,
     backgroundColor,
     placeholder,
-    onUpload,
   }, ref) => {
     const containerRef = useRef<HTMLDivElement>(null);
     const contentRef = useRef<HTMLDivElement>(null);
@@ -264,19 +242,6 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(
     const checkerBg = isDark ? CHECKER_BG_DARK : CHECKER_BG_LIGHT;
     const hasDimensions = !!contentWidth && !!contentHeight;
 
-    let placeholderContent: ReactNode = null;
-    if (placeholder) {
-      if (typeof placeholder === 'boolean') {
-        if (onUpload) {
-          placeholderContent = <UploadPlaceholder onUpload={onUpload} />;
-        } else {
-          placeholderContent = "Пустой холст";
-        }
-      } else {
-        placeholderContent = placeholder;
-      }
-    }
-
     return (
       <div
         ref={containerRef}
@@ -317,7 +282,6 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(
               style={{
                 width: contentWidth,
                 height: contentHeight,
-                // Используем именованную константу вместо магического числа
                 boxShadow: `0 0 0 ${OVERLAY_SPREAD_SIZE}px rgba(0,0,0,${shadowOverlayOpacity})`,
                 zIndex: 0
               }}
@@ -358,17 +322,10 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(
           </div>
         </div>
 
-        {placeholderContent && (
-          <div className="absolute inset-0 z-20 flex items-center justify-center pointer-events-none">
-            {typeof placeholderContent === 'string' ? (
-              <span className="bg-white/80 dark:bg-black/80 px-4 py-2 rounded-lg shadow-sm backdrop-blur-sm text-zinc-400 select-none font-medium text-sm border border-zinc-200/50 dark:border-zinc-700/50">
-                {placeholderContent}
-              </span>
-            ) : (
-              <div className="w-full h-full pointer-events-auto">
-                {placeholderContent}
-              </div>
-            )}
+        {/* Placeholder Area: Rendered only if content is missing (no width/height) and placeholder prop exists */}
+        {!hasDimensions && placeholder && (
+          <div className="absolute inset-0 z-20 flex items-center justify-center pointer-events-auto">
+            {placeholder}
           </div>
         )}
 

@@ -2,7 +2,7 @@
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Canvas, CanvasRef } from '../../ui/Canvas';
-import { FileDropzone } from '../../ui/FileDropzone';
+import { FileDropzone, CanvasFilePlaceholder } from '../../ui/FileDropzone';
 import { ToolLayout } from '../ToolLayout';
 import { Slider } from '../../ui/Slider';
 
@@ -579,8 +579,7 @@ export function MonochromeBackgroundRemover() {
           contentHeight={imgDimensions.h}
           shadowOverlayOpacity={originalUrl ? 0.8 : 0}
           showTransparencyGrid={true}
-          placeholder={!originalUrl} // Uses default interactive placeholder
-          onUpload={handleFilesSelected} // Connects placeholder to upload logic
+          placeholder={<CanvasFilePlaceholder onUpload={handleFilesSelected} />}
         >
           {/* HIDDEN SOURCE CANVAS */}
           <canvas ref={sourceCanvasRef} className="hidden" />

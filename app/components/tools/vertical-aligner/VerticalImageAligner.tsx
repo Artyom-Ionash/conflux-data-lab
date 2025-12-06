@@ -2,7 +2,7 @@
 
 import React, { useCallback, useMemo, useState, useRef, useEffect } from 'react';
 import { Canvas, CanvasRef } from '../../ui/Canvas';
-import { FileDropzone } from '../../ui/FileDropzone';
+import { FileDropzone, CanvasFilePlaceholder } from '../../ui/FileDropzone';
 import { ToolLayout } from '../ToolLayout';
 import { Switch } from '../../ui/Switch';
 import { TextureDimensionSlider } from '../../domain/graphics/TextureDimensionSlider';
@@ -326,8 +326,7 @@ export function VerticalImageAligner() {
         shadowOverlayOpacity={images.length ? 0.5 : 0}
         showTransparencyGrid={true}
         backgroundColor={cssBackgroundColor}
-        placeholder={!images.length}
-        onUpload={processFiles}
+        placeholder={<CanvasFilePlaceholder onUpload={processFiles} multiple={true} />}
       >
         {/* User Selected Background Color */}
         <div className="absolute inset-0" style={{ backgroundColor: cssBackgroundColor }} />
