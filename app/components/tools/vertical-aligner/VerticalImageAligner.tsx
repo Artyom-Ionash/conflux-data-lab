@@ -3,27 +3,45 @@
 import React, { useCallback, useMemo, useState, useRef, useEffect } from 'react';
 import { Canvas, CanvasRef } from '../../ui/Canvas';
 import { FileDropzone } from '../../ui/FileDropzone';
-import { ToolLayout } from '..//ToolLayout';
+import { ToolLayout } from '../ToolLayout';
 import { Switch } from '../../ui/Switch';
 import { TextureDimensionSlider } from '../../domain/graphics/TextureDimensionSlider';
 
-// --- Constants ---
+// --- CONSTANTS ---
+// Hardware limits handled by TextureDimensionSlider, but browser limit is needed for export check
 const LIMIT_MAX_BROWSER = 16384;
+const EXPORT_DELAY_JSON = 100; // ms to wait before downloading JSON after PNG
 
-// --- Types ---
+const DEFAULT_SETTINGS = {
+  slotSize: 1, // Default width/height
+  frameStep: 1,
+  frameColor: '#00ff00',
+  redGridColor: '#ff0000',
+  bgColor: '#ffffff',
+  bgOpacity: 0,
+};
+
+// --- TYPES ---
 type AlignImage = {
-  id: string; file: File; url: string; name: string;
-  offsetX: number; offsetY: number; isActive: boolean;
-  naturalWidth: number; naturalHeight: number;
+  id: string;
+  file: File;
+  url: string;
+  name: string;
+  offsetX: number;
+  offsetY: number;
+  isActive: boolean;
+  naturalWidth: number;
+  naturalHeight: number;
 };
 
 function revokeObjectURLSafely(url: string) { try { URL.revokeObjectURL(url); } catch { } }
 
-// --- Draggable Image Slot ---
+// --- DRAGGABLE IMAGE SLOT ---
 interface DraggableImageSlotProps {
   img: AlignImage; index: number; slotHeight: number; slotWidth: number;
   getCanvasScale: () => number; onActivate: (id: string) => void; onUpdatePosition: (id: string, x: number, y: number) => void;
 }
+
 const DraggableImageSlot = React.memo(({ img, index, slotHeight, slotWidth, getCanvasScale, onActivate, onUpdatePosition }: DraggableImageSlotProps) => {
   const [isDragging, setIsDragging] = useState(false);
 
@@ -80,19 +98,21 @@ export function VerticalImageAligner() {
   useEffect(() => { imagesRef.current = images; }, [images]);
 
   // Dimensions
-  const [slotHeight, setSlotHeight] = useState(1);
-  const [slotWidth, setSlotWidth] = useState(1);
+  const [slotHeight, setSlotHeight] = useState(DEFAULT_SETTINGS.slotSize);
+  const [slotWidth, setSlotWidth] = useState(DEFAULT_SETTINGS.slotSize);
 
   // Grids & Settings
   const [showFrameGrid, setShowFrameGrid] = useState(true);
-  const [frameStepX, setFrameStepX] = useState(1);
-  const [frameBorderColor] = useState('#00ff00');
+  const [frameStepX, setFrameStepX] = useState(DEFAULT_SETTINGS.frameStep);
+  const [frameBorderColor] = useState(DEFAULT_SETTINGS.frameColor);
+
   const [showRedGrid, setShowRedGrid] = useState(true);
   const [redGridOffsetX, setRedGridOffsetX] = useState(0);
   const [redGridOffsetY, setRedGridOffsetY] = useState(0);
-  const [redGridColor] = useState('#ff0000');
-  const [bgColorHex] = useState('#ffffff');
-  const [bgOpacity] = useState(0);
+  const [redGridColor] = useState(DEFAULT_SETTINGS.redGridColor);
+
+  const [bgColorHex] = useState(DEFAULT_SETTINGS.bgColor);
+  const [bgOpacity] = useState(DEFAULT_SETTINGS.bgOpacity);
 
   const [draggingListIndex, setDraggingListIndex] = useState<number | null>(null);
   const [isExporting, setIsExporting] = useState(false);
@@ -115,14 +135,18 @@ export function VerticalImageAligner() {
     return `rgba(${r}, ${g}, ${b}, ${bgOpacity})`;
   }, [bgColorHex, bgOpacity]);
 
-  // Handlers
+  // --- Handlers ---
   const getCanvasScale = useCallback(() => workspaceRef.current?.getTransform().scale || 1, []);
+
   const handleUpdatePosition = useCallback((id: string, x: number, y: number) => {
     setImages(prev => prev.map(img => img.id === id ? { ...img, offsetX: x, offsetY: y } : img));
   }, []);
+
   const handleCenterAllX = useCallback(() => setImages(prev => prev.map(img => ({ ...img, offsetX: Math.round((slotWidth - img.naturalWidth) / 2) }))), [slotWidth]);
   const handleCenterAllY = useCallback(() => setImages(prev => prev.map(img => ({ ...img, offsetY: Math.round((slotHeight - img.naturalHeight) / 2) }))), [slotHeight]);
+
   const handleActivate = useCallback((id: string) => setImages(prev => prev.map(x => ({ ...x, isActive: x.id === id }))), []);
+
   const handleRemoveImage = useCallback((id: string) => {
     setImages((prev) => {
       const target = prev.find((img) => img.id === id);
@@ -130,7 +154,9 @@ export function VerticalImageAligner() {
       return prev.filter((img) => img.id !== id);
     });
   }, []);
+
   const handleDragStart = (e: React.DragEvent, index: number) => { setDraggingListIndex(index); };
+
   const handleDrop = (e: React.DragEvent, targetIndex: number) => {
     e.preventDefault();
     if (draggingListIndex === null || draggingListIndex === targetIndex) { setDraggingListIndex(null); return; }
@@ -147,13 +173,16 @@ export function VerticalImageAligner() {
     if (!files || files.length === 0) return;
     const newImages: AlignImage[] = [];
     const isListEmpty = images.length === 0;
+
     Array.from(files).forEach((file, index) => {
       if (!file.type.startsWith('image/')) return;
       const url = URL.createObjectURL(file);
       const id = `${Date.now()}-${index}-${Math.random().toString(36).substr(2, 9)}`;
       newImages.push({ id, file, url, name: file.name, offsetX: 0, offsetY: 0, isActive: isListEmpty && index === 0, naturalWidth: 0, naturalHeight: 0 });
     });
+
     setImages((prev) => [...prev, ...newImages]);
+
     newImages.forEach((item, idx) => {
       const img = new Image();
       img.onload = () => {
@@ -172,17 +201,20 @@ export function VerticalImageAligner() {
       const loaded = await Promise.all(images.map((item) => new Promise<{ meta: AlignImage; img: HTMLImageElement }>((resolve, reject) => {
         const i = new Image(); i.onload = () => resolve({ meta: item, img: i }); i.onerror = () => reject(); i.src = item.url;
       })));
+
       const finalW = slotWidth;
       const finalH = images.length * slotHeight;
       const canvas = document.createElement('canvas');
       canvas.width = finalW; canvas.height = finalH;
       const ctx = canvas.getContext('2d');
       if (!ctx) return;
+
       const r = parseInt(bgColorHex.slice(1, 3), 16);
       const g = parseInt(bgColorHex.slice(3, 5), 16);
       const b = parseInt(bgColorHex.slice(5, 7), 16);
       ctx.fillStyle = `rgba(${r}, ${g}, ${b}, ${bgOpacity})`;
       ctx.fillRect(0, 0, finalW, finalH);
+
       loaded.forEach(({ meta, img }, index) => {
         const slotY = index * slotHeight;
         ctx.save();
@@ -190,6 +222,7 @@ export function VerticalImageAligner() {
         ctx.drawImage(img, meta.offsetX, slotY + meta.offsetY, img.width, img.height);
         ctx.restore();
       });
+
       const atlasData = {
         meta: { app: "VerticalImageAligner", version: "1.0", size: { w: finalW, h: finalH }, scale: 1, generated: new Date().toISOString() },
         frames: images.reduce((acc, img, index) => {
@@ -201,14 +234,16 @@ export function VerticalImageAligner() {
           return acc;
         }, {} as Record<string, any>)
       };
+
       const pngLink = document.createElement('a'); pngLink.href = canvas.toDataURL('image/png'); pngLink.download = 'aligned-export.png';
       document.body.appendChild(pngLink); pngLink.click(); document.body.removeChild(pngLink);
+
       setTimeout(() => {
         const jsonString = JSON.stringify(atlasData, null, 2);
         const jsonBlob = new Blob([jsonString], { type: "application/json" });
         const jsonLink = document.createElement('a'); jsonLink.href = URL.createObjectURL(jsonBlob); jsonLink.download = 'aligned-export.json';
         document.body.appendChild(jsonLink); jsonLink.click(); document.body.removeChild(jsonLink); URL.revokeObjectURL(jsonLink.href);
-      }, 100);
+      }, EXPORT_DELAY_JSON);
     } finally { setIsExporting(false); }
   }, [images, slotHeight, slotWidth, bgColorHex, bgOpacity, isCriticalHeight]);
 
@@ -229,7 +264,6 @@ export function VerticalImageAligner() {
 
           <div className="p-4 bg-zinc-50 dark:bg-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-700">
             <div className="text-xs font-bold text-zinc-500 mb-3 uppercase tracking-wide">Размеры слота</div>
-            {/* TextureDimensionSlider теперь содержит всю логику лимитов и PoT */}
             <TextureDimensionSlider label="Ширина" value={slotWidth} onChange={setSlotWidth} max={16384} />
             <TextureDimensionSlider label="Высота" value={slotHeight} onChange={setSlotHeight} max={16384} />
             <div className="mt-2 text-xs font-medium text-zinc-500 text-center">Итого: <span className="text-zinc-900 dark:text-zinc-100">{slotWidth}</span> x <span className="text-zinc-900 dark:text-zinc-100">{totalHeight}</span> px</div>
@@ -291,8 +325,8 @@ export function VerticalImageAligner() {
         showTransparencyGrid={true}
         backgroundColor={cssBackgroundColor}
         placeholder={!images.length}
+        onUpload={processFiles}
       >
-        {/* User Selected Background Color */}
         <div className="absolute inset-0" style={{ backgroundColor: cssBackgroundColor }} />
 
         {showRedGrid && (
