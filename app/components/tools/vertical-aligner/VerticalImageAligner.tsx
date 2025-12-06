@@ -8,12 +8,14 @@ import { Switch } from '../../ui/Switch';
 import { TextureDimensionSlider } from '../../domain/graphics/TextureDimensionSlider';
 
 // --- CONSTANTS ---
-// Hardware limits handled by TextureDimensionSlider, but browser limit is needed for export check
 const LIMIT_MAX_BROWSER = 16384;
-const EXPORT_DELAY_JSON = 100; // ms to wait before downloading JSON after PNG
+const EXPORT_DELAY_JSON = 100; // ms
+const EXPORT_FILENAME = 'aligned-export';
+const EXPORT_META_APP = "VerticalImageAligner";
+const EXPORT_META_VERSION = "1.0";
 
 const DEFAULT_SETTINGS = {
-  slotSize: 1, // Default width/height
+  slotSize: 1,
   frameStep: 1,
   frameColor: '#00ff00',
   redGridColor: '#ff0000',
@@ -224,7 +226,7 @@ export function VerticalImageAligner() {
       });
 
       const atlasData = {
-        meta: { app: "VerticalImageAligner", version: "1.0", size: { w: finalW, h: finalH }, scale: 1, generated: new Date().toISOString() },
+        meta: { app: EXPORT_META_APP, version: EXPORT_META_VERSION, size: { w: finalW, h: finalH }, scale: 1, generated: new Date().toISOString() },
         frames: images.reduce((acc, img, index) => {
           acc[img.name] = {
             frame: { x: 0, y: index * slotHeight, w: slotWidth, h: slotHeight },
@@ -235,13 +237,13 @@ export function VerticalImageAligner() {
         }, {} as Record<string, any>)
       };
 
-      const pngLink = document.createElement('a'); pngLink.href = canvas.toDataURL('image/png'); pngLink.download = 'aligned-export.png';
+      const pngLink = document.createElement('a'); pngLink.href = canvas.toDataURL('image/png'); pngLink.download = `${EXPORT_FILENAME}.png`;
       document.body.appendChild(pngLink); pngLink.click(); document.body.removeChild(pngLink);
 
       setTimeout(() => {
         const jsonString = JSON.stringify(atlasData, null, 2);
         const jsonBlob = new Blob([jsonString], { type: "application/json" });
-        const jsonLink = document.createElement('a'); jsonLink.href = URL.createObjectURL(jsonBlob); jsonLink.download = 'aligned-export.json';
+        const jsonLink = document.createElement('a'); jsonLink.href = URL.createObjectURL(jsonBlob); jsonLink.download = `${EXPORT_FILENAME}.json`;
         document.body.appendChild(jsonLink); jsonLink.click(); document.body.removeChild(jsonLink); URL.revokeObjectURL(jsonLink.href);
       }, EXPORT_DELAY_JSON);
     } finally { setIsExporting(false); }
@@ -264,8 +266,8 @@ export function VerticalImageAligner() {
 
           <div className="p-4 bg-zinc-50 dark:bg-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-700">
             <div className="text-xs font-bold text-zinc-500 mb-3 uppercase tracking-wide">Размеры слота</div>
-            <TextureDimensionSlider label="Ширина" value={slotWidth} onChange={setSlotWidth} max={16384} />
-            <TextureDimensionSlider label="Высота" value={slotHeight} onChange={setSlotHeight} max={16384} />
+            <TextureDimensionSlider label="Ширина" value={slotWidth} onChange={setSlotWidth} max={LIMIT_MAX_BROWSER} />
+            <TextureDimensionSlider label="Высота" value={slotHeight} onChange={setSlotHeight} max={LIMIT_MAX_BROWSER} />
             <div className="mt-2 text-xs font-medium text-zinc-500 text-center">Итого: <span className="text-zinc-900 dark:text-zinc-100">{slotWidth}</span> x <span className="text-zinc-900 dark:text-zinc-100">{totalHeight}</span> px</div>
           </div>
 
@@ -327,6 +329,7 @@ export function VerticalImageAligner() {
         placeholder={!images.length}
         onUpload={processFiles}
       >
+        {/* User Selected Background Color */}
         <div className="absolute inset-0" style={{ backgroundColor: cssBackgroundColor }} />
 
         {showRedGrid && (

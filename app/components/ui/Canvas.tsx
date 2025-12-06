@@ -11,6 +11,7 @@ const ZOOM_INTENSITY = 0.002;
 const PAN_BUTTON_CODE = 1; // Middle mouse button
 const STABILIZATION_DELAY = 150; // ms
 const AUTO_CONTRAST_PERIOD_DEFAULT = 5; // seconds
+const OVERLAY_SPREAD_SIZE = 50000; // px (достаточно большое число, чтобы перекрыть экран)
 
 const THEME_DARK_BG = 'bg-[#111]';
 const THEME_LIGHT_BG = 'bg-[#e5e5e5]';
@@ -134,6 +135,8 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(
     const stabilizeView = useCallback(() => {
       if (!contentRef.current) return;
       updateDOM(false);
+      // Force reflow
+      /* eslint-disable-next-line @typescript-eslint/no-unused-vars */
       const _force = contentRef.current.offsetHeight;
     }, [updateDOM]);
 
@@ -314,7 +317,8 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(
               style={{
                 width: contentWidth,
                 height: contentHeight,
-                boxShadow: `0 0 0 50000px rgba(0,0,0,${shadowOverlayOpacity})`,
+                // Используем именованную константу вместо магического числа
+                boxShadow: `0 0 0 ${OVERLAY_SPREAD_SIZE}px rgba(0,0,0,${shadowOverlayOpacity})`,
                 zIndex: 0
               }}
             />
@@ -333,12 +337,7 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(
               <div
                 className="absolute inset-0 pointer-events-none z-0 transition-colors duration-300"
                 style={{
-                  backgroundImage: `
-                      linear-gradient(45deg, ${checkerColor} 25%, transparent 25%), 
-                      linear-gradient(-45deg, ${checkerColor} 25%, transparent 25%), 
-                      linear-gradient(45deg, transparent 75%, ${checkerColor} 75%), 
-                      linear-gradient(-45deg, transparent 75%, ${checkerColor} 75%)
-                    `,
+                  backgroundImage: `linear-gradient(45deg, ${checkerColor} 25%, transparent 25%), linear-gradient(-45deg, ${checkerColor} 25%, transparent 25%), linear-gradient(45deg, transparent 75%, ${checkerColor} 75%), linear-gradient(-45deg, transparent 75%, ${checkerColor} 75%)`,
                   backgroundSize: '20px 20px',
                   backgroundPosition: '0 0, 0 10px, 10px -10px, -10px 0px',
                   backgroundColor: checkerBg

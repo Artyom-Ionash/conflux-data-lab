@@ -10,6 +10,7 @@ import { Slider } from '../../ui/Slider';
 const DEBOUNCE_DELAY = 50; // ms
 const VIEW_RESET_DELAY = 50; // ms
 const MAX_RGB_DISTANCE = Math.sqrt(3 * 255 ** 2); // ~441.67
+const DOWNLOAD_FILENAME = 'removed_bg.png';
 
 const DEFAULT_SETTINGS = {
   targetColor: '#ffffff',
@@ -350,7 +351,7 @@ export function MonochromeBackgroundRemover() {
   const handleDownload = () => {
     if (previewCanvasRef.current) {
       const link = document.createElement('a');
-      link.download = 'removed_bg.png';
+      link.download = DOWNLOAD_FILENAME;
       link.href = previewCanvasRef.current.toDataURL('image/png');
       link.click();
     }
