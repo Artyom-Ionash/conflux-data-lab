@@ -2,15 +2,15 @@
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Canvas, CanvasRef } from '../../ui/Canvas';
-// Импортируем оба компонента из одного файла
 import { FileDropzone, FileDropzonePlaceholder } from '../../ui/FileDropzone';
 import { ToolLayout } from '../ToolLayout';
 import { Slider } from '../../ui/Slider';
+import { ToggleGroup, ToggleGroupItem } from '../../ui/ToggleGroup';
 
 // --- CONSTANTS & CONFIG ---
-const DEBOUNCE_DELAY = 50;
-const VIEW_RESET_DELAY = 50;
-const MAX_RGB_DISTANCE = Math.sqrt(3 * 255 ** 2);
+const DEBOUNCE_DELAY = 50; // ms
+const VIEW_RESET_DELAY = 50; // ms
+const MAX_RGB_DISTANCE = Math.sqrt(3 * 255 ** 2); // ~441.67
 const DOWNLOAD_FILENAME = 'removed_bg.png';
 
 const DEFAULT_SETTINGS = {
@@ -438,28 +438,32 @@ export function MonochromeBackgroundRemover() {
           {/* 2. Mode Selection */}
           <div className="space-y-2">
             <label className="block text-xs font-bold uppercase text-zinc-400">Режим</label>
-            <div className="flex flex-col gap-1 bg-zinc-100 dark:bg-zinc-800 p-1 rounded-lg">
-              <div className="grid grid-cols-2 gap-1">
-                <button
-                  onClick={() => setProcessingMode('remove')}
-                  className={`text-xs font-medium py-2 rounded-md transition-all ${processingMode === 'remove' ? 'bg-white dark:bg-zinc-700 text-blue-600 dark:text-blue-300 shadow-sm' : 'text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300'}`}
-                >
-                  Убрать цвет
-                </button>
-                <button
-                  onClick={() => setProcessingMode('keep')}
-                  className={`text-xs font-medium py-2 rounded-md transition-all ${processingMode === 'keep' ? 'bg-white dark:bg-zinc-700 text-blue-600 dark:text-blue-300 shadow-sm' : 'text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300'}`}
-                >
-                  Оставить цвет
-                </button>
-              </div>
-              <button
-                onClick={() => setProcessingMode('flood-clear')}
-                className={`text-xs font-medium py-2 rounded-md transition-all flex items-center justify-center gap-2 ${processingMode === 'flood-clear' ? 'bg-white dark:bg-zinc-700 text-blue-600 dark:text-blue-300 shadow-sm' : 'text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300'}`}
+
+            <ToggleGroup
+              type="single"
+              value={processingMode}
+              gridCols={2} // <-- Используем встроенную сетку
+              onValueChange={(val) => {
+                if (val) setProcessingMode(val as ProcessingMode);
+              }}
+            >
+              <ToggleGroupItem value="remove">
+                Убрать цвет
+              </ToggleGroupItem>
+
+              <ToggleGroupItem value="keep">
+                Оставить цвет
+              </ToggleGroupItem>
+
+              <ToggleGroupItem
+                value="flood-clear"
+                fullWidth // <-- Растягиваем на всю ширину
+                className="flex items-center justify-center gap-2"
               >
                 Заливка невидимостью
-              </button>
-            </div>
+              </ToggleGroupItem>
+            </ToggleGroup>
+
             {processingMode === 'flood-clear' && (
               <div className="text-[10px] text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 p-2 rounded border border-blue-100 dark:border-blue-800 leading-tight">
                 1. Кликните на холст, чтобы поставить точки.<br />
@@ -580,7 +584,6 @@ export function MonochromeBackgroundRemover() {
           contentHeight={imgDimensions.h}
           shadowOverlayOpacity={originalUrl ? 0.8 : 0}
           showTransparencyGrid={true}
-          // Передача компонента-заглушки
           placeholder={
             !originalUrl ? (
               <FileDropzonePlaceholder onUpload={handleFilesSelected} />

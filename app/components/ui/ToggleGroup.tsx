@@ -1,0 +1,92 @@
+'use client';
+
+import * as React from 'react';
+import * as ToggleGroupPrimitive from '@radix-ui/react-toggle-group';
+
+// Хелпер для объединения классов без зависимостей
+function cx(...classes: (string | undefined | null | false)[]) {
+  return classes.filter(Boolean).join(' ');
+}
+
+// --- Props ---
+
+// FIX: Changed from interface to type to avoid "statically known members" error
+type ToggleGroupProps = React.ComponentPropsWithoutRef<typeof ToggleGroupPrimitive.Root> & {
+  /** Количество колонок в сетке. Если указано, включается display: grid. */
+  gridCols?: number;
+};
+
+// FIX: Changed from interface to type
+type ToggleGroupItemProps = React.ComponentPropsWithoutRef<typeof ToggleGroupPrimitive.Item> & {
+  /** Растянуть элемент на всю ширину сетки (col-span-full) */
+  fullWidth?: boolean;
+};
+
+// --- Components ---
+
+const ToggleGroup = React.forwardRef<
+  React.ElementRef<typeof ToggleGroupPrimitive.Root>,
+  ToggleGroupProps
+>(({ className, children, gridCols, style, ...props }, ref) => {
+
+  // Базовые стили контейнера
+  const baseStyles = "bg-zinc-100 dark:bg-zinc-800 p-1 rounded-lg gap-1";
+
+  // Если gridCols задан, используем Grid, иначе Flex
+  const layoutStyles = gridCols
+    ? "grid"
+    : "inline-flex flex-row";
+
+  // Динамически создаем стиль для колонок
+  const dynamicStyle: React.CSSProperties = gridCols
+    ? {
+      ...style,
+      gridTemplateColumns: `repeat(${gridCols}, minmax(0, 1fr))`
+    }
+    : style || {};
+
+  return (
+    <ToggleGroupPrimitive.Root
+      ref={ref}
+      className={cx(baseStyles, layoutStyles, className)}
+      style={dynamicStyle}
+      {...props}
+    >
+      {children}
+    </ToggleGroupPrimitive.Root>
+  );
+});
+
+ToggleGroup.displayName = ToggleGroupPrimitive.Root.displayName;
+
+const ToggleGroupItem = React.forwardRef<
+  React.ElementRef<typeof ToggleGroupPrimitive.Item>,
+  ToggleGroupItemProps
+>(({ className, children, fullWidth, ...props }, ref) => (
+  <ToggleGroupPrimitive.Item
+    ref={ref}
+    className={cx(
+      // Базовая геометрия и фокус
+      "inline-flex items-center justify-center whitespace-nowrap rounded-md px-3 py-2 text-xs font-medium ring-offset-white transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-950 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50",
+
+      // Цвета (неактивный / ховер)
+      "text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-300",
+
+      // Активное состояние (data-state=on)
+      "data-[state=on]:bg-white data-[state=on]:text-zinc-950 data-[state=on]:shadow-sm",
+      "dark:data-[state=on]:bg-zinc-700 dark:data-[state=on]:text-zinc-100",
+
+      // Утилита для растягивания на всю ширину грида
+      fullWidth ? "col-span-full" : undefined,
+
+      className
+    )}
+    {...props}
+  >
+    {children}
+  </ToggleGroupPrimitive.Item>
+));
+
+ToggleGroupItem.displayName = ToggleGroupPrimitive.Item.displayName;
+
+export { ToggleGroup, ToggleGroupItem };
