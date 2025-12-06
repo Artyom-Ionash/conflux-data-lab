@@ -39,31 +39,12 @@ const ToggleGroup = React.forwardRef<
     }
     : style || {};
 
-  // FIX: Хак для поддержки навигации Вверх/Вниз в режиме сетки.
-  // Radix поддерживает только 1D навигацию (либо гор., либо верт.).
-  // В сетке мы перенаправляем Вверх->Влево и Вниз->Вправо, чтобы фокус перемещался линейно.
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
-    if (gridCols) {
-      if (e.key === 'ArrowUp') {
-        e.preventDefault();
-        const event = new KeyboardEvent('keydown', { key: 'ArrowLeft', bubbles: true });
-        e.currentTarget.dispatchEvent(event);
-      }
-      if (e.key === 'ArrowDown') {
-        e.preventDefault();
-        const event = new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true });
-        e.currentTarget.dispatchEvent(event);
-      }
-    }
-    if (onKeyDown) onKeyDown(e);
-  };
 
   return (
     <ToggleGroupPrimitive.Root
       ref={ref}
       className={cx(baseStyles, layoutStyles, className)}
       style={dynamicStyle}
-      onKeyDown={handleKeyDown}
       loop={true} // Включаем зацикливание навигации
       {...props}
     >
