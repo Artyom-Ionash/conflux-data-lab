@@ -13,8 +13,9 @@ export function RangeVideoPlayer({ src, startTime, endTime, className = "" }: Ra
   const videoRef = useRef<HTMLVideoElement>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(startTime);
+  const [isHovering, setIsHovering] = useState(false);
 
-  // Sync start time when changed externally
+  // Sync start time
   useEffect(() => {
     if (videoRef.current && Math.abs(videoRef.current.currentTime - startTime) > 0.5) {
       videoRef.current.currentTime = startTime;
@@ -22,7 +23,7 @@ export function RangeVideoPlayer({ src, startTime, endTime, className = "" }: Ra
     }
   }, [startTime]);
 
-  // Loop logic
+  // Loop logic & Time update
   useEffect(() => {
     const video = videoRef.current;
     if (!video) return;
@@ -65,69 +66,70 @@ export function RangeVideoPlayer({ src, startTime, endTime, className = "" }: Ra
   };
 
   const elapsedTime = Math.max(0, currentTime - startTime);
-  const remainingTime = Math.max(0, endTime - currentTime);
 
   if (!src) return null;
 
   return (
-    <div className={`flex flex-col gap-2 ${className}`}>
-      {/* Container forced to take available height or aspect ratio defined by parent/class */}
-      <div className="relative overflow-hidden rounded-md bg-black flex-1 group w-full h-full">
-        <video
-          ref={videoRef}
-          src={src}
-          className="h-full w-full object-contain"
-          muted
-          playsInline
-          onPlay={() => setIsPlaying(true)}
-          onPause={() => setIsPlaying(false)}
-        />
+    <div
+      className={`relative bg-black group overflow-hidden ${className}`}
+      onMouseEnter={() => setIsHovering(true)}
+      onMouseLeave={() => setIsHovering(false)}
+    >
+      <video
+        ref={videoRef}
+        src={src}
+        className="w-full h-full object-contain"
+        muted
+        playsInline
+        onPlay={() => setIsPlaying(true)}
+        onPause={() => setIsPlaying(false)}
+        onClick={togglePlay}
+      />
 
-        {/* Play/Pause Overlay */}
-        <div className="absolute inset-0 flex items-center justify-center bg-black/10 opacity-0 group-hover:opacity-100 transition-opacity z-10">
-          <button
-            onClick={togglePlay}
-            className="rounded-full bg-white/90 p-3 text-black shadow-lg hover:bg-white hover:scale-110 transition-all"
-          >
-            {isPlaying ? (
-              <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" /></svg>
-            ) : (
-              <svg className="w-6 h-6 translate-x-0.5" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z" /></svg>
-            )}
-          </button>
-        </div>
-
-        {!isPlaying && (
-          <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-0">
-            <div className="rounded-full bg-black/50 p-3 text-white backdrop-blur-sm">
-              <svg className="w-8 h-8 translate-x-0.5" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z" /></svg>
-            </div>
-          </div>
-        )}
-
-        <div className="absolute bottom-2 right-2 bg-black/70 backdrop-blur-sm rounded px-2 py-1 text-xs text-white font-mono pointer-events-none z-20">
-          {formatTime(elapsedTime)} / {formatTime(duration)}
-        </div>
+      {/* Center Play Button Overlay */}
+      <div
+        className={`absolute inset-0 flex items-center justify-center pointer-events-none transition-opacity duration-200 ${isPlaying && !isHovering ? 'opacity-0' : 'opacity-100'}`}
+      >
+        <button
+          onClick={togglePlay}
+          className="rounded-full bg-black/40 p-4 text-white backdrop-blur-sm pointer-events-auto hover:bg-black/60 hover:scale-110 transition-all"
+        >
+          {isPlaying ? (
+            <svg className="w-8 h-8" fill="currentColor" viewBox="0 0 24 24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" /></svg>
+          ) : (
+            <svg className="w-8 h-8 translate-x-0.5" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z" /></svg>
+          )}
+        </button>
       </div>
 
-      {/* Progress Bar */}
-      <div className="h-4 flex flex-col justify-end space-y-1 flex-shrink-0">
-        <div className="relative h-2 bg-zinc-200 dark:bg-zinc-800 rounded-full overflow-hidden">
-          <div
-            className="absolute inset-y-0 left-0 bg-blue-600 transition-all duration-100 ease-linear"
-            style={{ width: `${progressSafe}%` }}
-          />
-          <button
-            className="absolute inset-0 cursor-pointer"
-            onClick={(e) => {
-              if (!videoRef.current) return;
-              const rect = e.currentTarget.getBoundingClientRect();
-              const x = e.clientX - rect.left;
-              const percentage = x / rect.width;
-              const newTime = startTime + (duration * percentage);
-              videoRef.current.currentTime = Math.max(startTime, Math.min(endTime, newTime));
-            }}
-          />
+      {/* Bottom Controls Overlay (Gradient + Progress) */}
+      <div className={`absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent pt-8 pb-1 px-2 transition-opacity duration-200 ${!isPlaying || isHovering ? 'opacity-100' : 'opacity-0'}`}>
+        <div className="flex items-end gap-2">
+
+          {/* Progress Bar */}
+          <div className="relative flex-1 h-1.5 bg-white/30 rounded-full cursor-pointer overflow-hidden mb-1.5 group/progress">
+            <div
+              className="absolute inset-y-0 left-0 bg-blue-500 rounded-full"
+              style={{ width: `${progressSafe}%` }}
+            />
+            {/* Click area */}
+            <div
+              className="absolute inset-0 w-full h-full z-10"
+              onClick={(e) => {
+                if (!videoRef.current) return;
+                const rect = e.currentTarget.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const percentage = x / rect.width;
+                const newTime = startTime + (duration * percentage);
+                videoRef.current.currentTime = Math.max(startTime, Math.min(endTime, newTime));
+              }}
+            />
+          </div>
+
+          {/* Time Display */}
+          <div className="text-[10px] text-white font-mono mb-1 min-w-[60px] text-right tabular-nums">
+            {formatTime(elapsedTime)} / {formatTime(duration)}
+          </div>
         </div>
       </div>
     </div>

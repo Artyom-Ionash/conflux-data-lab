@@ -79,6 +79,8 @@ function useVideoFrameExtraction() {
   const [videoFile, setVideoFile] = useState<File | null>(null);
   const [videoSrc, setVideoSrc] = useState<string | null>(null);
   const [videoDuration, setVideoDuration] = useState<number | null>(null);
+  const [videoDimensions, setVideoDimensions] = useState<{ width: number; height: number } | null>(null);
+
   const [extractionParams, setExtractionParams] = useState<ExtractionParams>({ startTime: 0, endTime: 0, frameStep: 1, symmetricLoop: false });
   const [frames, setFrames] = useState<ExtractedFrame[]>([]);
   const [gifParams, setGifParams] = useState<GifParams>({ fps: 5, dataUrl: null });
@@ -144,6 +146,7 @@ function useVideoFrameExtraction() {
     setError(null);
     setGifParams((p) => ({ ...p, dataUrl: null }));
     setVideoDuration(null);
+    setVideoDimensions(null);
     setExtractionParams((p) => ({ ...p, startTime: 0, endTime: 0 }));
 
     if (videoSrc) URL.revokeObjectURL(videoSrc);
@@ -155,6 +158,8 @@ function useVideoFrameExtraction() {
     tempVideo.onloadedmetadata = () => {
       const duration = tempVideo.duration || 0;
       setVideoDuration(duration);
+      setVideoDimensions({ width: tempVideo.videoWidth, height: tempVideo.videoHeight });
+
       const defaultStep = Math.max(0.5, duration / 10);
       setExtractionParams((p) => ({ ...p, endTime: duration, frameStep: Number(defaultStep.toFixed(2)) }));
     };
@@ -236,7 +241,7 @@ function useVideoFrameExtraction() {
   }, [videoSrc, extractionParams, effectiveEnd, gifParams.fps]);
 
   return {
-    videoRef, previewVideoRef, canvasRef, videoSrc, videoDuration,
+    videoRef, previewVideoRef, canvasRef, videoSrc, videoDuration, videoDimensions,
     extractionParams, setExtractionParams,
     frames, gifParams, setGifParams, status, error, effectiveEnd,
     previewFrames, isPreviewing,
@@ -248,7 +253,7 @@ function useVideoFrameExtraction() {
 // --- MAIN COMPONENT ---
 export function VideoFrameExtractor() {
   const {
-    videoRef, previewVideoRef, canvasRef, videoSrc, videoDuration,
+    videoRef, previewVideoRef, canvasRef, videoSrc, videoDuration, videoDimensions,
     extractionParams, setExtractionParams,
     frames, gifParams, setGifParams, status, error, effectiveEnd,
     previewFrames, isPreviewing,
@@ -257,6 +262,7 @@ export function VideoFrameExtractor() {
 
   const [spriteOptions, setSpriteOptions] = useState({ maxHeight: 300, spacing: 0, bg: "transparent" });
   const [spriteSheetUrl, setSpriteSheetUrl] = useState<string | null>(null);
+  const [diffDataUrl, setDiffDataUrl] = useState<string | null>(null);
   const { generateSpriteSheet } = useSpriteSheetGenerator();
 
   // Generate Sprite Sheet when frames change
@@ -270,38 +276,39 @@ export function VideoFrameExtractor() {
     return () => clearTimeout(timer);
   }, [frames, spriteOptions, generateSpriteSheet]);
 
+  // Calculate Aspect Ratio style
+  const aspectRatioStyle = useMemo(() => {
+    if (!videoDimensions) return {};
+    return { aspectRatio: `${videoDimensions.width} / ${videoDimensions.height}` };
+  }, [videoDimensions]);
+
   // --- SIDEBAR ---
   const sidebarContent = (
     <div className="flex flex-col gap-6 pb-4">
-      {/* 1. File Input */}
       <div className="flex flex-col gap-2">
         <FileDropzone onFilesSelected={handleFilesSelected} multiple={false} accept="video/*" label="Загрузить видео" />
       </div>
 
       {videoSrc && (
         <>
-          {/* 2. Timeline */}
-          {videoDuration && (
-            <div className="p-4 bg-zinc-50 dark:bg-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-700 space-y-3">
-              <div className="text-xs font-bold text-zinc-500 uppercase tracking-wide">Временной диапазон</div>
-              <div className="px-1">
-                <RangeSlider
-                  min={0}
-                  max={videoDuration}
-                  step={0.01}
-                  value={[extractionParams.startTime, effectiveEnd]}
-                  onValueChange={([s, e]) => setExtractionParams(p => ({ ...p, startTime: s, endTime: e }))}
-                  minStepsBetweenThumbs={0.1}
-                />
-              </div>
-              <div className="flex justify-between text-xs text-zinc-600 font-mono">
-                <span>{extractionParams.startTime.toFixed(2)}s</span>
-                <span>{effectiveEnd.toFixed(2)}s</span>
-              </div>
+          <div className="p-4 bg-zinc-50 dark:bg-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-700 space-y-3">
+            <div className="text-xs font-bold text-zinc-500 uppercase tracking-wide">Временной диапазон</div>
+            <div className="px-1">
+              <RangeSlider
+                min={0}
+                max={videoDuration ?? 0}
+                step={0.01}
+                value={[extractionParams.startTime, effectiveEnd]}
+                onValueChange={([s, e]) => setExtractionParams(p => ({ ...p, startTime: s, endTime: e }))}
+                minStepsBetweenThumbs={0.1}
+              />
             </div>
-          )}
+            <div className="flex justify-between text-xs text-zinc-600 font-mono">
+              <span>{extractionParams.startTime.toFixed(2)}s</span>
+              <span>{effectiveEnd.toFixed(2)}s</span>
+            </div>
+          </div>
 
-          {/* 3. Settings */}
           <div className="p-4 bg-zinc-50 dark:bg-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-700 space-y-4">
             <div className="text-xs font-bold text-zinc-500 uppercase tracking-wide">Настройки</div>
 
@@ -332,7 +339,6 @@ export function VideoFrameExtractor() {
             />
           </div>
 
-          {/* 4. Main Action */}
           <div className="space-y-2">
             <button
               onClick={runExtraction}
@@ -359,14 +365,16 @@ export function VideoFrameExtractor() {
         ) : (
           <div className="flex-1 overflow-y-auto p-4 space-y-6">
 
-            {/* ROW 1: Video & GIF */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {/* Left: Video Player */}
-              <div className="bg-white dark:bg-zinc-900 rounded-lg border border-zinc-200 dark:border-zinc-700 p-3 shadow-sm aspect-video flex flex-col">
-                <div className="flex items-center justify-between mb-2 flex-shrink-0">
+            {/* ROW 1: Video | Diff | GIF (3 Columns) */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+
+              {/* 1. Video Player */}
+              <div className="bg-white dark:bg-zinc-900 rounded-lg border border-zinc-200 dark:border-zinc-700 shadow-sm flex flex-col overflow-hidden">
+                <div className="flex items-center justify-between px-3 py-2 border-b border-zinc-100 dark:border-zinc-800 bg-white dark:bg-zinc-900 z-10">
                   <h3 className="text-xs font-bold text-zinc-500 uppercase tracking-wide">Видео</h3>
                 </div>
-                <div className="flex-1 relative overflow-hidden bg-black rounded">
+                {/* Media Container with Dynamic Aspect Ratio */}
+                <div className="relative w-full bg-black" style={aspectRatioStyle}>
                   <RangeVideoPlayer
                     src={videoSrc}
                     startTime={extractionParams.startTime}
@@ -376,24 +384,49 @@ export function VideoFrameExtractor() {
                 </div>
               </div>
 
-              {/* Right: GIF Preview */}
-              <div className="bg-white dark:bg-zinc-900 rounded-lg border border-zinc-200 dark:border-zinc-700 p-3 shadow-sm aspect-video flex flex-col">
-                <div className="flex items-center justify-between mb-2 flex-shrink-0">
-                  <h3 className="text-xs font-bold text-zinc-500 uppercase tracking-wide">GIF Результат</h3>
-                  {gifParams.dataUrl && (
+              {/* 2. Diff Overlay */}
+              <div className="bg-white dark:bg-zinc-900 rounded-lg border border-zinc-200 dark:border-zinc-700 shadow-sm flex flex-col overflow-hidden">
+                <div className="flex items-center justify-between px-3 py-2 border-b border-zinc-100 dark:border-zinc-800 bg-white dark:bg-zinc-900 z-10">
+                  <h3 className="text-xs font-bold text-zinc-500 uppercase tracking-wide">Разница</h3>
+                  {diffDataUrl && (
                     <button
-                      onClick={() => { const a = document.createElement('a'); a.href = gifParams.dataUrl!; a.download = 'animation.gif'; a.click(); }}
-                      className="text-xs text-blue-600 hover:underline"
+                      onClick={() => { const a = document.createElement('a'); a.href = diffDataUrl; a.download = 'diff.png'; a.click(); }}
+                      className="text-xs text-blue-600 hover:underline font-medium"
                     >
                       Скачать
                     </button>
                   )}
                 </div>
-                <div className="flex-1 relative overflow-hidden bg-zinc-100 dark:bg-zinc-950 rounded border border-dashed border-zinc-300 dark:border-zinc-800 flex items-center justify-center">
+                <div className="relative w-full bg-zinc-100 dark:bg-zinc-950" style={aspectRatioStyle}>
+                  <div className="absolute inset-0">
+                    <FrameDiffOverlay
+                      image1={previewFrames.start}
+                      image2={previewFrames.end}
+                      isProcessing={isPreviewing}
+                      onDataGenerated={setDiffDataUrl}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* 3. GIF Preview */}
+              <div className="bg-white dark:bg-zinc-900 rounded-lg border border-zinc-200 dark:border-zinc-700 shadow-sm flex flex-col overflow-hidden">
+                <div className="flex items-center justify-between px-3 py-2 border-b border-zinc-100 dark:border-zinc-800 bg-white dark:bg-zinc-900 z-10">
+                  <h3 className="text-xs font-bold text-zinc-500 uppercase tracking-wide">GIF</h3>
+                  {gifParams.dataUrl && (
+                    <button
+                      onClick={() => { const a = document.createElement('a'); a.href = gifParams.dataUrl!; a.download = 'animation.gif'; a.click(); }}
+                      className="text-xs text-blue-600 hover:underline font-medium"
+                    >
+                      Скачать
+                    </button>
+                  )}
+                </div>
+                <div className="relative w-full bg-zinc-100 dark:bg-zinc-950" style={aspectRatioStyle}>
                   {gifParams.dataUrl ? (
-                    <img src={gifParams.dataUrl} alt="GIF" className="w-full h-full object-contain" />
+                    <img src={gifParams.dataUrl} alt="GIF" className="absolute inset-0 w-full h-full object-contain" />
                   ) : (
-                    <div className="text-center p-4">
+                    <div className="absolute inset-0 flex items-center justify-center text-center p-4">
                       <p className="text-xs text-zinc-400">
                         {status.isProcessing ? "Генерация..." : "Здесь появится GIF"}
                       </p>
@@ -403,26 +436,13 @@ export function VideoFrameExtractor() {
               </div>
             </div>
 
-            {/* ROW 2: Frame Diff & Sprite Preview */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {/* Diff Overlay */}
-              <div className="bg-white dark:bg-zinc-900 rounded-lg border border-zinc-200 dark:border-zinc-700 p-3 shadow-sm h-[220px]">
-                <h3 className="text-xs font-bold text-zinc-500 uppercase tracking-wide mb-2">Разница (Старт vs Конец)</h3>
-                <FrameDiffOverlay
-                  image1={previewFrames.start}
-                  image2={previewFrames.end}
-                  isProcessing={isPreviewing}
-                  label="Обновление превью..."
-                />
-              </div>
-
-              {/* Sprite Sheet Preview - Controls inside */}
-              <div className="bg-white dark:bg-zinc-900 rounded-lg border border-zinc-200 dark:border-zinc-700 p-3 shadow-sm flex flex-col h-[220px]">
-                <div className="flex items-center justify-between mb-3 flex-shrink-0 gap-2">
-                  <h3 className="text-xs font-bold text-zinc-500 uppercase tracking-wide whitespace-nowrap">Превью спрайт-листа</h3>
-                  {/* In-component Controls */}
+            {/* ROW 2: Sprite Sheet Preview */}
+            <div className="bg-white dark:bg-zinc-900 rounded-lg border border-zinc-200 dark:border-zinc-700 shadow-sm flex flex-col h-[220px]">
+              <div className="flex items-center justify-between px-3 py-2 border-b border-zinc-100 dark:border-zinc-800 bg-white dark:bg-zinc-900">
+                <div className="flex items-center gap-4">
+                  <h3 className="text-xs font-bold text-zinc-500 uppercase tracking-wide whitespace-nowrap">Спрайт-лист</h3>
                   {frames.length > 0 && (
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-3">
                       <div className="flex items-center gap-1">
                         <span className="text-[10px] text-zinc-400">Высота:</span>
                         <input
@@ -441,55 +461,58 @@ export function VideoFrameExtractor() {
                           onChange={(e) => setSpriteOptions(p => ({ ...p, spacing: Number(e.target.value) }))}
                         />
                       </div>
-                      {spriteSheetUrl && (
-                        <button
-                          onClick={() => { const a = document.createElement('a'); a.href = spriteSheetUrl; a.download = 'spritesheet.png'; a.click(); }}
-                          className="text-[10px] bg-green-50 text-green-700 px-2 py-1 rounded border border-green-200 hover:bg-green-100 transition-colors"
-                        >
-                          Скачать
-                        </button>
-                      )}
                     </div>
                   )}
                 </div>
 
-                <div className="flex-1 bg-zinc-100 dark:bg-zinc-950 rounded border border-dashed border-zinc-300 dark:border-zinc-800 relative overflow-x-auto overflow-y-hidden">
-                  {spriteSheetUrl ? (
-                    <div className="h-full flex items-center px-2">
-                      <img src={spriteSheetUrl} alt="Sprite" className="h-4/5 w-auto max-w-none object-contain" />
-                    </div>
-                  ) : (
-                    <div className="absolute inset-0 flex items-center justify-center">
-                      <span className="text-xs text-zinc-400">{frames.length > 0 ? "Генерация..." : "Нет кадров"}</span>
-                    </div>
-                  )}
-                </div>
+                {spriteSheetUrl && (
+                  <button
+                    onClick={() => { const a = document.createElement('a'); a.href = spriteSheetUrl; a.download = 'spritesheet.png'; a.click(); }}
+                    className="text-xs text-blue-600 hover:underline font-medium"
+                  >
+                    Скачать
+                  </button>
+                )}
+              </div>
+
+              <div className="flex-1 bg-zinc-100 dark:bg-zinc-950 relative overflow-x-auto overflow-y-hidden">
+                {spriteSheetUrl ? (
+                  <div className="h-full flex items-center px-2">
+                    <img src={spriteSheetUrl} alt="Sprite" className="h-4/5 w-auto max-w-none object-contain border border-dashed border-zinc-300 dark:border-zinc-700 bg-[url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAKQCAYAAAB2440yAAAAIklEQVQ4jWNgGAWjYBQMBAAABgAB/6Zj+QAAAABJRU5ErkJggg==')] bg-repeat" />
+                  </div>
+                ) : (
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <span className="text-xs text-zinc-400">{frames.length > 0 ? "Генерация..." : "Нет кадров"}</span>
+                  </div>
+                )}
               </div>
             </div>
 
             {/* ROW 3: Frames List */}
             {frames.length > 0 && (
-              <div className="bg-white dark:bg-zinc-900 rounded-lg border border-zinc-200 dark:border-zinc-700 p-3 shadow-sm">
-                <div className="flex items-center justify-between mb-3">
+              <div className="bg-white dark:bg-zinc-900 rounded-lg border border-zinc-200 dark:border-zinc-700 shadow-sm">
+                <div className="flex items-center justify-between px-3 py-2 border-b border-zinc-100 dark:border-zinc-800 bg-white dark:bg-zinc-900">
                   <h3 className="text-xs font-bold text-zinc-500 uppercase tracking-wide">Все кадры ({frames.length})</h3>
                 </div>
-                <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-thin scrollbar-thumb-zinc-300 dark:scrollbar-thumb-zinc-600">
-                  {frames.map((frame, idx) => (
-                    <div key={idx} className="flex-shrink-0 w-32 border border-zinc-200 dark:border-zinc-700 rounded p-1 group relative bg-white dark:bg-zinc-800">
-                      <img src={frame.dataUrl} className="w-full h-auto bg-black/5 rounded" alt={`f-${idx}`} />
-                      <div className="mt-1 flex justify-between text-[10px] text-zinc-500">
-                        <span className="font-mono">{frame.time.toFixed(2)}s</span>
-                        <span className="font-mono">#{idx + 1}</span>
+                <div className="p-3">
+                  <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-thin scrollbar-thumb-zinc-300 dark:scrollbar-thumb-zinc-600">
+                    {frames.map((frame, idx) => (
+                      <div key={idx} className="flex-shrink-0 w-32 border border-zinc-200 dark:border-zinc-700 rounded p-1 group relative bg-white dark:bg-zinc-800">
+                        <img src={frame.dataUrl} className="w-full h-auto bg-black/5 rounded" alt={`f-${idx}`} />
+                        <div className="mt-1 flex justify-between text-[10px] text-zinc-500">
+                          <span className="font-mono">{frame.time.toFixed(2)}s</span>
+                          <span className="font-mono">#{idx + 1}</span>
+                        </div>
+                        <button
+                          onClick={() => { const a = document.createElement('a'); a.href = frame.dataUrl; a.download = `frame-${idx}.png`; a.click(); }}
+                          className="absolute top-2 right-2 p-1 bg-white/90 text-black rounded opacity-0 group-hover:opacity-100 shadow-sm transition-opacity"
+                          title="Скачать кадр"
+                        >
+                          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+                        </button>
                       </div>
-                      <button
-                        onClick={() => { const a = document.createElement('a'); a.href = frame.dataUrl; a.download = `frame-${idx}.png`; a.click(); }}
-                        className="absolute top-2 right-2 p-1 bg-white/90 text-black rounded opacity-0 group-hover:opacity-100 shadow-sm transition-opacity"
-                        title="Скачать кадр"
-                      >
-                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
-                      </button>
-                    </div>
-                  ))}
+                    ))}
+                  </div>
                 </div>
               </div>
             )}
