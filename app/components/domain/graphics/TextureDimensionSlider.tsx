@@ -25,10 +25,12 @@ interface TextureDimensionSliderProps {
   min?: number;
   max?: number;
   step?: number;
+  className?: string;
+  disabled?: boolean; // <-- Добавлен проп disabled
 }
 
 export const TextureDimensionSlider = (props: TextureDimensionSliderProps) => {
-  const { value, onChange } = props;
+  const { value, onChange, disabled } = props;
 
   const isPoT = useMemo(() => isPowerOfTwo(value), [value]);
   const nearestPoT = useMemo(() => getNearestPoT(value || 1), [value]);
@@ -73,16 +75,14 @@ export const TextureDimensionSlider = (props: TextureDimensionSliderProps) => {
     return { status: 'safe', message: null };
   }, [value]);
 
-  // Маппинг логического статуса на цвет UI-компонента
   let sliderColor: SliderStatusColor = 'blue';
   if (status === 'critical') sliderColor = 'red';
   else if (status === 'danger') sliderColor = 'orange';
   else if (status === 'warning') sliderColor = 'yellow';
-  else if (isPoT) sliderColor = 'green'; // Если всё ок и PoT — зеленый
+  else if (isPoT) sliderColor = 'green';
 
   const headerRight = (
     <div className="flex items-center gap-2">
-      {/* 1. Предупреждение (если есть) */}
       {status !== 'safe' && (
         <Tooltip.Provider delayDuration={0}>
           <Tooltip.Root>
@@ -106,8 +106,8 @@ export const TextureDimensionSlider = (props: TextureDimensionSliderProps) => {
         </Tooltip.Provider>
       )}
 
-      {/* 2. Кнопка Power of Two */}
-      {value > 0 && (
+      {/* Кнопка "2n" отображается только если не disabled */}
+      {!disabled && value > 0 && (
         <Tooltip.Provider delayDuration={200}>
           <Tooltip.Root>
             <Tooltip.Trigger asChild>
@@ -143,6 +143,7 @@ export const TextureDimensionSlider = (props: TextureDimensionSliderProps) => {
       {...props}
       statusColor={sliderColor}
       headerRight={headerRight}
+      disabled={disabled} // Прокидываем disabled дальше
     />
   );
 };

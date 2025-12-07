@@ -13,8 +13,9 @@ interface SliderProps {
   max?: number;
   step?: number;
   statusColor?: SliderStatusColor;
-  headerRight?: ReactNode; // Слот для иконок, кнопок или тултипов справа от названия
+  headerRight?: ReactNode;
   className?: string;
+  disabled?: boolean; // <-- Добавлен проп disabled
 }
 
 export const Slider = ({
@@ -26,7 +27,8 @@ export const Slider = ({
   step = 1,
   statusColor = 'blue',
   headerRight,
-  className = ''
+  className = '',
+  disabled = false // <-- Значение по умолчанию
 }: SliderProps) => {
 
   const trackColors: Record<SliderStatusColor, string> = {
@@ -62,10 +64,10 @@ export const Slider = ({
   };
 
   return (
-    <div className={`flex flex-col gap-2 mb-4 ${className}`}>
+    <div className={`flex flex-col gap-2 mb-4 ${className} ${disabled ? 'opacity-60 grayscale' : ''}`}>
       <div className="flex justify-between items-end">
 
-        {/* Левая часть: Лейбл + Доп контент (иконки ошибок) */}
+        {/* Левая часть: Лейбл + Доп контент */}
         <div className="flex items-center gap-2">
           <label className={`text-xs uppercase font-bold tracking-wider transition-colors ${textColors[statusColor]}`}>
             {label}
@@ -77,24 +79,31 @@ export const Slider = ({
         <input
           type="number"
           value={value}
-          onChange={(e) => onChange(Number(e.target.value))}
+          onChange={(e) => !disabled && onChange(Number(e.target.value))}
+          disabled={disabled}
           className={`w-16 h-7 px-1 text-right text-sm font-medium border rounded bg-white dark:bg-zinc-800 focus:outline-none transition-colors shadow-sm ${inputColors[statusColor]}`}
         />
       </div>
 
       <SliderPrimitive.Root
-        className="relative flex items-center select-none touch-none w-full h-6 cursor-pointer group"
+        className={`relative flex items-center select-none touch-none w-full h-6 cursor-pointer group ${disabled ? 'cursor-not-allowed' : ''}`}
         value={[value]}
         max={max}
         min={min}
         step={step}
+        disabled={disabled} // <-- Блокировка Radix
         onValueChange={(val) => onChange(val[0])}
       >
         <SliderPrimitive.Track className="bg-zinc-200 dark:bg-zinc-700 relative grow rounded-full h-[4px]">
           <SliderPrimitive.Range className={`absolute rounded-full h-full transition-colors duration-300 ${trackColors[statusColor]}`} />
         </SliderPrimitive.Track>
+
+        {/* Скрываем Thumb, если disabled */}
         <SliderPrimitive.Thumb
-          className={`block w-4 h-4 bg-white border shadow-md rounded-full hover:scale-110 focus:outline-none focus:ring-2 transition-all duration-200 ${thumbColors[statusColor]}`}
+          className={`
+            ${disabled ? 'hidden' : 'block'} 
+            w-4 h-4 bg-white border shadow-md rounded-full hover:scale-110 focus:outline-none focus:ring-2 transition-all duration-200 ${thumbColors[statusColor]}
+          `}
           aria-label={label}
         />
       </SliderPrimitive.Root>

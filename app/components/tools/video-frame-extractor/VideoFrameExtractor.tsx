@@ -10,6 +10,8 @@ import { RangeSlider } from "../../ui/RangeSlider";
 import { Switch } from "../../ui/Switch";
 import { RangeVideoPlayer } from "./RangeVideoPlayer";
 import { FrameDiffOverlay } from "./FrameDiffOverlay";
+// Import Domain Components
+import { TextureDimensionSlider } from "../../domain/graphics/TextureDimensionSlider";
 
 // --- TYPES ---
 export interface ExtractedFrame {
@@ -98,6 +100,7 @@ function useVideoFrameExtraction() {
 
   useEffect(() => { return () => { if (videoSrc) URL.revokeObjectURL(videoSrc); }; }, [videoSrc]);
 
+  // Preview Generation Effect (Thumbnails)
   useEffect(() => {
     if (!videoSrc || !previewVideoRef.current || !canvasRef.current || !videoDuration) return;
 
@@ -136,7 +139,6 @@ function useVideoFrameExtraction() {
     return () => clearTimeout(timer);
   }, [videoSrc, extractionParams.startTime, effectiveEnd, videoDuration]);
 
-
   const handleFilesSelected = useCallback(async (files: File[]) => {
     if (!files.length) return;
     const file = files[0];
@@ -166,6 +168,7 @@ function useVideoFrameExtraction() {
     tempVideo.onerror = () => setError("Ошибка загрузки видео");
   }, [videoSrc]);
 
+  // 1. EXTRACT FRAMES ONLY
   const runExtraction = useCallback(async () => {
     if (!videoRef.current || !canvasRef.current || !videoSrc) return;
     const videoEl = videoRef.current;
@@ -214,31 +217,49 @@ function useVideoFrameExtraction() {
       if (extractionParams.symmetricLoop && resultFrames.length > 1) {
         finalFrames = [...resultFrames, ...resultFrames.slice(1, -1).reverse()];
       }
+
       setFrames(finalFrames);
 
-      if (finalFrames.length > 0) {
-        setStatus({ isProcessing: true, currentStep: "generating" });
-        if (typeof gifshot !== 'undefined') {
-          gifshot.createGIF({
-            images: finalFrames.map(f => f.dataUrl),
-            interval: 1 / gifParams.fps,
-            gifWidth: canvasEl.width,
-            gifHeight: canvasEl.height,
-            numFrames: finalFrames.length,
-          }, (obj: any) => {
-            if (!obj.error) setGifParams(p => ({ ...p, dataUrl: obj.image }));
-            else setError("Ошибка создания GIF");
-            setStatus({ isProcessing: false, currentStep: "" });
-          });
-        }
-      } else {
+      if (finalFrames.length === 0) {
         setStatus({ isProcessing: false, currentStep: "" });
       }
+
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error");
       setStatus({ isProcessing: false, currentStep: "" });
     }
-  }, [videoSrc, extractionParams, effectiveEnd, gifParams.fps]);
+  }, [videoSrc, extractionParams, effectiveEnd]);
+
+  // 2. AUTO GENERATE GIF (Reactive to frames or FPS change)
+  useEffect(() => {
+    if (frames.length === 0) return;
+
+    setStatus({ isProcessing: true, currentStep: "generating" });
+
+    const timer = setTimeout(() => {
+      if (typeof gifshot !== 'undefined') {
+        const width = videoDimensions?.width || 300;
+        const height = videoDimensions?.height || 200;
+
+        gifshot.createGIF({
+          images: frames.map(f => f.dataUrl),
+          interval: 1 / gifParams.fps,
+          gifWidth: width,
+          gifHeight: height,
+          numFrames: frames.length,
+        }, (obj: any) => {
+          if (!obj.error) setGifParams(p => ({ ...p, dataUrl: obj.image }));
+          else setError("Ошибка создания GIF");
+          setStatus({ isProcessing: false, currentStep: "" });
+        });
+      } else {
+        setStatus({ isProcessing: false, currentStep: "" });
+      }
+    }, 100);
+
+    return () => clearTimeout(timer);
+  }, [frames, gifParams.fps, videoDimensions]);
+
 
   return {
     videoRef, previewVideoRef, canvasRef, videoSrc, videoDuration, videoDimensions,
@@ -282,75 +303,21 @@ export function VideoFrameExtractor() {
     return { aspectRatio: `${videoDimensions.width} / ${videoDimensions.height}` };
   }, [videoDimensions]);
 
-  // --- SIDEBAR ---
+  // Calculate Sprite Dimensions on the fly (for Warning UI)
+  const spriteDimensions = useMemo(() => {
+    if (!videoDimensions || frames.length === 0) return { width: 0, height: 0 };
+    const scale = spriteOptions.maxHeight / videoDimensions.height;
+    const scaledWidth = Math.floor(videoDimensions.width * scale);
+    const totalWidth = (scaledWidth + spriteOptions.spacing) * frames.length - spriteOptions.spacing;
+    return { width: totalWidth, height: spriteOptions.maxHeight };
+  }, [videoDimensions, frames.length, spriteOptions.maxHeight, spriteOptions.spacing]);
+
+  // --- SIDEBAR (Reduced to Actions) ---
   const sidebarContent = (
     <div className="flex flex-col gap-6 pb-4">
       <div className="flex flex-col gap-2">
         <FileDropzone onFilesSelected={handleFilesSelected} multiple={false} accept="video/*" label="Загрузить видео" />
       </div>
-
-      {videoSrc && (
-        <>
-          <div className="p-4 bg-zinc-50 dark:bg-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-700 space-y-3">
-            <div className="text-xs font-bold text-zinc-500 uppercase tracking-wide">Временной диапазон</div>
-            <div className="px-1">
-              <RangeSlider
-                min={0}
-                max={videoDuration ?? 0}
-                step={0.01}
-                value={[extractionParams.startTime, effectiveEnd]}
-                onValueChange={([s, e]) => setExtractionParams(p => ({ ...p, startTime: s, endTime: e }))}
-                minStepsBetweenThumbs={0.1}
-              />
-            </div>
-            <div className="flex justify-between text-xs text-zinc-600 font-mono">
-              <span>{extractionParams.startTime.toFixed(2)}s</span>
-              <span>{effectiveEnd.toFixed(2)}s</span>
-            </div>
-          </div>
-
-          <div className="p-4 bg-zinc-50 dark:bg-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-700 space-y-4">
-            <div className="text-xs font-bold text-zinc-500 uppercase tracking-wide">Настройки</div>
-
-            <div>
-              <label className="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1.5">Шаг кадров (сек)</label>
-              <input
-                type="number" min="0.01" step="0.05"
-                value={extractionParams.frameStep}
-                onChange={(e) => setExtractionParams(p => ({ ...p, frameStep: parseFloat(e.target.value) }))}
-                className="w-full rounded-md border border-zinc-300 bg-white px-2 py-1.5 text-sm dark:border-zinc-700 dark:bg-zinc-900"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1.5">FPS для GIF</label>
-              <input
-                type="number" min="1" max="60"
-                value={gifParams.fps}
-                onChange={(e) => setGifParams(p => ({ ...p, fps: parseFloat(e.target.value) }))}
-                className="w-full rounded-md border border-zinc-300 bg-white px-2 py-1.5 text-sm dark:border-zinc-700 dark:bg-zinc-900"
-              />
-            </div>
-
-            <Switch
-              label="Симметричный цикл"
-              checked={extractionParams.symmetricLoop}
-              onCheckedChange={(c) => setExtractionParams(p => ({ ...p, symmetricLoop: c }))}
-            />
-          </div>
-
-          <div className="space-y-2">
-            <button
-              onClick={runExtraction}
-              disabled={status.isProcessing}
-              className="w-full rounded-md bg-blue-600 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50 transition-all shadow-sm hover:shadow-md"
-            >
-              {status.isProcessing ? (status.currentStep === 'generating' ? 'Создание GIF...' : 'Обработка...') : (frames.length > 0 ? 'Обновить GIF' : 'Создать GIF и Кадры')}
-            </button>
-            {error && <div className="text-xs text-red-600 px-1">{error}</div>}
-          </div>
-        </>
-      )}
     </div>
   );
 
@@ -363,17 +330,74 @@ export function VideoFrameExtractor() {
             <FileDropzonePlaceholder onUpload={handleFilesSelected} multiple={false} title="Перетащите видеофайл" />
           </div>
         ) : (
-          <div className="flex-1 overflow-y-auto p-4 space-y-6">
+          <div className="flex-1 overflow-y-auto p-4 space-y-4">
 
-            {/* ROW 1: Video | Diff | GIF (3 Columns) */}
+            {/* --- SECTION 1: GLOBAL EXTRACTION SETTINGS (TOP) --- */}
+            <div className="bg-white dark:bg-zinc-900 rounded-lg border border-zinc-200 dark:border-zinc-700 shadow-sm p-4">
+              <div className="flex flex-col gap-4">
+                {/* Time Range */}
+                <div className="space-y-2">
+                  <div className="flex justify-between items-center">
+                    <span className="text-xs font-bold text-zinc-500 uppercase tracking-wide">Диапазон извлечения</span>
+                    <div className="flex gap-2 text-xs font-mono text-zinc-700 dark:text-zinc-300 bg-zinc-100 dark:bg-zinc-800 px-2 py-0.5 rounded">
+                      <span>{extractionParams.startTime.toFixed(2)}s</span>
+                      <span className="text-zinc-400">→</span>
+                      <span>{effectiveEnd.toFixed(2)}s</span>
+                    </div>
+                  </div>
+                  <RangeSlider
+                    min={0}
+                    max={videoDuration ?? 0}
+                    step={0.01}
+                    value={[extractionParams.startTime, effectiveEnd]}
+                    onValueChange={([s, e]) => setExtractionParams(p => ({ ...p, startTime: s, endTime: e }))}
+                    minStepsBetweenThumbs={0.1}
+                  />
+                </div>
+
+                {/* Secondary Options + Button */}
+                <div className="flex flex-wrap items-center justify-between gap-6 pt-2 border-t border-zinc-100 dark:border-zinc-800">
+                  <div className="flex items-center gap-6">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-medium text-zinc-600 dark:text-zinc-400">Шаг (сек):</span>
+                      <input
+                        type="number" min="0.01" step="0.05"
+                        value={extractionParams.frameStep}
+                        onChange={(e) => setExtractionParams(p => ({ ...p, frameStep: parseFloat(e.target.value) }))}
+                        className="w-16 rounded border border-zinc-300 bg-white px-2 py-1 text-xs dark:border-zinc-700 dark:bg-zinc-800"
+                      />
+                    </div>
+                    <div className="h-4 w-px bg-zinc-200 dark:bg-zinc-700"></div>
+                    <div className="flex items-center">
+                      <Switch
+                        label="Симметричный цикл"
+                        checked={extractionParams.symmetricLoop}
+                        onCheckedChange={(c) => setExtractionParams(p => ({ ...p, symmetricLoop: c }))}
+                        className="whitespace-nowrap gap-3"
+                      />
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={runExtraction}
+                    disabled={status.isProcessing}
+                    className="rounded-md bg-blue-600 px-4 py-1.5 text-xs font-semibold text-white hover:bg-blue-700 disabled:opacity-50 transition-all shadow-sm hover:shadow-md uppercase tracking-wide"
+                  >
+                    {status.isProcessing ? (status.currentStep === 'generating' ? 'Генерация GIF...' : 'Обработка...') : 'Обновить кадры'}
+                  </button>
+                </div>
+                {error && <div className="text-xs text-red-600 text-right">{error}</div>}
+              </div>
+            </div>
+
+            {/* --- SECTION 2: VISUALIZATION GRID --- */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
 
               {/* 1. Video Player */}
               <div className="bg-white dark:bg-zinc-900 rounded-lg border border-zinc-200 dark:border-zinc-700 shadow-sm flex flex-col overflow-hidden">
-                <div className="flex items-center justify-between px-3 py-2 border-b border-zinc-100 dark:border-zinc-800 bg-white dark:bg-zinc-900 z-10">
-                  <h3 className="text-xs font-bold text-zinc-500 uppercase tracking-wide">Видео</h3>
+                <div className="flex items-center justify-between px-3 py-2 border-b border-zinc-100 dark:border-zinc-800 bg-white dark:bg-zinc-900 z-10 h-10">
+                  <h3 className="text-xs font-bold text-zinc-500 uppercase tracking-wide">Исходное видео</h3>
                 </div>
-                {/* Media Container with Dynamic Aspect Ratio */}
                 <div className="relative w-full bg-black" style={aspectRatioStyle}>
                   <RangeVideoPlayer
                     src={videoSrc}
@@ -386,8 +410,8 @@ export function VideoFrameExtractor() {
 
               {/* 2. Diff Overlay */}
               <div className="bg-white dark:bg-zinc-900 rounded-lg border border-zinc-200 dark:border-zinc-700 shadow-sm flex flex-col overflow-hidden">
-                <div className="flex items-center justify-between px-3 py-2 border-b border-zinc-100 dark:border-zinc-800 bg-white dark:bg-zinc-900 z-10">
-                  <h3 className="text-xs font-bold text-zinc-500 uppercase tracking-wide">Разница</h3>
+                <div className="flex items-center justify-between px-3 py-2 border-b border-zinc-100 dark:border-zinc-800 bg-white dark:bg-zinc-900 z-10 h-10">
+                  <h3 className="text-xs font-bold text-zinc-500 uppercase tracking-wide">Разница (Начало/Конец)</h3>
                   {diffDataUrl && (
                     <button
                       onClick={() => { const a = document.createElement('a'); a.href = diffDataUrl; a.download = 'diff.png'; a.click(); }}
@@ -411,40 +435,70 @@ export function VideoFrameExtractor() {
 
               {/* 3. GIF Preview */}
               <div className="bg-white dark:bg-zinc-900 rounded-lg border border-zinc-200 dark:border-zinc-700 shadow-sm flex flex-col overflow-hidden">
-                <div className="flex items-center justify-between px-3 py-2 border-b border-zinc-100 dark:border-zinc-800 bg-white dark:bg-zinc-900 z-10">
-                  <h3 className="text-xs font-bold text-zinc-500 uppercase tracking-wide">GIF</h3>
-                  {gifParams.dataUrl && (
-                    <button
-                      onClick={() => { const a = document.createElement('a'); a.href = gifParams.dataUrl!; a.download = 'animation.gif'; a.click(); }}
-                      className="text-xs text-blue-600 hover:underline font-medium"
-                    >
-                      Скачать
-                    </button>
-                  )}
+                <div className="flex items-center justify-between px-3 py-2 border-b border-zinc-100 dark:border-zinc-800 bg-white dark:bg-zinc-900 z-10 h-10">
+                  <h3 className="text-xs font-bold text-zinc-500 uppercase tracking-wide flex items-center gap-2">
+                    GIF
+                    <span className="text-[10px] text-zinc-400 font-medium">FPS:</span>
+                    <input
+                      type="number" min="1" max="60"
+                      value={gifParams.fps}
+                      onChange={(e) => setGifParams(p => ({ ...p, fps: parseFloat(e.target.value) }))}
+                      className="w-10 text-[10px] px-1 py-0.5 border rounded dark:bg-zinc-800 dark:border-zinc-600 text-center"
+                    />
+                  </h3>
+                  <div className="flex items-center gap-3">
+                    {gifParams.dataUrl && !status.isProcessing && (
+                      <button
+                        onClick={() => { const a = document.createElement('a'); a.href = gifParams.dataUrl!; a.download = 'animation.gif'; a.click(); }}
+                        className="text-xs text-blue-600 hover:underline font-medium"
+                      >
+                        Скачать
+                      </button>
+                    )}
+                  </div>
                 </div>
                 <div className="relative w-full bg-zinc-100 dark:bg-zinc-950" style={aspectRatioStyle}>
-                  {gifParams.dataUrl ? (
-                    <img src={gifParams.dataUrl} alt="GIF" className="absolute inset-0 w-full h-full object-contain" />
-                  ) : (
-                    <div className="absolute inset-0 flex items-center justify-center text-center p-4">
-                      <p className="text-xs text-zinc-400">
-                        {status.isProcessing ? "Генерация..." : "Здесь появится GIF"}
-                      </p>
+                  {/* GENERATING OVERLAY */}
+                  {status.currentStep === 'generating' && (
+                    <div className="absolute inset-0 flex flex-col items-center justify-center z-20 bg-white/50 dark:bg-black/50 backdrop-blur-[1px]">
+                      <svg className="animate-spin h-8 w-8 text-blue-600 mb-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      <span className="text-xs font-semibold text-zinc-600 dark:text-zinc-300 bg-white/80 dark:bg-black/60 px-2 py-1 rounded">
+                        Генерация...
+                      </span>
                     </div>
+                  )}
+
+                  {gifParams.dataUrl ? (
+                    <img
+                      src={gifParams.dataUrl}
+                      alt="GIF"
+                      className={`absolute inset-0 w-full h-full object-contain ${status.currentStep === 'generating' ? 'opacity-50 blur-[2px]' : ''}`}
+                    />
+                  ) : (
+                    !status.isProcessing && (
+                      <div className="absolute inset-0 flex items-center justify-center text-center p-4">
+                        <p className="text-xs text-zinc-400">
+                          {status.isProcessing ? "Генерация..." : "Нажмите 'Обновить кадры', чтобы увидеть GIF"}
+                        </p>
+                      </div>
+                    )
                   )}
                 </div>
               </div>
             </div>
 
-            {/* ROW 2: Sprite Sheet Preview */}
+            {/* --- SECTION 3: SPRITE SHEET --- */}
             <div className="bg-white dark:bg-zinc-900 rounded-lg border border-zinc-200 dark:border-zinc-700 shadow-sm flex flex-col h-[220px]">
               <div className="flex items-center justify-between px-3 py-2 border-b border-zinc-100 dark:border-zinc-800 bg-white dark:bg-zinc-900">
                 <div className="flex items-center gap-4">
                   <h3 className="text-xs font-bold text-zinc-500 uppercase tracking-wide whitespace-nowrap">Спрайт-лист</h3>
                   {frames.length > 0 && (
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-3 bg-zinc-50 dark:bg-zinc-800/50 px-2 py-1 rounded border border-zinc-100 dark:border-zinc-800">
                       <div className="flex items-center gap-1">
-                        <span className="text-[10px] text-zinc-400">Высота:</span>
+                        <span className="text-[10px] text-zinc-500">Высота:</span>
                         <input
                           type="number"
                           className="w-12 text-[10px] px-1 py-0.5 border rounded dark:bg-zinc-800 dark:border-zinc-600"
@@ -453,7 +507,7 @@ export function VideoFrameExtractor() {
                         />
                       </div>
                       <div className="flex items-center gap-1">
-                        <span className="text-[10px] text-zinc-400">Отступ:</span>
+                        <span className="text-[10px] text-zinc-500">Отступ:</span>
                         <input
                           type="number"
                           className="w-10 text-[10px] px-1 py-0.5 border rounded dark:bg-zinc-800 dark:border-zinc-600"
@@ -465,14 +519,30 @@ export function VideoFrameExtractor() {
                   )}
                 </div>
 
-                {spriteSheetUrl && (
-                  <button
-                    onClick={() => { const a = document.createElement('a'); a.href = spriteSheetUrl; a.download = 'spritesheet.png'; a.click(); }}
-                    className="text-xs text-blue-600 hover:underline font-medium"
-                  >
-                    Скачать
-                  </button>
-                )}
+                <div className="flex items-center gap-4">
+                  {/* WARNING SYSTEM (Read-Only Slider, No Track) */}
+                  {frames.length > 0 && (
+                    <div className="w-[180px]">
+                      <TextureDimensionSlider
+                        label="Итоговая ширина"
+                        value={spriteDimensions.width}
+                        onChange={() => { }} // Read-only: no updates allowed
+                        max={16384 * 1.5} // Allow visual overflow
+                        className="mb-0" // Reset margin for header alignment
+                        disabled={true} // <-- DISABLE INTERACTION
+                      />
+                    </div>
+                  )}
+
+                  {spriteSheetUrl && (
+                    <button
+                      onClick={() => { const a = document.createElement('a'); a.href = spriteSheetUrl; a.download = 'spritesheet.png'; a.click(); }}
+                      className="text-xs text-blue-600 hover:underline font-medium"
+                    >
+                      Скачать
+                    </button>
+                  )}
+                </div>
               </div>
 
               <div className="flex-1 bg-zinc-100 dark:bg-zinc-950 relative overflow-x-auto overflow-y-hidden">
@@ -488,7 +558,7 @@ export function VideoFrameExtractor() {
               </div>
             </div>
 
-            {/* ROW 3: Frames List */}
+            {/* --- SECTION 4: FRAMES LIST --- */}
             {frames.length > 0 && (
               <div className="bg-white dark:bg-zinc-900 rounded-lg border border-zinc-200 dark:border-zinc-700 shadow-sm">
                 <div className="flex items-center justify-between px-3 py-2 border-b border-zinc-100 dark:border-zinc-800 bg-white dark:bg-zinc-900">
