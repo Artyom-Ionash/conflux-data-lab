@@ -2,7 +2,6 @@
 
 import React, { useCallback, useMemo, useState, useRef, useEffect } from 'react';
 import { Canvas, CanvasRef } from '../../ui/Canvas';
-// Импортируем оба компонента
 import { FileDropzone, FileDropzonePlaceholder } from '../../ui/FileDropzone';
 import { ToolLayout } from '../ToolLayout';
 import { Switch } from '../../ui/Switch';
@@ -11,9 +10,30 @@ import { TextureDimensionSlider } from '../../domain/graphics/TextureDimensionSl
 // --- CONSTANTS ---
 const LIMIT_MAX_BROWSER = 16384;
 const EXPORT_DELAY_JSON = 100; // ms
+const VIEW_RESET_DELAY = 50; // ms (добавлено для синхронизации с рендером)
 const EXPORT_FILENAME = 'aligned-export';
 const EXPORT_META_APP = "VerticalImageAligner";
 const EXPORT_META_VERSION = "1.0";
+const MOUSE_BUTTON_LEFT = 0;
+const CANVAS_SCALE_DEFAULT = 1;
+
+// Grid & Styling Constants
+const HEX_PARSE_R_START = 1;
+const HEX_PARSE_R_END = 3;
+const HEX_PARSE_G_START = 3;
+const HEX_PARSE_G_END = 5;
+const HEX_PARSE_B_START = 5;
+const HEX_PARSE_B_END = 7;
+const HEX_BASE = 16;
+
+const GRID_FRAME_DASH = 10;
+const GRID_FRAME_OFFSET_CSS = '-5px -5px';
+
+const Z_INDEX_SLOT_BASE = 10;
+const Z_INDEX_SLOT_ACTIVE = 30;
+const Z_INDEX_LABEL = 40;
+const Z_INDEX_GRID_RED = 50;
+const Z_INDEX_GRID_FRAME = 60;
 
 const DEFAULT_SETTINGS = {
   slotSize: 1,
@@ -49,7 +69,7 @@ const DraggableImageSlot = React.memo(({ img, index, slotHeight, slotWidth, getC
   const [isDragging, setIsDragging] = useState(false);
 
   const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
-    if (e.button !== 0) return;
+    if (e.button !== MOUSE_BUTTON_LEFT) return;
     e.stopPropagation();
     onActivate(img.id);
     setIsDragging(true);
@@ -75,17 +95,28 @@ const DraggableImageSlot = React.memo(({ img, index, slotHeight, slotWidth, getC
     target.addEventListener('pointerup', handlePointerUp as EventListener);
   };
 
+  const zIndexClass = img.isActive ? `z-${Z_INDEX_SLOT_ACTIVE}` : `z-${Z_INDEX_SLOT_BASE}`;
+  const borderClass = img.isActive ? 'border-blue-500/50' : 'border-zinc-300/30 hover:border-zinc-400/50';
+
   return (
     <div
       className={`absolute left-0 overflow-hidden group border-r border-dashed transition-colors
         ${isDragging ? 'cursor-grabbing' : 'cursor-grab'}
-        ${img.isActive ? 'border-blue-500/50 z-30' : 'border-zinc-300/30 z-10 hover:border-zinc-400/50'}
+        ${borderClass} ${zIndexClass}
       `}
-      style={{ top: index * slotHeight, height: slotHeight, width: slotWidth }}
+      style={{
+        top: index * slotHeight,
+        height: slotHeight,
+        width: slotWidth,
+        zIndex: img.isActive ? Z_INDEX_SLOT_ACTIVE : Z_INDEX_SLOT_BASE
+      }}
       onPointerDown={handlePointerDown}
     >
       <div className={`absolute inset-0 transition-colors pointer-events-none ${img.isActive ? 'bg-blue-500/10' : 'group-hover:bg-blue-500/5'}`} />
-      <div className={`absolute top-1 left-1 bg-black/60 text-white text-[10px] px-1.5 py-0.5 rounded pointer-events-none select-none z-40 backdrop-blur-sm transition-opacity duration-200 ${img.isActive ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}>
+      <div
+        className={`absolute top-1 left-1 bg-black/60 text-white text-[10px] px-1.5 py-0.5 rounded pointer-events-none select-none backdrop-blur-sm transition-opacity duration-200 ${img.isActive ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
+        style={{ zIndex: Z_INDEX_LABEL }}
+      >
         {Math.round(img.offsetX)}, {Math.round(img.offsetY)}
       </div>
       <img src={img.url} draggable={false} alt="" className="absolute select-none origin-top-left max-w-none" style={{ left: 0, top: 0, transform: `translate3d(${img.offsetX}px, ${img.offsetY}px, 0)`, width: img.naturalWidth, height: img.naturalHeight, backfaceVisibility: 'hidden', imageRendering: 'inherit' }} />
@@ -132,14 +163,14 @@ export function VerticalImageAligner() {
   }, [images.length, slotHeight, slotWidth]);
 
   const cssBackgroundColor = useMemo(() => {
-    const r = parseInt(bgColorHex.slice(1, 3), 16);
-    const g = parseInt(bgColorHex.slice(3, 5), 16);
-    const b = parseInt(bgColorHex.slice(5, 7), 16);
+    const r = parseInt(bgColorHex.slice(HEX_PARSE_R_START, HEX_PARSE_R_END), HEX_BASE);
+    const g = parseInt(bgColorHex.slice(HEX_PARSE_G_START, HEX_PARSE_G_END), HEX_BASE);
+    const b = parseInt(bgColorHex.slice(HEX_PARSE_B_START, HEX_PARSE_B_END), HEX_BASE);
     return `rgba(${r}, ${g}, ${b}, ${bgOpacity})`;
   }, [bgColorHex, bgOpacity]);
 
   // --- Handlers ---
-  const getCanvasScale = useCallback(() => workspaceRef.current?.getTransform().scale || 1, []);
+  const getCanvasScale = useCallback(() => workspaceRef.current?.getTransform().scale || CANVAS_SCALE_DEFAULT, []);
 
   const handleUpdatePosition = useCallback((id: string, x: number, y: number) => {
     setImages(prev => prev.map(img => img.id === id ? { ...img, offsetX: x, offsetY: y } : img));
@@ -189,7 +220,20 @@ export function VerticalImageAligner() {
     newImages.forEach((item, idx) => {
       const img = new Image();
       img.onload = () => {
-        if (isListEmpty && idx === 0) { setSlotHeight(img.height); setFrameStepX(img.height); }
+        // Логика установки размеров на основе ПЕРВОГО изображения (если список был пуст)
+        if (isListEmpty && idx === 0) {
+          setSlotHeight(img.height);
+          setFrameStepX(img.height);
+
+          // --- ИСПРАВЛЕНИЕ: Автоматический сброс масштаба ---
+          // Мы используем setTimeout, чтобы дать React время обновить DOM и размеры контейнера
+          setTimeout(() => {
+            // Устанавливаем вид по размерам первого изображения. 
+            // Это поведение аналогично MonochromeBackgroundRemover.
+            workspaceRef.current?.resetView(img.width, img.height);
+          }, VIEW_RESET_DELAY);
+        }
+
         setSlotWidth(prev => { if (isListEmpty && idx === 0) return img.width; return Math.max(prev, img.width); });
         setImages(current => current.map(ex => ex.id === item.id ? { ...ex, naturalWidth: img.width, naturalHeight: img.height } : ex));
       };
@@ -212,9 +256,9 @@ export function VerticalImageAligner() {
       const ctx = canvas.getContext('2d');
       if (!ctx) return;
 
-      const r = parseInt(bgColorHex.slice(1, 3), 16);
-      const g = parseInt(bgColorHex.slice(3, 5), 16);
-      const b = parseInt(bgColorHex.slice(5, 7), 16);
+      const r = parseInt(bgColorHex.slice(HEX_PARSE_R_START, HEX_PARSE_R_END), HEX_BASE);
+      const g = parseInt(bgColorHex.slice(HEX_PARSE_G_START, HEX_PARSE_G_END), HEX_BASE);
+      const b = parseInt(bgColorHex.slice(HEX_PARSE_B_START, HEX_PARSE_B_END), HEX_BASE);
       ctx.fillStyle = `rgba(${r}, ${g}, ${b}, ${bgOpacity})`;
       ctx.fillRect(0, 0, finalW, finalH);
 
@@ -327,7 +371,6 @@ export function VerticalImageAligner() {
         shadowOverlayOpacity={images.length ? 0.5 : 0}
         showTransparencyGrid={true}
         backgroundColor={cssBackgroundColor}
-        // Передача специализированной заглушки
         placeholder={
           !images.length ? (
             <FileDropzonePlaceholder onUpload={processFiles} multiple={true} title="Перетащите изображения для склейки" />
@@ -336,8 +379,9 @@ export function VerticalImageAligner() {
       >
         <div className="absolute inset-0" style={{ backgroundColor: cssBackgroundColor }} />
         {showRedGrid && (
-          <div className="absolute inset-0 pointer-events-none z-50 opacity-50"
+          <div className={`absolute inset-0 pointer-events-none opacity-50`}
             style={{
+              zIndex: Z_INDEX_GRID_RED,
               backgroundImage: `linear-gradient(to right, ${redGridColor} 1px, transparent 1px), linear-gradient(to bottom, ${redGridColor} 1px, transparent 1px)`,
               backgroundSize: `${frameStepX}px ${slotHeight}px`,
               backgroundPosition: `${redGridOffsetX}px ${redGridOffsetY}px`
@@ -345,11 +389,12 @@ export function VerticalImageAligner() {
           />
         )}
         {showFrameGrid && (
-          <div className="absolute inset-0 pointer-events-none z-[60] opacity-80"
+          <div className={`absolute inset-0 pointer-events-none opacity-80`}
             style={{
-              backgroundImage: `linear-gradient(to right, ${frameBorderColor} 10px, transparent 10px), linear-gradient(to bottom, ${frameBorderColor} 10px, transparent 10px)`,
+              zIndex: Z_INDEX_GRID_FRAME,
+              backgroundImage: `linear-gradient(to right, ${frameBorderColor} ${GRID_FRAME_DASH}px, transparent ${GRID_FRAME_DASH}px), linear-gradient(to bottom, ${frameBorderColor} ${GRID_FRAME_DASH}px, transparent ${GRID_FRAME_DASH}px)`,
               backgroundSize: `${frameStepX}px ${slotHeight}px`,
-              backgroundPosition: '-5px -5px'
+              backgroundPosition: GRID_FRAME_OFFSET_CSS
             }}
           />
         )}
