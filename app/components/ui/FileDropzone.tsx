@@ -1,6 +1,34 @@
 'use client';
 
-import React, { useState, useRef, useEffect, ReactNode } from 'react';
+import React, { useState, useRef, useEffect, ReactNode, useCallback } from 'react';
+
+// --- Helper: Validate File Type ---
+const isFileAccepted = (file: File, accept: string): boolean => {
+  if (!accept || accept === '*' || accept === '') return true;
+
+  const acceptedTypes = accept.split(',').map((t) => t.trim().toLowerCase());
+  const fileName = file.name.toLowerCase();
+  const fileType = file.type.toLowerCase();
+
+  return acceptedTypes.some((type) => {
+    // 1. Проверка расширения (например, .jpg)
+    if (type.startsWith('.')) {
+      return fileName.endsWith(type);
+    }
+    // 2. Проверка MIME wildcard (например, image/*)
+    if (type.endsWith('/*')) {
+      const mainType = type.replace('/*', '');
+      // Если файл имеет MIME тип, проверяем начало.
+      // Важно: иногда file.type бывает пустым, тогда полагаемся на расширение или отвергаем.
+      if (fileType) {
+        return fileType.startsWith(mainType);
+      }
+      return false;
+    }
+    // 3. Точное совпадение MIME (например, image/jpeg)
+    return fileType === type;
+  });
+};
 
 // --- Base Component Props ---
 interface FileDropzoneProps {
@@ -26,6 +54,21 @@ export const FileDropzone = ({
   const [isDragActive, setIsDragActive] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
+  // Обработка списка файлов с валидацией
+  const processFiles = useCallback((fileList: FileList | File[]) => {
+    const filesArray = Array.from(fileList);
+
+    // Фильтруем файлы согласно accept
+    const validFiles = filesArray.filter(file => isFileAccepted(file, accept));
+
+    if (validFiles.length > 0) {
+      onFilesSelected(validFiles);
+    } else {
+      // Опционально: можно добавить уведомление, что файлы не подошли по формату
+      console.warn("Файлы были проигнорированы, так как не соответствуют формату:", accept);
+    }
+  }, [accept, onFilesSelected]);
+
   // --- Global DnD (Window) ---
   useEffect(() => {
     if (!enableWindowDrop) return;
@@ -46,7 +89,7 @@ export const FileDropzone = ({
       e.preventDefault();
       setIsDragActive(false);
       if (e.dataTransfer?.files && e.dataTransfer.files.length > 0) {
-        onFilesSelected(Array.from(e.dataTransfer.files));
+        processFiles(e.dataTransfer.files);
       }
     };
 
@@ -59,14 +102,14 @@ export const FileDropzone = ({
       window.removeEventListener('dragleave', handleWindowDragLeave);
       window.removeEventListener('drop', handleWindowDrop);
     };
-  }, [enableWindowDrop, onFilesSelected]);
+  }, [enableWindowDrop, processFiles]);
 
   // --- Local Handlers ---
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
-      onFilesSelected(Array.from(e.target.files));
+      processFiles(e.target.files);
     }
-    e.target.value = '';
+    e.target.value = ''; // Сброс value, чтобы можно было выбрать тот же файл повторно
   };
 
   const handleClick = () => {
@@ -90,7 +133,7 @@ export const FileDropzone = ({
     e.stopPropagation();
     setIsDragActive(false);
     if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-      onFilesSelected(Array.from(e.dataTransfer.files));
+      processFiles(e.dataTransfer.files);
     }
   };
 
@@ -147,7 +190,6 @@ export const FileDropzone = ({
 };
 
 // --- Specialized Component: Full Size Placeholder ---
-// Это "стандартная реализация" для заглушек на весь экран/канвас
 
 interface FileDropzonePlaceholderProps {
   onUpload: (files: File[]) => void;
@@ -156,21 +198,24 @@ interface FileDropzonePlaceholderProps {
   className?: string;
   title?: string;
   subTitle?: string;
+  accept?: string;
 }
 
 export const FileDropzonePlaceholder = ({
   onUpload,
   multiple = false,
-  enableWindowDrop = false, // По умолчанию false, чтобы не конфликтовать с сайдбарами
+  enableWindowDrop = false,
   className = "",
   title = "Перетащите изображения сюда",
-  subTitle = "или кликните для выбора"
+  subTitle = "или кликните для выбора",
+  accept = "image/*"
 }: FileDropzonePlaceholderProps) => {
   return (
     <FileDropzone
       onFilesSelected={onUpload}
       multiple={multiple}
       enableWindowDrop={enableWindowDrop}
+      accept={accept}
       className={`w-full h-full border-none bg-transparent hover:bg-zinc-50/50 dark:hover:bg-zinc-900/50 transition-colors ${className}`}
     >
       <div className="flex flex-col items-center justify-center text-zinc-400 animate-in fade-in zoom-in-95 duration-300">

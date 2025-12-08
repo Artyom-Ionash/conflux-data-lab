@@ -500,7 +500,12 @@ export function VideoFrameExtractor() {
 
         {!videoSrc ? (
           <div className="flex-1 p-8">
-            <FileDropzonePlaceholder onUpload={handleFilesSelected} multiple={false} title="Перетащите видеофайл" />
+            <FileDropzonePlaceholder
+              onUpload={handleFilesSelected}
+              multiple={false}
+              accept="video/*"
+              title="Перетащите видеофайл"
+            />
           </div>
         ) : (
           <div className="flex-1 overflow-y-auto p-4 space-y-4">
