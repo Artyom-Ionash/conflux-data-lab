@@ -29,7 +29,7 @@ const DEFAULT_SETTINGS = {
   frameStep: 1,
   frameColor: '#00ff00',
   redGridColor: '#ff0000',
-  bgColor: '#ffffff',
+  bgColor: '#ffffff', // Используется только как fallback initial value
 };
 
 // --- TYPES ---
@@ -132,8 +132,6 @@ export function VerticalImageAligner() {
   const [redGridOffsetY, setRedGridOffsetY] = useState(0);
   const [redGridColor] = useState(DEFAULT_SETTINGS.redGridColor);
 
-  const [bgColorHex, setBgColorHex] = useState(DEFAULT_SETTINGS.bgColor);
-
   const [draggingListIndex, setDraggingListIndex] = useState<number | null>(null);
   const [isExporting, setIsExporting] = useState(false);
   const workspaceRef = useRef<CanvasRef>(null);
@@ -147,9 +145,6 @@ export function VerticalImageAligner() {
     const height = Math.max(1, images.length * slotHeight);
     return { bounds: { width, height }, totalHeight: height, isCriticalHeight: height > LIMIT_MAX_BROWSER };
   }, [images.length, slotHeight, slotWidth]);
-
-  // Фон теперь просто HEX строка
-  const cssBackgroundColor = bgColorHex;
 
   // --- Handlers ---
   const getCanvasScale = useCallback(() => workspaceRef.current?.getTransform().scale || CANVAS_SCALE_DEFAULT, []);
@@ -207,7 +202,7 @@ export function VerticalImageAligner() {
           setSlotHeight(img.height);
           setFrameStepX(img.height);
 
-          // Попытка взять цвет верхнего левого пикселя
+          // Попытка взять цвет верхнего левого пикселя и применить его к Canvas
           try {
             const tempCanvas = document.createElement('canvas');
             tempCanvas.width = 1;
@@ -216,12 +211,11 @@ export function VerticalImageAligner() {
             if (tempCtx) {
               tempCtx.drawImage(img, 0, 0, 1, 1, 0, 0, 1, 1);
               const [r, g, b] = tempCtx.getImageData(0, 0, 1, 1).data;
-
-              // Преобразование RGB в HEX без "магических битовых сдвигов" для читаемости
               const toHex = (c: number) => c.toString(16).padStart(2, '0');
               const hex = `#${toHex(r)}${toHex(g)}${toHex(b)}`;
 
-              setBgColorHex(hex);
+              // ПРОГРАММНО УСТАНАВЛИВАЕМ ЦВЕТ В CANVAS
+              workspaceRef.current?.setBackgroundColor(hex);
             }
           } catch (e) {
             console.warn("Could not extract color from image", e);
@@ -255,9 +249,17 @@ export function VerticalImageAligner() {
       const ctx = canvas.getContext('2d');
       if (!ctx) return;
 
-      // Заливка фона непрозрачным цветом
-      ctx.fillStyle = bgColorHex;
-      ctx.fillRect(0, 0, finalW, finalH);
+      // Получаем текущий цвет фона из компонента Canvas через Ref
+      const currentBg = workspaceRef.current?.getBackgroundColor();
+
+      // Заливка фона (если есть цвет)
+      if (currentBg) {
+        ctx.fillStyle = currentBg;
+        ctx.fillRect(0, 0, finalW, finalH);
+      } else {
+        // Если прозрачный - очищаем (на всякий случай)
+        ctx.clearRect(0, 0, finalW, finalH);
+      }
 
       loaded.forEach(({ meta, img }, index) => {
         const slotY = index * slotHeight;
@@ -275,7 +277,7 @@ export function VerticalImageAligner() {
       document.body.removeChild(pngLink);
 
     } finally { setIsExporting(false); }
-  }, [images, slotHeight, slotWidth, bgColorHex, isCriticalHeight]);
+  }, [images, slotHeight, slotWidth, isCriticalHeight]);
 
   const sidebarContent = (
     <div className="flex flex-col gap-6 pb-4">
@@ -299,24 +301,7 @@ export function VerticalImageAligner() {
             <div className="mt-2 text-xs font-medium text-zinc-500 text-center">Итого: <span className="text-zinc-900 dark:text-zinc-100">{slotWidth}</span> x <span className="text-zinc-900 dark:text-zinc-100">{totalHeight}</span> px</div>
           </div>
 
-          {/* Настройки фона (Только цвет) */}
-          <div className="p-4 bg-zinc-50 dark:bg-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-700">
-            <div className="text-xs font-bold text-zinc-500 mb-3 uppercase tracking-wide">Фон</div>
-            <div className="flex items-center gap-3">
-              <div className="relative w-10 h-10 rounded border border-zinc-300 dark:border-zinc-600 overflow-hidden shadow-sm">
-                <input
-                  type="color"
-                  value={bgColorHex}
-                  onChange={(e) => setBgColorHex(e.target.value)}
-                  className="absolute -top-2 -left-2 w-16 h-16 p-0 border-0 cursor-pointer"
-                />
-              </div>
-              <div className="flex flex-col">
-                <span className="text-sm font-mono uppercase text-zinc-700 dark:text-zinc-300">{bgColorHex}</span>
-                <span className="text-[10px] text-zinc-400">Цвет заливки</span>
-              </div>
-            </div>
-          </div>
+          {/* Настройка фона удалена отсюда, теперь она в Canvas */}
 
           <div className="p-4 bg-zinc-50 dark:bg-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-700">
             <Switch label="ЗЕЛЕНАЯ СЕТКА (КАДР)" checked={showFrameGrid} onCheckedChange={setShowFrameGrid} />
@@ -374,7 +359,7 @@ export function VerticalImageAligner() {
         contentHeight={bounds.height}
         shadowOverlayOpacity={images.length ? 0.5 : 0}
         showTransparencyGrid={true}
-        backgroundColor={cssBackgroundColor}
+        defaultBackgroundColor={DEFAULT_SETTINGS.bgColor}
         placeholder={
           !images.length ? (
             <FileDropzonePlaceholder onUpload={processFiles} multiple={true} title="Перетащите изображения для склейки" />
