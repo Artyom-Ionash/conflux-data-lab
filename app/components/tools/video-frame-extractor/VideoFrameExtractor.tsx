@@ -13,10 +13,14 @@ import { FrameDiffOverlay } from "./FrameDiffOverlay";
 // Import Domain Components
 import { TextureDimensionSlider } from "../../domain/graphics/TextureDimensionSlider";
 
+// --- CONSTANTS ---
+// Единый стиль для оверлеев времени (используется в HTML, в Canvas эмулируется вручную)
+const TIMESTAMP_CLASS = "absolute bottom-2 left-2 bg-black/70 text-white px-2 py-0.5 rounded text-[11px] font-bold font-mono backdrop-blur-[2px] pointer-events-none shadow-sm";
+
 // --- 1. DOMAIN TYPES ---
 export interface ExtractedFrame {
   time: number;
-  dataUrl: string;
+  dataUrl: string | null; // Allow null for placeholder state
 }
 
 export type ExtractionStep = "extracting" | "generating" | "";
@@ -42,21 +46,26 @@ export interface ExtractionStatus {
 // --- 2. GENERIC UI COMPONENTS ---
 
 interface FramePlayerProps {
-  images: string[];
+  frames: ExtractedFrame[]; // Changed from images to full frames for timestamps
   fps: number;
   width?: number;
   height?: number;
   className?: string;
 }
 
-export function FramePlayer({ images, fps, width, height, className }: FramePlayerProps) {
+export function FramePlayer({ frames, fps, width, height, className }: FramePlayerProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const requestRef = useRef<number | undefined>(undefined);
   const previousTimeRef = useRef<number | undefined>(undefined);
   const indexRef = useRef(0);
 
-  // Reset logic handled gently to allow smooth looping
-  if (indexRef.current >= images.length) {
+  // Filter out nulls for playback AND cast type safely
+  const validFrames = useMemo(() =>
+    frames.filter((f): f is ExtractedFrame & { dataUrl: string } => f.dataUrl !== null),
+    [frames]);
+
+  // Reset logic
+  if (indexRef.current >= validFrames.length) {
     indexRef.current = 0;
   }
 
@@ -68,25 +77,54 @@ export function FramePlayer({ images, fps, width, height, className }: FramePlay
       if (deltaTime > interval) {
         previousTimeRef.current = time - (deltaTime % interval);
 
-        if (images.length > 0) {
-          indexRef.current = (indexRef.current + 1) % images.length;
-          const imageUrl = images[indexRef.current];
+        if (validFrames.length > 0) {
+          indexRef.current = (indexRef.current + 1) % validFrames.length;
+          const frame = validFrames[indexRef.current];
 
           const canvas = canvasRef.current;
           const ctx = canvas?.getContext('2d');
 
           if (canvas && ctx) {
             const img = new Image();
-            img.src = imageUrl;
+            img.src = frame.dataUrl;
 
-            if (img.complete) {
+            // Helper to draw frame and timestamp
+            const draw = () => {
               ctx.clearRect(0, 0, canvas.width, canvas.height);
               ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+              // --- Draw Timestamp (Unified Style emulation on Canvas) ---
+              const timeText = `${frame.time.toFixed(2)}s`;
+              ctx.font = 'bold 11px monospace';
+              const textMetrics = ctx.measureText(timeText);
+
+              const padX = 8;
+              const padY = 4;
+              const boxHeight = 20;
+              const boxWidth = textMetrics.width + (padX * 2);
+              const x = 8;
+              const y = canvas.height - 28; // bottom-left position
+
+              // Background (Rounded Rect simulation)
+              ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+              ctx.beginPath();
+              if (typeof ctx.roundRect === 'function') {
+                ctx.roundRect(x, y, boxWidth, boxHeight, 4);
+              } else {
+                ctx.rect(x, y, boxWidth, boxHeight); // Fallback
+              }
+              ctx.fill();
+
+              // Text
+              ctx.fillStyle = 'white';
+              ctx.textBaseline = 'middle';
+              ctx.fillText(timeText, x + padX, y + (boxHeight / 2) + 1);
+            };
+
+            if (img.complete) {
+              draw();
             } else {
-              img.onload = () => {
-                ctx.clearRect(0, 0, canvas.width, canvas.height);
-                ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-              };
+              img.onload = draw;
             }
           }
         }
@@ -95,7 +133,7 @@ export function FramePlayer({ images, fps, width, height, className }: FramePlay
       previousTimeRef.current = time;
     }
     requestRef.current = requestAnimationFrame(animate);
-  }, [images, fps]);
+  }, [validFrames, fps]);
 
   useEffect(() => {
     requestRef.current = requestAnimationFrame(animate);
@@ -104,17 +142,36 @@ export function FramePlayer({ images, fps, width, height, className }: FramePlay
     };
   }, [animate]);
 
+  // Initial Paint
   useEffect(() => {
-    if (images.length > 0 && canvasRef.current) {
+    if (validFrames.length > 0 && canvasRef.current) {
       const img = new Image();
-      img.src = images[0];
+      img.src = validFrames[0].dataUrl;
       img.onload = () => {
         const w = width || canvasRef.current!.width;
         const h = height || canvasRef.current!.height;
-        canvasRef.current?.getContext('2d')?.drawImage(img, 0, 0, w, h);
+        const ctx = canvasRef.current?.getContext('2d');
+        if (ctx) {
+          ctx.drawImage(img, 0, 0, w, h);
+          // Draw timestamp for first frame immediately
+          const timeText = `${validFrames[0].time.toFixed(2)}s`;
+          ctx.font = 'bold 11px monospace';
+          ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+          const metrics = ctx.measureText(timeText);
+          if (typeof ctx.roundRect === 'function') {
+            ctx.beginPath();
+            ctx.roundRect(8, h - 28, metrics.width + 16, 20, 4);
+            ctx.fill();
+          } else {
+            ctx.fillRect(8, h - 28, metrics.width + 16, 20);
+          }
+          ctx.fillStyle = 'white';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(timeText, 16, h - 18);
+        }
       };
     }
-  }, [images]);
+  }, [validFrames]);
 
   return (
     <canvas
@@ -131,10 +188,12 @@ export function FramePlayer({ images, fps, width, height, className }: FramePlay
 function useSpriteSheetGenerator() {
   const generateSpriteSheet = useCallback(
     async (frames: ExtractedFrame[], options: { maxHeight: number; spacing: number; backgroundColor: string }) => {
-      if (frames.length === 0) throw new Error("No frames");
+      // Filter only completed frames
+      const validFrames = frames.filter(f => f.dataUrl !== null);
+      if (validFrames.length === 0) throw new Error("No frames");
 
       const firstImage = new Image();
-      await new Promise<void>((resolve) => { firstImage.onload = () => resolve(); firstImage.src = frames[0].dataUrl; });
+      await new Promise<void>((resolve) => { firstImage.onload = () => resolve(); firstImage.src = validFrames[0].dataUrl!; });
 
       const scale = options.maxHeight / firstImage.height;
       const scaledWidth = Math.floor(firstImage.width * scale);
@@ -144,7 +203,7 @@ function useSpriteSheetGenerator() {
       const ctx = canvas.getContext("2d");
       if (!ctx) throw new Error("No context");
 
-      canvas.width = (scaledWidth + options.spacing) * frames.length - options.spacing;
+      canvas.width = (scaledWidth + options.spacing) * validFrames.length - options.spacing;
       canvas.height = scaledHeight;
 
       if (options.backgroundColor !== "transparent") {
@@ -152,9 +211,9 @@ function useSpriteSheetGenerator() {
         ctx.fillRect(0, 0, canvas.width, canvas.height);
       }
 
-      for (let i = 0; i < frames.length; i++) {
+      for (let i = 0; i < validFrames.length; i++) {
         const img = new Image();
-        await new Promise<void>((resolve) => { img.onload = () => resolve(); img.src = frames[i].dataUrl; });
+        await new Promise<void>((resolve) => { img.onload = () => resolve(); img.src = validFrames[i].dataUrl!; });
         const x = i * (scaledWidth + options.spacing);
         ctx.drawImage(img, x, 0, scaledWidth, scaledHeight);
       }
@@ -173,10 +232,10 @@ function useVideoFrameExtraction() {
 
   const [extractionParams, setExtractionParams] = useState<ExtractionParams>({ startTime: 0, endTime: 0, frameStep: 1, symmetricLoop: false });
 
-  // RAW frames (directly from video extraction loop)
+  // RAW frames (may contain nulls for placeholders)
   const [rawFrames, setRawFrames] = useState<ExtractedFrame[]>([]);
 
-  // PROCESSED frames (memoized to handle symmetry instantly without re-extraction)
+  // PROCESSED frames (memoized to handle symmetry)
   const frames = useMemo(() => {
     if (rawFrames.length < 2) return rawFrames;
     if (!extractionParams.symmetricLoop) return rawFrames;
@@ -331,7 +390,13 @@ function useVideoFrameExtraction() {
       if (!ctx) throw new Error("Canvas context failed");
 
       const numberOfSteps = Math.floor((safeEnd - safeStart) / interval);
-      const actualEndTime = safeStart + (numberOfSteps * interval);
+
+      // --- 0. PRE-CALCULATE TIMESTAMPS (PLACEHOLDERS) ---
+      const initialFrames: ExtractedFrame[] = [];
+      for (let i = 0; i <= numberOfSteps; i++) {
+        initialFrames.push({ time: safeStart + (i * interval), dataUrl: null });
+      }
+      setRawFrames(initialFrames); // Immediate UI update with empty frames
 
       // 1. Priority Capture Start
       videoEl.currentTime = safeStart;
@@ -340,7 +405,7 @@ function useVideoFrameExtraction() {
       const startFrameUrl = canvasEl.toDataURL("image/png");
 
       // 2. Priority Capture End
-      videoEl.currentTime = actualEndTime;
+      videoEl.currentTime = safeStart + (numberOfSteps * interval);
       await new Promise<void>(resolve => { videoEl.onseeked = () => resolve(); });
       ctx.drawImage(videoEl, 0, 0, canvasEl.width, canvasEl.height);
       const endFrameUrl = canvasEl.toDataURL("image/png");
@@ -349,7 +414,7 @@ function useVideoFrameExtraction() {
 
       const totalSteps = numberOfSteps + 1;
 
-      // 3. Loop Generation (Populating Raw Frames)
+      // 3. Loop Generation (Filling Raw Frames)
       for (let i = 0; i <= numberOfSteps; i++) {
         if (signal.aborted) throw new Error("Aborted");
 
@@ -359,9 +424,11 @@ function useVideoFrameExtraction() {
           const onSeeked = () => {
             ctx.drawImage(videoEl, 0, 0, canvasEl.width, canvasEl.height);
             const url = canvasEl.toDataURL("image/png");
-            const newFrame = { time: current, dataUrl: url };
 
-            setRawFrames(prev => [...prev, newFrame]);
+            // Update specific frame in state without destroying others
+            setRawFrames(prev => prev.map((f, idx) =>
+              idx === i ? { ...f, dataUrl: url } : f
+            ));
 
             resolve();
           };
@@ -393,7 +460,9 @@ function useVideoFrameExtraction() {
   }, [runExtraction]);
 
   const generateAndDownloadGif = useCallback(() => {
-    if (frames.length === 0) return;
+    // Filter out nulls
+    const validFrames = frames.filter(f => f.dataUrl !== null);
+    if (validFrames.length === 0) return;
 
     setStatus({ isProcessing: true, currentStep: "generating", progress: 0 });
     setError(null);
@@ -404,11 +473,12 @@ function useVideoFrameExtraction() {
         const height = videoDimensions?.height || 200;
 
         gifshot.createGIF({
-          images: frames.map(f => f.dataUrl),
+          // BUG FIX: Added assertion '!' because filter ensures it's not null, but map returns (string|null)[] otherwise
+          images: validFrames.map(f => f.dataUrl!),
           interval: 1 / gifParams.fps,
           gifWidth: width,
           gifHeight: height,
-          numFrames: frames.length,
+          numFrames: validFrames.length,
         }, (obj: any) => {
           if (!obj.error) {
             const a = document.createElement('a');
@@ -459,9 +529,10 @@ export function VideoFrameExtractor() {
 
   // --- AUTO-DETECT BACKGROUND COLOR FROM FIRST FRAME ---
   useEffect(() => {
-    // Срабатываем, когда появляются кадры (например, после извлечения)
-    if (frames.length > 0) {
-      const firstFrameUrl = frames[0].dataUrl;
+    // Срабатываем, когда появляется хотя бы один загруженный кадр (обычно первый)
+    const firstLoadedFrame = frames.find(f => f.dataUrl !== null);
+
+    if (firstLoadedFrame && firstLoadedFrame.dataUrl) {
       const img = new Image();
       img.onload = () => {
         const canvas = document.createElement('canvas');
@@ -472,8 +543,6 @@ export function VideoFrameExtractor() {
           ctx.drawImage(img, 0, 0, 1, 1, 0, 0, 1, 1);
           const [r, g, b, a] = ctx.getImageData(0, 0, 1, 1).data;
 
-          // Если пиксель полностью прозрачный - ставим transparent
-          // Если есть цвет - конвертируем в hex
           if (a === 0) {
             setSpriteOptions(prev => ({ ...prev, bg: "transparent" }));
           } else {
@@ -484,14 +553,13 @@ export function VideoFrameExtractor() {
           }
         }
       };
-      img.src = firstFrameUrl;
+      img.src = firstLoadedFrame.dataUrl;
     }
-  }, [frames]); // Зависимость от frames - пересчитываем при новом наборе кадров
+  }, [frames]); // Re-run when frames update (specifically when first dataUrl becomes available)
 
   const handleDownloadSpriteSheet = async () => {
     if (frames.length === 0) return;
     try {
-      // Generating ONLY on click
       const url = await generateSpriteSheet(frames, {
         maxHeight: spriteOptions.maxHeight,
         spacing: spriteOptions.spacing,
@@ -516,6 +584,16 @@ export function VideoFrameExtractor() {
     if (!videoDimensions) return {};
     return { aspectRatio: `${videoDimensions.width} / ${videoDimensions.height}` };
   }, [videoDimensions]);
+
+  // Dimensions for placeholder
+  const placeholderStyle = useMemo(() => {
+    if (!videoDimensions) return { width: 100, height: spriteOptions.maxHeight };
+    const scale = spriteOptions.maxHeight / videoDimensions.height;
+    return {
+      width: Math.floor(videoDimensions.width * scale),
+      height: spriteOptions.maxHeight
+    };
+  }, [videoDimensions, spriteOptions.maxHeight]);
 
   // Purely mathematical calculation, no generation involved
   const spriteDimensions = useMemo(() => {
@@ -692,7 +770,7 @@ export function VideoFrameExtractor() {
                   {(frames.length > 0 || status.isProcessing) ? (
                     <>
                       <FramePlayer
-                        images={frames.map(f => f.dataUrl)}
+                        frames={frames}
                         fps={gifParams.fps}
                         width={videoDimensions?.width || 300}
                         height={videoDimensions?.height || 200}
@@ -839,19 +917,32 @@ export function VideoFrameExtractor() {
                     >
                       {frames.map((frame, idx) => (
                         <div key={idx} className="relative shrink-0 group select-none">
-                          <img
-                            src={frame.dataUrl}
-                            alt={`Sprite ${idx}`}
-                            style={{
-                              height: spriteOptions.maxHeight,
-                              display: 'block',
-                              boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
-                            }}
-                            className="bg-black/5 rounded-sm"
-                          />
 
-                          {/* Timestamp - Bottom Left, Larger */}
-                          <div className="absolute bottom-2 left-2 bg-black/80 text-white px-2 py-1 rounded text-xs font-bold font-mono backdrop-blur-[2px] pointer-events-none shadow-sm">
+                          {/* IMAGE OR PLACEHOLDER LOGIC */}
+                          {frame.dataUrl ? (
+                            <img
+                              src={frame.dataUrl}
+                              alt={`Sprite ${idx}`}
+                              style={{
+                                height: spriteOptions.maxHeight,
+                                display: 'block',
+                                boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+                              }}
+                              className="bg-black/5 rounded-sm"
+                            />
+                          ) : (
+                            <div
+                              className="rounded-sm transition-colors duration-500 animate-pulse border border-zinc-200 dark:border-zinc-800"
+                              style={{
+                                width: placeholderStyle.width,
+                                height: placeholderStyle.height,
+                                backgroundColor: spriteOptions.bg === 'transparent' ? 'rgba(0,0,0,0.05)' : spriteOptions.bg
+                              }}
+                            />
+                          )}
+
+                          {/* Timestamp - Bottom Left, Unified Style */}
+                          <div className={TIMESTAMP_CLASS}>
                             {frame.time.toFixed(2)}s
                           </div>
 
