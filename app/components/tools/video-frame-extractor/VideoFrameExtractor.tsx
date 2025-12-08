@@ -450,9 +450,43 @@ export function VideoFrameExtractor() {
   } = useVideoFrameExtraction();
 
   const [spriteOptions, setSpriteOptions] = useState({ maxHeight: 300, spacing: 0, bg: "transparent" });
+  // Для управления инпутом цвета, если выбран "прозрачный", храним последнее значение или белый
+  const [pickerValue, setPickerValue] = useState("#ffffff");
+
   const [diffDataUrl, setDiffDataUrl] = useState<string | null>(null);
 
   const { generateSpriteSheet } = useSpriteSheetGenerator();
+
+  // --- AUTO-DETECT BACKGROUND COLOR FROM FIRST FRAME ---
+  useEffect(() => {
+    // Срабатываем, когда появляются кадры (например, после извлечения)
+    if (frames.length > 0) {
+      const firstFrameUrl = frames[0].dataUrl;
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        canvas.width = 1;
+        canvas.height = 1;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.drawImage(img, 0, 0, 1, 1, 0, 0, 1, 1);
+          const [r, g, b, a] = ctx.getImageData(0, 0, 1, 1).data;
+
+          // Если пиксель полностью прозрачный - ставим transparent
+          // Если есть цвет - конвертируем в hex
+          if (a === 0) {
+            setSpriteOptions(prev => ({ ...prev, bg: "transparent" }));
+          } else {
+            const toHex = (c: number) => c.toString(16).padStart(2, '0');
+            const hex = `#${toHex(r)}${toHex(g)}${toHex(b)}`;
+            setSpriteOptions(prev => ({ ...prev, bg: hex }));
+            setPickerValue(hex);
+          }
+        }
+      };
+      img.src = firstFrameUrl;
+    }
+  }, [frames]); // Зависимость от frames - пересчитываем при новом наборе кадров
 
   const handleDownloadSpriteSheet = async () => {
     if (frames.length === 0) return;
@@ -470,6 +504,12 @@ export function VideoFrameExtractor() {
     } catch (e) {
       console.error(e);
     }
+  };
+
+  const handleColorChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value;
+    setPickerValue(val);
+    setSpriteOptions(prev => ({ ...prev, bg: val }));
   };
 
   const aspectRatioStyle = useMemo(() => {
@@ -708,7 +748,7 @@ export function VideoFrameExtractor() {
                           onChange={(e) => setSpriteOptions(p => ({ ...p, maxHeight: Number(e.target.value) }))}
                         />
                       </div>
-                      <div className="flex items-center gap-1">
+                      <div className="flex items-center gap-1 border-r border-zinc-200 dark:border-zinc-700 pr-3 mr-1">
                         <span className="text-[10px] text-zinc-500">Отступ:</span>
                         <input
                           type="number"
@@ -717,6 +757,43 @@ export function VideoFrameExtractor() {
                           onChange={(e) => setSpriteOptions(p => ({ ...p, spacing: Number(e.target.value) }))}
                         />
                       </div>
+
+                      {/* Color Picker Interface */}
+                      <div className="flex items-center gap-1.5" title="Фон спрайт-листа">
+                        <div className="relative w-5 h-5 rounded-full overflow-hidden border border-zinc-300 dark:border-zinc-600 shadow-sm cursor-pointer hover:scale-105 transition-transform group">
+                          {/* Нативный инпут */}
+                          <input
+                            type="color"
+                            className="absolute inset-0 w-[150%] h-[150%] p-0 m-0 -translate-x-1/4 -translate-y-1/4 cursor-pointer opacity-0 z-10"
+                            value={pickerValue}
+                            onInput={handleColorChange}
+                          />
+                          {/* Шахматка для прозрачности */}
+                          <div className="absolute inset-0 z-0 bg-white"
+                            style={{
+                              backgroundImage: `linear-gradient(45deg, #ccc 25%, transparent 25%), linear-gradient(-45deg, #ccc 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #ccc 75%), linear-gradient(-45deg, transparent 75%, #ccc 75%)`,
+                              backgroundSize: '6px 6px',
+                              backgroundPosition: '0 0, 0 3px, 3px -3px, -3px 0px'
+                            }}
+                          />
+                          {/* Выбранный цвет */}
+                          <div
+                            className="absolute inset-0 z-1 transition-colors duration-200"
+                            style={{ backgroundColor: spriteOptions.bg === 'transparent' ? 'transparent' : spriteOptions.bg }}
+                          />
+                        </div>
+
+                        {spriteOptions.bg !== 'transparent' && (
+                          <button
+                            onClick={() => setSpriteOptions(p => ({ ...p, bg: 'transparent' }))}
+                            className="flex items-center justify-center w-4 h-4 text-zinc-400 hover:text-red-500 rounded-full transition-colors"
+                            title="Сбросить на прозрачный"
+                          >
+                            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                          </button>
+                        )}
+                      </div>
+
                     </div>
                   )}
                 </div>
