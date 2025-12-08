@@ -6,6 +6,7 @@ import { FileDropzone, FileDropzonePlaceholder } from '../../ui/FileDropzone';
 import { ToolLayout } from '../ToolLayout';
 import { Switch } from '../../ui/Switch';
 import { TextureDimensionSlider } from '../../domain/graphics/TextureDimensionSlider';
+import { Slider } from '../../ui/Slider';
 
 // --- CONSTANTS ---
 const LIMIT_MAX_BROWSER = 16384;
@@ -318,14 +319,16 @@ export function VerticalImageAligner() {
 
           <div className="p-4 bg-zinc-50 dark:bg-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-700">
             <Switch label="ЗЕЛЕНАЯ СЕТКА (КАДР)" checked={showFrameGrid} onCheckedChange={setShowFrameGrid} />
-            {showFrameGrid && <div className="mt-2 pt-4 border-t border-zinc-200 dark:border-zinc-700"><TextureDimensionSlider label="Шаг X" value={frameStepX} onChange={setFrameStepX} max={slotWidth * 2} /></div>}
+            {showFrameGrid && <div className="mt-2 pt-4 border-t border-zinc-200 dark:border-zinc-700">
+              <Slider label="Шаг X" value={frameStepX} onChange={setFrameStepX} max={slotWidth * 2} statusColor="green" />
+            </div>}
           </div>
 
           <div className="p-4 bg-zinc-50 dark:bg-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-700">
             <Switch label="КРАСНАЯ СЕТКА (СДВИГ)" checked={showRedGrid} onCheckedChange={setShowRedGrid} />
             {showRedGrid && <div className="mt-2 pt-4 border-t border-zinc-200 dark:border-zinc-700">
-              <TextureDimensionSlider label="Сдвиг X" value={redGridOffsetX} onChange={setRedGridOffsetX} min={-slotWidth} max={slotWidth} />
-              <TextureDimensionSlider label="Сдвиг Y" value={redGridOffsetY} onChange={setRedGridOffsetY} min={-slotHeight} max={slotHeight} />
+              <Slider label="Сдвиг X" value={redGridOffsetX} onChange={setRedGridOffsetX} min={-slotWidth} max={slotWidth} statusColor="red" />
+              <Slider label="Сдвиг Y" value={redGridOffsetY} onChange={setRedGridOffsetY} min={-slotHeight} max={slotHeight} statusColor="red" />
             </div>}
           </div>
 
@@ -352,8 +355,8 @@ export function VerticalImageAligner() {
           {activeImageId && (
             <div className="p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
               <p className="font-bold text-xs mb-3 text-yellow-800 dark:text-yellow-200 uppercase tracking-wide">Смещение активного слоя</p>
-              <TextureDimensionSlider label="X (px)" value={Math.round(images.find(i => i.id === activeImageId)?.offsetX || 0)} onChange={(val) => handleUpdatePosition(activeImageId, val, (images.find(i => i.id === activeImageId)?.offsetY || 0))} min={-slotWidth} max={slotWidth} />
-              <TextureDimensionSlider label="Y (px)" value={Math.round(images.find(i => i.id === activeImageId)?.offsetY || 0)} onChange={(val) => handleUpdatePosition(activeImageId, (images.find(i => i.id === activeImageId)?.offsetX || 0), val)} min={-slotHeight} max={slotHeight} />
+              <Slider label="X (px)" value={Math.round(images.find(i => i.id === activeImageId)?.offsetX || 0)} onChange={(val) => handleUpdatePosition(activeImageId, val, (images.find(i => i.id === activeImageId)?.offsetY || 0))} min={-slotWidth} max={slotWidth} statusColor="yellow" />
+              <Slider label="Y (px)" value={Math.round(images.find(i => i.id === activeImageId)?.offsetY || 0)} onChange={(val) => handleUpdatePosition(activeImageId, (images.find(i => i.id === activeImageId)?.offsetX || 0), val)} min={-slotHeight} max={slotHeight} statusColor="yellow" />
             </div>
           )}
         </>
