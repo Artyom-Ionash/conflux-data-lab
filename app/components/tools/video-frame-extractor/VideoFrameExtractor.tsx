@@ -8,23 +8,23 @@ import { ToolLayout } from "../ToolLayout";
 import { FileDropzone, FileDropzonePlaceholder } from "../../ui/FileDropzone";
 import { RangeSlider } from "../../ui/RangeSlider";
 import { Switch } from "../../ui/Switch";
+import { ImageSequencePlayer } from "../../ui/ImageSequencePlayer"; // Импортируем новый универсальный компонент
+
+// Tool Specific Imports
 import { RangeVideoPlayer } from "./RangeVideoPlayer";
 import { FrameDiffOverlay } from "./FrameDiffOverlay";
-// Import Domain Components
 import { TextureDimensionSlider } from "../../domain/graphics/TextureDimensionSlider";
 
 // --- CONSTANTS ---
 
-// Базовые визуальные стили (черная плашка, белый текст, шрифт)
+// Визуальный стиль для меток времени (используется и в HTML верстке, и в Canvas)
 const TIMESTAMP_VISUALS = "bg-black/70 text-white px-2 py-0.5 rounded text-[11px] font-bold font-mono backdrop-blur-[2px] shadow-sm";
-
-// Полный класс для абсолютного позиционирования на карточках
-const TIMESTAMP_CLASS = `absolute bottom-2 left-2 pointer-events-none ${TIMESTAMP_VISUALS}`;
+const TIMESTAMP_HTML_CLASS = `absolute bottom-2 left-2 pointer-events-none ${TIMESTAMP_VISUALS}`;
 
 // --- 1. DOMAIN TYPES ---
 export interface ExtractedFrame {
   time: number;
-  dataUrl: string | null; // Allow null for placeholder state
+  dataUrl: string | null;
 }
 
 export type ExtractionStep = "extracting" | "generating" | "";
@@ -47,178 +47,11 @@ export interface ExtractionStatus {
   progress: number;
 }
 
-// --- 2. GENERIC UI COMPONENTS ---
-
-interface FramePlayerProps {
-  frames: ExtractedFrame[];
-  fps: number;
-  width?: number;
-  height?: number;
-  className?: string;
-}
-
-export function FramePlayer({ frames, fps, width, height, className }: FramePlayerProps) {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const requestRef = useRef<number | undefined>(undefined);
-  const previousTimeRef = useRef<number | undefined>(undefined);
-  const indexRef = useRef(0);
-
-  // Плеер теперь использует ВСЕ кадры, даже пустые (null), чтобы соблюдать тайминг
-  // Сбрасываем индекс, если массив изменился и индекс вышел за пределы
-  if (indexRef.current >= frames.length) {
-    indexRef.current = 0;
-  }
-
-  const animate = useCallback((time: number) => {
-    if (previousTimeRef.current !== undefined) {
-      const deltaTime = time - previousTimeRef.current;
-      const interval = 1000 / fps;
-
-      if (deltaTime > interval) {
-        previousTimeRef.current = time - (deltaTime % interval);
-
-        if (frames.length > 0) {
-          indexRef.current = (indexRef.current + 1) % frames.length;
-          const frame = frames[indexRef.current];
-
-          const canvas = canvasRef.current;
-          const ctx = canvas?.getContext('2d');
-
-          if (canvas && ctx) {
-            // Helper to draw timestamp (Unified Style emulation on Canvas)
-            const drawTimestamp = () => {
-              const timeText = `${frame.time.toFixed(2)}s`;
-              ctx.font = 'bold 11px monospace';
-              const textMetrics = ctx.measureText(timeText);
-
-              const padX = 8;
-              // const padY = 4;
-              const boxHeight = 20;
-              const boxWidth = textMetrics.width + (padX * 2);
-              const x = 8;
-              const y = canvas.height - 28; // bottom-left position
-
-              // Background (Rounded Rect simulation)
-              ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
-              ctx.beginPath();
-              if (typeof ctx.roundRect === 'function') {
-                ctx.roundRect(x, y, boxWidth, boxHeight, 4);
-              } else {
-                ctx.rect(x, y, boxWidth, boxHeight); // Fallback
-              }
-              ctx.fill();
-
-              // Text
-              ctx.fillStyle = 'white';
-              ctx.textBaseline = 'middle';
-              ctx.fillText(timeText, x + padX, y + (boxHeight / 2) + 1);
-            };
-
-            // LOGIC: If dataUrl exists -> Draw Image. If null -> Draw Placeholder BG.
-            if (frame.dataUrl) {
-              const img = new Image();
-              img.src = frame.dataUrl;
-
-              const onDraw = () => {
-                ctx.clearRect(0, 0, canvas.width, canvas.height);
-                ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-                drawTimestamp();
-              };
-
-              if (img.complete) {
-                onDraw();
-              } else {
-                img.onload = onDraw;
-              }
-            } else {
-              // Placeholder State (Gray background)
-              ctx.fillStyle = '#f4f4f5'; // zinc-100 equivalent
-              ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-              // Optional: Draw a "loading" or "empty" icon/text
-              ctx.fillStyle = '#d4d4d8'; // zinc-300
-              ctx.font = '10px sans-serif';
-              ctx.textAlign = 'center';
-              ctx.textBaseline = 'middle';
-              ctx.fillText('...', canvas.width / 2, canvas.height / 2);
-              ctx.textAlign = 'start'; // reset
-
-              drawTimestamp();
-            }
-          }
-        }
-      }
-    } else {
-      previousTimeRef.current = time;
-    }
-    requestRef.current = requestAnimationFrame(animate);
-  }, [frames, fps]);
-
-  useEffect(() => {
-    requestRef.current = requestAnimationFrame(animate);
-    return () => {
-      if (requestRef.current) cancelAnimationFrame(requestRef.current);
-    };
-  }, [animate]);
-
-  // Initial Paint (First frame only)
-  useEffect(() => {
-    if (frames.length > 0 && canvasRef.current) {
-      const frame = frames[0];
-      const ctx = canvasRef.current.getContext('2d');
-      if (!ctx) return;
-
-      const w = width || canvasRef.current.width;
-      const h = height || canvasRef.current.height;
-
-      const drawInitialTimestamp = () => {
-        const timeText = `${frame.time.toFixed(2)}s`;
-        ctx.font = 'bold 11px monospace';
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
-        const metrics = ctx.measureText(timeText);
-        if (typeof ctx.roundRect === 'function') {
-          ctx.beginPath();
-          ctx.roundRect(8, h - 28, metrics.width + 16, 20, 4);
-          ctx.fill();
-        } else {
-          ctx.fillRect(8, h - 28, metrics.width + 16, 20);
-        }
-        ctx.fillStyle = 'white';
-        ctx.textBaseline = 'middle';
-        ctx.fillText(timeText, 16, h - 18);
-      };
-
-      if (frame.dataUrl) {
-        const img = new Image();
-        img.src = frame.dataUrl;
-        img.onload = () => {
-          ctx.drawImage(img, 0, 0, w, h);
-          drawInitialTimestamp();
-        };
-      } else {
-        ctx.fillStyle = '#f4f4f5';
-        ctx.fillRect(0, 0, w, h);
-        drawInitialTimestamp();
-      }
-    }
-  }, [frames]); // Re-run if frames array changes (e.g. reset)
-
-  return (
-    <canvas
-      ref={canvasRef}
-      width={width}
-      height={height}
-      className={className || "w-full h-full object-contain"}
-    />
-  );
-}
-
-// --- 3. LOGIC & HOOKS ---
+// --- 2. LOGIC & HOOKS ---
 
 function useSpriteSheetGenerator() {
   const generateSpriteSheet = useCallback(
     async (frames: ExtractedFrame[], options: { maxHeight: number; spacing: number; backgroundColor: string }) => {
-      // Filter only completed frames
       const validFrames = frames.filter(f => f.dataUrl !== null);
       if (validFrames.length === 0) throw new Error("No frames");
 
@@ -262,15 +95,11 @@ function useVideoFrameExtraction() {
 
   const [extractionParams, setExtractionParams] = useState<ExtractionParams>({ startTime: 0, endTime: 0, frameStep: 1, symmetricLoop: false });
 
-  // RAW frames (may contain nulls for placeholders)
   const [rawFrames, setRawFrames] = useState<ExtractedFrame[]>([]);
 
-  // PROCESSED frames (memoized to handle symmetry)
   const frames = useMemo(() => {
     if (rawFrames.length < 2) return rawFrames;
     if (!extractionParams.symmetricLoop) return rawFrames;
-
-    // Symmetric Logic: [0, 1, 2, 3] -> [0, 1, 2, 3, 2, 1]
     const loopBack = rawFrames.slice(1, -1).reverse();
     return [...rawFrames, ...loopBack];
   }, [rawFrames, extractionParams.symmetricLoop]);
@@ -291,7 +120,6 @@ function useVideoFrameExtraction() {
 
   useEffect(() => { return () => { if (videoSrc) URL.revokeObjectURL(videoSrc); }; }, [videoSrc]);
 
-  // Preview Start/End frames logic (Calculated Times)
   useEffect(() => {
     if (!videoSrc || !previewVideoRef.current || !canvasRef.current || !videoDuration) return;
     if (status.isProcessing) return;
@@ -311,19 +139,15 @@ function useVideoFrameExtraction() {
         canvas.height = vid.videoHeight;
 
         const safeStart = Math.max(0, extractionParams.startTime);
-        const safeEnd = Math.min(effectiveEnd, videoDuration);
         const interval = extractionParams.frameStep;
-
-        const steps = Math.floor((safeEnd - safeStart) / interval);
+        const steps = Math.floor((Math.min(effectiveEnd, videoDuration) - safeStart) / interval);
         const actualEndTime = safeStart + (steps * interval);
 
-        // Capture Start
         vid.currentTime = safeStart;
         await new Promise<void>(r => { vid.onseeked = () => r(); });
         ctx?.drawImage(vid, 0, 0);
         const startUrl = canvas.toDataURL('image/png');
 
-        // Capture End
         vid.currentTime = actualEndTime;
         await new Promise<void>(r => { vid.onseeked = () => r(); });
         ctx?.drawImage(vid, 0, 0);
@@ -338,14 +162,7 @@ function useVideoFrameExtraction() {
     }, 500);
 
     return () => clearTimeout(timer);
-  }, [
-    videoSrc,
-    extractionParams.startTime,
-    effectiveEnd,
-    videoDuration,
-    status.isProcessing,
-    extractionParams.frameStep
-  ]);
+  }, [videoSrc, extractionParams.startTime, effectiveEnd, videoDuration, status.isProcessing, extractionParams.frameStep]);
 
   const handleFilesSelected = useCallback(async (files: File[]) => {
     if (!files.length) return;
@@ -368,7 +185,6 @@ function useVideoFrameExtraction() {
       const duration = tempVideo.duration || 0;
       setVideoDuration(duration);
       setVideoDimensions({ width: tempVideo.videoWidth, height: tempVideo.videoHeight });
-
       const defaultStep = Math.max(0.5, duration / 10);
       setExtractionParams((p) => ({
         ...p,
@@ -382,10 +198,7 @@ function useVideoFrameExtraction() {
 
   const runExtraction = useCallback(async () => {
     if (!videoRef.current || !canvasRef.current || !videoSrc) return;
-
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort();
-    }
+    if (abortControllerRef.current) abortControllerRef.current.abort();
     abortControllerRef.current = new AbortController();
     const signal = abortControllerRef.current.signal;
 
@@ -421,20 +234,17 @@ function useVideoFrameExtraction() {
 
       const numberOfSteps = Math.floor((safeEnd - safeStart) / interval);
 
-      // --- 0. PRE-CALCULATE TIMESTAMPS (PLACEHOLDERS) ---
       const initialFrames: ExtractedFrame[] = [];
       for (let i = 0; i <= numberOfSteps; i++) {
         initialFrames.push({ time: safeStart + (i * interval), dataUrl: null });
       }
-      setRawFrames(initialFrames); // Immediate UI update with empty frames
+      setRawFrames(initialFrames);
 
-      // 1. Priority Capture Start
       videoEl.currentTime = safeStart;
       await new Promise<void>(resolve => { videoEl.onseeked = () => resolve(); });
       ctx.drawImage(videoEl, 0, 0, canvasEl.width, canvasEl.height);
       const startFrameUrl = canvasEl.toDataURL("image/png");
 
-      // 2. Priority Capture End
       videoEl.currentTime = safeStart + (numberOfSteps * interval);
       await new Promise<void>(resolve => { videoEl.onseeked = () => resolve(); });
       ctx.drawImage(videoEl, 0, 0, canvasEl.width, canvasEl.height);
@@ -444,34 +254,23 @@ function useVideoFrameExtraction() {
 
       const totalSteps = numberOfSteps + 1;
 
-      // 3. Loop Generation (Filling Raw Frames)
       for (let i = 0; i <= numberOfSteps; i++) {
         if (signal.aborted) throw new Error("Aborted");
-
         const current = safeStart + (i * interval);
-
         await new Promise<void>((resolve) => {
           const onSeeked = () => {
             ctx.drawImage(videoEl, 0, 0, canvasEl.width, canvasEl.height);
             const url = canvasEl.toDataURL("image/png");
-
-            // Update specific frame in state without destroying others
-            setRawFrames(prev => prev.map((f, idx) =>
-              idx === i ? { ...f, dataUrl: url } : f
-            ));
-
+            setRawFrames(prev => prev.map((f, idx) => idx === i ? { ...f, dataUrl: url } : f));
             resolve();
           };
           videoEl.currentTime = current;
           videoEl.onseeked = onSeeked;
         });
-
         setStatus(s => ({ ...s, progress: Math.min(100, ((i + 1) / totalSteps) * 100) }));
         await new Promise(r => requestAnimationFrame(r));
       }
-
       setStatus({ isProcessing: false, currentStep: "", progress: 100 });
-
     } catch (e: any) {
       if (e.message !== "Aborted") {
         setError(e instanceof Error ? e.message : "Error");
@@ -480,17 +279,13 @@ function useVideoFrameExtraction() {
     }
   }, [videoSrc, extractionParams.startTime, extractionParams.endTime, extractionParams.frameStep, effectiveEnd]);
 
-  // --- AUTO UPDATE EFFECT ---
   useEffect(() => {
     if (!videoSrc) return;
-    const timer = setTimeout(() => {
-      runExtraction();
-    }, 600);
+    const timer = setTimeout(() => runExtraction(), 600);
     return () => clearTimeout(timer);
   }, [runExtraction]);
 
   const generateAndDownloadGif = useCallback(() => {
-    // Filter out nulls
     const validFrames = frames.filter(f => f.dataUrl !== null);
     if (validFrames.length === 0) return;
 
@@ -501,9 +296,7 @@ function useVideoFrameExtraction() {
       if (typeof gifshot !== 'undefined') {
         const width = videoDimensions?.width || 300;
         const height = videoDimensions?.height || 200;
-
         gifshot.createGIF({
-          // BUG FIX: Added assertion '!' because filter ensures it's not null, but map returns (string|null)[] otherwise
           images: validFrames.map(f => f.dataUrl!),
           interval: 1 / gifParams.fps,
           gifWidth: width,
@@ -525,43 +318,63 @@ function useVideoFrameExtraction() {
         setStatus({ isProcessing: false, currentStep: "", progress: 0 });
       }
     }, 50);
-
   }, [frames, gifParams.fps, videoDimensions]);
 
   return {
     videoRef, previewVideoRef, canvasRef, videoSrc, videoDuration, videoDimensions,
-    extractionParams, setExtractionParams,
-    frames, gifParams, setGifParams, status, error, effectiveEnd,
-    previewFrames, isPreviewing,
-    handleFilesSelected, runExtraction, generateAndDownloadGif,
-    videoFile
+    extractionParams, setExtractionParams, frames, gifParams, setGifParams, status, error, effectiveEnd,
+    previewFrames, isPreviewing, handleFilesSelected, runExtraction, generateAndDownloadGif, videoFile
   };
 }
 
-// --- 4. MAIN LAYOUT COMPONENT ---
+// --- 3. MAIN LAYOUT COMPONENT ---
 
 export function VideoFrameExtractor() {
   const {
     videoRef, previewVideoRef, canvasRef, videoSrc, videoDuration, videoDimensions,
-    extractionParams, setExtractionParams,
-    frames, gifParams, setGifParams, status, error, effectiveEnd,
-    previewFrames, isPreviewing,
-    handleFilesSelected, runExtraction, generateAndDownloadGif
+    extractionParams, setExtractionParams, frames, gifParams, setGifParams, status, error, effectiveEnd,
+    previewFrames, isPreviewing, handleFilesSelected, runExtraction, generateAndDownloadGif
   } = useVideoFrameExtraction();
 
   const [spriteOptions, setSpriteOptions] = useState({ maxHeight: 300, spacing: 0, bg: "transparent" });
-  // Для управления инпутом цвета, если выбран "прозрачный", храним последнее значение или белый
   const [pickerValue, setPickerValue] = useState("#ffffff");
-
   const [diffDataUrl, setDiffDataUrl] = useState<string | null>(null);
 
   const { generateSpriteSheet } = useSpriteSheetGenerator();
 
-  // --- AUTO-DETECT BACKGROUND COLOR FROM FIRST FRAME ---
-  useEffect(() => {
-    // Срабатываем, когда появляется хотя бы один загруженный кадр (обычно первый)
-    const firstLoadedFrame = frames.find(f => f.dataUrl !== null);
+  // --- Overlay Draw Logic for Universal Player ---
+  const handleDrawOverlay = useCallback((ctx: CanvasRenderingContext2D, index: number, w: number, h: number) => {
+    const frame = frames[index];
+    if (!frame) return;
 
+    const timeText = `${frame.time.toFixed(2)}s`;
+    ctx.font = 'bold 11px monospace';
+    const textMetrics = ctx.measureText(timeText);
+
+    const padX = 8;
+    const boxHeight = 20;
+    const boxWidth = textMetrics.width + (padX * 2);
+    const x = 8;
+    const y = h - 28;
+
+    // Background (Rounded Rect simulation)
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+    ctx.beginPath();
+    if (typeof ctx.roundRect === 'function') {
+      ctx.roundRect(x, y, boxWidth, boxHeight, 4);
+    } else {
+      ctx.rect(x, y, boxWidth, boxHeight);
+    }
+    ctx.fill();
+
+    // Text
+    ctx.fillStyle = 'white';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(timeText, x + padX, y + (boxHeight / 2) + 1);
+  }, [frames]); // Re-create if frames logic/timing changes
+
+  useEffect(() => {
+    const firstLoadedFrame = frames.find(f => f.dataUrl !== null);
     if (firstLoadedFrame && firstLoadedFrame.dataUrl) {
       const img = new Image();
       img.onload = () => {
@@ -572,7 +385,6 @@ export function VideoFrameExtractor() {
         if (ctx) {
           ctx.drawImage(img, 0, 0, 1, 1, 0, 0, 1, 1);
           const [r, g, b, a] = ctx.getImageData(0, 0, 1, 1).data;
-
           if (a === 0) {
             setSpriteOptions(prev => ({ ...prev, bg: "transparent" }));
           } else {
@@ -585,7 +397,7 @@ export function VideoFrameExtractor() {
       };
       img.src = firstLoadedFrame.dataUrl;
     }
-  }, [frames]); // Re-run when frames update (specifically when first dataUrl becomes available)
+  }, [frames]);
 
   const handleDownloadSpriteSheet = async () => {
     if (frames.length === 0) return;
@@ -615,7 +427,6 @@ export function VideoFrameExtractor() {
     return { aspectRatio: `${videoDimensions.width} / ${videoDimensions.height}` };
   }, [videoDimensions]);
 
-  // Dimensions for placeholder
   const placeholderStyle = useMemo(() => {
     if (!videoDimensions) return { width: 100, height: spriteOptions.maxHeight };
     const scale = spriteOptions.maxHeight / videoDimensions.height;
@@ -625,7 +436,6 @@ export function VideoFrameExtractor() {
     };
   }, [videoDimensions, spriteOptions.maxHeight]);
 
-  // Purely mathematical calculation, no generation involved
   const spriteDimensions = useMemo(() => {
     if (!videoDimensions || frames.length === 0) return { width: 0, height: 0 };
     const scale = spriteOptions.maxHeight / videoDimensions.height;
@@ -638,8 +448,6 @@ export function VideoFrameExtractor() {
     <div className="flex flex-col gap-6 pb-4">
       <div className="flex flex-col gap-2">
         <FileDropzone onFilesSelected={handleFilesSelected} multiple={false} accept="video/*" label="Загрузить видео" />
-
-        {/* PROGRESS INDICATOR IN SIDEBAR */}
         {status.isProcessing && (
           <div className="mt-2 p-3 bg-blue-50 dark:bg-blue-900/20 rounded border border-blue-100 dark:border-blue-800 animate-in fade-in zoom-in-95 duration-200">
             <div className="text-xs font-semibold text-blue-700 dark:text-blue-300 mb-1.5 flex justify-between items-center">
@@ -681,9 +489,7 @@ export function VideoFrameExtractor() {
                   <div className="flex flex-wrap items-center justify-between gap-y-2 gap-x-4">
                     <div className="flex flex-wrap items-center gap-4">
                       <span className="text-xs font-bold text-zinc-500 uppercase tracking-wide">Диапазон извлечения</span>
-
                       <div className="h-4 w-px bg-zinc-200 dark:bg-zinc-700 hidden sm:block"></div>
-
                       <div className="flex items-center gap-2">
                         <span className="text-[10px] font-medium text-zinc-500">Шаг:</span>
                         <input
@@ -694,7 +500,6 @@ export function VideoFrameExtractor() {
                         />
                         <span className="text-[10px] text-zinc-400">сек</span>
                       </div>
-
                       <div className="flex items-center">
                         <Switch
                           label="Симметричный цикл"
@@ -705,7 +510,7 @@ export function VideoFrameExtractor() {
                       </div>
                     </div>
 
-                    {/* Updated Time Range Display to match Timestamp Style */}
+                    {/* Updated Time Range Display with Unified Style */}
                     <div className={`flex items-center gap-2 ${TIMESTAMP_VISUALS} ml-auto`}>
                       <span>{extractionParams.startTime.toFixed(2)}s</span>
                       <span className="text-zinc-300 opacity-60">→</span>
@@ -722,7 +527,6 @@ export function VideoFrameExtractor() {
                     minStepsBetweenThumbs={0.1}
                   />
                 </div>
-
                 {error && <div className="text-xs text-red-600 text-right font-medium">{error}</div>}
               </div>
             </div>
@@ -796,18 +600,17 @@ export function VideoFrameExtractor() {
                 </div>
 
                 <div className="relative w-full bg-zinc-100 dark:bg-zinc-950" style={aspectRatioStyle}>
-
-                  {/* PLAYER & LOADING OVERLAY COMBINATION */}
                   {(frames.length > 0 || status.isProcessing) ? (
                     <>
-                      <FramePlayer
-                        frames={frames}
+                      {/* NEW UNIVERSAL PLAYER USAGE */}
+                      <ImageSequencePlayer
+                        images={frames.map(f => f.dataUrl)}
                         fps={gifParams.fps}
                         width={videoDimensions?.width || 300}
                         height={videoDimensions?.height || 200}
+                        onDrawOverlay={handleDrawOverlay}
                       />
 
-                      {/* Transparent Processing Overlay */}
                       {status.isProcessing && (
                         <div className="absolute inset-0 z-20 flex flex-col justify-end pointer-events-none bg-black/5 backdrop-blur-[1px] transition-all duration-300">
                           <div className="w-full bg-zinc-200/20 dark:bg-zinc-700/30 h-1">
@@ -820,15 +623,11 @@ export function VideoFrameExtractor() {
                       )}
                     </>
                   ) : (
-                    /* Only show placeholder if strictly empty and idle */
                     <div className="absolute inset-0 flex items-center justify-center text-center p-4">
-                      <p className="text-xs text-zinc-400">
-                        Загрузите видео для предпросмотра
-                      </p>
+                      <p className="text-xs text-zinc-400">Загрузите видео для предпросмотра</p>
                     </div>
                   )}
 
-                  {/* Generation Spinner (GIF encoding) - specific overlay */}
                   {status.currentStep === 'generating' && (
                     <div className="absolute inset-0 flex flex-col items-center justify-center z-30 bg-white/50 dark:bg-black/50 backdrop-blur-[1px]">
                       <svg className="animate-spin h-8 w-8 text-blue-600 mb-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
@@ -870,17 +669,14 @@ export function VideoFrameExtractor() {
                         />
                       </div>
 
-                      {/* Color Picker Interface */}
                       <div className="flex items-center gap-1.5" title="Фон спрайт-листа">
                         <div className="relative w-5 h-5 rounded-full overflow-hidden border border-zinc-300 dark:border-zinc-600 shadow-sm cursor-pointer hover:scale-105 transition-transform group">
-                          {/* Нативный инпут */}
                           <input
                             type="color"
                             className="absolute inset-0 w-[150%] h-[150%] p-0 m-0 -translate-x-1/4 -translate-y-1/4 cursor-pointer opacity-0 z-10"
                             value={pickerValue}
                             onInput={handleColorChange}
                           />
-                          {/* Шахматка для прозрачности */}
                           <div className="absolute inset-0 z-0 bg-white"
                             style={{
                               backgroundImage: `linear-gradient(45deg, #ccc 25%, transparent 25%), linear-gradient(-45deg, #ccc 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #ccc 75%), linear-gradient(-45deg, transparent 75%, #ccc 75%)`,
@@ -888,7 +684,6 @@ export function VideoFrameExtractor() {
                               backgroundPosition: '0 0, 0 3px, 3px -3px, -3px 0px'
                             }}
                           />
-                          {/* Выбранный цвет */}
                           <div
                             className="absolute inset-0 z-1 transition-colors duration-200"
                             style={{ backgroundColor: spriteOptions.bg === 'transparent' ? 'transparent' : spriteOptions.bg }}
@@ -905,7 +700,6 @@ export function VideoFrameExtractor() {
                           </button>
                         )}
                       </div>
-
                     </div>
                   )}
                 </div>
@@ -923,14 +717,8 @@ export function VideoFrameExtractor() {
                       />
                     </div>
                   )}
-
                   {frames.length > 0 && !status.isProcessing && (
-                    <button
-                      onClick={handleDownloadSpriteSheet}
-                      className="text-xs text-blue-600 hover:underline font-medium"
-                    >
-                      Скачать
-                    </button>
+                    <button onClick={handleDownloadSpriteSheet} className="text-xs text-blue-600 hover:underline font-medium">Скачать</button>
                   )}
                 </div>
               </div>
@@ -938,7 +726,6 @@ export function VideoFrameExtractor() {
               <div className="flex-1 bg-zinc-100 dark:bg-zinc-950 relative overflow-x-auto overflow-y-hidden custom-scrollbar">
                 {frames.length > 0 ? (
                   <div className="h-full flex items-center px-4 py-4 min-w-fit">
-                    {/* Visual Preview Container using Flex Gap to Simulate Sprite Sheet */}
                     <div
                       className={`flex items-start border border-dashed border-zinc-300 dark:border-zinc-700 ${spriteOptions.bg === 'transparent' ? "bg-[url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAKQCAYAAAB2440yAAAAIklEQVQ4jWNgGAWjYBQMBAAABgAB/6Zj+QAAAABJRU5ErkJggg==')] bg-repeat" : ""}`}
                       style={{
@@ -948,17 +735,11 @@ export function VideoFrameExtractor() {
                     >
                       {frames.map((frame, idx) => (
                         <div key={idx} className="relative shrink-0 group select-none">
-
-                          {/* IMAGE OR PLACEHOLDER LOGIC */}
                           {frame.dataUrl ? (
                             <img
                               src={frame.dataUrl}
                               alt={`Sprite ${idx}`}
-                              style={{
-                                height: spriteOptions.maxHeight,
-                                display: 'block',
-                                boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
-                              }}
+                              style={{ height: spriteOptions.maxHeight, display: 'block', boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }}
                               className="bg-black/5 rounded-sm"
                             />
                           ) : (
@@ -972,12 +753,11 @@ export function VideoFrameExtractor() {
                             />
                           )}
 
-                          {/* Timestamp - Bottom Left, Unified Style */}
-                          <div className={TIMESTAMP_CLASS}>
+                          {/* Reusing the same visual style constant for timestamp in HTML */}
+                          <div className={TIMESTAMP_HTML_CLASS}>
                             {frame.time.toFixed(2)}s
                           </div>
 
-                          {/* Index - Top Right, Fade in */}
                           <div className="absolute top-2 right-2 bg-black/60 text-white px-1.5 py-0.5 rounded text-[10px] font-mono backdrop-blur-[2px] opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
                             #{idx + 1}
                           </div>
@@ -994,12 +774,10 @@ export function VideoFrameExtractor() {
                 )}
               </div>
             </div>
-
             <div className="h-8"></div>
           </div>
         )}
 
-        {/* Hidden Technical Elements */}
         <video ref={videoRef} className="hidden" crossOrigin="anonymous" muted playsInline />
         <video ref={previewVideoRef} className="hidden" crossOrigin="anonymous" muted playsInline />
         <canvas ref={canvasRef} className="hidden" />
