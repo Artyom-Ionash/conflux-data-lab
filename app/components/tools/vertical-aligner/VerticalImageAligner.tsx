@@ -15,15 +15,6 @@ const EXPORT_FILENAME = 'aligned-export';
 const MOUSE_BUTTON_LEFT = 0;
 const CANVAS_SCALE_DEFAULT = 1;
 
-// Grid & Styling Constants
-const HEX_PARSE_R_START = 1;
-const HEX_PARSE_R_END = 3;
-const HEX_PARSE_G_START = 3;
-const HEX_PARSE_G_END = 5;
-const HEX_PARSE_B_START = 5;
-const HEX_PARSE_B_END = 7;
-const HEX_BASE = 16;
-
 const GRID_FRAME_DASH = 10;
 const GRID_FRAME_OFFSET_CSS = '-5px -5px';
 
@@ -39,7 +30,6 @@ const DEFAULT_SETTINGS = {
   frameColor: '#00ff00',
   redGridColor: '#ff0000',
   bgColor: '#ffffff',
-  bgOpacity: 0,
 };
 
 // --- TYPES ---
@@ -143,7 +133,6 @@ export function VerticalImageAligner() {
   const [redGridColor] = useState(DEFAULT_SETTINGS.redGridColor);
 
   const [bgColorHex, setBgColorHex] = useState(DEFAULT_SETTINGS.bgColor);
-  const [bgOpacity, setBgOpacity] = useState(DEFAULT_SETTINGS.bgOpacity);
 
   const [draggingListIndex, setDraggingListIndex] = useState<number | null>(null);
   const [isExporting, setIsExporting] = useState(false);
@@ -159,12 +148,8 @@ export function VerticalImageAligner() {
     return { bounds: { width, height }, totalHeight: height, isCriticalHeight: height > LIMIT_MAX_BROWSER };
   }, [images.length, slotHeight, slotWidth]);
 
-  const cssBackgroundColor = useMemo(() => {
-    const r = parseInt(bgColorHex.slice(HEX_PARSE_R_START, HEX_PARSE_R_END), HEX_BASE);
-    const g = parseInt(bgColorHex.slice(HEX_PARSE_G_START, HEX_PARSE_G_END), HEX_BASE);
-    const b = parseInt(bgColorHex.slice(HEX_PARSE_B_START, HEX_PARSE_B_END), HEX_BASE);
-    return `rgba(${r}, ${g}, ${b}, ${bgOpacity})`;
-  }, [bgColorHex, bgOpacity]);
+  // Фон теперь просто HEX строка
+  const cssBackgroundColor = bgColorHex;
 
   // --- Handlers ---
   const getCanvasScale = useCallback(() => workspaceRef.current?.getTransform().scale || CANVAS_SCALE_DEFAULT, []);
@@ -237,7 +222,6 @@ export function VerticalImageAligner() {
               const hex = `#${toHex(r)}${toHex(g)}${toHex(b)}`;
 
               setBgColorHex(hex);
-              setBgOpacity(1); // Делаем фон видимым
             }
           } catch (e) {
             console.warn("Could not extract color from image", e);
@@ -271,10 +255,8 @@ export function VerticalImageAligner() {
       const ctx = canvas.getContext('2d');
       if (!ctx) return;
 
-      const r = parseInt(bgColorHex.slice(HEX_PARSE_R_START, HEX_PARSE_R_END), HEX_BASE);
-      const g = parseInt(bgColorHex.slice(HEX_PARSE_G_START, HEX_PARSE_G_END), HEX_BASE);
-      const b = parseInt(bgColorHex.slice(HEX_PARSE_B_START, HEX_PARSE_B_END), HEX_BASE);
-      ctx.fillStyle = `rgba(${r}, ${g}, ${b}, ${bgOpacity})`;
+      // Заливка фона непрозрачным цветом
+      ctx.fillStyle = bgColorHex;
       ctx.fillRect(0, 0, finalW, finalH);
 
       loaded.forEach(({ meta, img }, index) => {
@@ -293,7 +275,7 @@ export function VerticalImageAligner() {
       document.body.removeChild(pngLink);
 
     } finally { setIsExporting(false); }
-  }, [images, slotHeight, slotWidth, bgColorHex, bgOpacity, isCriticalHeight]);
+  }, [images, slotHeight, slotWidth, bgColorHex, isCriticalHeight]);
 
   const sidebarContent = (
     <div className="flex flex-col gap-6 pb-4">
@@ -317,10 +299,10 @@ export function VerticalImageAligner() {
             <div className="mt-2 text-xs font-medium text-zinc-500 text-center">Итого: <span className="text-zinc-900 dark:text-zinc-100">{slotWidth}</span> x <span className="text-zinc-900 dark:text-zinc-100">{totalHeight}</span> px</div>
           </div>
 
-          {/* Настройки фона */}
+          {/* Настройки фона (Только цвет) */}
           <div className="p-4 bg-zinc-50 dark:bg-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-700">
             <div className="text-xs font-bold text-zinc-500 mb-3 uppercase tracking-wide">Фон</div>
-            <div className="flex items-center gap-3 mb-4">
+            <div className="flex items-center gap-3">
               <div className="relative w-10 h-10 rounded border border-zinc-300 dark:border-zinc-600 overflow-hidden shadow-sm">
                 <input
                   type="color"
@@ -334,7 +316,6 @@ export function VerticalImageAligner() {
                 <span className="text-[10px] text-zinc-400">Цвет заливки</span>
               </div>
             </div>
-            <Slider label="Прозрачность" value={bgOpacity} onChange={setBgOpacity} min={0} max={1} step={0.01} statusColor="blue" />
           </div>
 
           <div className="p-4 bg-zinc-50 dark:bg-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-700">
@@ -400,7 +381,6 @@ export function VerticalImageAligner() {
           ) : null
         }
       >
-        {/* ФОН теперь обрабатывается пропом backgroundColor в Canvas, дублирующий div удален */}
         {showRedGrid && (
           <div className={`absolute inset-0 pointer-events-none opacity-50`}
             style={{
