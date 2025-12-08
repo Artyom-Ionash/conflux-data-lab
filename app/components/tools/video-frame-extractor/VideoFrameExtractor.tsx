@@ -530,6 +530,22 @@ export function VideoFrameExtractor() {
     <div className="flex flex-col gap-6 pb-4">
       <div className="flex flex-col gap-2">
         <FileDropzone onFilesSelected={handleFilesSelected} multiple={false} accept="video/*" label="Загрузить видео" />
+
+        {/* PROGRESS INDICATOR IN SIDEBAR */}
+        {status.isProcessing && (
+          <div className="mt-2 p-3 bg-blue-50 dark:bg-blue-900/20 rounded border border-blue-100 dark:border-blue-800 animate-in fade-in zoom-in-95 duration-200">
+            <div className="text-xs font-semibold text-blue-700 dark:text-blue-300 mb-1.5 flex justify-between items-center">
+              <span>{status.currentStep === 'extracting' ? 'Извлечение...' : 'Обработка...'}</span>
+              <span className="font-mono">{Math.round(status.progress)}%</span>
+            </div>
+            <div className="h-1.5 w-full bg-blue-200 dark:bg-blue-800 rounded-full overflow-hidden">
+              <div
+                className="h-full bg-blue-600 transition-all duration-300 ease-out"
+                style={{ width: `${status.progress}%` }}
+              />
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -552,15 +568,42 @@ export function VideoFrameExtractor() {
             {/* SETTINGS */}
             <div className="bg-white dark:bg-zinc-900 rounded-lg border border-zinc-200 dark:border-zinc-700 shadow-sm p-4">
               <div className="flex flex-col gap-4">
-                <div className="space-y-2">
-                  <div className="flex justify-between items-center">
-                    <span className="text-xs font-bold text-zinc-500 uppercase tracking-wide">Диапазон извлечения</span>
-                    <div className="flex gap-2 text-xs font-mono text-zinc-700 dark:text-zinc-300 bg-zinc-100 dark:bg-zinc-800 px-2 py-0.5 rounded">
+                <div className="space-y-3">
+                  {/* HEADER ROW WITH CONTROLS */}
+                  <div className="flex flex-wrap items-center justify-between gap-y-2 gap-x-4">
+                    <div className="flex flex-wrap items-center gap-4">
+                      <span className="text-xs font-bold text-zinc-500 uppercase tracking-wide">Диапазон извлечения</span>
+
+                      <div className="h-4 w-px bg-zinc-200 dark:bg-zinc-700 hidden sm:block"></div>
+
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] font-medium text-zinc-500">Шаг:</span>
+                        <input
+                          type="number" min="0.01" step="0.05"
+                          value={extractionParams.frameStep}
+                          onChange={(e) => setExtractionParams(p => ({ ...p, frameStep: parseFloat(e.target.value) }))}
+                          className="w-14 rounded border border-zinc-300 bg-white px-1.5 py-0.5 text-xs text-center dark:border-zinc-700 dark:bg-zinc-800"
+                        />
+                        <span className="text-[10px] text-zinc-400">сек</span>
+                      </div>
+
+                      <div className="flex items-center">
+                        <Switch
+                          label="Симметричный цикл"
+                          checked={extractionParams.symmetricLoop}
+                          onCheckedChange={(c) => setExtractionParams(p => ({ ...p, symmetricLoop: c }))}
+                          className="whitespace-nowrap gap-2 text-xs"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="flex gap-2 text-xs font-mono text-zinc-700 dark:text-zinc-300 bg-zinc-100 dark:bg-zinc-800 px-2 py-0.5 rounded ml-auto">
                       <span>{extractionParams.startTime.toFixed(2)}s</span>
                       <span className="text-zinc-400">→</span>
                       <span>{effectiveEnd.toFixed(2)}s</span>
                     </div>
                   </div>
+
                   <RangeSlider
                     min={0}
                     max={videoDuration ?? 0}
@@ -571,47 +614,7 @@ export function VideoFrameExtractor() {
                   />
                 </div>
 
-                <div className="flex flex-wrap items-center justify-between gap-6 pt-2 border-t border-zinc-100 dark:border-zinc-800">
-                  <div className="flex items-center gap-6">
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs font-medium text-zinc-600 dark:text-zinc-400">Шаг (сек):</span>
-                      <input
-                        type="number" min="0.01" step="0.05"
-                        value={extractionParams.frameStep}
-                        onChange={(e) => setExtractionParams(p => ({ ...p, frameStep: parseFloat(e.target.value) }))}
-                        className="w-16 rounded border border-zinc-300 bg-white px-2 py-1 text-xs dark:border-zinc-700 dark:bg-zinc-800"
-                      />
-                    </div>
-                    <div className="h-4 w-px bg-zinc-200 dark:bg-zinc-700"></div>
-                    <div className="flex items-center">
-                      <Switch
-                        label="Симметричный цикл"
-                        checked={extractionParams.symmetricLoop}
-                        onCheckedChange={(c) => setExtractionParams(p => ({ ...p, symmetricLoop: c }))}
-                        className="whitespace-nowrap gap-3"
-                      />
-                    </div>
-                  </div>
-
-                  <button
-                    onClick={runExtraction}
-                    disabled={status.isProcessing}
-                    className="relative rounded-md bg-blue-600 px-4 py-1.5 text-xs font-semibold text-white hover:bg-blue-700 disabled:opacity-50 transition-all shadow-sm hover:shadow-md uppercase tracking-wide overflow-hidden min-w-[140px]"
-                  >
-                    <span className="relative z-10">
-                      {status.isProcessing && status.currentStep === 'extracting'
-                        ? `Обновление ${Math.round(status.progress)}%`
-                        : 'Обновить принудительно'}
-                    </span>
-                    {status.isProcessing && status.currentStep === 'extracting' && (
-                      <div
-                        className="absolute inset-0 bg-blue-500 transition-all duration-300 ease-out"
-                        style={{ width: `${status.progress}%` }}
-                      />
-                    )}
-                  </button>
-                </div>
-                {error && <div className="text-xs text-red-600 text-right">{error}</div>}
+                {error && <div className="text-xs text-red-600 text-right font-medium">{error}</div>}
               </div>
             </div>
 
@@ -835,20 +838,26 @@ export function VideoFrameExtractor() {
                       }}
                     >
                       {frames.map((frame, idx) => (
-                        <div key={idx} className="flex flex-col shrink-0 group relative">
+                        <div key={idx} className="relative shrink-0 group select-none">
                           <img
                             src={frame.dataUrl}
                             alt={`Sprite ${idx}`}
                             style={{
                               height: spriteOptions.maxHeight,
-                              display: 'block'
+                              display: 'block',
+                              boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
                             }}
-                            className="bg-black/5"
+                            className="bg-black/5 rounded-sm"
                           />
-                          {/* UI ONLY: Metadata Labels (Not included in download) */}
-                          <div className="mt-1 flex justify-between text-[10px] text-zinc-500 font-mono px-0.5 select-none">
-                            <span>{frame.time.toFixed(2)}s</span>
-                            <span className="opacity-50">#{idx + 1}</span>
+
+                          {/* Timestamp - Bottom Left, Larger */}
+                          <div className="absolute bottom-2 left-2 bg-black/80 text-white px-2 py-1 rounded text-xs font-bold font-mono backdrop-blur-[2px] pointer-events-none shadow-sm">
+                            {frame.time.toFixed(2)}s
+                          </div>
+
+                          {/* Index - Top Right, Fade in */}
+                          <div className="absolute top-2 right-2 bg-black/60 text-white px-1.5 py-0.5 rounded text-[10px] font-mono backdrop-blur-[2px] opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+                            #{idx + 1}
                           </div>
                         </div>
                       ))}
