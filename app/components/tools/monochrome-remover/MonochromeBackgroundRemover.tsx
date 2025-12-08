@@ -10,7 +10,23 @@ import { ToggleGroup, ToggleGroupItem } from '../../ui/ToggleGroup';
 // --- CONSTANTS & CONFIG ---
 const DEBOUNCE_DELAY = 50;
 const VIEW_RESET_DELAY = 50;
-const MAX_RGB_DISTANCE = Math.sqrt(3 * 255 ** 2);
+const PROCESS_DELAY_MS = 10;
+const MOUSE_BUTTON_LEFT = 0;
+
+const RGB_MAX = 255;
+const HEX_BASE = 16;
+const HEX_PAD_CHAR = '0';
+
+// Pixel Data Constants
+const PIXEL_STRIDE = 4;
+const OFFSET_R = 0;
+const OFFSET_G = 1;
+const OFFSET_B = 2;
+const OFFSET_A = 3;
+const PERCENTAGE_MAX = 100;
+
+// Max distance in 3D RGB space: sqrt(255^2 + 255^2 + 255^2)
+const MAX_RGB_DISTANCE = Math.sqrt(3 * RGB_MAX ** 2);
 const DOWNLOAD_FILENAME = 'removed_bg.png';
 
 const DEFAULT_SETTINGS = {
@@ -27,23 +43,23 @@ const DEFAULT_SETTINGS = {
 function hexToRgb(hex: string) {
   const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
   return result ? {
-    r: parseInt(result[1], 16),
-    g: parseInt(result[2], 16),
-    b: parseInt(result[3], 16)
+    r: parseInt(result[1], HEX_BASE),
+    g: parseInt(result[2], HEX_BASE),
+    b: parseInt(result[3], HEX_BASE)
   } : null;
 }
 
 function rgbToHex(r: number, g: number, b: number) {
   return "#" + [r, g, b].map(x => {
-    const hex = x.toString(16);
-    return hex.length === 1 ? "0" + hex : hex;
+    const hex = x.toString(HEX_BASE);
+    return hex.length === 1 ? HEX_PAD_CHAR + hex : hex;
   }).join("");
 }
 
 function invertHex(hex: string) {
   const rgb = hexToRgb(hex);
   if (!rgb) return '#000000';
-  return rgbToHex(255 - rgb.r, 255 - rgb.g, 255 - rgb.b);
+  return rgbToHex(RGB_MAX - rgb.r, RGB_MAX - rgb.g, RGB_MAX - rgb.b);
 }
 
 type ProcessingMode = 'remove' | 'keep' | 'flood-clear';
@@ -139,11 +155,15 @@ export function MonochromeBackgroundRemover() {
         return;
       }
 
-      const tolVal = (tolerances[processingMode] / 100) * MAX_RGB_DISTANCE;
-      const smoothVal = (smoothness / 100) * MAX_RGB_DISTANCE;
+      const tolVal = (tolerances[processingMode] / PERCENTAGE_MAX) * MAX_RGB_DISTANCE;
+      const smoothVal = (smoothness / PERCENTAGE_MAX) * MAX_RGB_DISTANCE;
 
       const getDist = (i: number, rgb: { r: number, g: number, b: number }) =>
-        Math.sqrt((data[i] - rgb.r) ** 2 + (data[i + 1] - rgb.g) ** 2 + (data[i + 2] - rgb.b) ** 2);
+        Math.sqrt(
+          (data[i + OFFSET_R] - rgb.r) ** 2 +
+          (data[i + OFFSET_G] - rgb.g) ** 2 +
+          (data[i + OFFSET_B] - rgb.b) ** 2
+        );
 
       const alphaChannel = new Uint8Array(width * height);
 
@@ -154,7 +174,7 @@ export function MonochromeBackgroundRemover() {
           return;
         }
 
-        alphaChannel.fill(255);
+        alphaChannel.fill(RGB_MAX);
         const visited = new Uint8Array(width * height);
 
         floodPoints.forEach(pt => {
@@ -171,7 +191,7 @@ export function MonochromeBackgroundRemover() {
             if (visited[idx]) continue;
             visited[idx] = 1;
 
-            if (getDist(idx * 4, contourRGB) <= tolVal) continue;
+            if (getDist(idx * PIXEL_STRIDE, contourRGB) <= tolVal) continue;
 
             alphaChannel[idx] = 0;
 
@@ -182,19 +202,19 @@ export function MonochromeBackgroundRemover() {
           }
         });
       } else {
-        for (let i = 0, idx = 0; i < data.length; i += 4, idx++) {
+        for (let i = 0, idx = 0; i < data.length; i += PIXEL_STRIDE, idx++) {
           const dist = getDist(i, targetRGB);
-          let alpha = 255;
+          let alpha = RGB_MAX;
 
           if (processingMode === 'remove') {
             if (dist <= tolVal) alpha = 0;
             else if (dist <= tolVal + smoothVal && smoothVal > 0) {
-              alpha = Math.floor(255 * ((dist - tolVal) / smoothVal));
+              alpha = Math.floor(RGB_MAX * ((dist - tolVal) / smoothVal));
             }
           } else if (processingMode === 'keep') {
             if (dist > tolVal + smoothVal) alpha = 0;
             else if (dist > tolVal && smoothVal > 0) {
-              alpha = Math.floor(255 * (1 - ((dist - tolVal) / smoothVal)));
+              alpha = Math.floor(RGB_MAX * (1 - ((dist - tolVal) / smoothVal)));
             }
           }
           alphaChannel[idx] = alpha;
@@ -267,22 +287,22 @@ export function MonochromeBackgroundRemover() {
               }
             }
             if (isEdge) {
-              const p = i * 4;
-              data[p] = contourRGB.r;
-              data[p + 1] = contourRGB.g;
-              data[p + 2] = contourRGB.b;
+              const p = i * PIXEL_STRIDE;
+              data[p + OFFSET_R] = contourRGB.r;
+              data[p + OFFSET_G] = contourRGB.g;
+              data[p + OFFSET_B] = contourRGB.b;
             }
           }
         }
       }
 
-      for (let i = 0, idx = 0; i < data.length; i += 4, idx++) {
-        data[i + 3] = alphaChannel[idx];
+      for (let i = 0, idx = 0; i < data.length; i += PIXEL_STRIDE, idx++) {
+        data[i + OFFSET_A] = alphaChannel[idx];
       }
 
       previewCtx.putImageData(imageData, 0, 0);
       setIsProcessing(false);
-    }, 10);
+    }, PROCESS_DELAY_MS);
   }, [originalUrl, targetColor, contourColor, tolerances, smoothness, processingMode, floodPoints, edgeChoke, edgeBlur, edgePaint]);
 
   useEffect(() => {
@@ -318,7 +338,7 @@ export function MonochromeBackgroundRemover() {
       if (cx) {
         cx.drawImage(img, 0, 0);
         const p = cx.getImageData(0, 0, 1, 1).data;
-        const hex = rgbToHex(p[0], p[1], p[2]);
+        const hex = rgbToHex(p[OFFSET_R], p[OFFSET_G], p[OFFSET_B]);
         setTargetColor(hex);
         setContourColor(invertHex(hex));
       }
@@ -346,13 +366,13 @@ export function MonochromeBackgroundRemover() {
   const handlePointPointerDown = (e: React.PointerEvent, index: number) => {
     e.stopPropagation();
     e.preventDefault();
-    if (e.button !== 0) return;
+    if (e.button !== MOUSE_BUTTON_LEFT) return;
     setDraggingPointIndex(index);
     (e.target as HTMLElement).setPointerCapture(e.pointerId);
   };
 
   const handleImagePointerDown = (e: React.PointerEvent) => {
-    if (e.button !== 0) return;
+    if (e.button !== MOUSE_BUTTON_LEFT) return;
     if (processingMode === 'flood-clear') {
       const coords = getRelativeImageCoords(e.clientX, e.clientY);
       if (coords) setFloodPoints(prev => [...prev, coords]);
@@ -385,7 +405,7 @@ export function MonochromeBackgroundRemover() {
     const ctx = sourceCanvasRef.current.getContext('2d', { willReadFrequently: true });
     if (ctx) {
       const p = ctx.getImageData(x, y, 1, 1).data;
-      setTargetColor(rgbToHex(p[0], p[1], p[2]));
+      setTargetColor(rgbToHex(p[OFFSET_R], p[OFFSET_G], p[OFFSET_B]));
     }
   };
 
