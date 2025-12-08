@@ -14,8 +14,12 @@ import { FrameDiffOverlay } from "./FrameDiffOverlay";
 import { TextureDimensionSlider } from "../../domain/graphics/TextureDimensionSlider";
 
 // --- CONSTANTS ---
-// Единый стиль для оверлеев времени (используется в HTML, в Canvas эмулируется вручную)
-const TIMESTAMP_CLASS = "absolute bottom-2 left-2 bg-black/70 text-white px-2 py-0.5 rounded text-[11px] font-bold font-mono backdrop-blur-[2px] pointer-events-none shadow-sm";
+
+// Базовые визуальные стили (черная плашка, белый текст, шрифт)
+const TIMESTAMP_VISUALS = "bg-black/70 text-white px-2 py-0.5 rounded text-[11px] font-bold font-mono backdrop-blur-[2px] shadow-sm";
+
+// Полный класс для абсолютного позиционирования на карточках
+const TIMESTAMP_CLASS = `absolute bottom-2 left-2 pointer-events-none ${TIMESTAMP_VISUALS}`;
 
 // --- 1. DOMAIN TYPES ---
 export interface ExtractedFrame {
@@ -46,7 +50,7 @@ export interface ExtractionStatus {
 // --- 2. GENERIC UI COMPONENTS ---
 
 interface FramePlayerProps {
-  frames: ExtractedFrame[]; // Changed from images to full frames for timestamps
+  frames: ExtractedFrame[];
   fps: number;
   width?: number;
   height?: number;
@@ -59,13 +63,9 @@ export function FramePlayer({ frames, fps, width, height, className }: FramePlay
   const previousTimeRef = useRef<number | undefined>(undefined);
   const indexRef = useRef(0);
 
-  // Filter out nulls for playback AND cast type safely
-  const validFrames = useMemo(() =>
-    frames.filter((f): f is ExtractedFrame & { dataUrl: string } => f.dataUrl !== null),
-    [frames]);
-
-  // Reset logic
-  if (indexRef.current >= validFrames.length) {
+  // Плеер теперь использует ВСЕ кадры, даже пустые (null), чтобы соблюдать тайминг
+  // Сбрасываем индекс, если массив изменился и индекс вышел за пределы
+  if (indexRef.current >= frames.length) {
     indexRef.current = 0;
   }
 
@@ -77,29 +77,22 @@ export function FramePlayer({ frames, fps, width, height, className }: FramePlay
       if (deltaTime > interval) {
         previousTimeRef.current = time - (deltaTime % interval);
 
-        if (validFrames.length > 0) {
-          indexRef.current = (indexRef.current + 1) % validFrames.length;
-          const frame = validFrames[indexRef.current];
+        if (frames.length > 0) {
+          indexRef.current = (indexRef.current + 1) % frames.length;
+          const frame = frames[indexRef.current];
 
           const canvas = canvasRef.current;
           const ctx = canvas?.getContext('2d');
 
           if (canvas && ctx) {
-            const img = new Image();
-            img.src = frame.dataUrl;
-
-            // Helper to draw frame and timestamp
-            const draw = () => {
-              ctx.clearRect(0, 0, canvas.width, canvas.height);
-              ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-
-              // --- Draw Timestamp (Unified Style emulation on Canvas) ---
+            // Helper to draw timestamp (Unified Style emulation on Canvas)
+            const drawTimestamp = () => {
               const timeText = `${frame.time.toFixed(2)}s`;
               ctx.font = 'bold 11px monospace';
               const textMetrics = ctx.measureText(timeText);
 
               const padX = 8;
-              const padY = 4;
+              // const padY = 4;
               const boxHeight = 20;
               const boxWidth = textMetrics.width + (padX * 2);
               const x = 8;
@@ -121,10 +114,36 @@ export function FramePlayer({ frames, fps, width, height, className }: FramePlay
               ctx.fillText(timeText, x + padX, y + (boxHeight / 2) + 1);
             };
 
-            if (img.complete) {
-              draw();
+            // LOGIC: If dataUrl exists -> Draw Image. If null -> Draw Placeholder BG.
+            if (frame.dataUrl) {
+              const img = new Image();
+              img.src = frame.dataUrl;
+
+              const onDraw = () => {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                drawTimestamp();
+              };
+
+              if (img.complete) {
+                onDraw();
+              } else {
+                img.onload = onDraw;
+              }
             } else {
-              img.onload = draw;
+              // Placeholder State (Gray background)
+              ctx.fillStyle = '#f4f4f5'; // zinc-100 equivalent
+              ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+              // Optional: Draw a "loading" or "empty" icon/text
+              ctx.fillStyle = '#d4d4d8'; // zinc-300
+              ctx.font = '10px sans-serif';
+              ctx.textAlign = 'center';
+              ctx.textBaseline = 'middle';
+              ctx.fillText('...', canvas.width / 2, canvas.height / 2);
+              ctx.textAlign = 'start'; // reset
+
+              drawTimestamp();
             }
           }
         }
@@ -133,7 +152,7 @@ export function FramePlayer({ frames, fps, width, height, className }: FramePlay
       previousTimeRef.current = time;
     }
     requestRef.current = requestAnimationFrame(animate);
-  }, [validFrames, fps]);
+  }, [frames, fps]);
 
   useEffect(() => {
     requestRef.current = requestAnimationFrame(animate);
@@ -142,36 +161,47 @@ export function FramePlayer({ frames, fps, width, height, className }: FramePlay
     };
   }, [animate]);
 
-  // Initial Paint
+  // Initial Paint (First frame only)
   useEffect(() => {
-    if (validFrames.length > 0 && canvasRef.current) {
-      const img = new Image();
-      img.src = validFrames[0].dataUrl;
-      img.onload = () => {
-        const w = width || canvasRef.current!.width;
-        const h = height || canvasRef.current!.height;
-        const ctx = canvasRef.current?.getContext('2d');
-        if (ctx) {
-          ctx.drawImage(img, 0, 0, w, h);
-          // Draw timestamp for first frame immediately
-          const timeText = `${validFrames[0].time.toFixed(2)}s`;
-          ctx.font = 'bold 11px monospace';
-          ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
-          const metrics = ctx.measureText(timeText);
-          if (typeof ctx.roundRect === 'function') {
-            ctx.beginPath();
-            ctx.roundRect(8, h - 28, metrics.width + 16, 20, 4);
-            ctx.fill();
-          } else {
-            ctx.fillRect(8, h - 28, metrics.width + 16, 20);
-          }
-          ctx.fillStyle = 'white';
-          ctx.textBaseline = 'middle';
-          ctx.fillText(timeText, 16, h - 18);
+    if (frames.length > 0 && canvasRef.current) {
+      const frame = frames[0];
+      const ctx = canvasRef.current.getContext('2d');
+      if (!ctx) return;
+
+      const w = width || canvasRef.current.width;
+      const h = height || canvasRef.current.height;
+
+      const drawInitialTimestamp = () => {
+        const timeText = `${frame.time.toFixed(2)}s`;
+        ctx.font = 'bold 11px monospace';
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+        const metrics = ctx.measureText(timeText);
+        if (typeof ctx.roundRect === 'function') {
+          ctx.beginPath();
+          ctx.roundRect(8, h - 28, metrics.width + 16, 20, 4);
+          ctx.fill();
+        } else {
+          ctx.fillRect(8, h - 28, metrics.width + 16, 20);
         }
+        ctx.fillStyle = 'white';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(timeText, 16, h - 18);
       };
+
+      if (frame.dataUrl) {
+        const img = new Image();
+        img.src = frame.dataUrl;
+        img.onload = () => {
+          ctx.drawImage(img, 0, 0, w, h);
+          drawInitialTimestamp();
+        };
+      } else {
+        ctx.fillStyle = '#f4f4f5';
+        ctx.fillRect(0, 0, w, h);
+        drawInitialTimestamp();
+      }
     }
-  }, [validFrames]);
+  }, [frames]); // Re-run if frames array changes (e.g. reset)
 
   return (
     <canvas
@@ -675,9 +705,10 @@ export function VideoFrameExtractor() {
                       </div>
                     </div>
 
-                    <div className="flex gap-2 text-xs font-mono text-zinc-700 dark:text-zinc-300 bg-zinc-100 dark:bg-zinc-800 px-2 py-0.5 rounded ml-auto">
+                    {/* Updated Time Range Display to match Timestamp Style */}
+                    <div className={`flex items-center gap-2 ${TIMESTAMP_VISUALS} ml-auto`}>
                       <span>{extractionParams.startTime.toFixed(2)}s</span>
-                      <span className="text-zinc-400">→</span>
+                      <span className="text-zinc-300 opacity-60">→</span>
                       <span>{effectiveEnd.toFixed(2)}s</span>
                     </div>
                   </div>
