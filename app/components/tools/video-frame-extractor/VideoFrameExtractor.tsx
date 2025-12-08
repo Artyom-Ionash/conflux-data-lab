@@ -36,6 +36,7 @@ export interface GifParams {
 export interface ExtractionStatus {
   isProcessing: boolean;
   currentStep: ExtractionStep;
+  progress: number;
 }
 
 // --- 2. GENERIC UI COMPONENTS ---
@@ -50,15 +51,13 @@ interface FramePlayerProps {
 
 export function FramePlayer({ images, fps, width, height, className }: FramePlayerProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  // FIX: Explicitly provide 'undefined' as the initial value to satisfy strict TS rules
   const requestRef = useRef<number | undefined>(undefined);
   const previousTimeRef = useRef<number | undefined>(undefined);
   const indexRef = useRef(0);
 
-  // Reset index when images change
-  useEffect(() => {
+  if (indexRef.current >= images.length && images.length > 0) {
     indexRef.current = 0;
-  }, [images]);
+  }
 
   const animate = useCallback((time: number) => {
     if (previousTimeRef.current !== undefined) {
@@ -104,7 +103,6 @@ export function FramePlayer({ images, fps, width, height, className }: FramePlay
     };
   }, [animate]);
 
-  // Initial render
   useEffect(() => {
     if (images.length > 0 && canvasRef.current) {
       const img = new Image();
@@ -115,7 +113,7 @@ export function FramePlayer({ images, fps, width, height, className }: FramePlay
         canvasRef.current?.getContext('2d')?.drawImage(img, 0, 0, w, h);
       };
     }
-  }, [images, width, height]);
+  }, []);
 
   return (
     <canvas
@@ -175,7 +173,7 @@ function useVideoFrameExtraction() {
   const [extractionParams, setExtractionParams] = useState<ExtractionParams>({ startTime: 0, endTime: 0, frameStep: 1, symmetricLoop: false });
   const [frames, setFrames] = useState<ExtractedFrame[]>([]);
   const [gifParams, setGifParams] = useState<GifParams>({ fps: 5, dataUrl: null });
-  const [status, setStatus] = useState<ExtractionStatus>({ isProcessing: false, currentStep: "" });
+  const [status, setStatus] = useState<ExtractionStatus>({ isProcessing: false, currentStep: "", progress: 0 });
   const [error, setError] = useState<string | null>(null);
 
   const [previewFrames, setPreviewFrames] = useState<{ start: string | null, end: string | null }>({ start: null, end: null });
@@ -184,11 +182,13 @@ function useVideoFrameExtraction() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const previewVideoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   const effectiveEnd = useMemo(() => (extractionParams.endTime > 0 ? extractionParams.endTime : videoDuration ?? 0), [extractionParams.endTime, videoDuration]);
 
   useEffect(() => { return () => { if (videoSrc) URL.revokeObjectURL(videoSrc); }; }, [videoSrc]);
 
+  // Preview Start/End frames logic
   useEffect(() => {
     if (!videoSrc || !previewVideoRef.current || !canvasRef.current || !videoDuration) return;
 
@@ -237,7 +237,6 @@ function useVideoFrameExtraction() {
     setGifParams((p) => ({ ...p, dataUrl: null }));
     setVideoDuration(null);
     setVideoDimensions(null);
-    setExtractionParams((p) => ({ ...p, startTime: 0, endTime: 0 }));
 
     if (videoSrc) URL.revokeObjectURL(videoSrc);
     const objectUrl = URL.createObjectURL(file);
@@ -251,19 +250,31 @@ function useVideoFrameExtraction() {
       setVideoDimensions({ width: tempVideo.videoWidth, height: tempVideo.videoHeight });
 
       const defaultStep = Math.max(0.5, duration / 10);
-      setExtractionParams((p) => ({ ...p, endTime: duration, frameStep: Number(defaultStep.toFixed(2)) }));
+      setExtractionParams((p) => ({
+        ...p,
+        startTime: 0,
+        endTime: duration,
+        frameStep: Number(defaultStep.toFixed(2))
+      }));
     };
     tempVideo.onerror = () => setError("Ошибка загрузки видео");
   }, [videoSrc]);
 
   const runExtraction = useCallback(async () => {
     if (!videoRef.current || !canvasRef.current || !videoSrc) return;
+
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    abortControllerRef.current = new AbortController();
+    const signal = abortControllerRef.current.signal;
+
     const videoEl = videoRef.current;
     const canvasEl = canvasRef.current;
 
     if (videoEl.src !== videoSrc) videoEl.src = videoSrc;
 
-    setStatus({ isProcessing: true, currentStep: "extracting" });
+    setStatus({ isProcessing: true, currentStep: "extracting", progress: 0 });
     setError(null);
     setFrames([]);
     setGifParams(p => ({ ...p, dataUrl: null }));
@@ -285,39 +296,64 @@ function useVideoFrameExtraction() {
       const ctx = canvasEl.getContext("2d");
       if (!ctx) throw new Error("Canvas context failed");
 
-      const resultFrames: ExtractedFrame[] = [];
       const interval = extractionParams.frameStep;
+      if (interval <= 0) throw new Error("Invalid frame step");
+
+      const totalSteps = Math.floor((safeEnd - safeStart) / interval) + 1;
+      let stepCount = 0;
+      const localFrames: ExtractedFrame[] = [];
 
       for (let current = safeStart; current <= safeEnd; current += interval) {
+        if (signal.aborted) throw new Error("Aborted");
+
         await new Promise<void>((resolve) => {
           const onSeeked = () => {
             ctx.drawImage(videoEl, 0, 0, canvasEl.width, canvasEl.height);
-            resultFrames.push({ time: current, dataUrl: canvasEl.toDataURL("image/png") });
+            const url = canvasEl.toDataURL("image/png");
+            const newFrame = { time: current, dataUrl: url };
+
+            localFrames.push(newFrame);
+            setFrames(prev => [...prev, newFrame]);
+
             resolve();
           };
           videoEl.currentTime = current;
           videoEl.onseeked = onSeeked;
         });
+
+        stepCount++;
+        setStatus(s => ({ ...s, progress: Math.min(100, (stepCount / totalSteps) * 100) }));
+        await new Promise(r => requestAnimationFrame(r));
       }
 
-      let finalFrames = resultFrames;
-      if (extractionParams.symmetricLoop && resultFrames.length > 1) {
-        finalFrames = [...resultFrames, ...resultFrames.slice(1, -1).reverse()];
+      if (extractionParams.symmetricLoop && localFrames.length > 1) {
+        const reversed = localFrames.slice(1, -1).reverse();
+        setFrames(prev => [...prev, ...reversed]);
       }
 
-      setFrames(finalFrames);
-      setStatus({ isProcessing: false, currentStep: "" });
+      setStatus({ isProcessing: false, currentStep: "", progress: 100 });
 
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Error");
-      setStatus({ isProcessing: false, currentStep: "" });
+    } catch (e: any) {
+      if (e.message !== "Aborted") {
+        setError(e instanceof Error ? e.message : "Error");
+        setStatus({ isProcessing: false, currentStep: "", progress: 0 });
+      }
     }
   }, [videoSrc, extractionParams, effectiveEnd]);
+
+  // --- AUTO UPDATE EFFECT ---
+  useEffect(() => {
+    if (!videoSrc) return;
+    const timer = setTimeout(() => {
+      runExtraction();
+    }, 600);
+    return () => clearTimeout(timer);
+  }, [runExtraction]);
 
   const generateAndDownloadGif = useCallback(() => {
     if (frames.length === 0) return;
 
-    setStatus({ isProcessing: true, currentStep: "generating" });
+    setStatus({ isProcessing: true, currentStep: "generating", progress: 0 });
     setError(null);
 
     setTimeout(() => {
@@ -341,10 +377,10 @@ function useVideoFrameExtraction() {
           } else {
             setError("Ошибка создания GIF: " + obj.errorCode);
           }
-          setStatus({ isProcessing: false, currentStep: "" });
+          setStatus({ isProcessing: false, currentStep: "", progress: 0 });
         });
       } else {
-        setStatus({ isProcessing: false, currentStep: "" });
+        setStatus({ isProcessing: false, currentStep: "", progress: 0 });
       }
     }, 50);
 
@@ -378,13 +414,15 @@ export function VideoFrameExtractor() {
 
   useEffect(() => {
     if (frames.length === 0) { setSpriteSheetUrl(null); return; }
+    if (status.isProcessing) return;
+
     const timer = setTimeout(() => {
       generateSpriteSheet(frames, { maxHeight: spriteOptions.maxHeight, spacing: spriteOptions.spacing, backgroundColor: spriteOptions.bg })
         .then(setSpriteSheetUrl)
         .catch(console.error);
-    }, 300);
+    }, 500);
     return () => clearTimeout(timer);
-  }, [frames, spriteOptions, generateSpriteSheet]);
+  }, [frames, spriteOptions, generateSpriteSheet, status.isProcessing]);
 
   const aspectRatioStyle = useMemo(() => {
     if (!videoDimensions) return {};
@@ -464,9 +502,19 @@ export function VideoFrameExtractor() {
                   <button
                     onClick={runExtraction}
                     disabled={status.isProcessing}
-                    className="rounded-md bg-blue-600 px-4 py-1.5 text-xs font-semibold text-white hover:bg-blue-700 disabled:opacity-50 transition-all shadow-sm hover:shadow-md uppercase tracking-wide"
+                    className="relative rounded-md bg-blue-600 px-4 py-1.5 text-xs font-semibold text-white hover:bg-blue-700 disabled:opacity-50 transition-all shadow-sm hover:shadow-md uppercase tracking-wide overflow-hidden min-w-[140px]"
                   >
-                    {status.isProcessing && status.currentStep === 'extracting' ? 'Обработка...' : 'Обновить кадры'}
+                    <span className="relative z-10">
+                      {status.isProcessing && status.currentStep === 'extracting'
+                        ? `Обновление ${Math.round(status.progress)}%`
+                        : 'Обновить принудительно'}
+                    </span>
+                    {status.isProcessing && status.currentStep === 'extracting' && (
+                      <div
+                        className="absolute inset-0 bg-blue-500 transition-all duration-300 ease-out"
+                        style={{ width: `${status.progress}%` }}
+                      />
+                    )}
                   </button>
                 </div>
                 {error && <div className="text-xs text-red-600 text-right">{error}</div>}
@@ -515,7 +563,7 @@ export function VideoFrameExtractor() {
                 </div>
               </div>
 
-              {/* GIF Preview */}
+              {/* GIF Preview / Extracted Frames Player */}
               <div className="bg-white dark:bg-zinc-900 rounded-lg border border-zinc-200 dark:border-zinc-700 shadow-sm flex flex-col overflow-hidden">
                 <div className="flex items-center justify-between px-3 py-2 border-b border-zinc-100 dark:border-zinc-800 bg-white dark:bg-zinc-900 z-10 h-10">
                   <h3 className="text-xs font-bold text-zinc-500 uppercase tracking-wide flex items-center gap-2">
@@ -529,7 +577,7 @@ export function VideoFrameExtractor() {
                     />
                   </h3>
                   <div className="flex items-center gap-3">
-                    {frames.length > 0 && (
+                    {frames.length > 0 && !status.isProcessing && (
                       <button
                         onClick={generateAndDownloadGif}
                         disabled={status.isProcessing}
@@ -542,30 +590,48 @@ export function VideoFrameExtractor() {
                 </div>
 
                 <div className="relative w-full bg-zinc-100 dark:bg-zinc-950" style={aspectRatioStyle}>
+
+                  {/* PLAYER & LOADING OVERLAY COMBINATION */}
+                  {(frames.length > 0 || status.isProcessing) ? (
+                    <>
+                      <FramePlayer
+                        images={frames.map(f => f.dataUrl)}
+                        fps={gifParams.fps}
+                        width={videoDimensions?.width || 300}
+                        height={videoDimensions?.height || 200}
+                      />
+
+                      {/* Transparent Processing Overlay */}
+                      {status.isProcessing && (
+                        <div className="absolute inset-0 z-20 flex flex-col justify-end pointer-events-none bg-black/5 backdrop-blur-[1px] transition-all duration-300">
+                          <div className="w-full bg-zinc-200/20 dark:bg-zinc-700/30 h-1">
+                            <div
+                              className="h-full bg-blue-500 shadow-[0_0_10px_rgba(59,130,246,0.5)] transition-all duration-200 ease-linear"
+                              style={{ width: `${status.progress}%` }}
+                            />
+                          </div>
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    /* Only show placeholder if strictly empty and idle */
+                    <div className="absolute inset-0 flex items-center justify-center text-center p-4">
+                      <p className="text-xs text-zinc-400">
+                        Загрузите видео для предпросмотра
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Generation Spinner (GIF encoding) - specific overlay */}
                   {status.currentStep === 'generating' && (
-                    <div className="absolute inset-0 flex flex-col items-center justify-center z-20 bg-white/50 dark:bg-black/50 backdrop-blur-[1px]">
+                    <div className="absolute inset-0 flex flex-col items-center justify-center z-30 bg-white/50 dark:bg-black/50 backdrop-blur-[1px]">
                       <svg className="animate-spin h-8 w-8 text-blue-600 mb-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                         <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                         <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                       </svg>
                       <span className="text-xs font-semibold text-zinc-600 dark:text-zinc-300 bg-white/80 dark:bg-black/60 px-2 py-1 rounded">
-                        Создание файла...
+                        Создание GIF...
                       </span>
-                    </div>
-                  )}
-
-                  {frames.length > 0 ? (
-                    <FramePlayer
-                      images={frames.map(f => f.dataUrl)}
-                      fps={gifParams.fps}
-                      width={videoDimensions?.width || 300}
-                      height={videoDimensions?.height || 200}
-                    />
-                  ) : (
-                    <div className="absolute inset-0 flex items-center justify-center text-center p-4">
-                      <p className="text-xs text-zinc-400">
-                        Нажмите "Обновить кадры", чтобы увидеть анимацию
-                      </p>
                     </div>
                   )}
                 </div>
@@ -615,7 +681,7 @@ export function VideoFrameExtractor() {
                     </div>
                   )}
 
-                  {spriteSheetUrl && (
+                  {spriteSheetUrl && !status.isProcessing && (
                     <button
                       onClick={() => { const a = document.createElement('a'); a.href = spriteSheetUrl; a.download = 'spritesheet.png'; a.click(); }}
                       className="text-xs text-blue-600 hover:underline font-medium"
@@ -627,13 +693,15 @@ export function VideoFrameExtractor() {
               </div>
 
               <div className="flex-1 bg-zinc-100 dark:bg-zinc-950 relative overflow-x-auto overflow-y-hidden">
-                {spriteSheetUrl ? (
+                {spriteSheetUrl && !status.isProcessing ? (
                   <div className="h-full flex items-center px-2">
                     <img src={spriteSheetUrl} alt="Sprite" className="h-4/5 w-auto max-w-none object-contain border border-dashed border-zinc-300 dark:border-zinc-700 bg-[url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAKQCAYAAAB2440yAAAAIklEQVQ4jWNgGAWjYBQMBAAABgAB/6Zj+QAAAABJRU5ErkJggg==')] bg-repeat" />
                   </div>
                 ) : (
                   <div className="absolute inset-0 flex items-center justify-center">
-                    <span className="text-xs text-zinc-400">{frames.length > 0 ? "Генерация..." : "Нет кадров"}</span>
+                    <span className="text-xs text-zinc-400">
+                      {status.isProcessing ? "Генерация после извлечения..." : (frames.length > 0 ? "Ожидание..." : "Нет кадров")}
+                    </span>
                   </div>
                 )}
               </div>
