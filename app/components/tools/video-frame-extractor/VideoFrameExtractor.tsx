@@ -13,7 +13,7 @@ import { FrameDiffOverlay } from "./FrameDiffOverlay";
 // Import Domain Components
 import { TextureDimensionSlider } from "../../domain/graphics/TextureDimensionSlider";
 
-// --- TYPES ---
+// --- 1. DOMAIN TYPES ---
 export interface ExtractedFrame {
   time: number;
   dataUrl: string;
@@ -38,11 +38,101 @@ export interface ExtractionStatus {
   currentStep: ExtractionStep;
 }
 
-// --- HELPER: SPRITESHEET GENERATOR ---
+// --- 2. GENERIC UI COMPONENTS ---
+
+interface FramePlayerProps {
+  images: string[];
+  fps: number;
+  width?: number;
+  height?: number;
+  className?: string;
+}
+
+export function FramePlayer({ images, fps, width, height, className }: FramePlayerProps) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  // FIX: Explicitly provide 'undefined' as the initial value to satisfy strict TS rules
+  const requestRef = useRef<number | undefined>(undefined);
+  const previousTimeRef = useRef<number | undefined>(undefined);
+  const indexRef = useRef(0);
+
+  // Reset index when images change
+  useEffect(() => {
+    indexRef.current = 0;
+  }, [images]);
+
+  const animate = useCallback((time: number) => {
+    if (previousTimeRef.current !== undefined) {
+      const deltaTime = time - previousTimeRef.current;
+      const interval = 1000 / fps;
+
+      if (deltaTime > interval) {
+        previousTimeRef.current = time - (deltaTime % interval);
+
+        if (images.length > 0) {
+          indexRef.current = (indexRef.current + 1) % images.length;
+          const imageUrl = images[indexRef.current];
+
+          const canvas = canvasRef.current;
+          const ctx = canvas?.getContext('2d');
+
+          if (canvas && ctx) {
+            const img = new Image();
+            img.src = imageUrl;
+
+            if (img.complete) {
+              ctx.clearRect(0, 0, canvas.width, canvas.height);
+              ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+            } else {
+              img.onload = () => {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+              };
+            }
+          }
+        }
+      }
+    } else {
+      previousTimeRef.current = time;
+    }
+    requestRef.current = requestAnimationFrame(animate);
+  }, [images, fps]);
+
+  useEffect(() => {
+    requestRef.current = requestAnimationFrame(animate);
+    return () => {
+      if (requestRef.current) cancelAnimationFrame(requestRef.current);
+    };
+  }, [animate]);
+
+  // Initial render
+  useEffect(() => {
+    if (images.length > 0 && canvasRef.current) {
+      const img = new Image();
+      img.src = images[0];
+      img.onload = () => {
+        const w = width || canvasRef.current!.width;
+        const h = height || canvasRef.current!.height;
+        canvasRef.current?.getContext('2d')?.drawImage(img, 0, 0, w, h);
+      };
+    }
+  }, [images, width, height]);
+
+  return (
+    <canvas
+      ref={canvasRef}
+      width={width}
+      height={height}
+      className={className || "w-full h-full object-contain"}
+    />
+  );
+}
+
+// --- 3. LOGIC & HOOKS ---
+
 function useSpriteSheetGenerator() {
   const generateSpriteSheet = useCallback(
     async (frames: ExtractedFrame[], options: { maxHeight: number; spacing: number; backgroundColor: string }) => {
-      if (frames.length === 0) throw new Error("Нет кадров");
+      if (frames.length === 0) throw new Error("No frames");
 
       const firstImage = new Image();
       await new Promise<void>((resolve) => { firstImage.onload = () => resolve(); firstImage.src = frames[0].dataUrl; });
@@ -76,7 +166,6 @@ function useSpriteSheetGenerator() {
   return { generateSpriteSheet };
 }
 
-// --- MAIN LOGIC HOOK ---
 function useVideoFrameExtraction() {
   const [videoFile, setVideoFile] = useState<File | null>(null);
   const [videoSrc, setVideoSrc] = useState<string | null>(null);
@@ -100,7 +189,6 @@ function useVideoFrameExtraction() {
 
   useEffect(() => { return () => { if (videoSrc) URL.revokeObjectURL(videoSrc); }; }, [videoSrc]);
 
-  // Preview Generation Effect (Thumbnails)
   useEffect(() => {
     if (!videoSrc || !previewVideoRef.current || !canvasRef.current || !videoDuration) return;
 
@@ -168,7 +256,6 @@ function useVideoFrameExtraction() {
     tempVideo.onerror = () => setError("Ошибка загрузки видео");
   }, [videoSrc]);
 
-  // 1. EXTRACT FRAMES ONLY
   const runExtraction = useCallback(async () => {
     if (!videoRef.current || !canvasRef.current || !videoSrc) return;
     const videoEl = videoRef.current;
@@ -219,10 +306,7 @@ function useVideoFrameExtraction() {
       }
 
       setFrames(finalFrames);
-
-      if (finalFrames.length === 0) {
-        setStatus({ isProcessing: false, currentStep: "" });
-      }
+      setStatus({ isProcessing: false, currentStep: "" });
 
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error");
@@ -230,13 +314,13 @@ function useVideoFrameExtraction() {
     }
   }, [videoSrc, extractionParams, effectiveEnd]);
 
-  // 2. AUTO GENERATE GIF (Reactive to frames or FPS change)
-  useEffect(() => {
+  const generateAndDownloadGif = useCallback(() => {
     if (frames.length === 0) return;
 
     setStatus({ isProcessing: true, currentStep: "generating" });
+    setError(null);
 
-    const timer = setTimeout(() => {
+    setTimeout(() => {
       if (typeof gifshot !== 'undefined') {
         const width = videoDimensions?.width || 300;
         const height = videoDimensions?.height || 200;
@@ -248,37 +332,43 @@ function useVideoFrameExtraction() {
           gifHeight: height,
           numFrames: frames.length,
         }, (obj: any) => {
-          if (!obj.error) setGifParams(p => ({ ...p, dataUrl: obj.image }));
-          else setError("Ошибка создания GIF");
+          if (!obj.error) {
+            const a = document.createElement('a');
+            a.href = obj.image;
+            a.download = 'animation.gif';
+            a.click();
+            setGifParams(p => ({ ...p, dataUrl: obj.image }));
+          } else {
+            setError("Ошибка создания GIF: " + obj.errorCode);
+          }
           setStatus({ isProcessing: false, currentStep: "" });
         });
       } else {
         setStatus({ isProcessing: false, currentStep: "" });
       }
-    }, 100);
+    }, 50);
 
-    return () => clearTimeout(timer);
   }, [frames, gifParams.fps, videoDimensions]);
-
 
   return {
     videoRef, previewVideoRef, canvasRef, videoSrc, videoDuration, videoDimensions,
     extractionParams, setExtractionParams,
     frames, gifParams, setGifParams, status, error, effectiveEnd,
     previewFrames, isPreviewing,
-    handleFilesSelected, runExtraction,
+    handleFilesSelected, runExtraction, generateAndDownloadGif,
     videoFile
   };
 }
 
-// --- MAIN COMPONENT ---
+// --- 4. MAIN LAYOUT COMPONENT ---
+
 export function VideoFrameExtractor() {
   const {
     videoRef, previewVideoRef, canvasRef, videoSrc, videoDuration, videoDimensions,
     extractionParams, setExtractionParams,
     frames, gifParams, setGifParams, status, error, effectiveEnd,
     previewFrames, isPreviewing,
-    handleFilesSelected, runExtraction
+    handleFilesSelected, runExtraction, generateAndDownloadGif
   } = useVideoFrameExtraction();
 
   const [spriteOptions, setSpriteOptions] = useState({ maxHeight: 300, spacing: 0, bg: "transparent" });
@@ -286,7 +376,6 @@ export function VideoFrameExtractor() {
   const [diffDataUrl, setDiffDataUrl] = useState<string | null>(null);
   const { generateSpriteSheet } = useSpriteSheetGenerator();
 
-  // Generate Sprite Sheet when frames change
   useEffect(() => {
     if (frames.length === 0) { setSpriteSheetUrl(null); return; }
     const timer = setTimeout(() => {
@@ -297,13 +386,11 @@ export function VideoFrameExtractor() {
     return () => clearTimeout(timer);
   }, [frames, spriteOptions, generateSpriteSheet]);
 
-  // Calculate Aspect Ratio style
   const aspectRatioStyle = useMemo(() => {
     if (!videoDimensions) return {};
     return { aspectRatio: `${videoDimensions.width} / ${videoDimensions.height}` };
   }, [videoDimensions]);
 
-  // Calculate Sprite Dimensions on the fly (for Warning UI)
   const spriteDimensions = useMemo(() => {
     if (!videoDimensions || frames.length === 0) return { width: 0, height: 0 };
     const scale = spriteOptions.maxHeight / videoDimensions.height;
@@ -312,7 +399,6 @@ export function VideoFrameExtractor() {
     return { width: totalWidth, height: spriteOptions.maxHeight };
   }, [videoDimensions, frames.length, spriteOptions.maxHeight, spriteOptions.spacing]);
 
-  // --- SIDEBAR (Reduced to Actions) ---
   const sidebarContent = (
     <div className="flex flex-col gap-6 pb-4">
       <div className="flex flex-col gap-2">
@@ -331,11 +417,9 @@ export function VideoFrameExtractor() {
           </div>
         ) : (
           <div className="flex-1 overflow-y-auto p-4 space-y-4">
-
-            {/* --- SECTION 1: GLOBAL EXTRACTION SETTINGS (TOP) --- */}
+            {/* SETTINGS */}
             <div className="bg-white dark:bg-zinc-900 rounded-lg border border-zinc-200 dark:border-zinc-700 shadow-sm p-4">
               <div className="flex flex-col gap-4">
-                {/* Time Range */}
                 <div className="space-y-2">
                   <div className="flex justify-between items-center">
                     <span className="text-xs font-bold text-zinc-500 uppercase tracking-wide">Диапазон извлечения</span>
@@ -355,7 +439,6 @@ export function VideoFrameExtractor() {
                   />
                 </div>
 
-                {/* Secondary Options + Button */}
                 <div className="flex flex-wrap items-center justify-between gap-6 pt-2 border-t border-zinc-100 dark:border-zinc-800">
                   <div className="flex items-center gap-6">
                     <div className="flex items-center gap-2">
@@ -383,17 +466,16 @@ export function VideoFrameExtractor() {
                     disabled={status.isProcessing}
                     className="rounded-md bg-blue-600 px-4 py-1.5 text-xs font-semibold text-white hover:bg-blue-700 disabled:opacity-50 transition-all shadow-sm hover:shadow-md uppercase tracking-wide"
                   >
-                    {status.isProcessing ? (status.currentStep === 'generating' ? 'Генерация GIF...' : 'Обработка...') : 'Обновить кадры'}
+                    {status.isProcessing && status.currentStep === 'extracting' ? 'Обработка...' : 'Обновить кадры'}
                   </button>
                 </div>
                 {error && <div className="text-xs text-red-600 text-right">{error}</div>}
               </div>
             </div>
 
-            {/* --- SECTION 2: VISUALIZATION GRID --- */}
+            {/* GRID */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-
-              {/* 1. Video Player */}
+              {/* Video Player */}
               <div className="bg-white dark:bg-zinc-900 rounded-lg border border-zinc-200 dark:border-zinc-700 shadow-sm flex flex-col overflow-hidden">
                 <div className="flex items-center justify-between px-3 py-2 border-b border-zinc-100 dark:border-zinc-800 bg-white dark:bg-zinc-900 z-10 h-10">
                   <h3 className="text-xs font-bold text-zinc-500 uppercase tracking-wide">Исходное видео</h3>
@@ -408,7 +490,7 @@ export function VideoFrameExtractor() {
                 </div>
               </div>
 
-              {/* 2. Diff Overlay */}
+              {/* Diff Overlay */}
               <div className="bg-white dark:bg-zinc-900 rounded-lg border border-zinc-200 dark:border-zinc-700 shadow-sm flex flex-col overflow-hidden">
                 <div className="flex items-center justify-between px-3 py-2 border-b border-zinc-100 dark:border-zinc-800 bg-white dark:bg-zinc-900 z-10 h-10">
                   <h3 className="text-xs font-bold text-zinc-500 uppercase tracking-wide">Разница (Начало/Конец)</h3>
@@ -433,12 +515,12 @@ export function VideoFrameExtractor() {
                 </div>
               </div>
 
-              {/* 3. GIF Preview */}
+              {/* GIF Preview */}
               <div className="bg-white dark:bg-zinc-900 rounded-lg border border-zinc-200 dark:border-zinc-700 shadow-sm flex flex-col overflow-hidden">
                 <div className="flex items-center justify-between px-3 py-2 border-b border-zinc-100 dark:border-zinc-800 bg-white dark:bg-zinc-900 z-10 h-10">
                   <h3 className="text-xs font-bold text-zinc-500 uppercase tracking-wide flex items-center gap-2">
-                    GIF
-                    <span className="text-[10px] text-zinc-400 font-medium">FPS:</span>
+                    GIF Просмотр
+                    <span className="text-[10px] text-zinc-400 font-medium ml-2">FPS:</span>
                     <input
                       type="number" min="1" max="60"
                       value={gifParams.fps}
@@ -447,18 +529,19 @@ export function VideoFrameExtractor() {
                     />
                   </h3>
                   <div className="flex items-center gap-3">
-                    {gifParams.dataUrl && !status.isProcessing && (
+                    {frames.length > 0 && (
                       <button
-                        onClick={() => { const a = document.createElement('a'); a.href = gifParams.dataUrl!; a.download = 'animation.gif'; a.click(); }}
-                        className="text-xs text-blue-600 hover:underline font-medium"
+                        onClick={generateAndDownloadGif}
+                        disabled={status.isProcessing}
+                        className="text-xs text-blue-600 hover:underline font-medium disabled:opacity-50"
                       >
-                        Скачать
+                        {status.currentStep === 'generating' ? 'Кодирование...' : 'Скачать .GIF'}
                       </button>
                     )}
                   </div>
                 </div>
+
                 <div className="relative w-full bg-zinc-100 dark:bg-zinc-950" style={aspectRatioStyle}>
-                  {/* GENERATING OVERLAY */}
                   {status.currentStep === 'generating' && (
                     <div className="absolute inset-0 flex flex-col items-center justify-center z-20 bg-white/50 dark:bg-black/50 backdrop-blur-[1px]">
                       <svg className="animate-spin h-8 w-8 text-blue-600 mb-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
@@ -466,31 +549,30 @@ export function VideoFrameExtractor() {
                         <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                       </svg>
                       <span className="text-xs font-semibold text-zinc-600 dark:text-zinc-300 bg-white/80 dark:bg-black/60 px-2 py-1 rounded">
-                        Генерация...
+                        Создание файла...
                       </span>
                     </div>
                   )}
 
-                  {gifParams.dataUrl ? (
-                    <img
-                      src={gifParams.dataUrl}
-                      alt="GIF"
-                      className={`absolute inset-0 w-full h-full object-contain ${status.currentStep === 'generating' ? 'opacity-50 blur-[2px]' : ''}`}
+                  {frames.length > 0 ? (
+                    <FramePlayer
+                      images={frames.map(f => f.dataUrl)}
+                      fps={gifParams.fps}
+                      width={videoDimensions?.width || 300}
+                      height={videoDimensions?.height || 200}
                     />
                   ) : (
-                    !status.isProcessing && (
-                      <div className="absolute inset-0 flex items-center justify-center text-center p-4">
-                        <p className="text-xs text-zinc-400">
-                          {status.isProcessing ? "Генерация..." : "Нажмите 'Обновить кадры', чтобы увидеть GIF"}
-                        </p>
-                      </div>
-                    )
+                    <div className="absolute inset-0 flex items-center justify-center text-center p-4">
+                      <p className="text-xs text-zinc-400">
+                        Нажмите "Обновить кадры", чтобы увидеть анимацию
+                      </p>
+                    </div>
                   )}
                 </div>
               </div>
             </div>
 
-            {/* --- SECTION 3: SPRITE SHEET --- */}
+            {/* SPRITE SHEET */}
             <div className="bg-white dark:bg-zinc-900 rounded-lg border border-zinc-200 dark:border-zinc-700 shadow-sm flex flex-col h-[220px]">
               <div className="flex items-center justify-between px-3 py-2 border-b border-zinc-100 dark:border-zinc-800 bg-white dark:bg-zinc-900">
                 <div className="flex items-center gap-4">
@@ -520,16 +602,15 @@ export function VideoFrameExtractor() {
                 </div>
 
                 <div className="flex items-center gap-4">
-                  {/* WARNING SYSTEM (Read-Only Slider, No Track) */}
                   {frames.length > 0 && (
                     <div className="w-[180px]">
                       <TextureDimensionSlider
                         label="Итоговая ширина"
                         value={spriteDimensions.width}
-                        onChange={() => { }} // Read-only: no updates allowed
-                        max={16384 * 1.5} // Allow visual overflow
-                        className="mb-0" // Reset margin for header alignment
-                        disabled={true} // <-- DISABLE INTERACTION
+                        onChange={() => { }}
+                        max={16384 * 1.5}
+                        className="mb-0"
+                        disabled={true}
                       />
                     </div>
                   )}
@@ -558,7 +639,7 @@ export function VideoFrameExtractor() {
               </div>
             </div>
 
-            {/* --- SECTION 4: FRAMES LIST --- */}
+            {/* FRAMES LIST */}
             {frames.length > 0 && (
               <div className="bg-white dark:bg-zinc-900 rounded-lg border border-zinc-200 dark:border-zinc-700 shadow-sm">
                 <div className="flex items-center justify-between px-3 py-2 border-b border-zinc-100 dark:border-zinc-800 bg-white dark:bg-zinc-900">
