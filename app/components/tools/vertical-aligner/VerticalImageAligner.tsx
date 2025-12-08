@@ -10,11 +10,8 @@ import { Slider } from '../../ui/Slider';
 
 // --- CONSTANTS ---
 const LIMIT_MAX_BROWSER = 16384;
-const EXPORT_DELAY_JSON = 100; // ms
-const VIEW_RESET_DELAY = 50; // ms (добавлено для синхронизации с рендером)
+const VIEW_RESET_DELAY = 50; // ms
 const EXPORT_FILENAME = 'aligned-export';
-const EXPORT_META_APP = "VerticalImageAligner";
-const EXPORT_META_VERSION = "1.0";
 const MOUSE_BUTTON_LEFT = 0;
 const CANVAS_SCALE_DEFAULT = 1;
 
@@ -97,7 +94,7 @@ const DraggableImageSlot = React.memo(({ img, index, slotHeight, slotWidth, getC
   };
 
   const zIndexClass = img.isActive ? `z-${Z_INDEX_SLOT_ACTIVE}` : `z-${Z_INDEX_SLOT_BASE}`;
-  const borderClass = img.isActive ? 'border-blue-500/50' : 'border-zinc-300/30 hover:border-zinc-400/50';
+  const borderClass = img.isActive ? 'border-blue-500 ring-1 ring-blue-500' : 'border-zinc-300/30 hover:border-zinc-400/50';
 
   return (
     <div
@@ -113,7 +110,6 @@ const DraggableImageSlot = React.memo(({ img, index, slotHeight, slotWidth, getC
       }}
       onPointerDown={handlePointerDown}
     >
-      <div className={`absolute inset-0 transition-colors pointer-events-none ${img.isActive ? 'bg-blue-500/10' : 'group-hover:bg-blue-500/5'}`} />
       <div
         className={`absolute top-1 left-1 bg-black/60 text-white text-[10px] px-1.5 py-0.5 rounded pointer-events-none select-none backdrop-blur-sm transition-opacity duration-200 ${img.isActive ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
         style={{ zIndex: Z_INDEX_LABEL }}
@@ -146,8 +142,8 @@ export function VerticalImageAligner() {
   const [redGridOffsetY, setRedGridOffsetY] = useState(0);
   const [redGridColor] = useState(DEFAULT_SETTINGS.redGridColor);
 
-  const [bgColorHex] = useState(DEFAULT_SETTINGS.bgColor);
-  const [bgOpacity] = useState(DEFAULT_SETTINGS.bgOpacity);
+  const [bgColorHex, setBgColorHex] = useState(DEFAULT_SETTINGS.bgColor);
+  const [bgOpacity, setBgOpacity] = useState(DEFAULT_SETTINGS.bgOpacity);
 
   const [draggingListIndex, setDraggingListIndex] = useState<number | null>(null);
   const [isExporting, setIsExporting] = useState(false);
@@ -226,11 +222,29 @@ export function VerticalImageAligner() {
           setSlotHeight(img.height);
           setFrameStepX(img.height);
 
-          // --- ИСПРАВЛЕНИЕ: Автоматический сброс масштаба ---
-          // Мы используем setTimeout, чтобы дать React время обновить DOM и размеры контейнера
+          // Попытка взять цвет верхнего левого пикселя
+          try {
+            const tempCanvas = document.createElement('canvas');
+            tempCanvas.width = 1;
+            tempCanvas.height = 1;
+            const tempCtx = tempCanvas.getContext('2d');
+            if (tempCtx) {
+              tempCtx.drawImage(img, 0, 0, 1, 1, 0, 0, 1, 1);
+              const [r, g, b] = tempCtx.getImageData(0, 0, 1, 1).data;
+
+              // Преобразование RGB в HEX без "магических битовых сдвигов" для читаемости
+              const toHex = (c: number) => c.toString(16).padStart(2, '0');
+              const hex = `#${toHex(r)}${toHex(g)}${toHex(b)}`;
+
+              setBgColorHex(hex);
+              setBgOpacity(1); // Делаем фон видимым
+            }
+          } catch (e) {
+            console.warn("Could not extract color from image", e);
+          }
+
+          // Автоматический сброс масштаба
           setTimeout(() => {
-            // Устанавливаем вид по размерам первого изображения. 
-            // Это поведение аналогично MonochromeBackgroundRemover.
             workspaceRef.current?.resetView(img.width, img.height);
           }, VIEW_RESET_DELAY);
         }
@@ -271,27 +285,13 @@ export function VerticalImageAligner() {
         ctx.restore();
       });
 
-      const atlasData = {
-        meta: { app: EXPORT_META_APP, version: EXPORT_META_VERSION, size: { w: finalW, h: finalH }, scale: 1, generated: new Date().toISOString() },
-        frames: images.reduce((acc, img, index) => {
-          acc[img.name] = {
-            frame: { x: 0, y: index * slotHeight, w: slotWidth, h: slotHeight },
-            spriteSourceSize: { x: Math.round(img.offsetX), y: Math.round(img.offsetY), w: img.naturalWidth, h: img.naturalHeight },
-            sourceSize: { w: slotWidth, h: slotHeight }, rotated: false, trimmed: false
-          };
-          return acc;
-        }, {} as Record<string, any>)
-      };
+      const pngLink = document.createElement('a');
+      pngLink.href = canvas.toDataURL('image/png');
+      pngLink.download = `${EXPORT_FILENAME}.png`;
+      document.body.appendChild(pngLink);
+      pngLink.click();
+      document.body.removeChild(pngLink);
 
-      const pngLink = document.createElement('a'); pngLink.href = canvas.toDataURL('image/png'); pngLink.download = `${EXPORT_FILENAME}.png`;
-      document.body.appendChild(pngLink); pngLink.click(); document.body.removeChild(pngLink);
-
-      setTimeout(() => {
-        const jsonString = JSON.stringify(atlasData, null, 2);
-        const jsonBlob = new Blob([jsonString], { type: "application/json" });
-        const jsonLink = document.createElement('a'); jsonLink.href = URL.createObjectURL(jsonBlob); jsonLink.download = `${EXPORT_FILENAME}.json`;
-        document.body.appendChild(jsonLink); jsonLink.click(); document.body.removeChild(jsonLink); URL.revokeObjectURL(jsonLink.href);
-      }, EXPORT_DELAY_JSON);
     } finally { setIsExporting(false); }
   }, [images, slotHeight, slotWidth, bgColorHex, bgOpacity, isCriticalHeight]);
 
@@ -305,7 +305,7 @@ export function VerticalImageAligner() {
         <>
           <div className="space-y-2">
             <button onClick={handleExport} disabled={isExporting || isCriticalHeight} className={`w-full rounded-md py-2.5 text-sm font-semibold text-white transition-all shadow-sm ${isCriticalHeight ? 'bg-zinc-400 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700 disabled:opacity-50 hover:shadow-md'}`}>
-              {isExporting ? 'Экспорт...' : isCriticalHeight ? 'Размер превышен!' : 'Скачать PNG + JSON'}
+              {isExporting ? 'Экспорт...' : isCriticalHeight ? 'Размер превышен!' : 'Скачать PNG'}
             </button>
             {isCriticalHeight && <div className="text-xs text-red-600">Превышен лимит высоты {LIMIT_MAX_BROWSER}px</div>}
           </div>
@@ -315,6 +315,26 @@ export function VerticalImageAligner() {
             <TextureDimensionSlider label="Ширина" value={slotWidth} onChange={setSlotWidth} max={LIMIT_MAX_BROWSER} />
             <TextureDimensionSlider label="Высота" value={slotHeight} onChange={setSlotHeight} max={LIMIT_MAX_BROWSER} />
             <div className="mt-2 text-xs font-medium text-zinc-500 text-center">Итого: <span className="text-zinc-900 dark:text-zinc-100">{slotWidth}</span> x <span className="text-zinc-900 dark:text-zinc-100">{totalHeight}</span> px</div>
+          </div>
+
+          {/* Настройки фона */}
+          <div className="p-4 bg-zinc-50 dark:bg-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-700">
+            <div className="text-xs font-bold text-zinc-500 mb-3 uppercase tracking-wide">Фон</div>
+            <div className="flex items-center gap-3 mb-4">
+              <div className="relative w-10 h-10 rounded border border-zinc-300 dark:border-zinc-600 overflow-hidden shadow-sm">
+                <input
+                  type="color"
+                  value={bgColorHex}
+                  onChange={(e) => setBgColorHex(e.target.value)}
+                  className="absolute -top-2 -left-2 w-16 h-16 p-0 border-0 cursor-pointer"
+                />
+              </div>
+              <div className="flex flex-col">
+                <span className="text-sm font-mono uppercase text-zinc-700 dark:text-zinc-300">{bgColorHex}</span>
+                <span className="text-[10px] text-zinc-400">Цвет заливки</span>
+              </div>
+            </div>
+            <Slider label="Прозрачность" value={bgOpacity} onChange={setBgOpacity} min={0} max={1} step={0.01} statusColor="blue" />
           </div>
 
           <div className="p-4 bg-zinc-50 dark:bg-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-700">
@@ -380,7 +400,7 @@ export function VerticalImageAligner() {
           ) : null
         }
       >
-        <div className="absolute inset-0" style={{ backgroundColor: cssBackgroundColor }} />
+        {/* ФОН теперь обрабатывается пропом backgroundColor в Canvas, дублирующий div удален */}
         {showRedGrid && (
           <div className={`absolute inset-0 pointer-events-none opacity-50`}
             style={{
