@@ -1,26 +1,12 @@
 import React, { useCallback, useEffect, useRef } from "react";
 
 export interface ImageSequencePlayerProps {
-  /**
-   * Массив URL изображений.
-   * null используется для обозначения отсутствующего/загружаемого кадра.
-   */
   images: (string | null)[];
-
-  /** Количество кадров в секунду */
   fps: number;
-
-  /**
-   * Функция обратного вызова для отрисовки поверх кадра.
-   * Позволяет родительскому компоненту рисовать текст, водяные знаки и т.д.
-   */
   onDrawOverlay?: (ctx: CanvasRenderingContext2D, index: number, width: number, height: number) => void;
-
   width?: number;
   height?: number;
   className?: string;
-
-  /** Цвет фона для пустых (null) кадров */
   placeholderColor?: string;
 }
 
@@ -31,14 +17,13 @@ export function ImageSequencePlayer({
   width,
   height,
   className,
-  placeholderColor = "#f4f4f5" // zinc-100 по умолчанию
+  placeholderColor = "#f4f4f5"
 }: ImageSequencePlayerProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const requestRef = useRef<number | undefined>(undefined);
   const previousTimeRef = useRef<number | undefined>(undefined);
   const indexRef = useRef(0);
 
-  // Сброс индекса, если массив кадров изменился (например, при загрузке нового видео)
   if (indexRef.current >= images.length) {
     indexRef.current = 0;
   }
@@ -63,10 +48,9 @@ export function ImageSequencePlayer({
             const w = canvas.width;
             const h = canvas.height;
 
-            // Вспомогательная функция для финализации кадра (вызов оверлея)
             const finalizeFrame = () => {
               if (onDrawOverlay) {
-                ctx.save(); // Сохраняем состояние контекста перед внешним вмешательством
+                ctx.save();
                 onDrawOverlay(ctx, currentIndex, w, h);
                 ctx.restore();
               }
@@ -86,20 +70,20 @@ export function ImageSequencePlayer({
                 drawImage();
               } else {
                 img.onload = drawImage;
-                // В реальном проекте здесь можно добавить обработку ошибки загрузки картинки
               }
             } else {
-              // Отрисовка плейсхолдера
+              // Фон
               ctx.fillStyle = placeholderColor;
               ctx.fillRect(0, 0, w, h);
 
-              // Рисуем троеточие для индикации загрузки/пустоты
-              ctx.fillStyle = '#d4d4d8'; // zinc-300
-              ctx.font = '10px sans-serif';
+              // Адаптивный размер текста плейсхолдера
+              const fontSize = Math.max(16, Math.floor(w * 0.1));
+              ctx.fillStyle = '#a1a1aa';
+              ctx.font = `bold ${fontSize}px sans-serif`;
               ctx.textAlign = 'center';
               ctx.textBaseline = 'middle';
               ctx.fillText('...', w / 2, h / 2);
-              ctx.textAlign = 'start'; // сброс
+              ctx.textAlign = 'start';
 
               finalizeFrame();
             }
@@ -112,7 +96,6 @@ export function ImageSequencePlayer({
     requestRef.current = requestAnimationFrame(animate);
   }, [images, fps, onDrawOverlay, placeholderColor]);
 
-  // Запуск цикла анимации
   useEffect(() => {
     requestRef.current = requestAnimationFrame(animate);
     return () => {
@@ -120,11 +103,7 @@ export function ImageSequencePlayer({
     };
   }, [animate]);
 
-  // Эффект для отрисовки первого кадра при инициализации (без ожидания тика анимации)
-  useEffect(() => {
-    // Этот эффект полезен, чтобы канвас не был пустым при первой загрузке или паузе
-    // В данном случае animate() и так запустится, но это "страховка" для быстрой отрисовки статики
-  }, [images]);
+  useEffect(() => { }, [images]);
 
   return (
     <canvas
