@@ -178,7 +178,7 @@ function useVideoFrameExtraction() {
     }
   }, [videoSrc]);
 
-  // Generate Start/End Previews
+  // Generate Start/End Previews (These act as the "Cache")
   useEffect(() => {
     if (!videoSrc || !previewVideoRef.current || !canvasRef.current || !videoDuration) return;
     if (status.isProcessing) return;
@@ -200,11 +200,13 @@ function useVideoFrameExtraction() {
         const steps = Math.floor((Math.min(effectiveEnd, videoDuration) - safeStart) / interval);
         const actualEndTime = safeStart + (steps * interval);
 
+        // Generate Start Cache
         vid.currentTime = safeStart;
         await new Promise<void>(r => { vid.onseeked = () => r(); });
         ctx?.drawImage(vid, 0, 0);
         const startUrl = canvas.toDataURL('image/png');
 
+        // Generate End Cache
         vid.currentTime = actualEndTime;
         await new Promise<void>(r => { vid.onseeked = () => r(); });
         ctx?.drawImage(vid, 0, 0);
@@ -378,8 +380,9 @@ export function VideoFrameExtractor() {
   const [pickerValue, setPickerValue] = useState("#ffffff");
   const [diffDataUrl, setDiffDataUrl] = useState<string | null>(null);
 
-  // State for Hover/Drag Preview
-  const [hoverPreview, setHoverPreview] = useState<{ time: number; x: number } | null>(null);
+  // State for Dual Hover Preview
+  // activeThumb: 0 (start) | 1 (end)
+  const [hoverPreview, setHoverPreview] = useState<{ activeThumb: 0 | 1; time: number } | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const sliderContainerRef = useRef<HTMLDivElement>(null);
 
@@ -456,12 +459,8 @@ export function VideoFrameExtractor() {
 
   // --- PREVIEW LOGIC ---
 
-  const updatePreview = (time: number, rectWidth: number) => {
-    if (!videoDuration) return;
-    const percentage = Math.max(0, Math.min(1, time / videoDuration));
-    const x = percentage * rectWidth;
-
-    setHoverPreview({ time, x });
+  const updatePreview = (activeThumb: 0 | 1, time: number) => {
+    setHoverPreview({ activeThumb, time });
     if (hoverVideoRef.current) {
       hoverVideoRef.current.currentTime = time;
     }
@@ -470,12 +469,18 @@ export function VideoFrameExtractor() {
   // Hover Handler
   const handleSliderHover = (e: React.MouseEvent<HTMLDivElement>) => {
     if (!videoDuration || isDragging) return; // Ignore hover if dragging
+
     const rect = e.currentTarget.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const percentage = Math.max(0, Math.min(1, x / rect.width));
     const time = percentage * videoDuration;
 
-    setHoverPreview({ time, x });
+    // Determine nearest thumb
+    const distToStart = Math.abs(time - extractionParams.startTime);
+    const distToEnd = Math.abs(time - effectiveEnd);
+    const nearestThumb = distToStart < distToEnd ? 0 : 1;
+
+    setHoverPreview({ activeThumb: nearestThumb, time });
     if (hoverVideoRef.current) {
       hoverVideoRef.current.currentTime = time;
     }
@@ -497,43 +502,12 @@ export function VideoFrameExtractor() {
   const handleValueChange = (newValues: number[], thumbIndex?: 0 | 1) => {
     setExtractionParams(p => ({ ...p, startTime: newValues[0], endTime: newValues[1] }));
 
-    // Updated Logic: Use thumbIndex to know exactly which value changed
-    if (isDragging && sliderContainerRef.current && typeof thumbIndex === 'number') {
+    // During drag, force the active preview to the dragged thumb
+    if (isDragging && typeof thumbIndex === 'number') {
       const changedTime = newValues[thumbIndex];
-      const rect = sliderContainerRef.current.getBoundingClientRect();
-      updatePreview(changedTime, rect.width);
+      updatePreview(thumbIndex, changedTime);
     }
   };
-
-  // Clamping Calculations (Based on Container Bounds)
-  const getClampedOffset = () => {
-    if (!hoverPreview || !sliderContainerRef.current) return 0;
-
-    const tooltipWidth = 480; // Match max-w
-    const padding = 10;
-
-    const sliderRect = sliderContainerRef.current.getBoundingClientRect();
-    const globalX = sliderRect.left + hoverPreview.x; // Hover position relative to viewport
-
-    // Bounds relative to viewport, based on the container
-    const minCenter = sliderRect.left + (tooltipWidth / 2) + padding;
-    const maxCenter = sliderRect.right - (tooltipWidth / 2) - padding;
-
-    // Safety check if container is too small
-    if (minCenter > maxCenter) {
-      // Center relative to container
-      const containerCenter = sliderRect.left + (sliderRect.width / 2);
-      return containerCenter - globalX;
-    }
-
-    const clampedGlobalCenter = Math.max(minCenter, Math.min(globalX, maxCenter));
-
-    // Return the offset needed to move from `globalX` to `clampedGlobalCenter`
-    return clampedGlobalCenter - globalX;
-  };
-
-  const clampOffset = getClampedOffset();
-
 
   const sidebarContent = (
     <div className="flex flex-col gap-6 pb-4">
@@ -612,31 +586,64 @@ export function VideoFrameExtractor() {
                       minStepsBetweenThumbs={0.1}
                     />
 
-                    {/* Hover/Drag Tooltip */}
+                    {/* DUAL PREVIEW TOOLTIP - FULL SIZE */}
                     {hoverPreview && (
-                      <div
-                        className="absolute top-full mt-3 z-50 pointer-events-none flex flex-col items-center"
-                        style={{ left: hoverPreview.x, transform: 'translateX(-50%)' }}
-                      >
-                        {/* Arrow Pointing Up (Stays centered on the handle) */}
-                        <div className="w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-b-[6px] border-b-black translate-y-[1px]"></div>
+                      <div className="absolute top-full left-1/2 -translate-x-1/2 mt-6 w-[98vw] max-w-[1600px] z-[100] pointer-events-none">
+                        {/* Container for dual frames */}
+                        <div className="grid grid-cols-2 gap-6 bg-zinc-950/95 backdrop-blur-md p-6 rounded-2xl shadow-2xl border border-white/10">
 
-                        <div className="bg-black rounded-lg shadow-xl border border-white/20 overflow-hidden p-1 transition-transform duration-75 ease-out"
-                          style={{ transform: `translateX(${clampOffset}px)` }}
-                        >
-                          {/* Large Preview */}
-                          <div className="relative w-[480px] max-w-[80vw]" style={aspectRatioStyle}>
-                            <video
-                              ref={hoverVideoRef}
-                              src={videoSrc}
-                              className="w-full h-full object-contain"
-                              muted
-                              playsInline
-                            />
-                            <div className="absolute inset-x-0 bottom-0 bg-black/60 text-white text-xs font-mono font-bold text-center py-1">
-                              {hoverPreview.time.toFixed(2)}s
+                          {/* Left Frame (Start) */}
+                          <div className={`relative flex flex-col items-center gap-2 transition-opacity duration-200 ${hoverPreview.activeThumb === 0 ? 'opacity-100' : 'opacity-50 grayscale-[0.5]'}`}>
+                            <div className={`relative w-full bg-black rounded-lg overflow-hidden border-4 shadow-lg transition-all ${hoverPreview.activeThumb === 0 ? 'border-blue-500 shadow-blue-500/20' : 'border-zinc-800'}`} style={aspectRatioStyle}>
+                              {/* Static Cache (Image) */}
+                              {previewFrames.start && (
+                                <img src={previewFrames.start} alt="start" className="w-full h-full object-contain" />
+                              )}
+
+                              {/* Dynamic Video (Only if Start is active) */}
+                              {hoverPreview.activeThumb === 0 && (
+                                <div className="absolute inset-0 bg-black">
+                                  <video
+                                    ref={hoverVideoRef}
+                                    src={videoSrc}
+                                    className="w-full h-full object-contain"
+                                    muted
+                                    playsInline
+                                  />
+                                </div>
+                              )}
                             </div>
+                            <span className={`text-xs font-mono font-bold px-3 py-1 rounded-full shadow-sm ${hoverPreview.activeThumb === 0 ? 'bg-blue-600 text-white' : 'bg-zinc-800 text-zinc-500'}`}>
+                              START: {(hoverPreview.activeThumb === 0 ? hoverPreview.time : extractionParams.startTime).toFixed(2)}s
+                            </span>
                           </div>
+
+                          {/* Right Frame (End) */}
+                          <div className={`relative flex flex-col items-center gap-2 transition-opacity duration-200 ${hoverPreview.activeThumb === 1 ? 'opacity-100' : 'opacity-50 grayscale-[0.5]'}`}>
+                            <div className={`relative w-full bg-black rounded-lg overflow-hidden border-4 shadow-lg transition-all ${hoverPreview.activeThumb === 1 ? 'border-purple-500 shadow-purple-500/20' : 'border-zinc-800'}`} style={aspectRatioStyle}>
+                              {/* Static Cache (Image) */}
+                              {previewFrames.end && (
+                                <img src={previewFrames.end} alt="end" className="w-full h-full object-contain" />
+                              )}
+
+                              {/* Dynamic Video (Only if End is active) */}
+                              {hoverPreview.activeThumb === 1 && (
+                                <div className="absolute inset-0 bg-black">
+                                  <video
+                                    ref={hoverVideoRef}
+                                    src={videoSrc}
+                                    className="w-full h-full object-contain"
+                                    muted
+                                    playsInline
+                                  />
+                                </div>
+                              )}
+                            </div>
+                            <span className={`text-xs font-mono font-bold px-3 py-1 rounded-full shadow-sm ${hoverPreview.activeThumb === 1 ? 'bg-purple-600 text-white' : 'bg-zinc-800 text-zinc-500'}`}>
+                              END: {(hoverPreview.activeThumb === 1 ? hoverPreview.time : effectiveEnd).toFixed(2)}s
+                            </span>
+                          </div>
+
                         </div>
                       </div>
                     )}
