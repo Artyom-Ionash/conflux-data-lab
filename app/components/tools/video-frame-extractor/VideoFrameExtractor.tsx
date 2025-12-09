@@ -16,12 +16,10 @@ import { FrameDiffOverlay } from "./FrameDiffOverlay";
 import { TextureDimensionSlider } from "../../domain/graphics/TextureDimensionSlider";
 
 // --- STYLES CONSTANTS ---
-// Цвета и стили для таймстемпов.
 const TIMESTAMP_HTML_CLASS = "absolute bottom-2 left-2 pointer-events-none bg-black/80 text-white px-2 py-0.5 rounded text-[11px] font-bold font-mono shadow-sm backdrop-blur-[1px]";
 
 // --- COMPONENTS ---
 
-// Упрощенный Input (бывший Stepper) без кнопок +/-, но в едином стиле
 interface NumberStepperProps {
   value: number;
   onChange: (val: number) => void;
@@ -30,11 +28,11 @@ interface NumberStepperProps {
   step?: number;
   label?: string;
   className?: string;
+  disabled?: boolean;
 }
 
-function NumberStepper({ value, onChange, min, max, step, label, className = "" }: NumberStepperProps) {
+function NumberStepper({ value, onChange, min, max, step, label, className = "", disabled = false }: NumberStepperProps) {
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    // Разрешаем ввод, валидацию можно делать onBlur или мягко
     const val = parseFloat(e.target.value);
     if (!isNaN(val)) {
       onChange(val);
@@ -45,7 +43,11 @@ function NumberStepper({ value, onChange, min, max, step, label, className = "" 
     <div className={`flex items-center gap-2 ${className}`}>
       {label && <span className="text-xs font-bold text-zinc-500 uppercase tracking-wide">{label}:</span>}
 
-      <div className="flex items-center h-8 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-lg shadow-sm transition-colors hover:border-zinc-300 dark:hover:border-zinc-600">
+      <div className={`flex items-center h-8 border rounded-lg shadow-sm transition-colors 
+        ${disabled
+          ? "bg-zinc-100 dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 cursor-default opacity-80"
+          : "bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-700 hover:border-zinc-300 dark:hover:border-zinc-600"
+        }`}>
         <input
           type="number"
           value={value}
@@ -53,7 +55,9 @@ function NumberStepper({ value, onChange, min, max, step, label, className = "" 
           max={max}
           step={step}
           onChange={handleChange}
-          className="w-16 h-full text-center text-sm font-mono font-bold text-zinc-700 dark:text-zinc-200 bg-transparent outline-none appearance-none rounded-lg px-1"
+          disabled={disabled}
+          className={`w-16 h-full text-center text-sm font-mono font-bold bg-transparent outline-none appearance-none rounded-lg px-1
+            ${disabled ? "text-zinc-500 pointer-events-none" : "text-zinc-700 dark:text-zinc-200"}`}
         />
       </div>
     </div>
@@ -129,7 +133,7 @@ function useVideoFrameExtraction() {
     return [...rawFrames, ...loopBack];
   }, [rawFrames, extractionParams.symmetricLoop]);
 
-  const [gifParams, setGifParams] = useState({ fps: 5, dataUrl: null as string | null });
+  const [gifParams, setGifParams] = useState({ fps: 10, dataUrl: null as string | null });
   const [status, setStatus] = useState({ isProcessing: false, currentStep: "", progress: 0 });
   const [error, setError] = useState<string | null>(null);
 
@@ -142,6 +146,15 @@ function useVideoFrameExtraction() {
   const abortControllerRef = useRef<AbortController | null>(null);
 
   const effectiveEnd = useMemo(() => (extractionParams.endTime > 0 ? extractionParams.endTime : videoDuration ?? 0), [extractionParams.endTime, videoDuration]);
+
+  // --- AUTO-FPS LOGIC ---
+  useEffect(() => {
+    if (extractionParams.frameStep > 0) {
+      const calculatedFps = Math.round(1 / extractionParams.frameStep);
+      const safeFps = Math.max(1, Math.min(60, calculatedFps));
+      setGifParams(prev => ({ ...prev, fps: safeFps }));
+    }
+  }, [extractionParams.frameStep]);
 
   useEffect(() => { return () => { if (videoSrc) URL.revokeObjectURL(videoSrc); }; }, [videoSrc]);
 
@@ -207,13 +220,13 @@ function useVideoFrameExtraction() {
       const duration = tempVideo.duration || 0;
       setVideoDuration(duration);
       setVideoDimensions({ width: tempVideo.videoWidth, height: tempVideo.videoHeight });
-      const defaultStep = Math.max(0.5, duration / 10);
-      setExtractionParams(p => ({
-        ...p,
+
+      setExtractionParams({
         startTime: 0,
-        endTime: duration,
-        frameStep: Number(defaultStep.toFixed(2))
-      }));
+        endTime: Math.min(0.5, duration),
+        frameStep: 0.1,
+        symmetricLoop: true
+      });
     };
     tempVideo.onerror = () => setError("Ошибка загрузки");
   }, [videoSrc]);
@@ -344,16 +357,13 @@ export function VideoFrameExtractor() {
 
   const { generateSpriteSheet } = useSpriteSheetGenerator();
 
-  // Draw overlay for Canvas Player (Scaled to occupy approx 20% of frame width)
   const handleDrawOverlay = useCallback((ctx: CanvasRenderingContext2D, index: number, w: number, h: number) => {
     const frame = frames[index];
     if (!frame) return;
 
     const timeText = `${frame.time.toFixed(2)}s`;
 
-    // Calculate font size
     const fontSize = Math.max(14, Math.floor(w * 0.05));
-
     ctx.font = `bold ${fontSize}px monospace`;
     const textMetrics = ctx.measureText(timeText);
 
@@ -362,12 +372,10 @@ export function VideoFrameExtractor() {
     const boxWidth = textMetrics.width + (padX * 2);
     const boxHeight = fontSize + (padY * 2);
 
-    // Position: bottom left with proportional margin
     const margin = Math.max(8, w * 0.03);
     const x = margin;
     const y = h - margin - boxHeight;
 
-    // Background
     ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
     ctx.beginPath();
     const radius = fontSize * 0.4;
@@ -378,7 +386,6 @@ export function VideoFrameExtractor() {
     }
     ctx.fill();
 
-    // Text
     ctx.fillStyle = 'white';
     ctx.textBaseline = 'middle';
     ctx.fillText(timeText, x + padX, y + (boxHeight / 2) + (fontSize * 0.05));
@@ -387,7 +394,6 @@ export function VideoFrameExtractor() {
   const handleDownloadSpriteSheet = async () => {
     if (frames.length === 0) return;
     try {
-      // Исправлено: явное сопоставление свойства bg -> backgroundColor
       const url = await generateSpriteSheet(frames, {
         maxHeight: spriteOptions.maxHeight,
         spacing: spriteOptions.spacing,
@@ -429,6 +435,11 @@ export function VideoFrameExtractor() {
     </div>
   );
 
+  // --- DERIVED SPEED VALUES ---
+  const baseFps = extractionParams.frameStep > 0 ? Math.round(1 / extractionParams.frameStep) : 10;
+  // Calculate speed percentage based on current FPS relative to base FPS
+  const speedPercent = Math.round((gifParams.fps / baseFps) * 100);
+
   return (
     <ToolLayout title="Видео в Кадры/GIF" sidebar={sidebarContent}>
       <div className="relative w-full h-full flex flex-col bg-zinc-50 dark:bg-black/20 overflow-hidden">
@@ -465,7 +476,7 @@ export function VideoFrameExtractor() {
                       />
                     </div>
 
-                    {/* Time Range Indicator (Matches Overlay Style) */}
+                    {/* Time Range Indicator */}
                     <div className="bg-black/80 text-white px-3 py-1.5 rounded text-xs font-mono font-bold ml-auto flex items-center gap-2 shadow-sm">
                       <span>{extractionParams.startTime.toFixed(2)}s</span>
                       <span className="opacity-50">→</span>
@@ -511,16 +522,36 @@ export function VideoFrameExtractor() {
                 </div>
               </div>
 
-              {/* GIF Player */}
+              {/* Sprite (Animation) Player */}
               <div className="bg-white dark:bg-zinc-900 rounded-lg border border-zinc-200 dark:border-zinc-700 overflow-hidden flex flex-col shadow-sm">
                 <div className="flex items-center justify-between px-3 py-2 border-b border-zinc-100 dark:border-zinc-800 bg-white dark:bg-zinc-900 h-11">
                   <div className="flex items-center gap-4">
-                    <span className="text-xs font-bold text-zinc-500 uppercase tracking-wide">GIF</span>
-                    <NumberStepper label="" value={gifParams.fps} onChange={(v) => setGifParams(p => ({ ...p, fps: v }))} min={1} max={60} />
+                    <span className="text-xs font-bold text-zinc-500 uppercase tracking-wide">Спрайт</span>
+
+                    {/* Speed % Control */}
+                    <NumberStepper
+                      label="Скорость %"
+                      value={speedPercent}
+                      onChange={(val) => {
+                        const newFps = Math.max(1, Math.round(baseFps * (val / 100)));
+                        setGifParams(p => ({ ...p, fps: newFps }));
+                      }}
+                      min={10}
+                      max={500}
+                      step={10}
+                    />
+
+                    {/* Read-only FPS */}
+                    <NumberStepper
+                      label="FPS"
+                      value={gifParams.fps}
+                      onChange={() => { }}
+                      disabled={true}
+                    />
                   </div>
                   {frames.length > 0 && !status.isProcessing && (
                     <button onClick={generateAndDownloadGif} disabled={status.isProcessing} className="text-xs text-blue-600 hover:underline font-medium disabled:opacity-50">
-                      {status.currentStep === 'generating' ? '...' : 'Скачать'}
+                      {status.currentStep === 'generating' ? 'Кодирование...' : 'Скачать GIF'}
                     </button>
                   )}
                 </div>
@@ -570,6 +601,15 @@ export function VideoFrameExtractor() {
                 </div>
                 {frames.length > 0 && (
                   <div className="flex items-center gap-4">
+
+                    {/* Frame Count Indicator */}
+                    <NumberStepper
+                      label="Кадров"
+                      value={frames.length}
+                      onChange={() => { }}
+                      disabled={true}
+                    />
+
                     <div className="w-40"><TextureDimensionSlider label="Ширина" value={(Math.floor(videoDimensions!.width * (spriteOptions.maxHeight / videoDimensions!.height)) + spriteOptions.spacing) * frames.length - spriteOptions.spacing} onChange={() => { }} max={16384} disabled /></div>
                     <button onClick={handleDownloadSpriteSheet} className="text-xs text-blue-600 hover:underline font-bold">Скачать PNG</button>
                   </div>
