@@ -357,7 +357,7 @@ function useVideoFrameExtraction() {
         startTime: safeStartTime,
         endTime: duration,
         frameStep: DEFAULT_FRAME_STEP,
-        symmetricLoop: true
+        symmetricLoop: false
       });
     };
     tempVideo.onerror = () => setError("Ошибка загрузки");
