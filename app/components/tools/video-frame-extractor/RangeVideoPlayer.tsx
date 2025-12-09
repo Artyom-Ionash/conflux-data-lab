@@ -6,53 +6,123 @@ interface RangeVideoPlayerProps {
   src: string | null;
   startTime: number;
   endTime: number;
+  symmetricLoop?: boolean; // New prop for loop mode
   className?: string;
 }
 
-export function RangeVideoPlayer({ src, startTime, endTime, className = "" }: RangeVideoPlayerProps) {
+export function RangeVideoPlayer({
+  src,
+  startTime,
+  endTime,
+  symmetricLoop = false,
+  className = ""
+}: RangeVideoPlayerProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(startTime);
   const [isHovering, setIsHovering] = useState(false);
 
-  // Sync start time
+  // Track direction for symmetric loop
+  const directionRef = useRef<'forward' | 'backward'>('forward');
+  const animationFrameRef = useRef<number>(0);
+  const lastFrameTimeRef = useRef<number>(0);
+
+  // Sync start time when inputs change
   useEffect(() => {
     if (videoRef.current && Math.abs(videoRef.current.currentTime - startTime) > 0.5) {
       videoRef.current.currentTime = startTime;
       setCurrentTime(startTime);
+      directionRef.current = 'forward'; // Reset direction on range change
     }
   }, [startTime]);
 
-  // Loop logic & Time update
+  // Main playback loop logic
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+
+    const loop = (timestamp: number) => {
+      if (!isPlaying) return;
+
+      const t = video.currentTime;
+      setCurrentTime(t);
+
+      // Delta time calculation for smoother backward playback
+      if (!lastFrameTimeRef.current) lastFrameTimeRef.current = timestamp;
+      const deltaTime = (timestamp - lastFrameTimeRef.current) / 1000;
+      lastFrameTimeRef.current = timestamp;
+
+      if (directionRef.current === 'forward') {
+        // Native forward playback
+        if (video.paused && isPlaying) video.play().catch(() => { });
+
+        if (t >= endTime) {
+          if (symmetricLoop) {
+            directionRef.current = 'backward';
+            video.pause(); // Pause native playback to take control manually
+          } else {
+            video.currentTime = startTime;
+          }
+        }
+      } else {
+        // Manual backward playback
+        if (!video.paused) video.pause(); // Ensure native is paused
+
+        // Decrement time manually (simulate 1x speed backwards)
+        // Note: Performance depends on video codec (keyframe distance)
+        video.currentTime = Math.max(startTime, t - deltaTime);
+
+        if (video.currentTime <= startTime) {
+          directionRef.current = 'forward';
+          video.play().catch(() => { }); // Resume native playback
+        }
+      }
+
+      animationFrameRef.current = requestAnimationFrame(loop);
+    };
+
+    if (isPlaying) {
+      lastFrameTimeRef.current = performance.now();
+      animationFrameRef.current = requestAnimationFrame(loop);
+    } else {
+      if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);
+      video.pause();
+    }
+
+    return () => {
+      if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);
+    };
+  }, [isPlaying, startTime, endTime, symmetricLoop]);
+
+  // Simple event listener just for UI updates when paused or seeking manually
   useEffect(() => {
     const video = videoRef.current;
     if (!video) return;
 
     const handleTimeUpdate = () => {
-      const time = video.currentTime;
-      setCurrentTime(time);
-
-      if (time >= endTime) {
-        video.currentTime = startTime;
-        if (isPlaying) video.play().catch(() => { });
-      }
+      if (!isPlaying) setCurrentTime(video.currentTime);
     };
 
     video.addEventListener("timeupdate", handleTimeUpdate);
     return () => video.removeEventListener("timeupdate", handleTimeUpdate);
-  }, [endTime, startTime, isPlaying]);
+  }, [isPlaying]);
 
   const togglePlay = () => {
     if (!videoRef.current) return;
-    if (isPlaying) {
-      videoRef.current.pause();
-    } else {
-      if (videoRef.current.currentTime >= endTime) {
-        videoRef.current.currentTime = startTime;
-      }
-      videoRef.current.play().catch(console.error);
+
+    // Reset to start if finished and not looping symmetrically
+    if (!isPlaying && !symmetricLoop && videoRef.current.currentTime >= endTime) {
+      videoRef.current.currentTime = startTime;
     }
+
     setIsPlaying(!isPlaying);
+  };
+
+  const handleManualSeek = (newTime: number) => {
+    if (!videoRef.current) return;
+    videoRef.current.currentTime = Math.max(startTime, Math.min(endTime, newTime));
+    setCurrentTime(newTime);
+    directionRef.current = 'forward'; // Reset direction on manual interaction
   };
 
   const duration = endTime - startTime;
@@ -81,8 +151,8 @@ export function RangeVideoPlayer({ src, startTime, endTime, className = "" }: Ra
         className="w-full h-full object-contain"
         muted
         playsInline
-        onPlay={() => setIsPlaying(true)}
-        onPause={() => setIsPlaying(false)}
+        // Removed standard onPlay/onPause/timeupdate handlers from here
+        // to control them fully via React state and Effects above
         onClick={togglePlay}
       />
 
@@ -116,12 +186,11 @@ export function RangeVideoPlayer({ src, startTime, endTime, className = "" }: Ra
             <div
               className="absolute inset-0 w-full h-full z-10"
               onClick={(e) => {
-                if (!videoRef.current) return;
                 const rect = e.currentTarget.getBoundingClientRect();
                 const x = e.clientX - rect.left;
                 const percentage = x / rect.width;
                 const newTime = startTime + (duration * percentage);
-                videoRef.current.currentTime = Math.max(startTime, Math.min(endTime, newTime));
+                handleManualSeek(newTime);
               }}
             />
           </div>

@@ -526,7 +526,13 @@ export function VideoFrameExtractor() {
                   Исходное видео
                 </div>
                 <div className="relative w-full bg-black" style={aspectRatioStyle}>
-                  <RangeVideoPlayer src={videoSrc} startTime={extractionParams.startTime} endTime={effectiveEnd} className="absolute inset-0" />
+                  <RangeVideoPlayer
+                    src={videoSrc}
+                    startTime={extractionParams.startTime}
+                    endTime={effectiveEnd}
+                    symmetricLoop={extractionParams.symmetricLoop}
+                    className="absolute inset-0"
+                  />
                 </div>
               </div>
 
@@ -631,8 +637,8 @@ export function VideoFrameExtractor() {
                     <button
                       onClick={handleDownloadSpriteSheet}
                       className={`text-xs font-bold transition-colors ${totalSpriteWidth > TEXTURE_LIMITS.MAX_BROWSER
-                        ? "text-zinc-400 cursor-not-allowed"
-                        : "text-blue-600 hover:underline"
+                          ? "text-zinc-400 cursor-not-allowed"
+                          : "text-blue-600 hover:underline"
                         }`}
                       disabled={totalSpriteWidth > TEXTURE_LIMITS.MAX_BROWSER}
                     >
