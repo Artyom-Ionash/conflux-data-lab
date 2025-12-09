@@ -71,6 +71,113 @@ function NumberStepper({ value, onChange, min, max, step, label, className = "",
   );
 }
 
+// --- MULTI-SCALE PREVIEW MODAL ---
+
+interface MultiScalePreviewModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  frames: (string | null)[];
+  fps: number;
+}
+
+function MultiScalePreviewModal({ isOpen, onClose, frames, fps }: MultiScalePreviewModalProps) {
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const validFrames = useMemo(() => frames.filter((f): f is string => f !== null), [frames]);
+
+  // Animation Loop
+  useEffect(() => {
+    if (!isOpen || validFrames.length === 0) return;
+
+    let frameId: number;
+    let lastTime = performance.now();
+    const interval = 1000 / fps;
+
+    const loop = (time: number) => {
+      const delta = time - lastTime;
+      if (delta >= interval) {
+        setCurrentIndex((prev) => (prev + 1) % validFrames.length);
+        lastTime = time - (delta % interval);
+      }
+      frameId = requestAnimationFrame(loop);
+    };
+
+    frameId = requestAnimationFrame(loop);
+    return () => cancelAnimationFrame(frameId);
+  }, [isOpen, validFrames.length, fps]);
+
+  // Handle ESC key
+  useEffect(() => {
+    const handleEsc = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    if (isOpen) window.addEventListener("keydown", handleEsc);
+    return () => window.removeEventListener("keydown", handleEsc);
+  }, [isOpen, onClose]);
+
+  if (!isOpen) return null;
+
+  const currentSrc = validFrames[currentIndex];
+  // CHANGED ORDER: Smallest first (Left) -> Largest last (Right)
+  const SCALES = [32, 64, 128, 256, 512];
+
+  return (
+    <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/90 backdrop-blur-sm p-4" onClick={onClose}>
+      <div
+        className="bg-zinc-900 border border-zinc-700 rounded-2xl shadow-2xl w-[96vw] h-[92vh] max-w-[1920px] flex flex-col overflow-hidden"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-800 bg-zinc-900 shrink-0">
+          <h3 className="text-lg font-bold text-white flex items-center gap-3">
+            <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+            Предпросмотр масштабов
+          </h3>
+          <div className="flex items-center gap-4">
+            <span className="text-xs font-mono text-zinc-500">FPS: {fps}</span>
+            <button
+              onClick={onClose}
+              className="text-zinc-400 hover:text-white transition-colors p-2 hover:bg-zinc-800 rounded-lg"
+            >
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+            </button>
+          </div>
+        </div>
+
+        {/* Content - Full Available Space */}
+        <div className="flex-1 bg-zinc-950 p-8 flex items-center justify-center overflow-auto custom-scrollbar">
+          {validFrames.length > 0 ? (
+            <div className="flex flex-wrap items-center justify-center content-center gap-x-12 gap-y-12">
+              {SCALES.map((size) => (
+                <div key={size} className="flex flex-col items-center gap-4">
+                  <div
+                    className="bg-black/50 border border-zinc-800 rounded-lg overflow-hidden shadow-[0_0_30px_rgba(0,0,0,0.5)] flex items-center justify-center relative transition-transform hover:scale-[1.02]"
+                    style={{ width: size, height: size }}
+                  >
+                    {/* Checkerboard background for transparency */}
+                    <div className="absolute inset-0 z-0 opacity-20" style={{ backgroundImage: 'linear-gradient(45deg, #333 25%, transparent 25%), linear-gradient(-45deg, #333 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #333 75%), linear-gradient(-45deg, transparent 75%, #333 75%)', backgroundSize: '20px 20px' }} />
+
+                    <img
+                      src={currentSrc}
+                      alt={`${size}px preview`}
+                      className="relative z-10 w-full h-full object-contain"
+                      style={{ imageRendering: size < 64 ? 'pixelated' : 'auto' }}
+                    />
+                  </div>
+                  <span className="text-sm font-mono font-bold text-zinc-400 bg-zinc-900/80 px-3 py-1.5 rounded-full border border-zinc-800">
+                    {size}x{size}
+                  </span>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="flex items-center justify-center text-zinc-500">Нет кадров для отображения</div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // --- TYPES ---
 export interface ExtractedFrame {
   time: number;
@@ -381,10 +488,12 @@ export function VideoFrameExtractor() {
   const [diffDataUrl, setDiffDataUrl] = useState<string | null>(null);
 
   // State for Dual Hover Preview
-  // activeThumb: 0 (start) | 1 (end)
   const [hoverPreview, setHoverPreview] = useState<{ activeThumb: 0 | 1; time: number } | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const sliderContainerRef = useRef<HTMLDivElement>(null);
+
+  // State for Modal
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
   const { generateSpriteSheet } = useSpriteSheetGenerator();
 
@@ -466,16 +575,14 @@ export function VideoFrameExtractor() {
     }
   };
 
-  // Hover Handler
   const handleSliderHover = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (!videoDuration || isDragging) return; // Ignore hover if dragging
+    if (!videoDuration || isDragging) return;
 
     const rect = e.currentTarget.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const percentage = Math.max(0, Math.min(1, x / rect.width));
     const time = percentage * videoDuration;
 
-    // Determine nearest thumb
     const distToStart = Math.abs(time - extractionParams.startTime);
     const distToEnd = Math.abs(time - effectiveEnd);
     const nearestThumb = distToStart < distToEnd ? 0 : 1;
@@ -492,7 +599,6 @@ export function VideoFrameExtractor() {
     }
   };
 
-  // Dragging Handlers
   const handlePointerDown = () => setIsDragging(true);
   const handlePointerUp = () => {
     setIsDragging(false);
@@ -502,7 +608,6 @@ export function VideoFrameExtractor() {
   const handleValueChange = (newValues: number[], thumbIndex?: 0 | 1) => {
     setExtractionParams(p => ({ ...p, startTime: newValues[0], endTime: newValues[1] }));
 
-    // During drag, force the active preview to the dragged thumb
     if (isDragging && typeof thumbIndex === 'number') {
       const changedTime = newValues[thumbIndex];
       updatePreview(thumbIndex, changedTime);
@@ -589,27 +694,15 @@ export function VideoFrameExtractor() {
                     {/* DUAL PREVIEW TOOLTIP - FULL SIZE */}
                     {hoverPreview && (
                       <div className="absolute top-full left-1/2 -translate-x-1/2 mt-6 w-[98vw] max-w-[1600px] z-[100] pointer-events-none">
-                        {/* Container for dual frames */}
                         <div className="grid grid-cols-2 gap-6 bg-zinc-950/95 backdrop-blur-md p-6 rounded-2xl shadow-2xl border border-white/10">
 
                           {/* Left Frame (Start) */}
                           <div className={`relative flex flex-col items-center gap-2 transition-opacity duration-200 ${hoverPreview.activeThumb === 0 ? 'opacity-100' : 'opacity-50 grayscale-[0.5]'}`}>
                             <div className={`relative w-full bg-black rounded-lg overflow-hidden border-4 shadow-lg transition-all ${hoverPreview.activeThumb === 0 ? 'border-blue-500 shadow-blue-500/20' : 'border-zinc-800'}`} style={aspectRatioStyle}>
-                              {/* Static Cache (Image) */}
-                              {previewFrames.start && (
-                                <img src={previewFrames.start} alt="start" className="w-full h-full object-contain" />
-                              )}
-
-                              {/* Dynamic Video (Only if Start is active) */}
+                              {previewFrames.start && <img src={previewFrames.start} alt="start" className="w-full h-full object-contain" />}
                               {hoverPreview.activeThumb === 0 && (
                                 <div className="absolute inset-0 bg-black">
-                                  <video
-                                    ref={hoverVideoRef}
-                                    src={videoSrc}
-                                    className="w-full h-full object-contain"
-                                    muted
-                                    playsInline
-                                  />
+                                  <video ref={hoverVideoRef} src={videoSrc} className="w-full h-full object-contain" muted playsInline />
                                 </div>
                               )}
                             </div>
@@ -621,21 +714,10 @@ export function VideoFrameExtractor() {
                           {/* Right Frame (End) */}
                           <div className={`relative flex flex-col items-center gap-2 transition-opacity duration-200 ${hoverPreview.activeThumb === 1 ? 'opacity-100' : 'opacity-50 grayscale-[0.5]'}`}>
                             <div className={`relative w-full bg-black rounded-lg overflow-hidden border-4 shadow-lg transition-all ${hoverPreview.activeThumb === 1 ? 'border-purple-500 shadow-purple-500/20' : 'border-zinc-800'}`} style={aspectRatioStyle}>
-                              {/* Static Cache (Image) */}
-                              {previewFrames.end && (
-                                <img src={previewFrames.end} alt="end" className="w-full h-full object-contain" />
-                              )}
-
-                              {/* Dynamic Video (Only if End is active) */}
+                              {previewFrames.end && <img src={previewFrames.end} alt="end" className="w-full h-full object-contain" />}
                               {hoverPreview.activeThumb === 1 && (
                                 <div className="absolute inset-0 bg-black">
-                                  <video
-                                    ref={hoverVideoRef}
-                                    src={videoSrc}
-                                    className="w-full h-full object-contain"
-                                    muted
-                                    playsInline
-                                  />
+                                  <video ref={hoverVideoRef} src={videoSrc} className="w-full h-full object-contain" muted playsInline />
                                 </div>
                               )}
                             </div>
@@ -707,7 +789,14 @@ export function VideoFrameExtractor() {
                     </button>
                   )}
                 </div>
-                <div className="relative w-full bg-zinc-100 dark:bg-zinc-950" style={aspectRatioStyle}>
+
+                {/* WRAPPER DIV for CLICK to OPEN MODAL */}
+                <div
+                  className="relative w-full bg-zinc-100 dark:bg-zinc-950 cursor-pointer group"
+                  style={aspectRatioStyle}
+                  onClick={() => setIsModalOpen(true)}
+                  title="Нажмите, чтобы открыть предпросмотр масштабов"
+                >
                   {(frames.length > 0 || status.isProcessing) ? (
                     <>
                       <ImageSequencePlayer
@@ -722,6 +811,13 @@ export function VideoFrameExtractor() {
                           <div className="w-full bg-black/10 h-1"><div className="h-full bg-blue-500 transition-all duration-200" style={{ width: `${status.progress}%` }} /></div>
                         </div>
                       )}
+
+                      {/* Hint Overlay on Hover */}
+                      <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors flex items-center justify-center">
+                        <div className="opacity-0 group-hover:opacity-100 bg-black/70 text-white px-3 py-1.5 rounded-full text-xs font-bold backdrop-blur-sm transition-opacity transform scale-95 group-hover:scale-100">
+                          Открыть масштабы ⤢
+                        </div>
+                      </div>
                     </>
                   ) : (
                     <div className="absolute inset-0 flex items-center justify-center text-xs text-zinc-400">Нет кадров</div>
@@ -816,6 +912,14 @@ export function VideoFrameExtractor() {
         <video ref={videoRef} className="hidden" crossOrigin="anonymous" muted playsInline />
         <video ref={previewVideoRef} className="hidden" crossOrigin="anonymous" muted playsInline />
         <canvas ref={canvasRef} className="hidden" />
+
+        {/* --- MODAL --- */}
+        <MultiScalePreviewModal
+          isOpen={isModalOpen}
+          onClose={() => setIsModalOpen(false)}
+          frames={frames.map(f => f.dataUrl)}
+          fps={gifParams.fps}
+        />
       </div>
     </ToolLayout>
   );
