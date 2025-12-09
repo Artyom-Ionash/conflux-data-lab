@@ -5,11 +5,11 @@ import { Canvas, CanvasRef } from '../../ui/Canvas';
 import { FileDropzone, FileDropzonePlaceholder } from '../../ui/FileDropzone';
 import { ToolLayout } from '../ToolLayout';
 import { Switch } from '../../ui/Switch';
-import { TextureDimensionSlider } from '../../domain/graphics/TextureDimensionSlider';
+import { TextureDimensionSlider } from '@/app/components/domain/hardware/TextureDimensionSlider';
 import { Slider } from '../../ui/Slider';
 
 // --- CONSTANTS ---
-const LIMIT_MAX_BROWSER = 16384;
+const LIMIT_MAX_BROWSER = 16384; // Используется только как предел слайдера UI
 const VIEW_RESET_DELAY = 50; // ms
 const EXPORT_FILENAME = 'aligned-export';
 const MOUSE_BUTTON_LEFT = 0;
@@ -29,7 +29,7 @@ const DEFAULT_SETTINGS = {
   frameStep: 1,
   frameColor: '#00ff00',
   redGridColor: '#ff0000',
-  bgColor: '#ffffff', // Используется только как fallback initial value
+  bgColor: '#ffffff',
 };
 
 // --- TYPES ---
@@ -139,11 +139,11 @@ export function VerticalImageAligner() {
 
   useEffect(() => () => imagesRef.current.forEach(img => URL.revokeObjectURL(img.url)), []);
 
-  const { bounds, totalHeight, isCriticalHeight } = useMemo(() => {
-    if (!images.length) return { bounds: { width: 1, height: 1 }, totalHeight: 0, isCriticalHeight: false };
+  const { bounds, totalHeight } = useMemo(() => {
+    if (!images.length) return { bounds: { width: 1, height: 1 }, totalHeight: 0 };
     const width = slotWidth;
     const height = Math.max(1, images.length * slotHeight);
-    return { bounds: { width, height }, totalHeight: height, isCriticalHeight: height > LIMIT_MAX_BROWSER };
+    return { bounds: { width, height }, totalHeight: height };
   }, [images.length, slotHeight, slotWidth]);
 
   // --- Handlers ---
@@ -197,12 +197,10 @@ export function VerticalImageAligner() {
     newImages.forEach((item, idx) => {
       const img = new Image();
       img.onload = () => {
-        // Логика установки размеров на основе ПЕРВОГО изображения (если список был пуст)
         if (isListEmpty && idx === 0) {
           setSlotHeight(img.height);
           setFrameStepX(img.height);
 
-          // Попытка взять цвет верхнего левого пикселя и применить его к Canvas
           try {
             const tempCanvas = document.createElement('canvas');
             tempCanvas.width = 1;
@@ -213,15 +211,12 @@ export function VerticalImageAligner() {
               const [r, g, b] = tempCtx.getImageData(0, 0, 1, 1).data;
               const toHex = (c: number) => c.toString(16).padStart(2, '0');
               const hex = `#${toHex(r)}${toHex(g)}${toHex(b)}`;
-
-              // ПРОГРАММНО УСТАНАВЛИВАЕМ ЦВЕТ В CANVAS
               workspaceRef.current?.setBackgroundColor(hex);
             }
           } catch (e) {
             console.warn("Could not extract color from image", e);
           }
 
-          // Автоматический сброс масштаба
           setTimeout(() => {
             workspaceRef.current?.resetView(img.width, img.height);
           }, VIEW_RESET_DELAY);
@@ -235,7 +230,7 @@ export function VerticalImageAligner() {
   }, [images.length]);
 
   const handleExport = useCallback(async () => {
-    if (!images.length || isCriticalHeight) return;
+    if (!images.length) return; // Removed isCriticalHeight check
     setIsExporting(true);
     try {
       const loaded = await Promise.all(images.map((item) => new Promise<{ meta: AlignImage; img: HTMLImageElement }>((resolve, reject) => {
@@ -249,15 +244,12 @@ export function VerticalImageAligner() {
       const ctx = canvas.getContext('2d');
       if (!ctx) return;
 
-      // Получаем текущий цвет фона из компонента Canvas через Ref
       const currentBg = workspaceRef.current?.getBackgroundColor();
 
-      // Заливка фона (если есть цвет)
       if (currentBg) {
         ctx.fillStyle = currentBg;
         ctx.fillRect(0, 0, finalW, finalH);
       } else {
-        // Если прозрачный - очищаем (на всякий случай)
         ctx.clearRect(0, 0, finalW, finalH);
       }
 
@@ -277,7 +269,7 @@ export function VerticalImageAligner() {
       document.body.removeChild(pngLink);
 
     } finally { setIsExporting(false); }
-  }, [images, slotHeight, slotWidth, isCriticalHeight]);
+  }, [images, slotHeight, slotWidth]);
 
   const sidebarContent = (
     <div className="flex flex-col gap-6 pb-4">
@@ -288,20 +280,29 @@ export function VerticalImageAligner() {
       {images.length > 0 && (
         <>
           <div className="space-y-2">
-            <button onClick={handleExport} disabled={isExporting || isCriticalHeight} className={`w-full rounded-md py-2.5 text-sm font-semibold text-white transition-all shadow-sm ${isCriticalHeight ? 'bg-zinc-400 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700 disabled:opacity-50 hover:shadow-md'}`}>
-              {isExporting ? 'Экспорт...' : isCriticalHeight ? 'Размер превышен!' : 'Скачать PNG'}
+            {/* Removed disabled state for height check and error message */}
+            <button
+              onClick={handleExport}
+              disabled={isExporting}
+              className={`w-full rounded-md py-2.5 text-sm font-semibold text-white transition-all shadow-sm bg-blue-600 hover:bg-blue-700 disabled:opacity-50 hover:shadow-md`}
+            >
+              {isExporting ? 'Экспорт...' : 'Скачать PNG'}
             </button>
-            {isCriticalHeight && <div className="text-xs text-red-600">Превышен лимит высоты {LIMIT_MAX_BROWSER}px</div>}
           </div>
 
           <div className="p-4 bg-zinc-50 dark:bg-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-700">
-            <div className="text-xs font-bold text-zinc-500 mb-3 uppercase tracking-wide">Размеры слота</div>
-            <TextureDimensionSlider label="Ширина" value={slotWidth} onChange={setSlotWidth} max={LIMIT_MAX_BROWSER} />
-            <TextureDimensionSlider label="Высота" value={slotHeight} onChange={setSlotHeight} max={LIMIT_MAX_BROWSER} />
-            <div className="mt-2 text-xs font-medium text-zinc-500 text-center">Итого: <span className="text-zinc-900 dark:text-zinc-100">{slotWidth}</span> x <span className="text-zinc-900 dark:text-zinc-100">{totalHeight}</span> px</div>
-          </div>
+            <div className="text-xs font-bold text-zinc-500 mb-4 uppercase tracking-wide">Размеры слота</div>
 
-          {/* Настройка фона удалена отсюда, теперь она в Canvas */}
+            <div className="flex flex-col gap-6">
+              <TextureDimensionSlider label="Ширина" value={slotWidth} onChange={setSlotWidth} max={LIMIT_MAX_BROWSER} />
+              <TextureDimensionSlider label="Высота" value={slotHeight} onChange={setSlotHeight} max={LIMIT_MAX_BROWSER} />
+            </div>
+
+            <div className="mt-4 pt-3 border-t border-zinc-200 dark:border-zinc-700 text-xs font-medium text-zinc-500 text-center flex justify-between">
+              <span>Итого:</span>
+              <span className="font-mono text-zinc-900 dark:text-zinc-100">{slotWidth} x {totalHeight} px</span>
+            </div>
+          </div>
 
           <div className="p-4 bg-zinc-50 dark:bg-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-700">
             <Switch label="ЗЕЛЕНАЯ СЕТКА (КАДР)" checked={showFrameGrid} onCheckedChange={setShowFrameGrid} />
