@@ -494,11 +494,10 @@ export function VideoFrameExtractor() {
     setHoverPreview(null);
   };
 
-  // Now handles explicit thumbIndex from RangeSlider
   const handleValueChange = (newValues: number[], thumbIndex?: 0 | 1) => {
     setExtractionParams(p => ({ ...p, startTime: newValues[0], endTime: newValues[1] }));
 
-    // If dragging and we know which thumb, update preview for THAT thumb
+    // Updated Logic: Use thumbIndex to know exactly which value changed
     if (isDragging && sliderContainerRef.current && typeof thumbIndex === 'number') {
       const changedTime = newValues[thumbIndex];
       const rect = sliderContainerRef.current.getBoundingClientRect();
@@ -506,22 +505,30 @@ export function VideoFrameExtractor() {
     }
   };
 
-  // Clamping Calculations
+  // Clamping Calculations (Based on Container Bounds)
   const getClampedOffset = () => {
     if (!hoverPreview || !sliderContainerRef.current) return 0;
 
-    const tooltipWidth = 480; // Should match max-w below
-    const padding = 20;
+    const tooltipWidth = 480; // Match max-w
+    const padding = 10;
 
     const sliderRect = sliderContainerRef.current.getBoundingClientRect();
-    const globalX = sliderRect.left + hoverPreview.x;
-    const windowWidth = window.innerWidth;
+    const globalX = sliderRect.left + hoverPreview.x; // Hover position relative to viewport
 
-    const minCenter = padding + (tooltipWidth / 2);
-    const maxCenter = windowWidth - padding - (tooltipWidth / 2);
+    // Bounds relative to viewport, based on the container
+    const minCenter = sliderRect.left + (tooltipWidth / 2) + padding;
+    const maxCenter = sliderRect.right - (tooltipWidth / 2) - padding;
+
+    // Safety check if container is too small
+    if (minCenter > maxCenter) {
+      // Center relative to container
+      const containerCenter = sliderRect.left + (sliderRect.width / 2);
+      return containerCenter - globalX;
+    }
 
     const clampedGlobalCenter = Math.max(minCenter, Math.min(globalX, maxCenter));
 
+    // Return the offset needed to move from `globalX` to `clampedGlobalCenter`
     return clampedGlobalCenter - globalX;
   };
 
