@@ -6,7 +6,6 @@ interface RangeVideoPlayerProps {
   src: string | null;
   startTime: number;
   endTime: number;
-  symmetricLoop?: boolean;
   className?: string;
 }
 
@@ -14,87 +13,70 @@ export function RangeVideoPlayer({
   src,
   startTime,
   endTime,
-  symmetricLoop = false,
   className = ""
 }: RangeVideoPlayerProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(startTime);
 
-  const directionRef = useRef<'forward' | 'backward'>('forward');
   const animationFrameRef = useRef<number>(0);
-  const lastFrameTimeRef = useRef<number>(0);
 
-  // Sync Start
+  // Sync Start Logic
+  // Если время плеера сильно отличается от startTime при остановленном видео, синхронизируем
   useEffect(() => {
-    if (videoRef.current && Math.abs(videoRef.current.currentTime - startTime) > 0.5) {
-      videoRef.current.currentTime = startTime;
-      setCurrentTime(startTime);
-      directionRef.current = 'forward';
+    if (videoRef.current && Math.abs(videoRef.current.currentTime - startTime) > 0.1) {
+      if (!isPlaying) {
+        videoRef.current.currentTime = startTime;
+        setCurrentTime(startTime);
+      }
     }
-  }, [startTime]);
+  }, [startTime, isPlaying]);
 
-  // Fix: Reset direction if range changes while moving backward
-  useEffect(() => {
-    if (directionRef.current === 'backward') {
-      directionRef.current = 'forward';
-      if (isPlaying && videoRef.current) videoRef.current.play().catch(() => { });
-    }
-  }, [endTime, isPlaying]);
-
-  // Playback Loop
+  // Playback Loop Logic
   useEffect(() => {
     const video = videoRef.current;
     if (!video) return;
 
-    const loop = (timestamp: number) => {
+    const loop = () => {
       if (!isPlaying) return;
-
-      if (!lastFrameTimeRef.current) lastFrameTimeRef.current = timestamp;
-      const dt = (timestamp - lastFrameTimeRef.current) / 1000;
-      lastFrameTimeRef.current = timestamp;
 
       const t = video.currentTime;
       setCurrentTime(t);
 
-      if (directionRef.current === 'forward') {
-        if (video.paused && isPlaying) video.play().catch(() => { });
-
-        if (t >= endTime) {
-          if (symmetricLoop) {
-            directionRef.current = 'backward';
-            video.pause();
-          } else {
-            video.currentTime = startTime;
-          }
-        }
-      } else {
-        if (!video.paused) video.pause();
-        video.currentTime = Math.max(startTime, t - dt); // Manual backward seek
-
-        if (video.currentTime <= startTime) {
-          directionRef.current = 'forward';
-          video.play().catch(() => { });
-        }
+      // Проверка окончания диапазона
+      if (t >= endTime) {
+        video.currentTime = startTime;
       }
+
+      // Если видео на паузе (из-за внешних факторов), но мы в режиме play - запускаем
+      if (video.paused && isPlaying) {
+        video.play().catch(() => {
+          // Игнорируем ошибки автовоспроизведения
+        });
+      }
+
       animationFrameRef.current = requestAnimationFrame(loop);
     };
 
     if (isPlaying) {
-      lastFrameTimeRef.current = performance.now();
+      video.play().catch(console.error);
       animationFrameRef.current = requestAnimationFrame(loop);
     } else {
       cancelAnimationFrame(animationFrameRef.current);
       video.pause();
     }
+
     return () => cancelAnimationFrame(animationFrameRef.current);
-  }, [isPlaying, startTime, endTime, symmetricLoop]);
+  }, [isPlaying, startTime, endTime]);
 
   const togglePlay = () => {
     if (!videoRef.current) return;
-    if (!isPlaying && !symmetricLoop && videoRef.current.currentTime >= endTime) {
+
+    // Если мы уже в конце диапазона и нажимаем Play, прыгаем в начало
+    if (!isPlaying && videoRef.current.currentTime >= endTime) {
       videoRef.current.currentTime = startTime;
     }
+
     setIsPlaying(!isPlaying);
   };
 
@@ -102,9 +84,11 @@ export function RangeVideoPlayer({
     const rect = e.currentTarget.getBoundingClientRect();
     const pct = (e.clientX - rect.left) / rect.width;
     const newTime = startTime + (endTime - startTime) * pct;
-    if (videoRef.current) videoRef.current.currentTime = newTime;
+
+    if (videoRef.current) {
+      videoRef.current.currentTime = newTime;
+    }
     setCurrentTime(newTime);
-    directionRef.current = 'forward';
   };
 
   if (!src) return null;

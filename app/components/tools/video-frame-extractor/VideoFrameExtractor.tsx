@@ -13,15 +13,17 @@ import { ImageSequencePlayer } from "../../ui/ImageSequencePlayer";
 // Specific Domain UI Import
 import { TextureLimitIndicator } from "@/app/components/domain/hardware/TextureLimitIndicator";
 
-// Domain Logic Import (нужен для проверки лимита при скачивании)
+// Domain Logic Import
 import { TEXTURE_LIMITS } from "@/lib/domain/hardware/texture-standards";
 
 // Tool Specific Imports
 import { RangeVideoPlayer } from "./RangeVideoPlayer";
 import { FrameDiffOverlay } from "./FrameDiffOverlay";
 
-// --- STYLES CONSTANTS ---
+// --- CONSTANTS ---
 const TIMESTAMP_HTML_CLASS = "absolute bottom-2 left-2 pointer-events-none bg-black/80 text-white px-2 py-0.5 rounded text-[11px] font-bold font-mono shadow-sm backdrop-blur-[1px]";
+const DEFAULT_CLIP_DURATION = 0.5; // seconds
+const DEFAULT_FRAME_STEP = 0.1; // seconds
 
 // --- COMPONENTS ---
 
@@ -136,9 +138,11 @@ function useVideoFrameExtraction() {
   const [extractionParams, setExtractionParams] = useState<ExtractionParams>({ startTime: 0, endTime: 0, frameStep: 1, symmetricLoop: false });
   const [rawFrames, setRawFrames] = useState<ExtractedFrame[]>([]);
 
+  // Логика формирования итогового массива кадров (с учетом симметричного цикла)
   const frames = useMemo(() => {
     if (rawFrames.length < 2) return rawFrames;
     if (!extractionParams.symmetricLoop) return rawFrames;
+    // Создаем "пинг-понг" эффект для спрайта/гифки
     const loopBack = rawFrames.slice(1, -1).reverse();
     return [...rawFrames, ...loopBack];
   }, [rawFrames, extractionParams.symmetricLoop]);
@@ -231,10 +235,13 @@ function useVideoFrameExtraction() {
       setVideoDuration(duration);
       setVideoDimensions({ width: tempVideo.videoWidth, height: tempVideo.videoHeight });
 
+      // Устанавливаем диапазон на последние 0.5 сек по умолчанию
+      const safeStartTime = Math.max(0, duration - DEFAULT_CLIP_DURATION);
+
       setExtractionParams({
-        startTime: 0,
-        endTime: Math.min(0.5, duration),
-        frameStep: 0.1,
+        startTime: safeStartTime,
+        endTime: duration,
+        frameStep: DEFAULT_FRAME_STEP,
         symmetricLoop: true
       });
     };
@@ -414,7 +421,6 @@ export function VideoFrameExtractor() {
       a.download = 'spritesheet.png';
       a.click();
     } catch (e: any) {
-      // Обработка ошибок, включая превышение лимитов
       alert(e.message || "Ошибка генерации");
       console.error(e);
     }
@@ -430,7 +436,6 @@ export function VideoFrameExtractor() {
     return { aspectRatio: `${videoDimensions.width} / ${videoDimensions.height}` };
   }, [videoDimensions]);
 
-  // Вычисляем итоговую ширину спрайт-листа
   const totalSpriteWidth = useMemo(() => {
     if (!videoDimensions || frames.length === 0) return 0;
     const scale = spriteOptions.maxHeight / videoDimensions.height;
@@ -457,7 +462,6 @@ export function VideoFrameExtractor() {
     </div>
   );
 
-  // --- DERIVED SPEED VALUES ---
   const baseFps = extractionParams.frameStep > 0 ? Math.round(1 / extractionParams.frameStep) : 10;
   const speedPercent = Math.round((gifParams.fps / baseFps) * 100);
 
@@ -487,13 +491,6 @@ export function VideoFrameExtractor() {
                         step={0.05}
                         min={0.05}
                         max={10}
-                      />
-
-                      <Switch
-                        label="Симметричный цикл"
-                        checked={extractionParams.symmetricLoop}
-                        onCheckedChange={(c) => setExtractionParams(p => ({ ...p, symmetricLoop: c }))}
-                        className="whitespace-nowrap gap-2 text-xs font-medium"
                       />
                     </div>
 
@@ -530,7 +527,6 @@ export function VideoFrameExtractor() {
                     src={videoSrc}
                     startTime={extractionParams.startTime}
                     endTime={effectiveEnd}
-                    symmetricLoop={extractionParams.symmetricLoop}
                     className="absolute inset-0"
                   />
                 </div>
@@ -603,6 +599,15 @@ export function VideoFrameExtractor() {
                   <span className="text-xs font-bold text-zinc-500 uppercase tracking-wide">Спрайт-лист</span>
                   {frames.length > 0 && (
                     <div className="flex items-center gap-4">
+                      {/* MOVED SYMMETRIC SWITCH HERE */}
+                      <Switch
+                        label="Loop"
+                        checked={extractionParams.symmetricLoop}
+                        onCheckedChange={(c) => setExtractionParams(p => ({ ...p, symmetricLoop: c }))}
+                        className="whitespace-nowrap gap-2 text-xs font-medium"
+                      />
+                      <div className="w-px h-6 bg-zinc-200 dark:bg-zinc-700"></div>
+
                       <NumberStepper label="Высота" value={spriteOptions.maxHeight} onChange={(v) => setSpriteOptions(p => ({ ...p, maxHeight: v }))} step={10} min={10} max={2000} />
                       <div className="w-px h-6 bg-zinc-200 dark:bg-zinc-700"></div>
                       <NumberStepper label="Отступ" value={spriteOptions.spacing} onChange={(v) => setSpriteOptions(p => ({ ...p, spacing: v }))} step={1} min={0} max={100} />
@@ -637,8 +642,8 @@ export function VideoFrameExtractor() {
                     <button
                       onClick={handleDownloadSpriteSheet}
                       className={`text-xs font-bold transition-colors ${totalSpriteWidth > TEXTURE_LIMITS.MAX_BROWSER
-                          ? "text-zinc-400 cursor-not-allowed"
-                          : "text-blue-600 hover:underline"
+                        ? "text-zinc-400 cursor-not-allowed"
+                        : "text-blue-600 hover:underline"
                         }`}
                       disabled={totalSpriteWidth > TEXTURE_LIMITS.MAX_BROWSER}
                     >
