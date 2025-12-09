@@ -10,10 +10,15 @@ import { RangeSlider } from "../../ui/RangeSlider";
 import { Switch } from "../../ui/Switch";
 import { ImageSequencePlayer } from "../../ui/ImageSequencePlayer";
 
+// Specific Domain UI Import
+import { TextureLimitIndicator } from "@/app/components/domain/hardware/TextureLimitIndicator";
+
+// Domain Logic Import (нужен для проверки лимита при скачивании)
+import { TEXTURE_LIMITS } from "@/lib/domain/hardware/texture-standards";
+
 // Tool Specific Imports
 import { RangeVideoPlayer } from "./RangeVideoPlayer";
 import { FrameDiffOverlay } from "./FrameDiffOverlay";
-import { TextureDimensionSlider } from "../../domain/graphics/TextureDimensionSlider";
 
 // --- STYLES CONSTANTS ---
 const TIMESTAMP_HTML_CLASS = "absolute bottom-2 left-2 pointer-events-none bg-black/80 text-white px-2 py-0.5 rounded text-[11px] font-bold font-mono shadow-sm backdrop-blur-[1px]";
@@ -98,6 +103,11 @@ function useSpriteSheetGenerator() {
 
       canvas.width = (scaledWidth + options.spacing) * validFrames.length - options.spacing;
       canvas.height = scaledHeight;
+
+      // Check browser limit immediately to prevent crash
+      if (canvas.width > TEXTURE_LIMITS.MAX_BROWSER || canvas.height > TEXTURE_LIMITS.MAX_BROWSER) {
+        throw new Error(`Размер текстуры (${canvas.width}x${canvas.height}) превышает лимит браузера (${TEXTURE_LIMITS.MAX_BROWSER}px).`);
+      }
 
       if (options.backgroundColor !== "transparent") {
         ctx.fillStyle = options.backgroundColor;
@@ -403,7 +413,11 @@ export function VideoFrameExtractor() {
       a.href = url;
       a.download = 'spritesheet.png';
       a.click();
-    } catch (e) { console.error(e); }
+    } catch (e: any) {
+      // Обработка ошибок, включая превышение лимитов
+      alert(e.message || "Ошибка генерации");
+      console.error(e);
+    }
   };
 
   const handleColorChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -415,6 +429,14 @@ export function VideoFrameExtractor() {
     if (!videoDimensions) return {};
     return { aspectRatio: `${videoDimensions.width} / ${videoDimensions.height}` };
   }, [videoDimensions]);
+
+  // Вычисляем итоговую ширину спрайт-листа
+  const totalSpriteWidth = useMemo(() => {
+    if (!videoDimensions || frames.length === 0) return 0;
+    const scale = spriteOptions.maxHeight / videoDimensions.height;
+    const scaledWidth = Math.floor(videoDimensions.width * scale);
+    return (scaledWidth + spriteOptions.spacing) * frames.length - spriteOptions.spacing;
+  }, [videoDimensions, frames.length, spriteOptions.maxHeight, spriteOptions.spacing]);
 
   const sidebarContent = (
     <div className="flex flex-col gap-6 pb-4">
@@ -437,7 +459,6 @@ export function VideoFrameExtractor() {
 
   // --- DERIVED SPEED VALUES ---
   const baseFps = extractionParams.frameStep > 0 ? Math.round(1 / extractionParams.frameStep) : 10;
-  // Calculate speed percentage based on current FPS relative to base FPS
   const speedPercent = Math.round((gifParams.fps / baseFps) * 100);
 
   return (
@@ -527,8 +548,6 @@ export function VideoFrameExtractor() {
                 <div className="flex items-center justify-between px-3 py-2 border-b border-zinc-100 dark:border-zinc-800 bg-white dark:bg-zinc-900 h-11">
                   <div className="flex items-center gap-4">
                     <span className="text-xs font-bold text-zinc-500 uppercase tracking-wide">Спрайт</span>
-
-                    {/* Speed % Control */}
                     <NumberStepper
                       label="Скорость %"
                       value={speedPercent}
@@ -540,14 +559,7 @@ export function VideoFrameExtractor() {
                       max={500}
                       step={10}
                     />
-
-                    {/* Read-only FPS */}
-                    <NumberStepper
-                      label="FPS"
-                      value={gifParams.fps}
-                      onChange={() => { }}
-                      disabled={true}
-                    />
+                    <NumberStepper label="FPS" value={gifParams.fps} onChange={() => { }} disabled={true} />
                   </div>
                   {frames.length > 0 && !status.isProcessing && (
                     <button onClick={generateAndDownloadGif} disabled={status.isProcessing} className="text-xs text-blue-600 hover:underline font-medium disabled:opacity-50">
@@ -601,8 +613,6 @@ export function VideoFrameExtractor() {
                 </div>
                 {frames.length > 0 && (
                   <div className="flex items-center gap-4">
-
-                    {/* Frame Count Indicator */}
                     <NumberStepper
                       label="Кадров"
                       value={frames.length}
@@ -610,8 +620,24 @@ export function VideoFrameExtractor() {
                       disabled={true}
                     />
 
-                    <div className="w-40"><TextureDimensionSlider label="Ширина" value={(Math.floor(videoDimensions!.width * (spriteOptions.maxHeight / videoDimensions!.height)) + spriteOptions.spacing) * frames.length - spriteOptions.spacing} onChange={() => { }} max={16384} disabled /></div>
-                    <button onClick={handleDownloadSpriteSheet} className="text-xs text-blue-600 hover:underline font-bold">Скачать PNG</button>
+                    {/* Visual Texture Limit Indicator */}
+                    <div className="w-48 pt-1">
+                      <TextureLimitIndicator
+                        value={totalSpriteWidth}
+                        label="ШИРИНА"
+                      />
+                    </div>
+
+                    <button
+                      onClick={handleDownloadSpriteSheet}
+                      className={`text-xs font-bold transition-colors ${totalSpriteWidth > TEXTURE_LIMITS.MAX_BROWSER
+                        ? "text-zinc-400 cursor-not-allowed"
+                        : "text-blue-600 hover:underline"
+                        }`}
+                      disabled={totalSpriteWidth > TEXTURE_LIMITS.MAX_BROWSER}
+                    >
+                      Скачать PNG
+                    </button>
                   </div>
                 )}
               </div>
