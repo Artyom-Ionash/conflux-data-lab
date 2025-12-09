@@ -106,7 +106,6 @@ function useSpriteSheetGenerator() {
       canvas.width = (scaledWidth + options.spacing) * validFrames.length - options.spacing;
       canvas.height = scaledHeight;
 
-      // Check browser limit immediately to prevent crash
       if (canvas.width > TEXTURE_LIMITS.MAX_BROWSER || canvas.height > TEXTURE_LIMITS.MAX_BROWSER) {
         throw new Error(`Размер текстуры (${canvas.width}x${canvas.height}) превышает лимит браузера (${TEXTURE_LIMITS.MAX_BROWSER}px).`);
       }
@@ -138,11 +137,9 @@ function useVideoFrameExtraction() {
   const [extractionParams, setExtractionParams] = useState<ExtractionParams>({ startTime: 0, endTime: 0, frameStep: 1, symmetricLoop: false });
   const [rawFrames, setRawFrames] = useState<ExtractedFrame[]>([]);
 
-  // Логика формирования итогового массива кадров (с учетом симметричного цикла)
   const frames = useMemo(() => {
     if (rawFrames.length < 2) return rawFrames;
     if (!extractionParams.symmetricLoop) return rawFrames;
-    // Создаем "пинг-понг" эффект для спрайта/гифки
     const loopBack = rawFrames.slice(1, -1).reverse();
     return [...rawFrames, ...loopBack];
   }, [rawFrames, extractionParams.symmetricLoop]);
@@ -154,8 +151,10 @@ function useVideoFrameExtraction() {
   const [previewFrames, setPreviewFrames] = useState<{ start: string | null, end: string | null }>({ start: null, end: null });
   const [isPreviewing, setIsPreviewing] = useState(false);
 
+  // Refs
   const videoRef = useRef<HTMLVideoElement>(null);
   const previewVideoRef = useRef<HTMLVideoElement>(null);
+  const hoverVideoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
 
@@ -172,6 +171,14 @@ function useVideoFrameExtraction() {
 
   useEffect(() => { return () => { if (videoSrc) URL.revokeObjectURL(videoSrc); }; }, [videoSrc]);
 
+  // Sync Hover Video Source
+  useEffect(() => {
+    if (hoverVideoRef.current && videoSrc && hoverVideoRef.current.src !== videoSrc) {
+      hoverVideoRef.current.src = videoSrc;
+    }
+  }, [videoSrc]);
+
+  // Generate Start/End Previews
   useEffect(() => {
     if (!videoSrc || !previewVideoRef.current || !canvasRef.current || !videoDuration) return;
     if (status.isProcessing) return;
@@ -235,7 +242,6 @@ function useVideoFrameExtraction() {
       setVideoDuration(duration);
       setVideoDimensions({ width: tempVideo.videoWidth, height: tempVideo.videoHeight });
 
-      // Устанавливаем диапазон на последние 0.5 сек по умолчанию
       const safeStartTime = Math.max(0, duration - DEFAULT_CLIP_DURATION);
 
       setExtractionParams({
@@ -353,7 +359,7 @@ function useVideoFrameExtraction() {
   }, [frames, gifParams.fps, videoDimensions]);
 
   return {
-    videoRef, previewVideoRef, canvasRef, videoSrc, videoDuration, videoDimensions,
+    videoRef, previewVideoRef, hoverVideoRef, canvasRef, videoSrc, videoDuration, videoDimensions,
     extractionParams, setExtractionParams, frames, gifParams, setGifParams, status, error, effectiveEnd,
     previewFrames, isPreviewing, handleFilesSelected, runExtraction, generateAndDownloadGif
   };
@@ -363,7 +369,7 @@ function useVideoFrameExtraction() {
 
 export function VideoFrameExtractor() {
   const {
-    videoRef, previewVideoRef, canvasRef, videoSrc, videoDuration, videoDimensions,
+    videoRef, previewVideoRef, hoverVideoRef, canvasRef, videoSrc, videoDuration, videoDimensions,
     extractionParams, setExtractionParams, frames, gifParams, setGifParams, status, error, effectiveEnd,
     previewFrames, isPreviewing, handleFilesSelected, generateAndDownloadGif
   } = useVideoFrameExtraction();
@@ -371,6 +377,11 @@ export function VideoFrameExtractor() {
   const [spriteOptions, setSpriteOptions] = useState({ maxHeight: 300, spacing: 0, bg: "transparent" });
   const [pickerValue, setPickerValue] = useState("#ffffff");
   const [diffDataUrl, setDiffDataUrl] = useState<string | null>(null);
+
+  // State for Hover/Drag Preview
+  const [hoverPreview, setHoverPreview] = useState<{ time: number; x: number } | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const sliderContainerRef = useRef<HTMLDivElement>(null);
 
   const { generateSpriteSheet } = useSpriteSheetGenerator();
 
@@ -443,6 +454,80 @@ export function VideoFrameExtractor() {
     return (scaledWidth + spriteOptions.spacing) * frames.length - spriteOptions.spacing;
   }, [videoDimensions, frames.length, spriteOptions.maxHeight, spriteOptions.spacing]);
 
+  // --- PREVIEW LOGIC ---
+
+  const updatePreview = (time: number, rectWidth: number) => {
+    if (!videoDuration) return;
+    const percentage = Math.max(0, Math.min(1, time / videoDuration));
+    const x = percentage * rectWidth;
+
+    setHoverPreview({ time, x });
+    if (hoverVideoRef.current) {
+      hoverVideoRef.current.currentTime = time;
+    }
+  };
+
+  // Hover Handler
+  const handleSliderHover = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!videoDuration || isDragging) return; // Ignore hover if dragging
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const percentage = Math.max(0, Math.min(1, x / rect.width));
+    const time = percentage * videoDuration;
+
+    setHoverPreview({ time, x });
+    if (hoverVideoRef.current) {
+      hoverVideoRef.current.currentTime = time;
+    }
+  };
+
+  const handleSliderLeave = () => {
+    if (!isDragging) {
+      setHoverPreview(null);
+    }
+  };
+
+  // Dragging Handlers
+  const handlePointerDown = () => setIsDragging(true);
+  const handlePointerUp = () => {
+    setIsDragging(false);
+    setHoverPreview(null);
+  };
+
+  // Now handles explicit thumbIndex from RangeSlider
+  const handleValueChange = (newValues: number[], thumbIndex?: 0 | 1) => {
+    setExtractionParams(p => ({ ...p, startTime: newValues[0], endTime: newValues[1] }));
+
+    // If dragging and we know which thumb, update preview for THAT thumb
+    if (isDragging && sliderContainerRef.current && typeof thumbIndex === 'number') {
+      const changedTime = newValues[thumbIndex];
+      const rect = sliderContainerRef.current.getBoundingClientRect();
+      updatePreview(changedTime, rect.width);
+    }
+  };
+
+  // Clamping Calculations
+  const getClampedOffset = () => {
+    if (!hoverPreview || !sliderContainerRef.current) return 0;
+
+    const tooltipWidth = 480; // Should match max-w below
+    const padding = 20;
+
+    const sliderRect = sliderContainerRef.current.getBoundingClientRect();
+    const globalX = sliderRect.left + hoverPreview.x;
+    const windowWidth = window.innerWidth;
+
+    const minCenter = padding + (tooltipWidth / 2);
+    const maxCenter = windowWidth - padding - (tooltipWidth / 2);
+
+    const clampedGlobalCenter = Math.max(minCenter, Math.min(globalX, maxCenter));
+
+    return clampedGlobalCenter - globalX;
+  };
+
+  const clampOffset = getClampedOffset();
+
+
   const sidebarContent = (
     <div className="flex flex-col gap-6 pb-4">
       <div className="flex flex-col gap-2">
@@ -502,14 +587,53 @@ export function VideoFrameExtractor() {
                     </div>
                   </div>
 
-                  <RangeSlider
-                    min={0}
-                    max={videoDuration ?? 0}
-                    step={0.01}
-                    value={[extractionParams.startTime, effectiveEnd]}
-                    onValueChange={([s, e]) => setExtractionParams(p => ({ ...p, startTime: s, endTime: e }))}
-                    minStepsBetweenThumbs={0.1}
-                  />
+                  {/* Range Slider Wrapper for Hover Detection */}
+                  <div
+                    ref={sliderContainerRef}
+                    className="relative group py-2 touch-none"
+                    onMouseMove={handleSliderHover}
+                    onMouseLeave={handleSliderLeave}
+                    onPointerDown={handlePointerDown}
+                    onPointerUp={handlePointerUp}
+                  >
+                    <RangeSlider
+                      min={0}
+                      max={videoDuration ?? 0}
+                      step={0.01}
+                      value={[extractionParams.startTime, effectiveEnd]}
+                      onValueChange={handleValueChange}
+                      minStepsBetweenThumbs={0.1}
+                    />
+
+                    {/* Hover/Drag Tooltip */}
+                    {hoverPreview && (
+                      <div
+                        className="absolute top-full mt-3 z-50 pointer-events-none flex flex-col items-center"
+                        style={{ left: hoverPreview.x, transform: 'translateX(-50%)' }}
+                      >
+                        {/* Arrow Pointing Up (Stays centered on the handle) */}
+                        <div className="w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-b-[6px] border-b-black translate-y-[1px]"></div>
+
+                        <div className="bg-black rounded-lg shadow-xl border border-white/20 overflow-hidden p-1 transition-transform duration-75 ease-out"
+                          style={{ transform: `translateX(${clampOffset}px)` }}
+                        >
+                          {/* Large Preview */}
+                          <div className="relative w-[480px] max-w-[80vw]" style={aspectRatioStyle}>
+                            <video
+                              ref={hoverVideoRef}
+                              src={videoSrc}
+                              className="w-full h-full object-contain"
+                              muted
+                              playsInline
+                            />
+                            <div className="absolute inset-x-0 bottom-0 bg-black/60 text-white text-xs font-mono font-bold text-center py-1">
+                              {hoverPreview.time.toFixed(2)}s
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </div>
                 {error && <div className="text-xs text-red-600 text-right">{error}</div>}
               </div>
@@ -674,7 +798,7 @@ export function VideoFrameExtractor() {
           </div>
         )}
 
-        {/* Hidden */}
+        {/* Hidden processing videos */}
         <video ref={videoRef} className="hidden" crossOrigin="anonymous" muted playsInline />
         <video ref={previewVideoRef} className="hidden" crossOrigin="anonymous" muted playsInline />
         <canvas ref={canvasRef} className="hidden" />

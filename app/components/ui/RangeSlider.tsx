@@ -1,13 +1,14 @@
 "use client";
 
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useRef, useState } from "react";
 
 interface RangeSliderProps {
   min: number;
   max: number;
   step?: number;
   value: [number, number];
-  onValueChange: (value: [number, number]) => void;
+  // Обновленная сигнатура: передаем индекс активного ползунка (0 или 1)
+  onValueChange: (value: [number, number], thumbIndex?: 0 | 1) => void;
   minStepsBetweenThumbs?: number;
   className?: string;
   formatTooltip?: (value: number) => string;
@@ -68,6 +69,9 @@ export function RangeSlider({
     else target = "max";
 
     const nextValues = [...value] as [number, number];
+    // Определяем индекс для колбэка
+    const activeIndex = target === "min" ? 0 : 1;
+
     if (target === "min") {
       const limit = value[1] - step * minStepsBetweenThumbs;
       nextValues[0] = Math.min(newValue, limit);
@@ -76,7 +80,8 @@ export function RangeSlider({
       nextValues[1] = Math.max(newValue, limit);
     }
 
-    onValueChange(nextValues);
+    // Передаем activeIndex родителю
+    onValueChange(nextValues, activeIndex);
     setIsDragging(target);
     (e.target as HTMLElement).setPointerCapture(e.pointerId);
   };
@@ -87,6 +92,8 @@ export function RangeSlider({
     // 1. Logic: Dragging
     if (isDragging && containerRef.current) {
       const nextValues = [...value] as [number, number];
+      const activeIndex = isDragging === "min" ? 0 : 1;
+
       if (isDragging === "min") {
         const limit = value[1] - step * minStepsBetweenThumbs;
         nextValues[0] = Math.min(Math.max(valUnderCursor, min), limit);
@@ -94,7 +101,9 @@ export function RangeSlider({
         const limit = value[0] + step * minStepsBetweenThumbs;
         nextValues[1] = Math.max(Math.min(valUnderCursor, max), limit);
       }
-      onValueChange(nextValues);
+
+      // Передаем activeIndex родителю
+      onValueChange(nextValues, activeIndex);
       return;
     }
 
@@ -130,26 +139,21 @@ export function RangeSlider({
   const minPercent = getPercent(value[0]);
   const maxPercent = getPercent(value[1]);
 
-  // Вычисляем данные для тултипа (единая логика для Drag и Hover)
   let tooltipData = null;
 
   if (isDragging) {
-    // Режим перетаскивания: показываем реальное значение ползунка
     const activeVal = isDragging === "min" ? value[0] : value[1];
     tooltipData = {
       value: activeVal,
       label: isDragging === "min" ? "Start" : "End",
       isMin: isDragging === "min",
-      // При драге позиционируем по процентам (привязано к ползунку)
       style: { left: `${getPercent(activeVal)}%` }
     };
   } else if (hoverInfo) {
-    // Режим ховера: показываем значение под курсором
     tooltipData = {
       value: hoverInfo.value,
       label: hoverInfo.targetThumb === "min" ? "Start" : "End",
       isMin: hoverInfo.targetThumb === "min",
-      // При ховере позиционируем по пикселям курсора
       style: { left: hoverInfo.pixelX }
     };
   }
@@ -163,9 +167,7 @@ export function RangeSlider({
       onPointerUp={handlePointerUp}
       onPointerLeave={handlePointerLeave}
     >
-      {/* Background Track */}
       <div className="absolute w-full h-1.5 bg-zinc-200 dark:bg-zinc-800 rounded-full overflow-hidden">
-        {/* Active Range */}
         <div
           className="absolute h-full bg-blue-500 dark:bg-blue-600 opacity-80"
           style={{
@@ -175,7 +177,6 @@ export function RangeSlider({
         />
       </div>
 
-      {/* Unified Tooltip */}
       {tooltipData && (
         <div
           className="absolute top-0 transform -translate-x-1/2 -translate-y-full pointer-events-none z-30 pb-2 transition-all duration-75"
@@ -189,12 +190,10 @@ export function RangeSlider({
               {tooltipData.isMin ? '← Start' : 'End →'}
             </span>
           </div>
-          {/* Triangle */}
           <div className="w-0 h-0 border-l-[4px] border-l-transparent border-r-[4px] border-r-transparent border-t-[4px] border-t-zinc-700 absolute left-1/2 -translate-x-1/2 bottom-1" />
         </div>
       )}
 
-      {/* Thumbs */}
       {/* Min Thumb */}
       <div
         className={`absolute w-4 h-4 rounded-full shadow-md border-2 transition-transform duration-75
