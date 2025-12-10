@@ -9,6 +9,7 @@ import { FileDropzone, FileDropzonePlaceholder } from "../../ui/FileDropzone";
 import { RangeSlider } from "../../ui/RangeSlider";
 import { Switch } from "../../ui/Switch";
 import { ImageSequencePlayer } from "../../ui/ImageSequencePlayer";
+import { Card } from "../../ui/Card";
 // Shared UI Components
 import { NumberStepper } from "../../ui/NumberStepper";
 import { Modal } from "../../ui/Modal";
@@ -561,7 +562,7 @@ export function VideoFrameExtractor() {
           <div className="flex-1 overflow-y-auto p-4 space-y-4">
 
             {/* CONTROLS */}
-            <div className="bg-white dark:bg-zinc-900 rounded-lg border border-zinc-200 dark:border-zinc-700 p-4 shadow-sm">
+            <Card className="shadow-sm" contentClassName="p-4">
               <div className="flex flex-col gap-4">
                 <div className="space-y-4">
                   <div className="flex flex-wrap items-center justify-between gap-y-3 gap-x-6">
@@ -647,15 +648,16 @@ export function VideoFrameExtractor() {
                 </div>
                 {error && <div className="text-xs text-red-600 text-right">{error}</div>}
               </div>
-            </div>
+            </Card>
 
             {/* PREVIEWS */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
               {/* Source Video */}
-              <div className="bg-white dark:bg-zinc-900 rounded-lg border border-zinc-200 dark:border-zinc-700 overflow-hidden flex flex-col shadow-sm">
-                <div className="px-3 py-2 border-b border-zinc-100 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-xs font-bold text-zinc-500 uppercase tracking-wide">
-                  Исходное видео
-                </div>
+              <Card
+                className="overflow-hidden flex flex-col shadow-sm"
+                title={<span className="text-xs font-bold text-zinc-500 uppercase tracking-wide">Исходное видео</span>}
+                contentClassName="p-0"
+              >
                 <div className="relative w-full bg-black" style={aspectRatioStyle}>
                   <RangeVideoPlayer
                     src={videoSrc}
@@ -664,24 +666,33 @@ export function VideoFrameExtractor() {
                     className="absolute inset-0"
                   />
                 </div>
-              </div>
+              </Card>
 
               {/* Diff Overlay */}
-              <div className="bg-white dark:bg-zinc-900 rounded-lg border border-zinc-200 dark:border-zinc-700 overflow-hidden flex flex-col shadow-sm">
-                <div className="flex items-center justify-between px-3 py-2 border-b border-zinc-100 dark:border-zinc-800 bg-white dark:bg-zinc-900">
-                  <span className="text-xs font-bold text-zinc-500 uppercase tracking-wide">Разница</span>
-                  {diffDataUrl && <button onClick={() => { const a = document.createElement('a'); a.href = diffDataUrl; a.download = 'diff.png'; a.click(); }} className="text-xs text-blue-600 hover:underline font-medium">Скачать</button>}
-                </div>
+              <Card
+                className="overflow-hidden flex flex-col shadow-sm"
+                title={<span className="text-xs font-bold text-zinc-500 uppercase tracking-wide">Разница</span>}
+                headerActions={diffDataUrl ? (
+                  <button
+                    onClick={() => { const a = document.createElement('a'); a.href = diffDataUrl; a.download = 'diff.png'; a.click(); }}
+                    className="text-xs text-blue-600 hover:underline font-medium"
+                  >
+                    Скачать
+                  </button>
+                ) : undefined}
+                contentClassName="p-0"
+              >
                 <div className="relative w-full bg-zinc-100 dark:bg-zinc-950" style={aspectRatioStyle}>
                   <div className="absolute inset-0">
                     <FrameDiffOverlay image1={previewFrames.start} image2={previewFrames.end} isProcessing={isPreviewing} onDataGenerated={setDiffDataUrl} />
                   </div>
                 </div>
-              </div>
+              </Card>
 
               {/* Sprite (Animation) Player */}
-              <div className="bg-white dark:bg-zinc-900 rounded-lg border border-zinc-200 dark:border-zinc-700 overflow-hidden flex flex-col shadow-sm">
-                <div className="flex items-center justify-between px-3 py-2 border-b border-zinc-100 dark:border-zinc-800 bg-white dark:bg-zinc-900 h-11">
+              <Card
+                className="overflow-hidden flex flex-col shadow-sm"
+                title={
                   <div className="flex items-center gap-4">
                     <span className="text-xs font-bold text-zinc-500 uppercase tracking-wide">Спрайт</span>
                     <NumberStepper
@@ -697,12 +708,14 @@ export function VideoFrameExtractor() {
                     />
                     <NumberStepper label="FPS" value={gifParams.fps} onChange={() => { }} disabled={true} />
                   </div>
-                  {frames.length > 0 && !status.isProcessing && (
-                    <button onClick={generateAndDownloadGif} disabled={status.isProcessing} className="text-xs text-blue-600 hover:underline font-medium disabled:opacity-50">
-                      {status.currentStep === 'generating' ? 'Кодирование...' : 'Скачать GIF'}
-                    </button>
-                  )}
-                </div>
+                }
+                headerActions={frames.length > 0 && !status.isProcessing ? (
+                  <button onClick={generateAndDownloadGif} disabled={status.isProcessing} className="text-xs text-blue-600 hover:underline font-medium disabled:opacity-50">
+                    {status.currentStep === 'generating' ? 'Кодирование...' : 'Скачать GIF'}
+                  </button>
+                ) : undefined}
+                contentClassName="p-0"
+              >
                 <div
                   className="relative w-full bg-zinc-100 dark:bg-zinc-950 cursor-pointer group"
                   style={aspectRatioStyle}
@@ -735,12 +748,13 @@ export function VideoFrameExtractor() {
                     <div className="absolute inset-0 flex items-center justify-center text-xs text-zinc-400">Нет кадров</div>
                   )}
                 </div>
-              </div>
+              </Card>
             </div>
 
             {/* SPRITE SHEET */}
-            <div className="bg-white dark:bg-zinc-900 rounded-lg border border-zinc-200 dark:border-zinc-700 flex flex-col shadow-sm">
-              <div className="flex items-center justify-between px-3 py-2 border-b border-zinc-100 dark:border-zinc-800">
+            <Card
+              className="flex flex-col shadow-sm"
+              title={
                 <div className="flex items-center gap-6">
                   <span className="text-xs font-bold text-zinc-500 uppercase tracking-wide">Спрайт-лист</span>
                   {frames.length > 0 && (
@@ -768,36 +782,38 @@ export function VideoFrameExtractor() {
                     </div>
                   )}
                 </div>
-                {frames.length > 0 && (
-                  <div className="flex items-center gap-4">
-                    <NumberStepper
-                      label="Кадров"
-                      value={frames.length}
-                      onChange={() => { }}
-                      disabled={true}
+              }
+              headerActions={frames.length > 0 ? (
+                <div className="flex items-center gap-4">
+                  <NumberStepper
+                    label="Кадров"
+                    value={frames.length}
+                    onChange={() => { }}
+                    disabled={true}
+                  />
+
+                  {/* Visual Texture Limit Indicator */}
+                  <div className="w-48 pt-1">
+                    <TextureLimitIndicator
+                      value={totalSpriteWidth}
+                      label="ШИРИНА"
                     />
-
-                    {/* Visual Texture Limit Indicator */}
-                    <div className="w-48 pt-1">
-                      <TextureLimitIndicator
-                        value={totalSpriteWidth}
-                        label="ШИРИНА"
-                      />
-                    </div>
-
-                    <button
-                      onClick={handleDownloadSpriteSheet}
-                      className={`text-xs font-bold transition-colors ${totalSpriteWidth > TEXTURE_LIMITS.MAX_BROWSER
-                        ? "text-zinc-400 cursor-not-allowed"
-                        : "text-blue-600 hover:underline"
-                        }`}
-                      disabled={totalSpriteWidth > TEXTURE_LIMITS.MAX_BROWSER}
-                    >
-                      Скачать PNG
-                    </button>
                   </div>
-                )}
-              </div>
+
+                  <button
+                    onClick={handleDownloadSpriteSheet}
+                    className={`text-xs font-bold transition-colors ${totalSpriteWidth > TEXTURE_LIMITS.MAX_BROWSER
+                      ? "text-zinc-400 cursor-not-allowed"
+                      : "text-blue-600 hover:underline"
+                      }`}
+                    disabled={totalSpriteWidth > TEXTURE_LIMITS.MAX_BROWSER}
+                  >
+                    Скачать PNG
+                  </button>
+                </div>
+              ) : undefined}
+              contentClassName="p-0"
+            >
 
               <div className="bg-zinc-100 dark:bg-zinc-950 p-4 overflow-x-auto custom-scrollbar">
                 {frames.length > 0 ? (
@@ -816,7 +832,7 @@ export function VideoFrameExtractor() {
                   </div>
                 ) : <div className="text-center text-zinc-400 py-8">Нет кадров</div>}
               </div>
-            </div>
+            </Card>
           </div>
         )}
 
