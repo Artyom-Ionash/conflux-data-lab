@@ -4,30 +4,32 @@ import type { CreateGIFResult } from "gifshot";
 import gifshot from "gifshot";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-// Specific Domain UI Import
+// --- DOMAIN IMPORTS ---
 import { TextureLimitIndicator } from "@/app/components/domain/hardware/TextureLimitIndicator";
-// Domain Logic Import
+// --- EXTRACTED COMPONENTS ---
+import { DualHoverPreview } from "@/app/components/domain/video/DualHoverPreview";
+import { MultiScalePreview } from "@/app/components/domain/video/MultiScalePreview";
+import { SpriteFrameList } from "@/app/components/domain/video/SpriteFrameList";
 import { TEXTURE_LIMITS } from "@/lib/domain/hardware/texture-standards";
 
+// --- UI IMPORTS ---
 import { Card } from "../../ui/Card";
-import { Checkerboard } from "../../ui/Checkerboard"
 import { FileDropzone, FileDropzonePlaceholder } from "../../ui/FileDropzone";
 import { ImageSequencePlayer } from "../../ui/ImageSequencePlayer";
 import { Modal } from "../../ui/Modal";
-// Shared UI Components
 import { NumberStepper } from "../../ui/NumberStepper";
 import { RangeSlider } from "../../ui/RangeSlider";
 import { Switch } from "../../ui/Switch";
-// UI Imports
 import { ToolLayout } from "../ToolLayout";
 import { FrameDiffOverlay } from "./FrameDiffOverlay";
-// Tool Specific Imports
 import { RangeVideoPlayer } from "./RangeVideoPlayer";
 
 // --- CONSTANTS ---
-const TIMESTAMP_HTML_CLASS = "absolute bottom-2 left-2 pointer-events-none bg-black/80 text-white px-2 py-0.5 rounded text-[11px] font-bold font-mono shadow-sm backdrop-blur-[1px]";
 const DEFAULT_CLIP_DURATION = 0.5; // seconds
 const DEFAULT_FRAME_STEP = 0.1; // seconds
+const DEFAULT_FPS = 10;
+const DEFAULT_ASPECT_RATIO = 1.77; // 16:9 approx
+const MAX_BROWSER_TEXTURE = TEXTURE_LIMITS.MAX_BROWSER;
 
 // --- TYPES ---
 export interface ExtractedFrame {
@@ -42,70 +44,7 @@ export interface ExtractionParams {
   symmetricLoop: boolean;
 }
 
-// --- DOMAIN SPECIFIC COMPONENTS ---
-
-interface MultiScalePreviewContentProps {
-  frames: (string | null)[];
-  fps: number;
-}
-
-function MultiScalePreviewContent({ frames, fps }: MultiScalePreviewContentProps) {
-  const [currentIndex, setCurrentIndex] = useState(0);
-  const validFrames = useMemo(() => frames.filter((f): f is string => f !== null), [frames]);
-  // Smallest (Left) -> Largest (Right)
-  const SCALES = [32, 64, 128, 256, 512];
-
-  useEffect(() => {
-    if (validFrames.length === 0) return;
-    let frameId: number;
-    let lastTime = performance.now();
-    const interval = 1000 / fps;
-
-    const loop = (time: number) => {
-      const delta = time - lastTime;
-      if (delta >= interval) {
-        setCurrentIndex((prev) => (prev + 1) % validFrames.length);
-        lastTime = time - (delta % interval);
-      }
-      frameId = requestAnimationFrame(loop);
-    };
-    frameId = requestAnimationFrame(loop);
-    return () => cancelAnimationFrame(frameId);
-  }, [validFrames.length, fps]);
-
-  if (validFrames.length === 0) {
-    return <div className="text-zinc-500">Нет кадров для отображения</div>;
-  }
-
-  const currentSrc = validFrames[currentIndex];
-
-  return (
-    <div className="flex flex-wrap items-center justify-center content-center gap-x-12 gap-y-12">
-      {SCALES.map((size) => (
-        <div key={size} className="flex flex-col items-center gap-4">
-          <Checkerboard
-            className="border border-zinc-800 rounded-lg overflow-hidden shadow-[0_0_30px_rgba(0,0,0,0.5)] flex items-center justify-center transition-transform hover:scale-[1.02] bg-black/50"
-            size={20}
-          >
-            <div style={{ width: size, height: size }}>
-              <img
-                src={currentSrc}
-                alt={`${size}px preview`}
-                className="w-full h-full object-contain"
-                style={{ imageRendering: size < 64 ? 'pixelated' : 'auto' }}
-              />
-            </div>
-          </Checkerboard>
-          <span className="text-sm font-mono font-bold text-zinc-400 bg-zinc-900/80 px-3 py-1.5 rounded-full border border-zinc-800">
-            {size}x{size}
-          </span>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-// --- HOOKS ---
+// --- LOGIC HOOKS ---
 
 function useSpriteSheetGenerator() {
   const generateSpriteSheet = useCallback(
@@ -127,8 +66,8 @@ function useSpriteSheetGenerator() {
       canvas.width = (scaledWidth + options.spacing) * validFrames.length - options.spacing;
       canvas.height = scaledHeight;
 
-      if (canvas.width > TEXTURE_LIMITS.MAX_BROWSER || canvas.height > TEXTURE_LIMITS.MAX_BROWSER) {
-        throw new Error(`Размер текстуры (${canvas.width}x${canvas.height}) превышает лимит браузера (${TEXTURE_LIMITS.MAX_BROWSER}px).`);
+      if (canvas.width > MAX_BROWSER_TEXTURE || canvas.height > MAX_BROWSER_TEXTURE) {
+        throw new Error(`Размер текстуры (${canvas.width}x${canvas.height}) превышает лимит браузера (${MAX_BROWSER_TEXTURE}px).`);
       }
 
       if (options.backgroundColor !== "transparent") {
@@ -154,7 +93,12 @@ function useVideoFrameExtraction() {
   const [videoDuration, setVideoDuration] = useState<number | null>(null);
   const [videoDimensions, setVideoDimensions] = useState<{ width: number; height: number } | null>(null);
 
-  const [extractionParams, setExtractionParams] = useState<ExtractionParams>({ startTime: 0, endTime: 0, frameStep: 1, symmetricLoop: false });
+  const [extractionParams, setExtractionParams] = useState<ExtractionParams>({
+    startTime: 0,
+    endTime: 0,
+    frameStep: 1,
+    symmetricLoop: false
+  });
   const [rawFrames, setRawFrames] = useState<ExtractedFrame[]>([]);
 
   const frames = useMemo(() => {
@@ -164,7 +108,7 @@ function useVideoFrameExtraction() {
     return [...rawFrames, ...loopBack];
   }, [rawFrames, extractionParams.symmetricLoop]);
 
-  const [gifParams, setGifParams] = useState({ fps: 10, dataUrl: null as string | null });
+  const [gifParams, setGifParams] = useState({ fps: DEFAULT_FPS, dataUrl: null as string | null });
   const [status, setStatus] = useState({ isProcessing: false, currentStep: "", progress: 0 });
   const [error, setError] = useState<string | null>(null);
 
@@ -178,9 +122,12 @@ function useVideoFrameExtraction() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
 
-  const effectiveEnd = useMemo(() => (extractionParams.endTime > 0 ? extractionParams.endTime : videoDuration ?? 0), [extractionParams.endTime, videoDuration]);
+  const effectiveEnd = useMemo(() =>
+    (extractionParams.endTime > 0 ? extractionParams.endTime : videoDuration ?? 0),
+    [extractionParams.endTime, videoDuration]
+  );
 
-  // --- AUTO-FPS LOGIC ---
+  // Auto-FPS Logic
   useEffect(() => {
     if (extractionParams.frameStep > 0) {
       const calculatedFps = Math.round(1 / extractionParams.frameStep);
@@ -189,7 +136,9 @@ function useVideoFrameExtraction() {
     }
   }, [extractionParams.frameStep]);
 
-  useEffect(() => { return () => { if (videoSrc) URL.revokeObjectURL(videoSrc); }; }, [videoSrc]);
+  useEffect(() => {
+    return () => { if (videoSrc) URL.revokeObjectURL(videoSrc); };
+  }, [videoSrc]);
 
   // Sync Hover Video Source
   useEffect(() => {
@@ -198,7 +147,7 @@ function useVideoFrameExtraction() {
     }
   }, [videoSrc]);
 
-  // Generate Start/End Previews (These act as the "Cache")
+  // Generate Start/End Previews (Cache)
   useEffect(() => {
     if (!videoSrc || !previewVideoRef.current || !canvasRef.current || !videoDuration) return;
     if (status.isProcessing) return;
@@ -264,7 +213,6 @@ function useVideoFrameExtraction() {
       setVideoDimensions({ width: tempVideo.videoWidth, height: tempVideo.videoHeight });
 
       const safeStartTime = Math.max(0, duration - DEFAULT_CLIP_DURATION);
-
       setExtractionParams({
         startTime: safeStartTime,
         endTime: duration,
@@ -372,7 +320,7 @@ function useVideoFrameExtraction() {
             a.href = obj.image;
             a.download = 'animation.gif';
             a.click();
-            setGifParams(p => ({ ...p, dataUrl: obj.image }));
+            setGifParams(p => ({ ...p, dataUrl: obj.image ?? null }));
           } else {
             setError(`Error: ${obj.errorCode ?? obj.errorMsg ?? "unknown"}`);
           }
@@ -389,7 +337,7 @@ function useVideoFrameExtraction() {
   };
 }
 
-// --- MAIN LAYOUT ---
+// --- MAIN COMPONENT ---
 
 export function VideoFrameExtractor() {
   const {
@@ -398,44 +346,40 @@ export function VideoFrameExtractor() {
     previewFrames, isPreviewing, handleFilesSelected, generateAndDownloadGif
   } = useVideoFrameExtraction();
 
+  // Local UI State
   const [spriteOptions, setSpriteOptions] = useState({ maxHeight: 300, spacing: 0, bg: "transparent" });
   const [pickerValue, setPickerValue] = useState("#ffffff");
   const [diffDataUrl, setDiffDataUrl] = useState<string | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
-  // State for Dual Hover Preview
+  // Hover Preview State
   const [hoverPreview, setHoverPreview] = useState<{ activeThumb: 0 | 1; time: number } | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const sliderContainerRef = useRef<HTMLDivElement>(null);
 
-  // State for Modal
-  const [isModalOpen, setIsModalOpen] = useState(false);
-
   const { generateSpriteSheet } = useSpriteSheetGenerator();
 
+  // Draw overlay for SequencePlayer
   const handleDrawOverlay = useCallback((ctx: CanvasRenderingContext2D, index: number, w: number, h: number) => {
     const frame = frames[index];
     if (!frame) return;
-
     const timeText = `${frame.time.toFixed(2)}s`;
-
     const fontSize = Math.max(14, Math.floor(w * 0.05));
     ctx.font = `bold ${fontSize}px monospace`;
     const textMetrics = ctx.measureText(timeText);
 
     const padX = fontSize * 0.6;
     const padY = fontSize * 0.4;
+    const margin = Math.max(8, w * 0.03);
+    const x = margin;
+    const y = h - margin - (fontSize + (padY * 2));
     const boxWidth = textMetrics.width + (padX * 2);
     const boxHeight = fontSize + (padY * 2);
 
-    const margin = Math.max(8, w * 0.03);
-    const x = margin;
-    const y = h - margin - boxHeight;
-
     ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
     ctx.beginPath();
-    const radius = fontSize * 0.4;
     if (typeof ctx.roundRect === 'function') {
-      ctx.roundRect(x, y, boxWidth, boxHeight, radius);
+      ctx.roundRect(x, y, boxWidth, boxHeight, fontSize * 0.4);
     } else {
       ctx.rect(x, y, boxWidth, boxHeight);
     }
@@ -443,7 +387,7 @@ export function VideoFrameExtractor() {
 
     ctx.fillStyle = 'white';
     ctx.textBaseline = 'middle';
-    ctx.fillText(timeText, x + padX, y + (boxHeight / 2) + (fontSize * 0.05));
+    ctx.fillText(timeText, x + padX, y + (boxHeight / 2));
   }, [frames]);
 
   const handleDownloadSpriteSheet = async () => {
@@ -459,9 +403,7 @@ export function VideoFrameExtractor() {
       a.download = 'spritesheet.png';
       a.click();
     } catch (e: unknown) {
-      const message = e instanceof Error ? e.message : "Ошибка генерации";
-      alert(message);
-      console.error(e);
+      alert(e instanceof Error ? e.message : "Ошибка генерации");
     }
   };
 
@@ -482,18 +424,14 @@ export function VideoFrameExtractor() {
     return (scaledWidth + spriteOptions.spacing) * frames.length - spriteOptions.spacing;
   }, [videoDimensions, frames.length, spriteOptions.maxHeight, spriteOptions.spacing]);
 
-  // --- PREVIEW LOGIC ---
+  const videoRatio = videoDimensions
+    ? videoDimensions.width / videoDimensions.height
+    : DEFAULT_ASPECT_RATIO;
 
-  const updatePreview = (activeThumb: 0 | 1, time: number) => {
-    setHoverPreview({ activeThumb, time });
-    if (hoverVideoRef.current) {
-      hoverVideoRef.current.currentTime = time;
-    }
-  };
+  // --- PREVIEW LOGIC ---
 
   const handleSliderHover = (e: React.MouseEvent<HTMLDivElement>) => {
     if (!videoDuration || isDragging) return;
-
     const rect = e.currentTarget.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const percentage = Math.max(0, Math.min(1, x / rect.width));
@@ -504,29 +442,15 @@ export function VideoFrameExtractor() {
     const nearestThumb = distToStart < distToEnd ? 0 : 1;
 
     setHoverPreview({ activeThumb: nearestThumb, time });
-    if (hoverVideoRef.current) {
-      hoverVideoRef.current.currentTime = time;
-    }
-  };
-
-  const handleSliderLeave = () => {
-    if (!isDragging) {
-      setHoverPreview(null);
-    }
-  };
-
-  const handlePointerDown = () => setIsDragging(true);
-  const handlePointerUp = () => {
-    setIsDragging(false);
-    setHoverPreview(null);
+    if (hoverVideoRef.current) hoverVideoRef.current.currentTime = time;
   };
 
   const handleValueChange = (newValues: number[], thumbIndex?: 0 | 1) => {
     setExtractionParams(p => ({ ...p, startTime: newValues[0], endTime: newValues[1] }));
-
     if (isDragging && typeof thumbIndex === 'number') {
       const changedTime = newValues[thumbIndex];
-      updatePreview(thumbIndex, changedTime);
+      setHoverPreview({ activeThumb: thumbIndex, time: changedTime });
+      if (hoverVideoRef.current) hoverVideoRef.current.currentTime = changedTime;
     }
   };
 
@@ -537,8 +461,7 @@ export function VideoFrameExtractor() {
         {status.isProcessing && (
           <div className="mt-2 p-3 bg-blue-50 dark:bg-blue-900/20 rounded border border-blue-100 dark:border-blue-800">
             <div className="text-xs font-semibold text-blue-700 dark:text-blue-300 mb-1 flex justify-between">
-              <span>Обработка...</span>
-              <span className="font-mono">{Math.round(status.progress)}%</span>
+              <span>Обработка...</span><span className="font-mono">{Math.round(status.progress)}%</span>
             </div>
             <div className="h-1 w-full bg-blue-200 dark:bg-blue-800 rounded-full overflow-hidden">
               <div className="h-full bg-blue-600 transition-all duration-300" style={{ width: `${status.progress}%` }} />
@@ -548,9 +471,6 @@ export function VideoFrameExtractor() {
       </div>
     </div>
   );
-
-  const baseFps = extractionParams.frameStep > 0 ? Math.round(1 / extractionParams.frameStep) : 10;
-  const speedPercent = Math.round((gifParams.fps / baseFps) * 100);
 
   return (
     <ToolLayout title="Видео в Кадры/GIF" sidebar={sidebarContent}>
@@ -562,26 +482,22 @@ export function VideoFrameExtractor() {
         ) : (
           <div className="flex-1 overflow-y-auto p-4 space-y-4">
 
-            {/* CONTROLS */}
+            {/* CONTROLS CARD */}
             <Card className="shadow-sm relative z-20 overflow-visible" contentClassName="p-4">
               <div className="flex flex-col gap-4">
                 <div className="space-y-4">
+                  {/* Top Bar: Stepper & Time Indicator */}
                   <div className="flex flex-wrap items-center justify-between gap-y-3 gap-x-6">
                     <div className="flex flex-wrap items-center gap-6">
                       <span className="text-xs font-bold text-zinc-500 uppercase tracking-wide">Диапазон</span>
                       <div className="h-6 w-px bg-zinc-200 dark:bg-zinc-700 hidden sm:block"></div>
-
                       <NumberStepper
                         label="Шаг (сек)"
                         value={extractionParams.frameStep}
                         onChange={(v) => setExtractionParams(p => ({ ...p, frameStep: v }))}
-                        step={0.05}
-                        min={0.05}
-                        max={10}
+                        step={0.05} min={0.05} max={10}
                       />
                     </div>
-
-                    {/* Time Range Indicator */}
                     <div className="bg-black/80 text-white px-3 py-1.5 rounded text-xs font-mono font-bold ml-auto flex items-center gap-2 shadow-sm">
                       <span>{extractionParams.startTime.toFixed(2)}s</span>
                       <span className="opacity-50">→</span>
@@ -589,14 +505,14 @@ export function VideoFrameExtractor() {
                     </div>
                   </div>
 
-                  {/* Range Slider Wrapper for Hover Detection */}
+                  {/* Range Slider with Dual Preview */}
                   <div
                     ref={sliderContainerRef}
                     className="relative group py-2 touch-none"
                     onMouseMove={handleSliderHover}
-                    onMouseLeave={handleSliderLeave}
-                    onPointerDown={handlePointerDown}
-                    onPointerUp={handlePointerUp}
+                    onMouseLeave={() => !isDragging && setHoverPreview(null)}
+                    onPointerDown={() => setIsDragging(true)}
+                    onPointerUp={() => { setIsDragging(false); setHoverPreview(null); }}
                   >
                     <RangeSlider
                       min={0}
@@ -607,43 +523,18 @@ export function VideoFrameExtractor() {
                       minStepsBetweenThumbs={0.1}
                     />
 
-                    {/* DUAL PREVIEW TOOLTIP - FULL SIZE */}
                     {hoverPreview && (
-                      <div className="absolute top-full left-1/2 -translate-x-1/2 mt-6 w-[98vw] max-w-[1600px] z-[100] pointer-events-none">
-                        <div className="grid grid-cols-2 gap-6 bg-zinc-950/95 backdrop-blur-md p-6 rounded-2xl shadow-2xl border border-white/10">
-
-                          {/* Left Frame (Start) */}
-                          <div className={`relative flex flex-col items-center gap-2 transition-opacity duration-200 ${hoverPreview.activeThumb === 0 ? 'opacity-100' : 'opacity-50 grayscale-[0.5]'}`}>
-                            <div className={`relative w-full bg-black rounded-lg overflow-hidden border-4 shadow-lg transition-all ${hoverPreview.activeThumb === 0 ? 'border-blue-500 shadow-blue-500/20' : 'border-zinc-800'}`} style={aspectRatioStyle}>
-                              {previewFrames.start && <img src={previewFrames.start} alt="start" className="w-full h-full object-contain" />}
-                              {hoverPreview.activeThumb === 0 && (
-                                <div className="absolute inset-0 bg-black">
-                                  <video ref={hoverVideoRef} src={videoSrc} className="w-full h-full object-contain" muted playsInline />
-                                </div>
-                              )}
-                            </div>
-                            <span className={`text-xs font-mono font-bold px-3 py-1 rounded-full shadow-sm ${hoverPreview.activeThumb === 0 ? 'bg-blue-600 text-white' : 'bg-zinc-800 text-zinc-500'}`}>
-                              START: {(hoverPreview.activeThumb === 0 ? hoverPreview.time : extractionParams.startTime).toFixed(2)}s
-                            </span>
-                          </div>
-
-                          {/* Right Frame (End) */}
-                          <div className={`relative flex flex-col items-center gap-2 transition-opacity duration-200 ${hoverPreview.activeThumb === 1 ? 'opacity-100' : 'opacity-50 grayscale-[0.5]'}`}>
-                            <div className={`relative w-full bg-black rounded-lg overflow-hidden border-4 shadow-lg transition-all ${hoverPreview.activeThumb === 1 ? 'border-purple-500 shadow-purple-500/20' : 'border-zinc-800'}`} style={aspectRatioStyle}>
-                              {previewFrames.end && <img src={previewFrames.end} alt="end" className="w-full h-full object-contain" />}
-                              {hoverPreview.activeThumb === 1 && (
-                                <div className="absolute inset-0 bg-black">
-                                  <video ref={hoverVideoRef} src={videoSrc} className="w-full h-full object-contain" muted playsInline />
-                                </div>
-                              )}
-                            </div>
-                            <span className={`text-xs font-mono font-bold px-3 py-1 rounded-full shadow-sm ${hoverPreview.activeThumb === 1 ? 'bg-purple-600 text-white' : 'bg-zinc-800 text-zinc-500'}`}>
-                              END: {(hoverPreview.activeThumb === 1 ? hoverPreview.time : effectiveEnd).toFixed(2)}s
-                            </span>
-                          </div>
-
-                        </div>
-                      </div>
+                      <DualHoverPreview
+                        activeThumb={hoverPreview.activeThumb}
+                        hoverTime={hoverPreview.time}
+                        startTime={extractionParams.startTime}
+                        endTime={effectiveEnd}
+                        videoSrc={videoSrc}
+                        videoRef={hoverVideoRef as React.RefObject<HTMLVideoElement>}
+                        previewStartImage={previewFrames.start}
+                        previewEndImage={previewFrames.end}
+                        aspectRatioStyle={aspectRatioStyle}
+                      />
                     )}
                   </div>
                 </div>
@@ -651,14 +542,10 @@ export function VideoFrameExtractor() {
               </div>
             </Card>
 
-            {/* PREVIEWS */}
+            {/* PREVIEW GRID */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-              {/* Source Video */}
-              <Card
-                className="overflow-hidden flex flex-col shadow-sm"
-                title={<span className="text-xs font-bold text-zinc-500 uppercase tracking-wide">Исходное видео</span>}
-                contentClassName="p-0"
-              >
+              {/* 1. Source Video */}
+              <Card className="overflow-hidden flex flex-col shadow-sm" title={<span className="text-xs font-bold text-zinc-500 uppercase tracking-wide">Исходное видео</span>} contentClassName="p-0">
                 <div className="relative w-full bg-black" style={aspectRatioStyle}>
                   <RangeVideoPlayer
                     src={videoSrc}
@@ -669,28 +556,28 @@ export function VideoFrameExtractor() {
                 </div>
               </Card>
 
-              {/* Diff Overlay */}
+              {/* 2. Diff Overlay */}
               <Card
                 className="overflow-hidden flex flex-col shadow-sm"
                 title={<span className="text-xs font-bold text-zinc-500 uppercase tracking-wide">Разница</span>}
                 headerActions={diffDataUrl ? (
-                  <button
-                    onClick={() => { const a = document.createElement('a'); a.href = diffDataUrl; a.download = 'diff.png'; a.click(); }}
-                    className="text-xs text-blue-600 hover:underline font-medium"
-                  >
-                    Скачать
-                  </button>
+                  <button onClick={() => { const a = document.createElement('a'); a.href = diffDataUrl; a.download = 'diff.png'; a.click(); }} className="text-xs text-blue-600 hover:underline font-medium">Скачать</button>
                 ) : undefined}
                 contentClassName="p-0"
               >
                 <div className="relative w-full bg-zinc-100 dark:bg-zinc-950" style={aspectRatioStyle}>
                   <div className="absolute inset-0">
-                    <FrameDiffOverlay image1={previewFrames.start} image2={previewFrames.end} isProcessing={isPreviewing} onDataGenerated={setDiffDataUrl} />
+                    <FrameDiffOverlay
+                      image1={previewFrames.start}
+                      image2={previewFrames.end}
+                      isProcessing={isPreviewing}
+                      onDataGenerated={setDiffDataUrl}
+                    />
                   </div>
                 </div>
               </Card>
 
-              {/* Sprite (Animation) Player */}
+              {/* 3. Sprite / GIF Player */}
               <Card
                 className="overflow-hidden flex flex-col shadow-sm"
                 title={
@@ -698,14 +585,12 @@ export function VideoFrameExtractor() {
                     <span className="text-xs font-bold text-zinc-500 uppercase tracking-wide">Спрайт</span>
                     <NumberStepper
                       label="Скорость %"
-                      value={speedPercent}
+                      value={Math.round((gifParams.fps / (extractionParams.frameStep > 0 ? Math.round(1 / extractionParams.frameStep) : 10)) * 100)}
                       onChange={(val) => {
-                        const newFps = Math.max(1, Math.round(baseFps * (val / 100)));
-                        setGifParams(p => ({ ...p, fps: newFps }));
+                        const base = (extractionParams.frameStep > 0 ? Math.round(1 / extractionParams.frameStep) : 10);
+                        setGifParams(p => ({ ...p, fps: Math.max(1, Math.round(base * (val / 100))) }));
                       }}
-                      min={10}
-                      max={500}
-                      step={10}
+                      min={10} max={500} step={10}
                     />
                     <NumberStepper label="FPS" value={gifParams.fps} onChange={() => { }} disabled={true} />
                   </div>
@@ -737,8 +622,6 @@ export function VideoFrameExtractor() {
                           <div className="w-full bg-black/10 h-1"><div className="h-full bg-blue-500 transition-all duration-200" style={{ width: `${status.progress}%` }} /></div>
                         </div>
                       )}
-
-                      {/* Hint Overlay on Hover */}
                       <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors flex items-center justify-center">
                         <div className="opacity-0 group-hover:opacity-100 bg-black/70 text-white px-3 py-1.5 rounded-full text-xs font-bold backdrop-blur-sm transition-opacity transform scale-95 group-hover:scale-100">
                           Открыть масштабы ⤢
@@ -752,7 +635,7 @@ export function VideoFrameExtractor() {
               </Card>
             </div>
 
-            {/* SPRITE SHEET */}
+            {/* SPRITE SHEET SETTINGS & LIST */}
             <Card
               className="flex flex-col shadow-sm"
               title={
@@ -760,13 +643,7 @@ export function VideoFrameExtractor() {
                   <span className="text-xs font-bold text-zinc-500 uppercase tracking-wide">Спрайт-лист</span>
                   {frames.length > 0 && (
                     <div className="flex items-center gap-4">
-                      {/* MOVED SYMMETRIC SWITCH HERE */}
-                      <Switch
-                        label="Loop"
-                        checked={extractionParams.symmetricLoop}
-                        onCheckedChange={(c) => setExtractionParams(p => ({ ...p, symmetricLoop: c }))}
-                        className="whitespace-nowrap gap-2 text-xs font-medium"
-                      />
+                      <Switch label="Loop" checked={extractionParams.symmetricLoop} onCheckedChange={(c) => setExtractionParams(p => ({ ...p, symmetricLoop: c }))} className="whitespace-nowrap gap-2 text-xs font-medium" />
                       <div className="w-px h-6 bg-zinc-200 dark:bg-zinc-700"></div>
 
                       <NumberStepper label="Высота" value={spriteOptions.maxHeight} onChange={(v) => setSpriteOptions(p => ({ ...p, maxHeight: v }))} step={10} min={10} max={2000} />
@@ -786,28 +663,12 @@ export function VideoFrameExtractor() {
               }
               headerActions={frames.length > 0 ? (
                 <div className="flex items-center gap-4">
-                  <NumberStepper
-                    label="Кадров"
-                    value={frames.length}
-                    onChange={() => { }}
-                    disabled={true}
-                  />
-
-                  {/* Visual Texture Limit Indicator */}
-                  <div className="w-48 pt-1">
-                    <TextureLimitIndicator
-                      value={totalSpriteWidth}
-                      label="ШИРИНА"
-                    />
-                  </div>
-
+                  <NumberStepper label="Кадров" value={frames.length} onChange={() => { }} disabled={true} />
+                  <div className="w-48 pt-1"><TextureLimitIndicator value={totalSpriteWidth} label="ШИРИНА" /></div>
                   <button
                     onClick={handleDownloadSpriteSheet}
-                    className={`text-xs font-bold transition-colors ${totalSpriteWidth > TEXTURE_LIMITS.MAX_BROWSER
-                      ? "text-zinc-400 cursor-not-allowed"
-                      : "text-blue-600 hover:underline"
-                      }`}
-                    disabled={totalSpriteWidth > TEXTURE_LIMITS.MAX_BROWSER}
+                    className={`text-xs font-bold transition-colors ${totalSpriteWidth > MAX_BROWSER_TEXTURE ? "text-zinc-400 cursor-not-allowed" : "text-blue-600 hover:underline"}`}
+                    disabled={totalSpriteWidth > MAX_BROWSER_TEXTURE}
                   >
                     Скачать PNG
                   </button>
@@ -815,47 +676,33 @@ export function VideoFrameExtractor() {
               ) : undefined}
               contentClassName="p-0"
             >
-
               <div className="bg-zinc-100 dark:bg-zinc-950 p-4 overflow-x-auto custom-scrollbar">
-                {frames.length > 0 ? (
-                  <div className={`flex items-start border border-dashed border-zinc-300 dark:border-zinc-700 ${spriteOptions.bg === 'transparent' ? "bg-[url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAKQCAYAAAB2440yAAAAIklEQVQ4jWNgGAWjYBQMBAAABgAB/6Zj+QAAAABJRU5ErkJggg==')] bg-repeat" : ""}`} style={{ backgroundColor: spriteOptions.bg !== 'transparent' ? spriteOptions.bg : undefined, gap: `${spriteOptions.spacing}px` }}>
-                    {frames.map((frame, idx) => (
-                      <div key={idx} className="relative shrink-0 group">
-                        {frame.dataUrl ? (
-                          <img src={frame.dataUrl} alt="frame" style={{ height: spriteOptions.maxHeight, display: 'block' }} className="shadow-sm rounded-sm" />
-                        ) : (
-                          <div className="animate-pulse bg-black/5 rounded-sm" style={{ height: spriteOptions.maxHeight, width: Math.floor((videoDimensions?.width || 100) * (spriteOptions.maxHeight / (videoDimensions?.height || 100))) }} />
-                        )}
-                        <div className={TIMESTAMP_HTML_CLASS}>{frame.time.toFixed(2)}s</div>
-                        <div className="absolute top-2 right-2 bg-black/60 text-white px-1.5 py-0.5 rounded text-[10px] font-mono opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">#{idx + 1}</div>
-                      </div>
-                    ))}
-                  </div>
-                ) : <div className="text-center text-zinc-400 py-8">Нет кадров</div>}
+                <SpriteFrameList
+                  frames={frames}
+                  maxHeight={spriteOptions.maxHeight}
+                  spacing={spriteOptions.spacing}
+                  backgroundColor={spriteOptions.bg}
+                  videoAspectRatio={videoRatio}
+                />
               </div>
             </Card>
           </div>
         )}
 
-        {/* Hidden processing videos */}
+        {/* Hidden Processing Elements */}
         <video ref={videoRef} className="hidden" crossOrigin="anonymous" muted playsInline />
         <video ref={previewVideoRef} className="hidden" crossOrigin="anonymous" muted playsInline />
         <canvas ref={canvasRef} className="hidden" />
 
-        {/* --- MODAL --- */}
+        {/* MODAL */}
         <Modal
           isOpen={isModalOpen}
           onClose={() => setIsModalOpen(false)}
-          title={
-            <div className="flex items-center gap-3">
-              <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-              Предпросмотр масштабов
-            </div>
-          }
+          title={<div className="flex items-center gap-3"><span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />Предпросмотр масштабов</div>}
           headerActions={<span className="text-xs font-mono text-zinc-500">FPS: {gifParams.fps}</span>}
           className="w-[96vw] h-[92vh] max-w-[1920px]"
         >
-          <MultiScalePreviewContent frames={frames.map(f => f.dataUrl)} fps={gifParams.fps} />
+          <MultiScalePreview frames={frames.map(f => f.dataUrl)} fps={gifParams.fps} />
         </Modal>
       </div>
     </ToolLayout>
