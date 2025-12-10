@@ -1,10 +1,10 @@
 #!/usr/bin/env node
 
-import { readdirSync, statSync, readFileSync, writeFileSync, existsSync } from 'fs';
-import { join, relative } from 'path';
 import { execSync } from 'child_process';
-import { fileURLToPath } from 'url';
+import { existsSync, readdirSync, readFileSync, statSync, writeFileSync } from 'fs';
+import { join } from 'path'; // Удален relative
 import { dirname } from 'path';
+import { fileURLToPath } from 'url';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -96,7 +96,8 @@ function shouldIgnore(path, name) {
   });
 }
 
-function sortEntries(entries, basePath = '') {
+// Удален неиспользуемый аргумент basePath
+function sortEntries(entries) {
   return entries.sort((a, b) => {
     // Priority directories first
     const aPriorityDir = PRIORITY_DIRS.indexOf(a.name);
@@ -133,7 +134,8 @@ function getDescription(relativePath) {
 // TREE GENERATION
 // =============================================================================
 
-function buildTree(dirPath, basePath = '', prefix = '', isLast = true) {
+// Удален неиспользуемый аргумент isLast
+function buildTree(dirPath, basePath = '', prefix = '') {
   const entries = readdirSync(dirPath)
     .map((name) => {
       const fullPath = join(dirPath, name);
@@ -159,7 +161,7 @@ function buildTree(dirPath, basePath = '', prefix = '', isLast = true) {
     })
     .filter(Boolean);
 
-  const sorted = sortEntries(entries, basePath);
+  const sorted = sortEntries(entries); // Убран второй аргумент
   let result = '';
 
   sorted.forEach((entry, index) => {
@@ -174,7 +176,8 @@ function buildTree(dirPath, basePath = '', prefix = '', isLast = true) {
 
     if (entry.isDirectory) {
       result += `${prefix}${connector}${displayName}${comment}\n`;
-      result += buildTree(entry.fullPath, entry.relativePath, newPrefix, isLastEntry);
+      // Убран четвертый аргумент isLastEntry
+      result += buildTree(entry.fullPath, entry.relativePath, newPrefix);
     } else {
       result += `${prefix}${connector}${displayName}${comment}\n`;
     }
