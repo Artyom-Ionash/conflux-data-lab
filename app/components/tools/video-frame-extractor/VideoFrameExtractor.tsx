@@ -6,9 +6,11 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 
 // --- DOMAIN IMPORTS ---
 import { TextureLimitIndicator } from "@/app/components/domain/hardware/TextureLimitIndicator";
+import { FrameDiffOverlay } from "@/app/components/domain/video/analysis/FrameDiffOverlay";
 // --- EXTRACTED COMPONENTS ---
 import { DualHoverPreview } from "@/app/components/domain/video/DualHoverPreview";
 import { MultiScalePreview } from "@/app/components/domain/video/MultiScalePreview";
+import { RangeVideoPlayer } from "@/app/components/domain/video/player/RangeVideoPlayer";
 import { SpriteFrameList } from "@/app/components/domain/video/SpriteFrameList";
 import { TEXTURE_LIMITS } from "@/lib/domain/hardware/texture-standards";
 
@@ -21,8 +23,6 @@ import { NumberStepper } from "../../ui/NumberStepper";
 import { RangeSlider } from "../../ui/RangeSlider";
 import { Switch } from "../../ui/Switch";
 import { ToolLayout } from "../ToolLayout";
-import { FrameDiffOverlay } from "./FrameDiffOverlay";
-import { RangeVideoPlayer } from "./RangeVideoPlayer";
 
 // --- CONSTANTS ---
 const DEFAULT_CLIP_DURATION = 0.5; // seconds
