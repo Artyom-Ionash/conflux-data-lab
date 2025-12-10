@@ -1,93 +1,68 @@
-/**
- * Конфигурация всех инструментов портфолио
- */
 
-import { Tool, ToolConfig } from '@/lib/types/tools';
+import { ToolConfig } from '../types/tools';
 
-export const tools: Tool[] = [
-  {
-    id: 'json-to-csv',
-    name: 'JSON to CSV',
-    description: 'Конвертация JSON данных в CSV формат',
-    category: 'conversion',
-    tags: ['json', 'csv', 'conversion', 'data'],
-    featured: false,
-  },
-  {
-    id: 'csv-to-json',
-    name: 'CSV to JSON',
-    description: 'Конвертация CSV файлов в JSON формат',
-    category: 'conversion',
-    tags: ['csv', 'json', 'conversion', 'data'],
-    featured: false,
-  },
-  {
-    id: 'xml-to-json',
-    name: 'XML to JSON',
-    description: 'Преобразование XML в JSON структуру',
-    category: 'conversion',
-    tags: ['xml', 'json', 'conversion'],
-  },
-  {
-    id: 'json-formatter',
-    name: 'JSON Formatter',
-    description: 'Форматирование и валидация JSON',
-    category: 'formatting',
-    tags: ['json', 'formatting', 'validation'],
-  },
-  {
-    id: 'base64-encoder',
-    name: 'Base64 Encoder/Decoder',
-    description: 'Кодирование и декодирование Base64',
-    category: 'conversion',
-    tags: ['base64', 'encoding', 'decoding'],
-  },
+// Порядок ключей определяет порядок отображения категорий на странице
+export const categoryLabels: Record<string, string> = {
+  sprites: 'Таблицы спрайтов',
+  conversion: 'Конвертация',
+  analysis: 'Анализ данных',
+  formatting: 'Форматирование',
+  transformation: 'Трансформация',
+  validation: 'Валидация',
+};
+
+export const tools: ToolConfig[] = [
+  // --- SPRITES TOOLS ---
   {
     id: 'video-frame-extractor',
     name: 'Video Frame Extractor',
-    description: 'Извлечение серии кадров из видео с заданной частотой и диапазоном времени',
-    category: 'conversion',
-    tags: ['video', 'frames', 'images', 'extraction'],
+    description: 'Extract frames from video, create spritesheets and analyze differences.',
+    category: 'sprites', // Обновлена категория
+    tags: ['video', 'frames', 'spritesheet', 'gif'],
     featured: true,
   },
   {
     id: 'vertical-image-aligner',
     name: 'Vertical Image Aligner',
-    description:
-      'Калибровка и вертикальное объединение набора изображений с настраиваемым сдвигом и масштабом каждого слоя',
-    category: 'transformation',
-    tags: ['images', 'alignment', 'vertical', 'composition'],
-    featured: true,
+    description: 'Stack images vertically with equal width scaling.',
+    category: 'sprites', // Обновлена категория
+    tags: ['image',  'align', 'spritesheet'],
   },
   {
     id: 'monochrome-background-remover',
-    name: 'Monochrome Background Remover',
-    description:
-      'Удаление монохромного фона из изображения',
-    category: 'formatting',
-    tags: ['image', 'background', 'removal'],
+    name: 'Monochrome Remover',
+    description: 'Remove background from monochrome images using luminance.',
+    category: 'sprites', // Обновлена категория
+    tags: ['image',  'transparent','spritesheet'],
+  },
+
+  // --- CONVERSION TOOLS ---
+  {
+    id: 'project-to-context',
+    name: 'Project to LLM Context',
+    description: 'Convert a code project folder into a single Markdown file for LLM context (Godot, Next.js, etc).',
+    category: 'conversion',
+    tags: ['llm', 'context',  'markdown', 'code', 'godot'],
     featured: true,
+  },
+  {
+    id: 'json-to-csv',
+    name: 'JSON to CSV',
+    description: 'Convert JSON data to CSV format with flattening support.',
+    category: 'conversion',
+    tags: ['json', 'csv', 'converter', 'developer'],
   },
 ];
 
 export const toolsByCategory = tools.reduce((acc, tool) => {
-  if (!acc[tool.category]) {
-    acc[tool.category] = [];
+  const category = tool.category;
+  if (!acc[category]) {
+    acc[category] = [];
   }
-  acc[tool.category].push(tool);
+  acc[category].push(tool);
   return acc;
-}, {} as Record<string, Tool[]>);
+}, {} as Record<string, ToolConfig[]>);
 
-export const categoryLabels: Record<string, string> = {
-  conversion: 'Конвертация',
-  transformation: 'Трансформация',
-  analysis: 'Анализ',
-  validation: 'Валидация',
-  formatting: 'Форматирование',
-};
-
-export function getToolById(id: string): Tool | undefined {
-  return tools.find(tool => tool.id === id);
+export function getToolById(id: string): ToolConfig | undefined {
+  return tools.find((tool) => tool.id === id);
 }
-
-

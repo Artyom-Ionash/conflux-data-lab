@@ -31,6 +31,8 @@
 │   │   │   │   └── JsonToCsvConverter.tsx
 │   │   │   ├── monochrome-remover/
 │   │   │   │   └── MonochromeBackgroundRemover.tsx
+│   │   │   ├── project-to-context/
+│   │   │   │   └── ProjectToContext.tsx
 │   │   │   ├── vertical-aligner/
 │   │   │   │   └── VerticalImageAligner.tsx
 │   │   │   ├── video-frame-extractor/

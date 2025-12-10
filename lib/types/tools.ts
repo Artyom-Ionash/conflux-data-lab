@@ -1,28 +1,36 @@
+
+
 /**
  * Типы для системы инструментов портфолио
  */
 
 export type ToolCategory = 
-  | 'conversion'      // Конвертация данных
-  | 'transformation'  // Трансформация данных
-  | 'analysis'        // Анализ данных
-  | 'validation'      // Валидация данных
-  | 'formatting';     // Форматирование данных
+  | 'sprites'         // Таблицы спрайтов и графика
+  | 'conversion'      // Конвертация
+  | 'transformation'  // Трансформация
+  | 'analysis'        // Анализ
+  | 'validation'      // Валидация
+  | 'formatting';     // Форматирование
 
-export interface Tool {
+export interface ToolConfig {
   id: string;
   name: string;
   description: string;
   category: ToolCategory;
-  icon?: string;
   tags: string[];
+  
+  // Опциональные поля
   featured?: boolean;
-}
-
-export interface ToolConfig {
-  tool: Tool;
-  component: string; // путь к компоненту
+  icon?: string;
+  
+  // Метаданные для документации
   examples?: ToolExample[];
+  
+  // Специфично для конвертеров
+  supportedFormats?: {
+    input: string[];
+    output: string[];
+  };
 }
 
 export interface ToolExample {
@@ -31,13 +39,3 @@ export interface ToolExample {
   output: string;
   description?: string;
 }
-
-export interface ConversionTool extends Tool {
-  category: 'conversion';
-  supportedFormats: {
-    input: string[];
-    output: string[];
-  };
-}
-
-
