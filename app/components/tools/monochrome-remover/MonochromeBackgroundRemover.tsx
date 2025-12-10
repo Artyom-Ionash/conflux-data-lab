@@ -135,7 +135,7 @@ export function MonochromeBackgroundRemover() {
   };
 
   // React Compiler cannot currently preserve this memoization; disable the lint to keep stable callback identity.
-  // eslint-disable-next-line react-hooks/preserve-manual-memoization
+
   const processImage = useCallback(() => {
     if (!originalUrl || !sourceCanvasRef.current || !previewCanvasRef.current) return;
 
@@ -310,6 +310,7 @@ export function MonochromeBackgroundRemover() {
     }, PROCESS_DELAY_MS);
   }, [originalUrl, targetColor, contourColor, tolerances, smoothness, processingMode, floodPoints, edgeChoke, edgeBlur, edgePaint]);
 
+  // FIX: Убрали дублирование зависимостей. Теперь эффект зависит только от processImage и originalUrl.
   useEffect(() => {
     if (!originalUrl) return;
     if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
@@ -317,12 +318,14 @@ export function MonochromeBackgroundRemover() {
       processImage();
     }, DEBOUNCE_DELAY);
     return () => { if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current); };
-  }, [originalUrl, targetColor, contourColor, tolerances, smoothness, processingMode, floodPoints, edgeChoke, edgeBlur, edgePaint]);
+  }, [originalUrl, processImage]);
 
+  // FIX: Оставили только ручной триггер и отключили линтер, чтобы избежать бесконечного цикла обновлений.
   useEffect(() => {
     if (manualTrigger > 0 && processingMode === 'flood-clear') {
       processImage();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [manualTrigger]);
 
   const handleFilesSelected = (files: File[]) => {
