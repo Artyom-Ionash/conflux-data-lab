@@ -1,3 +1,4 @@
+import Image from "next/image";
 import React, { RefObject } from "react";
 
 interface DualHoverPreviewProps {
@@ -37,7 +38,15 @@ export function DualHoverPreview({
         className={`relative w-full bg-black rounded-lg overflow-hidden border-4 shadow-lg transition-all ${isActive ? borderColorClass : 'border-zinc-800'}`}
         style={aspectRatioStyle}
       >
-        {imageSrc && <img src={imageSrc} alt={label.toLowerCase()} className="w-full h-full object-contain" />}
+        {imageSrc && (
+          <Image
+            src={imageSrc}
+            alt={label.toLowerCase()}
+            fill
+            unoptimized // Важно для Data URL
+            className="object-contain"
+          />
+        )}
         {isActive && videoSrc && (
           <div className="absolute inset-0 bg-black">
             <video ref={videoRef} src={videoSrc} className="w-full h-full object-contain" muted playsInline />

@@ -1,3 +1,4 @@
+import Image from "next/image";
 import React, { useEffect, useMemo, useState } from "react";
 
 import { Checkerboard } from "@/app/components/ui/Checkerboard";
@@ -47,9 +48,12 @@ export function MultiScalePreview({ frames, fps }: MultiScalePreviewProps) {
             size={20}
           >
             <div style={{ width: size, height: size }}>
-              <img
+              <Image
                 src={currentSrc}
                 alt={`${size}px preview`}
+                width={size}
+                height={size}
+                unoptimized // Важно для Data URL
                 className="w-full h-full object-contain"
                 style={{ imageRendering: size < PIXELATED_THRESHOLD ? 'pixelated' : 'auto' }}
               />

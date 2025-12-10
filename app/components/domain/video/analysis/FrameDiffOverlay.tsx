@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
 
 interface FrameDiffOverlayProps {
@@ -28,8 +29,9 @@ export function FrameDiffOverlay({ image1, image2, isProcessing, onDataGenerated
         const ctx = canvas?.getContext("2d");
         if (!ctx || !canvas) return;
 
-        const firstImg = new Image();
-        const lastImg = new Image();
+        // Создаем изображения внутри промисов для корректной загрузки
+        const firstImg = new window.Image();
+        const lastImg = new window.Image();
 
         await Promise.all([
           new Promise<void>((resolve, reject) => { firstImg.onload = () => resolve(); firstImg.onerror = reject; firstImg.src = image1; }),
@@ -88,7 +90,7 @@ export function FrameDiffOverlay({ image1, image2, isProcessing, onDataGenerated
       }
     };
     processFrames();
-  }, [image1, image2]);
+  }, [image1, image2, onDataGenerated]); // Добавлена зависимость
 
   const isLoading = processingDiff || isProcessing;
 
@@ -105,10 +107,12 @@ export function FrameDiffOverlay({ image1, image2, isProcessing, onDataGenerated
       <canvas ref={canvasRef} className="hidden" />
 
       {overlayDataUrl && (
-        <img
+        <Image
           src={overlayDataUrl}
           alt="Diff Overlay"
-          className="absolute inset-0 w-full h-full object-contain"
+          fill
+          unoptimized // Важно для Data URL
+          className="object-contain"
         />
       )}
 
@@ -120,7 +124,7 @@ export function FrameDiffOverlay({ image1, image2, isProcessing, onDataGenerated
 
       {/* Overlay Legend */}
       {overlayDataUrl && (
-        <div className="absolute bottom-0 left-0 right-0 p-2 bg-gradient-to-t from-black/70 to-transparent flex gap-3 text-[10px] text-white font-medium opacity-0 group-hover:opacity-100 transition-opacity">
+        <div className="absolute bottom-0 left-0 right-0 p-2 bg-gradient-to-t from-black/70 to-transparent flex gap-3 text-[10px] text-white font-medium opacity-0 group-hover:opacity-100 transition-opacity z-20">
           <span className="flex items-center gap-1"><div className="h-2 w-2 rounded-full bg-red-500 shadow-sm" /> Старт</span>
           <span className="flex items-center gap-1"><div className="h-2 w-2 rounded-full bg-blue-500 shadow-sm" /> Финиш</span>
         </div>

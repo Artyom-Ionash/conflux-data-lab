@@ -1,6 +1,7 @@
+import Image from "next/image"; // 1. Импортируем компонент
 import React, { useMemo } from "react";
 
-// Определяем интерфейс локально, чтобы разорвать порочный круг зависимости
+// Определяем интерфейс локально
 interface FrameData {
   time: number;
   dataUrl: string | null;
@@ -10,8 +11,8 @@ interface SpriteFrameListProps {
   frames: FrameData[];
   maxHeight: number;
   spacing: number;
-  backgroundColor: string; // "transparent" или hex код
-  videoAspectRatio: number; // Передаем одно число вместо объекта размеров
+  backgroundColor: string;
+  videoAspectRatio: number;
 }
 
 const TIMESTAMP_CLASS = "absolute bottom-2 left-2 pointer-events-none bg-black/80 text-white px-2 py-0.5 rounded text-[11px] font-bold font-mono shadow-sm backdrop-blur-[1px]";
@@ -25,9 +26,9 @@ export function SpriteFrameList({
   videoAspectRatio
 }: SpriteFrameListProps) {
 
-  // Вычисляем ширину заглушки только один раз
-  const placeholderWidth = useMemo(() => {
-    return Math.floor(maxHeight * (videoAspectRatio || 1.77)); // 1.77 как дефолт (16:9)
+  // Вычисляем ширину для пропорционального отображения
+  const frameWidth = useMemo(() => {
+    return Math.floor(maxHeight * (videoAspectRatio || 1.77));
   }, [maxHeight, videoAspectRatio]);
 
   if (frames.length === 0) {
@@ -48,16 +49,20 @@ export function SpriteFrameList({
       {frames.map((frame, idx) => (
         <div key={idx} className="relative shrink-0 group">
           {frame.dataUrl ? (
-            <img
+            // 2. Используем Image вместо img
+            <Image
               src={frame.dataUrl}
               alt={`frame-${idx}`}
-              style={{ height: maxHeight, display: 'block' }}
-              className="shadow-sm rounded-sm"
+              width={frameWidth}
+              height={maxHeight}
+              unoptimized // Важно для Data URL (отключает серверную обработку)
+              className="shadow-sm rounded-sm object-contain"
+              style={{ height: maxHeight, width: frameWidth }} // Явно задаем размеры стилями для надежности
             />
           ) : (
             <div
               className="animate-pulse bg-black/5 rounded-sm"
-              style={{ height: maxHeight, width: placeholderWidth }}
+              style={{ height: maxHeight, width: frameWidth }}
             />
           )}
 
