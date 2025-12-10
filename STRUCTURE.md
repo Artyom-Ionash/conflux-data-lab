@@ -1,92 +1,135 @@
 # Структура проекта Conflux Data Lab
-
-Этот файл описывает **фактическую структуру файлов** проекта. Архитектурные принципы см. в `ARCHITECTURE.md`, общий обзор — в `README.md`.
-
-```
-conflux-data-lab/
-│
-├── app/                                        # Next.js App Router
-│   ├── components/                             # React компоненты
-│   │   ├── layout/                             # Компоненты макета
-│   │   │   ├── Header.tsx                      # Шапка сайта
-│   │   │   └── Footer.tsx                      # Подвал сайта
-│   │   ├── tools/                              # Компоненты инструментов
-│   │   │   ├── ToolCard.tsx                    # Карточка инструмента
-│   │   │   ├── ToolGrid.tsx                    # Сетка инструментов
-│   │   │   ├── json-to-csv/                    # Инструмент конвертации
+  
+  Этот файл описывает **фактическую структуру файлов** проекта. Архитектурные принципы см. в `ARCHITECTURE.md`, общий обзор — в `README.md`.
+  
+  > ⚠️ **Этот файл генерируется автоматически при коммите.** Не редактируйте вручную!
+  > 
+  > Для настройки генератора см. `scripts/update-structure.mjs` и `scripts/structure-config.mjs`
+  
+  ```
+  conflux-data-lab/
+  │
+  ├── app/ # Next.js App Router
+│   ├── components/
+│   │   ├── domain/
+│   │   │   ├── hardware/
+│   │   │   │   ├── TextureDimensionSlider.tsx
+│   │   │   │   └── TextureLimitIndicator.tsx
+│   │   │   └── video/
+│   │   │       ├── analysis/
+│   │   │       │   └── FrameDiffOverlay.tsx
+│   │   │       ├── player/
+│   │   │       │   └── RangeVideoPlayer.tsx
+│   │   │       ├── DualHoverPreview.tsx
+│   │   │       ├── MultiScalePreview.tsx
+│   │   │       └── SpriteFrameList.tsx
+│   │   ├── layout/
+│   │   │   ├── Footer.tsx
+│   │   │   └── Header.tsx
+│   │   ├── tools/
+│   │   │   ├── json-to-csv/
 │   │   │   │   └── JsonToCsvConverter.tsx
-│   │   │   ├── monochrome-remover/             # Инструмент удаления фона
+│   │   │   ├── monochrome-remover/
 │   │   │   │   └── MonochromeBackgroundRemover.tsx
-│   │   │   ├── vertical-aligner/               # Инструмент склейки изображений
+│   │   │   ├── vertical-aligner/
 │   │   │   │   └── VerticalImageAligner.tsx
-│   │   │   └── video-frame-extractor/          # Инструмент извлечения кадров
-│   │   │       ├── FrameDiffOverlay.tsx
-│   │   │       ├── RangeVideoPlayer.tsx
-│   │   │       └── VideoFrameExtractor.tsx
-│   │   └── ui/                                 # UI компоненты
-│   │       ├── Badge.tsx                       # Бейдж/тег
-│   │       ├── Canvas.tsx                      # Универсальное полотно (Zoom/Pan/Theme)
-│   │       ├── Card.tsx                        # Карточка
-│   │       └── RangeSlider.tsx                 # Слайдер с двумя курсорами
-│   │
-│   ├── tools/                                  # Маршруты инструментов
-│   │   └── [category]/                         # Динамический маршрут категории
-│   │       ├── page.tsx                        # Страница категории
-│   │       └── [toolId]/                       # Динамический маршрут инструмента
-│   │           └── page.tsx                    # Страница инструмента
-│   │
-│   ├── layout.tsx                              # Корневой layout
-│   ├── page.tsx                                # Главная страница
-│   └── globals.css                             # Глобальные стили
-│
-├── lib/                                        # Библиотека и утилиты
-│   ├── config/
-│   │   └── tools.ts                            # Конфигурация всех инструментов
+│   │   │   ├── video-frame-extractor/
+│   │   │   │   └── VideoFrameExtractor.tsx
+│   │   │   ├── ToolCard.tsx
+│   │   │   ├── ToolGrid.tsx
+│   │   │   └── ToolLayout.tsx
+│   │   └── ui/
+│   │       ├── Badge.tsx
+│   │       ├── Canvas.tsx
+│   │       ├── Card.tsx
+│   │       ├── Checkerboard.tsx
+│   │       ├── FileDropzone.tsx
+│   │       ├── ImageSequencePlayer.tsx
+│   │       ├── Modal.tsx
+│   │       ├── NumberStepper.tsx
+│   │       ├── RangeSlider.tsx
+│   │       ├── Slider.tsx
+│   │       ├── Switch.tsx
+│   │       ├── ToggleGroup.tsx
+│   │       └── ZoneIndicator.tsx
+│   ├── about/
+│   │   └── page.tsx
+│   ├── tools/
+│   │   └── [category]/
+│   │       ├── [toolId]/
+│   │       │   └── page.tsx
+│   │       └── page.tsx
+│   ├── favicon.ico
+│   ├── globals.css
+│   ├── layout.tsx
+│   └── page.tsx
+├── lib/ # Библиотека и утилиты
 │   ├── types/
-│   │   └── tools.ts                            # TypeScript типы
-│   └── utils/
-│       └── tool-loader.tsx                     # Загрузчик компонентов
-│
-├── public/                                     # Статические файлы
-│
-├── ARCHITECTURE.md                             # Детальное описание архитектуры
-├── README.md                                   # Основная документация
-└── STRUCTURE.md                                # Этот файл
+│   │   └── tools.ts
+│   ├── utils/
+│   │   └── tool-loader.tsx
+│   ├── config/
+│   │   └── tools.ts
+│   └── domain/
+│       └── hardware/
+│           └── texture-standards.ts
+├── public/ # Статические файлы
+│   ├── file.svg
+│   ├── globe.svg
+│   ├── next.svg
+│   ├── vercel.svg
+│   └── window.svg
+├── types/ # TypeScript типы
+│   └── gifshot.d.ts
+├── README.md # Основная документация
+├── ARCHITECTURE.md # Описание архитектуры
+├── STRUCTURE.md # Структура файлов (автогенерируется)
+├── package.json # Конфигурация npm
+├── tsconfig.json # Конфигурация TypeScript
+├── next.config.ts # Конфигурация Next.js
+├── scripts/ # Вспомогательные скрипты
+│   └── structure/
+│       ├── config.mjs
+│       └── update.mjs
+├── CHANGES_REVIEW.md # Обзор изменений
+├── eslint.config.mjs # Конфигурация ESLint
+├── next-env.d.ts
+├── package-lock.json
+└── postcss.config.mjs # Конфигурация PostCSS
 ```
-
-## Ключевые особенности структуры
-
-### 1. Модульность
-- Каждый инструмент - независимый компонент
-- Легко добавлять/удалять инструменты
-- Переиспользуемые UI компоненты
-
-### 2. Типобезопасность
-- Все типы определены в `lib/types/`
-- TypeScript проверяет корректность на этапе компиляции
-
-### 3. Масштабируемость
-- Новые инструменты добавляются в 3 шага:
-  1. Конфигурация в `lib/config/tools.ts`
-  2. Компонент в `app/components/tools/[tool-id]/`
-  3. Регистрация в `lib/utils/tool-loader.tsx`
-
-### 4. Организация по категориям
-- Инструменты группируются по категориям
-- URL структура: `/tools/[category]/[toolId]`
-- Легкая навигация и фильтрация
-
-## Примеры маршрутов
-
-- `/` - Главная страница со всеми инструментами
-- `/tools/conversion` - Все инструменты конвертации
-- `/tools/conversion/json-to-csv` - Конкретный инструмент
-
-## Следующие шаги
-
-1. Добавьте больше инструментов в `lib/config/tools.ts`
-2. Создайте компоненты для каждого инструмента
-3. Зарегистрируйте компоненты в `lib/utils/tool-loader.tsx`
-4. Настройте стили под ваш бренд
-
-
+  
+  ## Ключевые особенности структуры
+  
+  ### 1. Модульность
+  - Каждый инструмент - независимый компонент
+  - Легко добавлять/удалять инструменты
+  - Переиспользуемые UI компоненты
+  
+  ### 2. Типобезопасность
+  - Все типы определены в `lib/types/`
+  - TypeScript проверяет корректность на этапе компиляции
+  
+  ### 3. Масштабируемость
+  - Новые инструменты добавляются в 3 шага:
+    1. Конфигурация в `lib/config/tools.ts`
+    2. Компонент в `app/components/tools/[tool-id]/`
+    3. Регистрация в `lib/utils/tool-loader.tsx`
+  
+  ### 4. Организация по категориям
+  - Инструменты группируются по категориям
+  - URL структура: `/tools/[category]/[toolId]`
+  - Легкая навигация и фильтрация
+  
+  ## Примеры маршрутов
+  
+  - `/` - Главная страница со всеми инструментами
+  - `/tools/conversion` - Все инструменты конвертации
+  - `/tools/conversion/json-to-csv` - Конкретный инструмент
+  
+  ## Следующие шаги
+  
+  1. Добавьте больше инструментов в `lib/config/tools.ts`
+  2. Создайте компоненты для каждого инструмента
+  3. Зарегистрируйте компоненты в `lib/utils/tool-loader.tsx`
+  4. Настройте стили под ваш бренд
+  
