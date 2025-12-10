@@ -1,12 +1,14 @@
 'use client';
 
-import React, { useCallback, useMemo, useState, useRef, useEffect } from 'react';
+import React, { useCallback, useEffect,useMemo, useRef, useState } from 'react';
+
+import { TextureDimensionSlider } from '@/app/components/domain/hardware/TextureDimensionSlider';
+
 import { Canvas, CanvasRef } from '../../ui/Canvas';
 import { FileDropzone, FileDropzonePlaceholder } from '../../ui/FileDropzone';
-import { ToolLayout } from '../ToolLayout';
-import { Switch } from '../../ui/Switch';
-import { TextureDimensionSlider } from '@/app/components/domain/hardware/TextureDimensionSlider';
 import { Slider } from '../../ui/Slider';
+import { Switch } from '../../ui/Switch';
+import { ToolLayout } from '../ToolLayout';
 
 // --- CONSTANTS ---
 const LIMIT_MAX_BROWSER = 16384; // Используется только как предел слайдера UI

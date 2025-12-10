@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
+
 import {
   analyzeTextureSize,
   getNearestPoT,
+  HARDWARE_STANDARD_YEAR,
   isPowerOfTwo,
   TEXTURE_LIMITS,
-  TEXTURE_ZONES,
-  HARDWARE_STANDARD_YEAR
-} from '@/lib/domain/hardware/texture-standards';
+  TEXTURE_ZONES} from '@/lib/domain/hardware/texture-standards';
 
 interface TextureDimensionSliderProps {
   label: string;

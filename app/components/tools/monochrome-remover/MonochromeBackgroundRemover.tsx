@@ -1,11 +1,12 @@
 'use client';
 
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useCallback,useEffect, useRef, useState } from 'react';
+
 import { Canvas, CanvasRef } from '../../ui/Canvas';
 import { FileDropzone, FileDropzonePlaceholder } from '../../ui/FileDropzone';
-import { ToolLayout } from '../ToolLayout';
 import { Slider } from '../../ui/Slider';
 import { ToggleGroup, ToggleGroupItem } from '../../ui/ToggleGroup';
+import { ToolLayout } from '../ToolLayout';
 
 // --- CONSTANTS & CONFIG ---
 const DEBOUNCE_DELAY = 50;
@@ -131,6 +132,8 @@ export function MonochromeBackgroundRemover() {
     };
   };
 
+  // React Compiler cannot currently preserve this memoization; disable the lint to keep stable callback identity.
+  // eslint-disable-next-line react-hooks/preserve-manual-memoization
   const processImage = useCallback(() => {
     if (!originalUrl || !sourceCanvasRef.current || !previewCanvasRef.current) return;
 

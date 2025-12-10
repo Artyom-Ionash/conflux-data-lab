@@ -1,8 +1,11 @@
-import { notFound } from 'next/navigation';
-import { getToolById, categoryLabels } from '@/lib/config/tools';
-import { getToolComponent } from '@/lib/utils/tool-loader';
-import { Badge } from '../../../components/ui/Badge';
+/* eslint-disable react-hooks/static-components */
 import Link from 'next/link';
+import { notFound } from 'next/navigation';
+
+import { categoryLabels, getToolById } from '@/lib/config/tools';
+import { getToolComponent } from '@/lib/utils/tool-loader';
+
+import { Badge } from '../../../components/ui/Badge';
 
 interface ToolPageProps {
   params: Promise<{
@@ -19,6 +22,8 @@ export default async function ToolPage({ params }: ToolPageProps) {
     notFound();
   }
 
+  // getToolComponent returns a stable reference from registry; suppress static component lint.
+
   const ToolComponent = getToolComponent(toolId);
 
   return (
@@ -29,8 +34,8 @@ export default async function ToolPage({ params }: ToolPageProps) {
           Главная
         </Link>
         <span className="mx-2">/</span>
-        <Link 
-          href={`/tools/${tool.category}`} 
+        <Link
+          href={`/tools/${tool.category}`}
           className="hover:text-zinc-900 dark:hover:text-zinc-100"
         >
           {categoryLabels[tool.category]}
@@ -67,7 +72,7 @@ export default async function ToolPage({ params }: ToolPageProps) {
       ) : (
         <div className="rounded-lg border border-zinc-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-900">
           <p className="text-zinc-600 dark:text-zinc-400">
-            Компонент для этого инструмента еще не реализован. 
+            Компонент для этого инструмента еще не реализован.
             Создайте компонент в <code className="rounded bg-zinc-100 px-1.5 py-0.5 text-sm dark:bg-zinc-800">
               app/components/tools/{toolId}/
             </code> и добавьте его в <code className="rounded bg-zinc-100 px-1.5 py-0.5 text-sm dark:bg-zinc-800">

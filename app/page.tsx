@@ -1,4 +1,5 @@
-import { tools, toolsByCategory, categoryLabels } from '@/lib/config/tools';
+import { categoryLabels,tools, toolsByCategory } from '@/lib/config/tools';
+
 import { ToolGrid } from './components/tools/ToolGrid';
 import { Badge } from './components/ui/Badge';
 

@@ -1,29 +1,28 @@
 "use client";
 
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { CreateGIFResult } from "gifshot";
 import gifshot from "gifshot";
-
-// UI Imports
-import { ToolLayout } from "../ToolLayout";
-import { FileDropzone, FileDropzonePlaceholder } from "../../ui/FileDropzone";
-import { RangeSlider } from "../../ui/RangeSlider";
-import { Switch } from "../../ui/Switch";
-import { ImageSequencePlayer } from "../../ui/ImageSequencePlayer";
-import { Card } from "../../ui/Card";
-// Shared UI Components
-import { NumberStepper } from "../../ui/NumberStepper";
-import { Modal } from "../../ui/Modal";
-import { Checkerboard } from "../../ui/Checkerboard"
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 // Specific Domain UI Import
 import { TextureLimitIndicator } from "@/app/components/domain/hardware/TextureLimitIndicator";
-
 // Domain Logic Import
 import { TEXTURE_LIMITS } from "@/lib/domain/hardware/texture-standards";
 
+import { Card } from "../../ui/Card";
+import { Checkerboard } from "../../ui/Checkerboard"
+import { FileDropzone, FileDropzonePlaceholder } from "../../ui/FileDropzone";
+import { ImageSequencePlayer } from "../../ui/ImageSequencePlayer";
+import { Modal } from "../../ui/Modal";
+// Shared UI Components
+import { NumberStepper } from "../../ui/NumberStepper";
+import { RangeSlider } from "../../ui/RangeSlider";
+import { Switch } from "../../ui/Switch";
+// UI Imports
+import { ToolLayout } from "../ToolLayout";
+import { FrameDiffOverlay } from "./FrameDiffOverlay";
 // Tool Specific Imports
 import { RangeVideoPlayer } from "./RangeVideoPlayer";
-import { FrameDiffOverlay } from "./FrameDiffOverlay";
 
 // --- CONSTANTS ---
 const TIMESTAMP_HTML_CLASS = "absolute bottom-2 left-2 pointer-events-none bg-black/80 text-white px-2 py-0.5 rounded text-[11px] font-bold font-mono shadow-sm backdrop-blur-[1px]";
@@ -151,7 +150,6 @@ function useSpriteSheetGenerator() {
 }
 
 function useVideoFrameExtraction() {
-  const [videoFile, setVideoFile] = useState<File | null>(null);
   const [videoSrc, setVideoSrc] = useState<string | null>(null);
   const [videoDuration, setVideoDuration] = useState<number | null>(null);
   const [videoDimensions, setVideoDimensions] = useState<{ width: number; height: number } | null>(null);
@@ -247,7 +245,6 @@ function useVideoFrameExtraction() {
   const handleFilesSelected = useCallback(async (files: File[]) => {
     if (!files.length) return;
     const file = files[0];
-    setVideoFile(file);
     setRawFrames([]);
     setPreviewFrames({ start: null, end: null });
     setError(null);
@@ -337,9 +334,12 @@ function useVideoFrameExtraction() {
         await new Promise(r => requestAnimationFrame(r));
       }
       setStatus({ isProcessing: false, currentStep: "", progress: 100 });
-    } catch (e: any) {
-      if (e.message !== "Aborted") {
-        setError(e instanceof Error ? e.message : "Error");
+    } catch (e: unknown) {
+      if (e instanceof Error && e.message !== "Aborted") {
+        setError(e.message);
+        setStatus({ isProcessing: false, currentStep: "", progress: 0 });
+      } else if (!(e instanceof Error)) {
+        setError("Error");
         setStatus({ isProcessing: false, currentStep: "", progress: 0 });
       }
     }
@@ -366,15 +366,15 @@ function useVideoFrameExtraction() {
           gifWidth: videoDimensions?.width || 300,
           gifHeight: videoDimensions?.height || 200,
           numFrames: validFrames.length,
-        }, (obj: any) => {
-          if (!obj.error) {
+        }, (obj: CreateGIFResult) => {
+          if (!obj.error && obj.image) {
             const a = document.createElement('a');
             a.href = obj.image;
             a.download = 'animation.gif';
             a.click();
             setGifParams(p => ({ ...p, dataUrl: obj.image }));
           } else {
-            setError("Error: " + obj.errorCode);
+            setError(`Error: ${obj.errorCode ?? obj.errorMsg ?? "unknown"}`);
           }
           setStatus({ isProcessing: false, currentStep: "", progress: 0 });
         });
@@ -458,8 +458,9 @@ export function VideoFrameExtractor() {
       a.href = url;
       a.download = 'spritesheet.png';
       a.click();
-    } catch (e: any) {
-      alert(e.message || "Ошибка генерации");
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : "Ошибка генерации";
+      alert(message);
       console.error(e);
     }
   };
@@ -562,7 +563,7 @@ export function VideoFrameExtractor() {
           <div className="flex-1 overflow-y-auto p-4 space-y-4">
 
             {/* CONTROLS */}
-            <Card className="shadow-sm" contentClassName="p-4">
+            <Card className="shadow-sm relative z-20 overflow-visible" contentClassName="p-4">
               <div className="flex flex-col gap-4">
                 <div className="space-y-4">
                   <div className="flex flex-wrap items-center justify-between gap-y-3 gap-x-6">

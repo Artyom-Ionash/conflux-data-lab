@@ -1,7 +1,7 @@
 'use client';
 
-import * as React from 'react';
 import * as ToggleGroupPrimitive from '@radix-ui/react-toggle-group';
+import * as React from 'react';
 
 // Хелпер для объединения классов
 function cx(...classes: (string | undefined | null | false)[]) {

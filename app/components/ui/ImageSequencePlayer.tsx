@@ -28,7 +28,7 @@ export function ImageSequencePlayer({
     indexRef.current = 0;
   }
 
-  const animate = useCallback((time: number) => {
+  const animate = useCallback(function animate(time: number) {
     if (previousTimeRef.current !== undefined) {
       const deltaTime = time - previousTimeRef.current;
       const interval = 1000 / fps;

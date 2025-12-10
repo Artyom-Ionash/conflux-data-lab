@@ -40,10 +40,10 @@ declare module 'gifshot' {
     progressCallback?: (progress: number) => void;
 
     // Fallbacks / misc
-    error?: (err: any) => void;
+    error?: (err: unknown) => void;
 
     // Any other provider-specific options
-    [key: string]: any;
+    [key: string]: unknown;
   }
 
   /**
@@ -60,7 +60,7 @@ declare module 'gifshot' {
     // Blob or ArrayBuffer could be present in custom builds
     blob?: Blob;
     // Additional fields
-    [key: string]: any;
+    [key: string]: unknown;
   }
 
   /**
@@ -97,7 +97,7 @@ declare module 'gifshot' {
     getBase64GIF?: () => string | undefined;
 
     // Any other methods
-    [key: string]: any;
+    [key: string]: unknown;
   }
 
   /**

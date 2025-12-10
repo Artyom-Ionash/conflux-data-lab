@@ -27,7 +27,6 @@ export function RangeVideoPlayer({
     if (videoRef.current && Math.abs(videoRef.current.currentTime - startTime) > 0.1) {
       if (!isPlaying) {
         videoRef.current.currentTime = startTime;
-        setCurrentTime(startTime);
       }
     }
   }, [startTime, isPlaying]);
@@ -93,7 +92,8 @@ export function RangeVideoPlayer({
 
   if (!src) return null;
 
-  const progress = Math.max(0, Math.min(100, ((currentTime - startTime) / (endTime - startTime)) * 100));
+  const displayTime = isPlaying ? currentTime : startTime;
+  const progress = Math.max(0, Math.min(100, ((displayTime - startTime) / (endTime - startTime)) * 100));
 
   return (
     <div className={`relative bg-black group ${className}`}>

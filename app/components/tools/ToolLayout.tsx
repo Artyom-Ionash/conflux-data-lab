@@ -1,7 +1,8 @@
 'use client';
 
-import React, { ReactNode } from 'react';
 import * as ScrollArea from '@radix-ui/react-scroll-area';
+import Link from 'next/link';
+import React, { ReactNode } from 'react';
 
 interface ToolLayoutProps {
   title: string;
@@ -17,9 +18,9 @@ export function ToolLayout({ title, sidebar, children }: ToolLayoutProps) {
           <ScrollArea.Viewport className="w-full h-full p-5">
 
             {/* Header */}
-            <a href="/" className="mb-4 inline-flex items-center gap-2 text-sm font-medium text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-200 transition-colors">
+            <Link href="/" className="mb-4 inline-flex items-center gap-2 text-sm font-medium text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-200 transition-colors">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 12H5M12 19l-7-7 7-7" /></svg> На главную
-            </a>
+            </Link>
             <h2 className="mb-6 text-xl font-bold">{title}</h2>
 
             {/* Sidebar Content */}

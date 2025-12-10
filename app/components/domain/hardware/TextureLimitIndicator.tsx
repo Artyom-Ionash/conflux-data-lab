@@ -1,11 +1,11 @@
 import React from 'react';
+
 import { ZoneIndicator } from '@/app/components/ui/ZoneIndicator';
 import {
   analyzeTextureSize,
+  HARDWARE_STANDARD_YEAR,
   TEXTURE_LIMITS,
-  TEXTURE_ZONES,
-  HARDWARE_STANDARD_YEAR
-} from '@/lib/domain/hardware/texture-standards';
+  TEXTURE_ZONES} from '@/lib/domain/hardware/texture-standards';
 
 interface TextureLimitIndicatorProps {
   value: number;

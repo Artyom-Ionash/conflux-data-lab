@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useRef, useState, useImperativeHandle, forwardRef, ReactNode, useEffect, useCallback, useLayoutEffect } from 'react';
+import React, { forwardRef, ReactNode, useCallback, useEffect, useImperativeHandle, useLayoutEffect,useRef, useState } from 'react';
 
 // --- CONSTANTS ---
 const DEFAULT_SCALE_MIN = 0.05;

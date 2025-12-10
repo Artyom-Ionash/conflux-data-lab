@@ -1,6 +1,7 @@
 import { Tool } from '@/lib/types/tools';
-import { Card } from '../ui/Card';
+
 import { Badge } from '../ui/Badge';
+import { Card } from '../ui/Card';
 
 interface ToolCardProps {
   tool: Tool;
