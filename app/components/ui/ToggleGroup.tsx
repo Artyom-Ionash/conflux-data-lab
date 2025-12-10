@@ -10,13 +10,11 @@ function cx(...classes: (string | undefined | null | false)[]) {
 
 // --- Props ---
 
-// FIX: Используем type вместо interface, чтобы избежать ошибки "statically known members"
 type ToggleGroupProps = React.ComponentPropsWithoutRef<typeof ToggleGroupPrimitive.Root> & {
   /** Количество колонок в сетке. Если указано, включается display: grid. */
   gridCols?: number;
 };
 
-// FIX: Используем type вместо interface
 type ToggleGroupItemProps = React.ComponentPropsWithoutRef<typeof ToggleGroupPrimitive.Item> & {
   /** Растянуть элемент на всю ширину сетки (col-span-full) */
   fullWidth?: boolean;
@@ -27,7 +25,7 @@ type ToggleGroupItemProps = React.ComponentPropsWithoutRef<typeof ToggleGroupPri
 const ToggleGroup = React.forwardRef<
   HTMLDivElement,
   ToggleGroupProps
->(({ className, children, gridCols, style, onKeyDown, ...props }, ref) => {
+>(({ className, children, gridCols, style, ...props }, ref) => { // <-- Убрали onKeyDown отсюда
 
   const baseStyles = "bg-zinc-100 dark:bg-zinc-800 p-1 rounded-lg gap-1";
   const layoutStyles = gridCols ? "grid" : "inline-flex flex-row";
@@ -39,14 +37,13 @@ const ToggleGroup = React.forwardRef<
     }
     : style || {};
 
-
   return (
     <ToggleGroupPrimitive.Root
       ref={ref}
       className={cx(baseStyles, layoutStyles, className)}
       style={dynamicStyle}
-      loop={true} // Включаем зацикливание навигации
-      {...props}
+      loop={true}
+      {...props} // <-- Теперь onKeyDown (если есть) передан здесь
     >
       {children}
     </ToggleGroupPrimitive.Root>
