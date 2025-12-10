@@ -1,9 +1,11 @@
-import { Tool } from '@/lib/types/tools';
+// 1. Импортируем ToolConfig вместо Tool
+import { ToolConfig } from '@/lib/types/tools';
 
 import { ToolCard } from './ToolCard';
 
 interface ToolGridProps {
-  tools: Tool[];
+  // 2. Указываем правильный тип массива
+  tools: ToolConfig[];
 }
 
 export function ToolGrid({ tools }: ToolGridProps) {
@@ -23,5 +25,3 @@ export function ToolGrid({ tools }: ToolGridProps) {
     </div>
   );
 }
-
-

@@ -1,10 +1,10 @@
-import { Tool } from '@/lib/types/tools';
+import { ToolConfig } from '@/lib/types/tools'; // <-- 1. Импортируем правильное имя
 
 import { Badge } from '../ui/Badge';
 import { Card } from '../ui/Card';
 
 interface ToolCardProps {
-  tool: Tool;
+  tool: ToolConfig; // <-- 2. Используем правильный тип здесь
 }
 
 export function ToolCard({ tool }: ToolCardProps) {
@@ -33,4 +33,3 @@ export function ToolCard({ tool }: ToolCardProps) {
     </Card>
   );
 }
-
