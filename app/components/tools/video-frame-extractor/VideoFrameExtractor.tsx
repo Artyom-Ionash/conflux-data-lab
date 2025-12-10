@@ -291,13 +291,13 @@ function useVideoFrameExtraction() {
         setStatus({ isProcessing: false, currentStep: "", progress: 0 });
       }
     }
-  }, [videoSrc, extractionParams.startTime, extractionParams.endTime, extractionParams.frameStep, effectiveEnd]);
+  }, [videoSrc, extractionParams.startTime, extractionParams.frameStep, effectiveEnd]);
 
   useEffect(() => {
     if (!videoSrc) return;
     const timer = setTimeout(() => runExtraction(), 600);
     return () => clearTimeout(timer);
-  }, [runExtraction]);
+  }, [runExtraction, videoSrc]);
 
   const generateAndDownloadGif = useCallback(() => {
     const validFrames = frames.filter(f => f.dataUrl !== null);
