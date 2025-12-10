@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useCallback,useEffect, useRef, useState } from 'react';
+import Image from 'next/image';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 
 import { Canvas, CanvasRef } from '../../ui/Canvas';
 import { FileDropzone, FileDropzonePlaceholder } from '../../ui/FileDropzone';
@@ -107,7 +108,8 @@ export function MonochromeBackgroundRemover() {
   // --- LOGIC ---
 
   const loadOriginalToCanvas = (url: string) => {
-    const img = new Image();
+    // Используем window.Image, чтобы избежать конфликта с компонентом Image из Next.js
+    const img = new window.Image();
     img.crossOrigin = "Anonymous";
     img.src = url;
     img.onload = () => {
@@ -331,7 +333,8 @@ export function MonochromeBackgroundRemover() {
     setFloodPoints([]);
     loadOriginalToCanvas(url);
 
-    const img = new Image();
+    // Используем window.Image для обработки данных
+    const img = new window.Image();
     img.src = url;
     img.onload = () => {
       const c = document.createElement('canvas');
@@ -467,7 +470,14 @@ export function MonochromeBackgroundRemover() {
             <div className="flex flex-col gap-2">
               <div className="flex gap-3 items-center">
                 <div className="w-8 h-8 rounded border cursor-crosshair overflow-hidden relative group dark:border-zinc-700 flex-shrink-0 bg-white">
-                  <img src={originalUrl} className="w-full h-full object-cover" onClick={handleEyedropper} alt="picker" />
+                  <Image
+                    src={originalUrl}
+                    alt="picker"
+                    fill
+                    className="object-cover"
+                    onClick={handleEyedropper}
+                    unoptimized // Важно для blob: URL
+                  />
                 </div>
                 <div className="flex-1 flex items-center gap-2 p-2 border rounded bg-zinc-50 dark:bg-zinc-800 dark:border-zinc-700">
                   <input type="color" value={targetColor} onChange={e => setTargetColor(e.target.value)} className="w-6 h-6 bg-transparent border-none cursor-pointer" />

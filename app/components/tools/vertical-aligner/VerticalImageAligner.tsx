@@ -1,6 +1,8 @@
+
 'use client';
 
-import React, { useCallback, useEffect,useMemo, useRef, useState } from 'react';
+import Image from 'next/image';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { TextureDimensionSlider } from '@/app/components/domain/hardware/TextureDimensionSlider';
 
@@ -108,7 +110,24 @@ const DraggableImageSlot = React.memo(({ img, index, slotHeight, slotWidth, getC
       >
         {Math.round(img.offsetX)}, {Math.round(img.offsetY)}
       </div>
-      <img src={img.url} draggable={false} alt="" className="absolute select-none origin-top-left max-w-none" style={{ left: 0, top: 0, transform: `translate3d(${img.offsetX}px, ${img.offsetY}px, 0)`, width: img.naturalWidth, height: img.naturalHeight, backfaceVisibility: 'hidden', imageRendering: 'inherit' }} />
+      <Image
+        src={img.url}
+        alt=""
+        draggable={false}
+        width={img.naturalWidth}
+        height={img.naturalHeight}
+        unoptimized // Важно для blob: URL
+        className="absolute select-none origin-top-left max-w-none"
+        style={{
+          left: 0,
+          top: 0,
+          transform: `translate3d(${img.offsetX}px, ${img.offsetY}px, 0)`,
+          width: img.naturalWidth,
+          height: img.naturalHeight,
+          backfaceVisibility: 'hidden',
+          imageRendering: 'inherit'
+        }}
+      />
     </div>
   );
 });
@@ -197,7 +216,8 @@ export function VerticalImageAligner() {
     setImages((prev) => [...prev, ...newImages]);
 
     newImages.forEach((item, idx) => {
-      const img = new Image();
+      // Используем window.Image для обработки данных
+      const img = new window.Image();
       img.onload = () => {
         if (isListEmpty && idx === 0) {
           setSlotHeight(img.height);
@@ -235,8 +255,9 @@ export function VerticalImageAligner() {
     if (!images.length) return; // Removed isCriticalHeight check
     setIsExporting(true);
     try {
+      // Используем window.Image для экспорта
       const loaded = await Promise.all(images.map((item) => new Promise<{ meta: AlignImage; img: HTMLImageElement }>((resolve, reject) => {
-        const i = new Image(); i.onload = () => resolve({ meta: item, img: i }); i.onerror = () => reject(); i.src = item.url;
+        const i = new window.Image(); i.onload = () => resolve({ meta: item, img: i }); i.onerror = () => reject(); i.src = item.url;
       })));
 
       const finalW = slotWidth;

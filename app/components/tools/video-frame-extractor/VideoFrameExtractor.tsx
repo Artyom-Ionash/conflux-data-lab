@@ -76,7 +76,7 @@ function useSpriteSheetGenerator() {
       }
 
       for (let i = 0; i < validFrames.length; i++) {
-        const img = new Image();
+        const img = new window.Image();
         await new Promise<void>((resolve) => { img.onload = () => resolve(); img.src = validFrames[i].dataUrl!; });
         const x = i * (scaledWidth + options.spacing);
         ctx.drawImage(img, x, 0, scaledWidth, scaledHeight);
