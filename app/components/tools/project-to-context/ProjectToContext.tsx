@@ -11,25 +11,27 @@ import { ToolLayout } from "../ToolLayout";
 const PRESETS = {
   godot: {
     name: "Godot 4 (Logic Only)",
+    // Файлы, содержимое которых мы ХОТИМ читать
     textExtensions: [".gd", ".tscn", ".godot", ".tres", ".cfg", ".gdshader", ".json", ".txt", ".md", ".py"],
+    // Папки и файлы, которые мы вообще НЕ ХОТИМ видеть (даже в дереве)
     hardIgnore: [
       ".git", ".godot", ".import", "builds", "__pycache__", "node_modules",
-      ".next", ".vscode", ".idea", "*.uid", "*.import"
+      ".next", ".vscode", ".idea", "*.uid", "*.import", ".DS_Store"
     ]
   },
   nextjs: {
     name: "Next.js / React",
     textExtensions: [".ts", ".tsx", ".js", ".jsx", ".css", ".scss", ".json", ".md", ".env.example", ".config.js"],
-    hardIgnore: [".git", "node_modules", ".next", "dist", "build", "coverage", "package-lock.json", "yarn.lock"]
+    hardIgnore: [".git", "node_modules", ".next", "dist", "build", "coverage", "package-lock.json", "yarn.lock", "pnpm-lock.yaml", ".DS_Store"]
   }
 };
 
-// Explicit mapping for Gemini's syntax highlighter
+// Explicit mapping for Gemini's syntax highlighter (Expert Routing)
 const LANGUAGE_MAP: Record<string, string> = {
   js: "javascript",
-  jsx: "javascript", // or jsx
+  jsx: "javascript",
   ts: "typescript",
-  tsx: "typescript", // or tsx
+  tsx: "typescript",
   py: "python",
   gd: "gdscript",
   shader: "glsl",
@@ -40,9 +42,11 @@ const LANGUAGE_MAP: Record<string, string> = {
   json: "json",
   md: "markdown",
   txt: "text",
-  godot: "ini", // Godot configs look like INI
+  godot: "ini",
   tscn: "ini",
-  tres: "ini"
+  tres: "ini",
+  yaml: "yaml",
+  yml: "yaml"
 };
 
 type PresetKey = keyof typeof PRESETS;
@@ -53,6 +57,21 @@ interface FileNode {
   size: number;
   file: File;
   isText: boolean;
+}
+
+interface ProjectStats {
+  totalFiles: number;
+  processedFiles: number;
+  totalChars: number;
+  estimatedTokens: number;
+  originalSize: number;
+  cleanedSize: number;
+  savings: {
+    bytes: number;
+    percentage: number;
+  };
+  composition: Record<string, number>; // Extension -> Count
+  topFiles: { path: string; size: number; tokens: number }[];
 }
 
 // --- HELPERS ---
@@ -73,10 +92,15 @@ function getLanguageTag(filename: string): string {
 
 function isTextFile(filename: string, extensions: string[]): boolean {
   const lowerName = filename.toLowerCase();
+
+  // Жесткий запрет для лок-файлов
   if (lowerName === "package-lock.json" || lowerName === "yarn.lock" || lowerName === "pnpm-lock.yaml" || lowerName === "bun.lockb") {
     return false;
   }
+
+  // Всегда разрешенные
   if (lowerName.endsWith("project.godot") || lowerName.endsWith("package.json") || lowerName === "dockerfile") return true;
+
   return extensions.some(ext => lowerName.endsWith(ext));
 }
 
@@ -88,6 +112,7 @@ function shouldIgnore(path: string, ignorePatterns: string[]): boolean {
     if (pattern.startsWith("*.")) {
       if (filename.endsWith(pattern.slice(1))) return true;
     } else {
+      // Точное совпадение папки или файла
       if (normalizedPath.includes(`/${pattern}/`) || normalizedPath.startsWith(`${pattern}/`) || normalizedPath === pattern) {
         return true;
       }
@@ -97,12 +122,13 @@ function shouldIgnore(path: string, ignorePatterns: string[]): boolean {
 }
 
 // --- LOGIC: AGGRESSIVE PREPROCESSING ---
-// Keeps the file size small and removes noise that confuses LLMs
+// Уменьшает размер контекста, удаляя шум, который не нужен LLM для понимания логики
 
 function preprocessContent(content: string, extension: string): string {
   let cleaned = content;
 
   if (extension === 'tscn' || extension === 'tres') {
+    // 1. УДАЛЕНИЕ "ШУМНЫХ" ПОД-РЕСУРСОВ
     const noiseTypes = [
       'AtlasTexture', 'StyleBoxTexture', 'StyleBoxFlat', 'Theme',
       'TileSetAtlasSource', 'BitMap', 'Gradient', 'GradientTexture1D',
@@ -113,20 +139,33 @@ function preprocessContent(content: string, extension: string): string {
 
     const noiseRegex = new RegExp(`\\[sub_resource type="(${noiseTypes})"[\\s\\S]*?(?=\\n\\[|$)`, 'g');
     cleaned = cleaned.replace(noiseRegex, "");
+
+    // 2. ОЧИСТКА ВНЕШНИХ РЕСУРСОВ (Картинки, звуки)
     cleaned = cleaned.replace(/^\[ext_resource.*path=".*\.(png|jpg|jpeg|webp|svg|mp3|wav|ogg|ttf|otf)".*\]$/gm, "");
+
+    // 3. СЖАТИЕ АНИМАЦИЙ
     cleaned = cleaned.replace(/(\[sub_resource type="Animation"[^\]]*\])([\s\S]*?)(?=\[|$)/g, (match, header, body) => {
       const nameMatch = body.match(/resource_name\s*=\s*"([^"]+)"/);
       const animName = nameMatch ? nameMatch[1] : "unnamed";
       return `${header}\n; Animation "${animName}" (data stripped)\n`;
     });
+
+    // 4. УДАЛЕНИЕ ТРЕКОВ АНИМАЦИИ
     cleaned = cleaned.replace(/^tracks\/.*$/gm, "");
+
+    // 5. ОЧИСТКА МАССИВОВ ДАННЫХ
     const arrayRegex = /\b(PackedByteArray|PackedVector2Array|PackedInt32Array|PackedFloat32Array|PackedStringArray|PackedColorArray)\s*\(([^)]*)\)/g;
     cleaned = cleaned.replace(arrayRegex, '$1(...)');
+
+    // 6. ОЧИСТКА СВОЙСТВ
     cleaned = cleaned.replace(/^region_rect = .*$/gm, "");
+
+    // 7. УДАЛЕНИЕ ПУСТЫХ СТРОК (сжатие вертикального пространства)
     cleaned = cleaned.replace(/\n{3,}/g, "\n\n");
   }
 
   if (extension === 'godot') {
+    // Упрощаем Input Map в конфиге
     cleaned = cleaned.replace(/Object\((InputEvent[^,]+),[^)]+\)/g, "$1(...)");
     cleaned = cleaned.replace(/"events": \[\]/g, "");
     cleaned = cleaned.replace(/\n\n\[/g, "\n[");
@@ -200,7 +239,9 @@ export function ProjectToContext() {
   const [processing, setProcessing] = useState(false);
   const [progress, setProgress] = useState(0);
   const [result, setResult] = useState<string | null>(null);
-  const [stats, setStats] = useState<{ files: number, textFiles: number, chars: number } | null>(null);
+
+  // New Stats State
+  const [stats, setStats] = useState<ProjectStats | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -214,6 +255,7 @@ export function ProjectToContext() {
     if (!e.target.files) return;
     const fileList = Array.from(e.target.files);
 
+    // --- AUTO-DETECT PRESET ---
     let detectedPreset: PresetKey | null = null;
     const fileNames = fileList.map(f => f.name);
 
@@ -270,82 +312,137 @@ export function ProjectToContext() {
     setProgress(0);
     setResult(null);
 
+    // Сортировка: конфиги выше, код посередине, ассеты ниже
     const sortedFiles = [...files].sort((a, b) => {
       const score = (name: string) => {
-        if (name === 'project.godot') return 0;
-        if (name.endsWith('.gd')) return 1;
-        if (name.endsWith('.py')) return 1;
-        if (name.endsWith('.tscn')) return 2;
+        if (name === 'project.godot' || name === 'package.json') return 0;
+        if (name.endsWith('.gd') || name.endsWith('.ts') || name.endsWith('.js') || name.endsWith('.py')) return 1;
+        if (name.endsWith('.tscn') || name.endsWith('.tsx')) return 2;
         return 3;
       };
       return score(a.name) - score(b.name);
     });
 
-    // --- GEMINI-OPTIMIZED HEADER ---
-    // Используем XML для структуры и естественный язык для инструкций
-    let output = `<codebase_context>
-<instruction>
-The following is a flattened representation of a project codebase. 
-1. Use the <directory_structure> to understand the file hierarchy.
-2. Each file is wrapped in a <file> tag with its path attribute.
-3. Code blocks utilize standard Markdown triple backticks with language tags for correct syntax highlighting.
-</instruction>
-
-`;
-
-    if (includeTree) {
-      output += `<directory_structure>
-\`\`\`text
-${generateTree(sortedFiles)}
-\`\`\`
-</directory_structure>
-
-`;
-    }
-
-    output += `<source_files>\n\n`;
+    // 1. Инициализация переменных статистики
+    let totalOriginalBytes = 0;
+    let totalCleanedBytes = 0;
+    const composition: Record<string, number> = {};
+    const processedFileStats: { path: string; size: number; tokens: number }[] = [];
+    const processedFilesData: { node: FileNode; content: string; langTag: string }[] = [];
 
     let processedCount = 0;
-    let textFileCount = 0;
 
+    // 2. ФАЗА ЧТЕНИЯ И ОБРАБОТКИ
     for (const node of sortedFiles) {
       if (!node.isText) {
         processedCount++;
         continue;
       }
 
-      textFileCount++;
-
-      // XML Wrapper for explicit context boundaries
-      output += `<file path="${node.path}">\n`;
       try {
         const originalText = await readFileAsText(node.file);
+        totalOriginalBytes += originalText.length;
+
         const ext = node.name.split('.').pop() || "txt";
         const cleanedText = preprocessContent(originalText, ext);
-        const langTag = getLanguageTag(node.name);
 
-        // Markdown block for Model's "Code Mode" activation
-        output += "```" + langTag + "\n";
-        output += cleanedText;
-        output += "\n```\n";
-      } catch {
-        output += `(Error reading file)\n`;
+        totalCleanedBytes += cleanedText.length;
+
+        // Определяем язык для маппинга и статистики
+        const langKey = getLanguageTag(node.name);
+        const reportLang = LANGUAGE_MAP[ext] || ext; // Для composition используем человекочитаемый ключ, если есть
+        composition[reportLang] = (composition[reportLang] || 0) + 1;
+
+        // Сохраняем обработанные данные
+        processedFilesData.push({
+          node,
+          content: cleanedText,
+          langTag: langKey
+        });
+
+        // Данные для топа файлов
+        processedFileStats.push({
+          path: node.path,
+          size: cleanedText.length,
+          tokens: Math.ceil(cleanedText.length / 4)
+        });
+
+      } catch (e) {
+        console.error(`Error processing ${node.path}`, e);
       }
-      output += `</file>\n\n`;
 
       processedCount++;
-      setProgress(Math.round((processedCount / sortedFiles.length) * 100));
-      if (processedCount % 5 === 0) await new Promise(r => setTimeout(r, 0));
+      // Первые 50% прогресса занимает чтение и обработка
+      setProgress(Math.round((processedCount / sortedFiles.length) * 50));
+      if (processedCount % 10 === 0) await new Promise(r => setTimeout(r, 0));
     }
+
+    // 3. РАСЧЕТ ИТОГОВОЙ СТАТИСТИКИ
+    const estimatedTokens = Math.ceil(totalCleanedBytes / 4);
+    const savingsBytes = totalOriginalBytes - totalCleanedBytes;
+    const savingsPercent = totalOriginalBytes > 0 ? (savingsBytes / totalOriginalBytes) * 100 : 0;
+
+    const topFiles = processedFileStats.sort((a, b) => b.size - a.size).slice(0, 5);
+
+    setStats({
+      totalFiles: sortedFiles.length,
+      processedFiles: processedFilesData.length,
+      totalChars: totalCleanedBytes,
+      estimatedTokens,
+      originalSize: totalOriginalBytes,
+      cleanedSize: totalCleanedBytes,
+      savings: { bytes: savingsBytes, percentage: savingsPercent },
+      composition,
+      topFiles
+    });
+
+    // 4. ФАЗА СБОРКИ ВЫХОДНОЙ СТРОКИ (XML + Markdown)
+
+    // Header с инструкциями и метриками для LLM
+    let output = `<codebase_context>
+<instruction>
+The following is a flattened representation of a project codebase.
+1. Use the <directory_structure> to understand the file hierarchy.
+2. Content is in <source_files>, where each file is wrapped in a <file> tag.
+3. Code blocks utilize standard Markdown triple backticks with language tags (e.g., \`\`\`python) for expert routing.
+4. METRICS: Approximately ${estimatedTokens.toLocaleString()} tokens across ${processedFilesData.length} files.
+</instruction>
+
+<project_metrics>
+  <token_count_estimate>${estimatedTokens}</token_count_estimate>
+  <file_count>${processedFilesData.length}</file_count>
+  <top_languages>
+    ${Object.entries(composition)
+        .sort(([, a], [, b]) => b - a)
+        .slice(0, 3)
+        .map(([lang, count]) => `${lang} (${count})`)
+        .join(", ")}
+  </top_languages>
+</project_metrics>
+
+`;
+
+    if (includeTree) {
+      output += `<directory_structure>\n\`\`\`text\n${generateTree(sortedFiles)}\n\`\`\`\n</directory_structure>\n\n`;
+    }
+
+    output += `<source_files>\n\n`;
+
+    // Сборка контента
+    processedFilesData.forEach((item, idx) => {
+      output += `<file path="${item.node.path}">\n`;
+      output += "```" + item.langTag + "\n";
+      output += item.content;
+      output += "\n```\n";
+      output += `</file>\n\n`;
+
+      // Оставшиеся 50% прогресса
+      if (idx % 10 === 0) setProgress(50 + Math.round((idx / processedFilesData.length) * 50));
+    });
 
     output += `</source_files>\n</codebase_context>`;
 
     setResult(output);
-    setStats({
-      files: sortedFiles.length,
-      textFiles: textFileCount,
-      chars: output.length
-    });
     setProcessing(false);
   };
 
@@ -355,7 +452,7 @@ ${generateTree(sortedFiles)}
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = "gemini_context.md"; // Updated filename
+    a.download = "gemini_context.md";
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -436,20 +533,52 @@ ${generateTree(sortedFiles)}
         className={`w-full py-3 rounded-lg font-bold text-white transition-all shadow-sm ${files.length === 0 ? 'bg-zinc-300 dark:bg-zinc-700' : 'bg-blue-600 hover:bg-blue-700'
           }`}
       >
-        {processing ? `Обработка ${progress}%...` : "Сгенерировать Context"}
+        {processing ? `Обработка ${progress}%...` : "Сгенерировать"}
       </button>
 
+      {/* --- STATS BLOCK --- */}
       {stats && (
-        <div className="space-y-2 pt-2 border-t border-zinc-200 dark:border-zinc-800">
-          <div className="text-xs text-zinc-500 flex justify-between">
-            <span>Всего файлов:</span> <span className="font-mono">{stats.files}</span>
+        <div className="space-y-4 pt-4 border-t border-zinc-200 dark:border-zinc-800 animate-in fade-in slide-in-from-bottom-2">
+
+          {/* Main Token Count */}
+          <div className="bg-blue-50 dark:bg-blue-900/20 p-3 rounded-lg border border-blue-100 dark:border-blue-800">
+            <div className="text-xs text-blue-600 dark:text-blue-300 font-bold uppercase tracking-wide mb-1">Токены (Est.)</div>
+            <div className="text-2xl font-mono font-bold text-blue-700 dark:text-blue-200">
+              ~{stats.estimatedTokens.toLocaleString()}
+            </div>
+            <div className="text-[10px] text-blue-500 mt-1">
+              {(stats.estimatedTokens / 1000000 * 100).toFixed(1)}% от контекста 1M
+            </div>
           </div>
-          <div className="text-xs text-zinc-500 flex justify-between">
-            <span>Включено в контент:</span> <span className="font-mono">{stats.textFiles}</span>
+
+          {/* Efficiency Stats */}
+          <div className="grid grid-cols-2 gap-2">
+            <div className="bg-zinc-50 dark:bg-zinc-800 p-2 rounded border border-zinc-200 dark:border-zinc-700">
+              <div className="text-[10px] text-zinc-500 font-bold">Файлы</div>
+              <div className="text-sm font-mono">{stats.processedFiles} <span className="text-zinc-400">/ {stats.totalFiles}</span></div>
+            </div>
+            <div className="bg-green-50 dark:bg-green-900/20 p-2 rounded border border-green-100 dark:border-green-800">
+              <div className="text-[10px] text-green-600 dark:text-green-400 font-bold">Сжатие</div>
+              <div className="text-sm font-mono text-green-700 dark:text-green-300">-{stats.savings.percentage.toFixed(0)}%</div>
+            </div>
           </div>
-          <div className="text-xs text-zinc-500 flex justify-between">
-            <span>Размер контекста:</span> <span className="font-mono">{formatBytes(stats.chars)}</span>
+
+          {/* Top Heaviest Files */}
+          <div className="space-y-1">
+            <div className="text-[10px] font-bold text-zinc-500 uppercase">Самые тяжелые файлы</div>
+            <div className="space-y-1">
+              {stats.topFiles.map((f, i) => (
+                <div key={i} className="flex justify-between items-center text-[10px] font-mono bg-zinc-50 dark:bg-zinc-800/50 px-2 py-1 rounded">
+                  <span className="truncate max-w-[140px]" title={f.path}>{f.path.split('/').pop()}</span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-zinc-500">~{(f.tokens).toLocaleString()}t</span>
+                    <span className="text-zinc-400 w-10 text-right">{formatBytes(f.size)}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
+
         </div>
       )}
     </div>
