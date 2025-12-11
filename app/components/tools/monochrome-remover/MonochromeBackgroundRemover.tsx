@@ -3,6 +3,9 @@
 import Image from 'next/image';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 
+import { hexToRgb, invertHex, rgbToHex } from '@/lib/utils/colors'; // <-- New Import
+import { downloadDataUrl, loadImage } from '@/lib/utils/media'; // <-- New Import
+
 import { Canvas, CanvasRef } from '../../ui/Canvas';
 import { FileDropzone, FileDropzonePlaceholder } from '../../ui/FileDropzone';
 import { Slider } from '../../ui/Slider';
@@ -16,9 +19,6 @@ const PROCESS_DELAY_MS = 10;
 const MOUSE_BUTTON_LEFT = 0;
 
 const RGB_MAX = 255;
-const HEX_BASE = 16;
-const HEX_PAD_CHAR = '0';
-
 // Pixel Data Constants
 const PIXEL_STRIDE = 4;
 const OFFSET_R = 0;
@@ -41,38 +41,7 @@ const DEFAULT_SETTINGS = {
   edgePaint: 0,
 };
 
-// --- HELPERS ---
-function hexToRgb(hex: string) {
-  const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-  return result
-    ? {
-        r: Number.parseInt(result[1], HEX_BASE),
-        g: Number.parseInt(result[2], HEX_BASE),
-        b: Number.parseInt(result[3], HEX_BASE),
-      }
-    : null;
-}
-
-function rgbToHex(r: number, g: number, b: number) {
-  return (
-    '#' +
-    [r, g, b]
-      .map((x) => {
-        const hex = x.toString(HEX_BASE);
-        return hex.length === 1 ? HEX_PAD_CHAR + hex : hex;
-      })
-      .join('')
-  );
-}
-
-function invertHex(hex: string) {
-  const rgb = hexToRgb(hex);
-  if (!rgb) return '#000000';
-  return rgbToHex(RGB_MAX - rgb.r, RGB_MAX - rgb.g, RGB_MAX - rgb.b);
-}
-
 type ProcessingMode = 'remove' | 'keep' | 'flood-clear';
-
 interface Point {
   x: number;
   y: number;
@@ -101,11 +70,9 @@ export function MonochromeBackgroundRemover() {
 
   const [floodPoints, setFloodPoints] = useState<Point[]>([]);
   const [manualTrigger, setManualTrigger] = useState(0);
-
   // UI
   const [isProcessing, setIsProcessing] = useState(false);
   const [draggingPointIndex, setDraggingPointIndex] = useState<number | null>(null);
-
   // --- REFS ---
   const workspaceRef = useRef<CanvasRef>(null);
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -114,14 +81,12 @@ export function MonochromeBackgroundRemover() {
 
   // --- LOGIC ---
 
-  const loadOriginalToCanvas = (url: string) => {
-    // Используем window.Image, чтобы избежать конфликта с компонентом Image из Next.js
-    const img = new window.Image();
-    img.crossOrigin = 'Anonymous';
-    img.src = url;
-    img.onload = () => {
-      setImgDimensions({ w: img.width, h: img.height });
+  const loadOriginalToCanvas = async (url: string) => {
+    try {
+      // REFACTOR: Использование loadImage
+      const img = await loadImage(url);
 
+      setImgDimensions({ w: img.width, h: img.height });
       if (sourceCanvasRef.current) {
         sourceCanvasRef.current.width = img.width;
         sourceCanvasRef.current.height = img.height;
@@ -138,10 +103,10 @@ export function MonochromeBackgroundRemover() {
 
       setTimeout(() => workspaceRef.current?.resetView(img.width, img.height), VIEW_RESET_DELAY);
       processImage();
-    };
+    } catch (e) {
+      console.error(e);
+    }
   };
-
-  // React Compiler cannot currently preserve this memoization; disable the lint to keep stable callback identity.
 
   const processImage = useCallback(() => {
     if (!originalUrl || !sourceCanvasRef.current || !previewCanvasRef.current) return;
@@ -159,6 +124,7 @@ export function MonochromeBackgroundRemover() {
       const imageData = sourceCtx.getImageData(0, 0, width, height);
       const data = imageData.data;
 
+      // REFACTOR: Использование hexToRgb из утилит
       const targetRGB = hexToRgb(targetColor);
       const contourRGB = hexToRgb(contourColor);
 
@@ -188,7 +154,6 @@ export function MonochromeBackgroundRemover() {
 
         alphaChannel.fill(RGB_MAX);
         const visited = new Uint8Array(width * height);
-
         floodPoints.forEach((pt) => {
           const startX = Math.floor(pt.x);
           const startY = Math.floor(pt.y);
@@ -341,7 +306,6 @@ export function MonochromeBackgroundRemover() {
     edgePaint,
   ]);
 
-  // FIX: Убрали дублирование зависимостей. Теперь эффект зависит только от processImage и originalUrl.
   useEffect(() => {
     if (!originalUrl) return;
     if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
@@ -353,7 +317,6 @@ export function MonochromeBackgroundRemover() {
     };
   }, [originalUrl, processImage]);
 
-  // FIX: Оставили только ручной триггер и отключили линтер, чтобы избежать бесконечного цикла обновлений.
   useEffect(() => {
     if (manualTrigger > 0 && processingMode === 'flood-clear') {
       processImage();
@@ -361,7 +324,7 @@ export function MonochromeBackgroundRemover() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [manualTrigger]);
 
-  const handleFilesSelected = (files: File[]) => {
+  const handleFilesSelected = async (files: File[]) => {
     const file = files[0];
     if (!file) return;
     const url = URL.createObjectURL(file);
@@ -369,10 +332,9 @@ export function MonochromeBackgroundRemover() {
     setFloodPoints([]);
     loadOriginalToCanvas(url);
 
-    // Используем window.Image для обработки данных
-    const img = new window.Image();
-    img.src = url;
-    img.onload = () => {
+    try {
+      // REFACTOR: Использование loadImage вместо new Image()
+      const img = await loadImage(url);
       const c = document.createElement('canvas');
       c.width = 1;
       c.height = 1;
@@ -380,19 +342,20 @@ export function MonochromeBackgroundRemover() {
       if (cx) {
         cx.drawImage(img, 0, 0);
         const p = cx.getImageData(0, 0, 1, 1).data;
+        // REFACTOR: Использование rgbToHex и invertHex
         const hex = rgbToHex(p[OFFSET_R], p[OFFSET_G], p[OFFSET_B]);
         setTargetColor(hex);
         setContourColor(invertHex(hex));
       }
-    };
+    } catch (e) {
+      console.error(e);
+    }
   };
 
   const handleDownload = () => {
     if (previewCanvasRef.current) {
-      const link = document.createElement('a');
-      link.download = DOWNLOAD_FILENAME;
-      link.href = previewCanvasRef.current.toDataURL('image/png');
-      link.click();
+      // REFACTOR: Использование downloadDataUrl
+      downloadDataUrl(previewCanvasRef.current.toDataURL('image/png'), DOWNLOAD_FILENAME);
     }
   };
 
@@ -443,10 +406,10 @@ export function MonochromeBackgroundRemover() {
     const rect = (e.target as HTMLElement).getBoundingClientRect();
     const x = ((e.clientX - rect.left) / rect.width) * sourceCanvasRef.current.width;
     const y = ((e.clientY - rect.top) / rect.height) * sourceCanvasRef.current.height;
-
     const ctx = sourceCanvasRef.current.getContext('2d', { willReadFrequently: true });
     if (ctx) {
       const p = ctx.getImageData(x, y, 1, 1).data;
+      // REFACTOR: Использование rgbToHex
       setTargetColor(rgbToHex(p[OFFSET_R], p[OFFSET_G], p[OFFSET_B]));
     }
   };
@@ -656,7 +619,9 @@ export function MonochromeBackgroundRemover() {
           shadowOverlayOpacity={originalUrl ? 0.8 : 0}
           showTransparencyGrid={true}
           placeholder={
-            !originalUrl ? <FileDropzonePlaceholder onUpload={handleFilesSelected} /> : null
+            !originalUrl ? (
+              <FileDropzonePlaceholder onUpload={(files) => handleFilesSelected(files)} />
+            ) : null
           }
         >
           <canvas ref={sourceCanvasRef} className="hidden" />

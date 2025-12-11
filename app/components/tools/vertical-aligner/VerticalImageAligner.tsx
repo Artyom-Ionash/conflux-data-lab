@@ -4,6 +4,8 @@ import Image from 'next/image';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { TextureDimensionSlider } from '@/app/components/domain/hardware/TextureDimensionSlider';
+import { rgbToHex } from '@/lib/utils/colors'; // <-- New Import
+import { downloadDataUrl, loadImage, revokeObjectURLSafely } from '@/lib/utils/media'; // <-- New Import
 
 import { Canvas, CanvasRef } from '../../ui/Canvas';
 import { FileDropzone, FileDropzonePlaceholder } from '../../ui/FileDropzone';
@@ -12,9 +14,9 @@ import { Switch } from '../../ui/Switch';
 import { ToolLayout } from '../ToolLayout';
 
 // --- CONSTANTS ---
-const LIMIT_MAX_BROWSER = 16_384; // Используется только как предел слайдера UI
-const VIEW_RESET_DELAY = 50; // ms
-const EXPORT_FILENAME = 'aligned-export';
+const LIMIT_MAX_BROWSER = 16_384;
+const VIEW_RESET_DELAY = 50;
+const EXPORT_FILENAME = 'aligned-export.png';
 const MOUSE_BUTTON_LEFT = 0;
 const CANVAS_SCALE_DEFAULT = 1;
 
@@ -48,12 +50,6 @@ type AlignImage = {
   naturalHeight: number;
 };
 
-function revokeObjectURLSafely(url: string) {
-  try {
-    URL.revokeObjectURL(url);
-  } catch {}
-}
-
 // --- DRAGGABLE IMAGE SLOT ---
 interface DraggableImageSlotProps {
   img: AlignImage;
@@ -84,6 +80,7 @@ const DraggableImageSlot = React.memo(
       setIsDragging(true);
       const target = e.currentTarget;
       target.setPointerCapture(e.pointerId);
+
       const startX = e.clientX;
       const startY = e.clientY;
       const initialOffsetX = img.offsetX;
@@ -175,9 +172,11 @@ export function VerticalImageAligner() {
   const [draggingListIndex, setDraggingListIndex] = useState<number | null>(null);
   const [isExporting, setIsExporting] = useState(false);
   const workspaceRef = useRef<CanvasRef>(null);
+
   const activeImageId = useMemo(() => images.find((img) => img.isActive)?.id ?? null, [images]);
 
-  useEffect(() => () => imagesRef.current.forEach((img) => URL.revokeObjectURL(img.url)), []);
+  // REFACTOR: Использование безопасной утилиты очистки
+  useEffect(() => () => imagesRef.current.forEach((img) => revokeObjectURLSafely(img.url)), []);
 
   const { bounds, totalHeight } = useMemo(() => {
     if (!images.length) return { bounds: { width: 1, height: 1 }, totalHeight: 0 };
@@ -205,6 +204,7 @@ export function VerticalImageAligner() {
       ),
     [slotWidth]
   );
+
   const handleCenterAllY = useCallback(
     () =>
       setImages((prev) =>
@@ -270,10 +270,11 @@ export function VerticalImageAligner() {
 
       setImages((prev) => [...prev, ...newImages]);
 
-      newImages.forEach((item, idx) => {
-        // Используем window.Image для обработки данных
-        const img = new window.Image();
-        img.onload = () => {
+      // REFACTOR: Используем loadImage из утилит
+      newImages.forEach(async (item, idx) => {
+        try {
+          const img = await loadImage(item.url);
+
           if (isListEmpty && idx === 0) {
             setSlotHeight(img.height);
             setFrameStepX(img.height);
@@ -286,8 +287,8 @@ export function VerticalImageAligner() {
               if (tempCtx) {
                 tempCtx.drawImage(img, 0, 0, 1, 1, 0, 0, 1, 1);
                 const [r, g, b] = tempCtx.getImageData(0, 0, 1, 1).data;
-                const toHex = (c: number) => c.toString(16).padStart(2, '0');
-                const hex = `#${toHex(r)}${toHex(g)}${toHex(b)}`;
+                // REFACTOR: Используем rgbToHex
+                const hex = rgbToHex(r, g, b);
                 workspaceRef.current?.setBackgroundColor(hex);
               }
             } catch (e) {
@@ -303,33 +304,30 @@ export function VerticalImageAligner() {
             if (isListEmpty && idx === 0) return img.width;
             return Math.max(prev, img.width);
           });
+
           setImages((current) =>
             current.map((ex) =>
               ex.id === item.id ? { ...ex, naturalWidth: img.width, naturalHeight: img.height } : ex
             )
           );
-        };
-        img.src = item.url;
+        } catch (e) {
+          console.error(e);
+        }
       });
     },
     [images.length]
   );
 
   const handleExport = useCallback(async () => {
-    if (!images.length) return; // Removed isCriticalHeight check
+    if (!images.length) return;
     setIsExporting(true);
     try {
-      // Используем window.Image для экспорта
+      // REFACTOR: Использование loadImage и Promise.all для загрузки всех картинок
       const loaded = await Promise.all(
-        images.map(
-          (item) =>
-            new Promise<{ meta: AlignImage; img: HTMLImageElement }>((resolve, reject) => {
-              const i = new window.Image();
-              i.onload = () => resolve({ meta: item, img: i });
-              i.onerror = () => reject();
-              i.src = item.url;
-            })
-        )
+        images.map(async (item) => {
+          const img = await loadImage(item.url);
+          return { meta: item, img };
+        })
       );
 
       const finalW = slotWidth;
@@ -359,12 +357,10 @@ export function VerticalImageAligner() {
         ctx.restore();
       });
 
-      const pngLink = document.createElement('a');
-      pngLink.href = canvas.toDataURL('image/png');
-      pngLink.download = `${EXPORT_FILENAME}.png`;
-      document.body.append(pngLink);
-      pngLink.click();
-      pngLink.remove();
+      // REFACTOR: Использование downloadDataUrl
+      downloadDataUrl(canvas.toDataURL('image/png'), EXPORT_FILENAME);
+    } catch (e) {
+      console.error('Export failed', e);
     } finally {
       setIsExporting(false);
     }
@@ -379,7 +375,6 @@ export function VerticalImageAligner() {
       {images.length > 0 && (
         <>
           <div className="space-y-2">
-            {/* Removed disabled state for height check and error message */}
             <button
               onClick={handleExport}
               disabled={isExporting}

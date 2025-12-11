@@ -192,14 +192,21 @@ function isTextFile(filename: string, extensions: string[]): boolean {
     '.npmrc',
     '.prettierrc',
     '.eslintrc',
-    '.sworc' // Vercel/Next configs sometimes
+    '.sworc', // Vercel/Next configs sometimes
   ];
 
   if (configWhitelist.includes(lowerName)) return true;
 
   // Also check for config patterns (e.g. .eslintrc.json)
   if (lowerName.startsWith('.eslintrc') || lowerName.startsWith('.prettierrc')) return true;
-  if (lowerName.startsWith('eslint.config') || lowerName.startsWith('next.config') || lowerName.startsWith('tailwind.config') || lowerName.startsWith('postcss.config') || lowerName.startsWith('vite.config')) return true;
+  if (
+    lowerName.startsWith('eslint.config') ||
+    lowerName.startsWith('next.config') ||
+    lowerName.startsWith('tailwind.config') ||
+    lowerName.startsWith('postcss.config') ||
+    lowerName.startsWith('vite.config')
+  )
+    return true;
 
   // 3. Check against User Settings (Extensions)
   return extensions.some((ext) => lowerName.endsWith(ext));
@@ -360,10 +367,18 @@ const calculateFileScore = (name: string) => {
     lower.includes('gitignore') ||
     lower.includes('next.config') ||
     lower.includes('tailwind.config')
-  ) return 0.5;
+  )
+    return 0.5;
 
   // 3. Source Code
-  if (lower.endsWith('.gd') || lower.endsWith('.ts') || lower.endsWith('.js') || lower.endsWith('.tsx') || lower.endsWith('.jsx') || lower.endsWith('.py'))
+  if (
+    lower.endsWith('.gd') ||
+    lower.endsWith('.ts') ||
+    lower.endsWith('.js') ||
+    lower.endsWith('.tsx') ||
+    lower.endsWith('.jsx') ||
+    lower.endsWith('.py')
+  )
     return 1;
 
   // 4. Scenes / Components
@@ -548,11 +563,11 @@ The following is a flattened representation of a project codebase.
   <file_count>${processedFilesData.length}</file_count>
   <top_languages>
     ${Object.entries(composition)
-        // eslint-disable-next-line unicorn/no-array-sort
-        .sort(([, a], [, b]) => b - a)
-        .slice(0, 3)
-        .map(([lang, count]) => `${lang} (${count})`)
-        .join(', ')}
+      // eslint-disable-next-line unicorn/no-array-sort
+      .sort(([, a], [, b]) => b - a)
+      .slice(0, 3)
+      .map(([lang, count]) => `${lang} (${count})`)
+      .join(', ')}
   </top_languages>
 </project_metrics>
 
@@ -628,10 +643,11 @@ The following is a flattened representation of a project codebase.
             <button
               key={key}
               onClick={() => handlePresetChange(key)}
-              className={`rounded border px-3 py-1.5 text-xs font-medium transition-colors ${selectedPreset === key
+              className={`rounded border px-3 py-1.5 text-xs font-medium transition-colors ${
+                selectedPreset === key
                   ? 'border-blue-300 bg-blue-100 text-blue-800 dark:border-blue-700 dark:bg-blue-900/30 dark:text-blue-300'
                   : 'border-zinc-200 bg-white text-zinc-600 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-400'
-                }`}
+              }`}
             >
               {PRESETS[key].name}
             </button>
@@ -664,8 +680,9 @@ The following is a flattened representation of a project codebase.
       <button
         onClick={processFiles}
         disabled={files.length === 0 || processing}
-        className={`w-full rounded-lg py-3 font-bold text-white shadow-sm transition-all ${files.length === 0 ? 'bg-zinc-300 dark:bg-zinc-700' : 'bg-blue-600 hover:bg-blue-700'
-          }`}
+        className={`w-full rounded-lg py-3 font-bold text-white shadow-sm transition-all ${
+          files.length === 0 ? 'bg-zinc-300 dark:bg-zinc-700' : 'bg-blue-600 hover:bg-blue-700'
+        }`}
       >
         {processing ? `Обработка ${progress}%...` : 'Сгенерировать'}
       </button>

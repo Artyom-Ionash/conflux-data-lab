@@ -3,6 +3,8 @@
 import Image from 'next/image';
 import { useEffect, useRef, useState } from 'react';
 
+import { loadImage } from '@/lib/utils/media'; // <-- New Import
+
 interface FrameDiffOverlayProps {
   image1: string | null;
   image2: string | null;
@@ -34,22 +36,8 @@ export function FrameDiffOverlay({
         const ctx = canvas?.getContext('2d');
         if (!ctx || !canvas) return;
 
-        // Создаем изображения внутри промисов для корректной загрузки
-        const firstImg = new window.Image();
-        const lastImg = new window.Image();
-
-        await Promise.all([
-          new Promise<void>((resolve, reject) => {
-            firstImg.onload = () => resolve();
-            firstImg.onerror = reject;
-            firstImg.src = image1;
-          }),
-          new Promise<void>((resolve, reject) => {
-            lastImg.onload = () => resolve();
-            lastImg.onerror = reject;
-            lastImg.src = image2;
-          }),
-        ]);
+        // REFACTOR: Использование утилиты loadImage вместо ручных Promise
+        const [firstImg, lastImg] = await Promise.all([loadImage(image1), loadImage(image2)]);
 
         canvas.width = firstImg.width;
         canvas.height = firstImg.height;
@@ -81,6 +69,7 @@ export function FrameDiffOverlay({
             Math.abs(firstR - bgR) < threshold &&
             Math.abs(firstG - bgG) < threshold &&
             Math.abs(firstB - bgB) < threshold;
+
           const lastIsBg =
             Math.abs(lastR - bgR) < threshold &&
             Math.abs(lastG - bgG) < threshold &&
@@ -89,16 +78,19 @@ export function FrameDiffOverlay({
           if (firstIsBg && lastIsBg) {
             resultImageData.data[i + 3] = 0;
           } else if (!firstIsBg && lastIsBg) {
+            // Исчезнувший объект (Красный)
             resultImageData.data[i] = 255;
             resultImageData.data[i + 1] = 0;
             resultImageData.data[i + 2] = 0;
             resultImageData.data[i + 3] = 200;
           } else if (firstIsBg && !lastIsBg) {
+            // Появившийся объект (Синий)
             resultImageData.data[i] = 0;
             resultImageData.data[i + 1] = 100;
             resultImageData.data[i + 2] = 255;
             resultImageData.data[i + 3] = 200;
           } else {
+            // Изменившийся объект (Фиолетовый)
             resultImageData.data[i] = 200;
             resultImageData.data[i + 1] = 50;
             resultImageData.data[i + 2] = 255;
@@ -117,7 +109,7 @@ export function FrameDiffOverlay({
       }
     };
     processFrames();
-  }, [image1, image2, onDataGenerated]); // Добавлена зависимость
+  }, [image1, image2, onDataGenerated]);
 
   const isLoading = processingDiff || isProcessing;
 
@@ -138,7 +130,7 @@ export function FrameDiffOverlay({
           src={overlayDataUrl}
           alt="Diff Overlay"
           fill
-          unoptimized // Важно для Data URL
+          unoptimized
           className="object-contain"
         />
       )}
