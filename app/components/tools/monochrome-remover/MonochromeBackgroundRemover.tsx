@@ -45,9 +45,9 @@ const DEFAULT_SETTINGS = {
 function hexToRgb(hex: string) {
   const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
   return result ? {
-    r: parseInt(result[1], HEX_BASE),
-    g: parseInt(result[2], HEX_BASE),
-    b: parseInt(result[3], HEX_BASE)
+    r: Number.parseInt(result[1], HEX_BASE),
+    g: Number.parseInt(result[2], HEX_BASE),
+    b: Number.parseInt(result[3], HEX_BASE)
   } : null;
 }
 
@@ -164,10 +164,10 @@ export function MonochromeBackgroundRemover() {
       const smoothVal = (smoothness / PERCENTAGE_MAX) * MAX_RGB_DISTANCE;
 
       const getDist = (i: number, rgb: { r: number, g: number, b: number }) =>
-        Math.sqrt(
-          (data[i + OFFSET_R] - rgb.r) ** 2 +
-          (data[i + OFFSET_G] - rgb.g) ** 2 +
-          (data[i + OFFSET_B] - rgb.b) ** 2
+        Math.hypot(
+          (data[i + OFFSET_R] - rgb.r),
+          (data[i + OFFSET_G] - rgb.g),
+          (data[i + OFFSET_B] - rgb.b)
         );
 
       const alphaChannel = new Uint8Array(width * height);

@@ -11,9 +11,7 @@ import { ToolLayout } from "../ToolLayout";
 const PRESETS = {
   godot: {
     name: "Godot 4 (Logic Only)",
-    // Файлы, содержимое которых мы ХОТИМ читать
     textExtensions: [".gd", ".tscn", ".godot", ".tres", ".cfg", ".gdshader", ".json", ".txt", ".md", ".py"],
-    // Папки и файлы, которые мы вообще НЕ ХОТИМ видеть (даже в дереве)
     hardIgnore: [
       ".git", ".godot", ".import", "builds", "__pycache__", "node_modules",
       ".next", ".vscode", ".idea", "*.uid", "*.import", ".DS_Store"
@@ -26,7 +24,6 @@ const PRESETS = {
   }
 };
 
-// Explicit mapping for Gemini's syntax highlighter (Expert Routing)
 const LANGUAGE_MAP: Record<string, string> = {
   js: "javascript",
   jsx: "javascript",
@@ -70,7 +67,7 @@ interface ProjectStats {
     bytes: number;
     percentage: number;
   };
-  composition: Record<string, number>; // Extension -> Count
+  composition: Record<string, number>;
   topFiles: { path: string; size: number; tokens: number }[];
 }
 
@@ -82,7 +79,7 @@ function formatBytes(bytes: number, decimals = 0) {
   const dm = decimals < 0 ? 0 : decimals;
   const sizes = ['B', 'KB', 'MB', 'GB'];
   const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return `${parseFloat((bytes / Math.pow(k, i)).toFixed(dm))}${sizes[i]}`;
+  return `${Number.parseFloat((bytes / Math.pow(k, i)).toFixed(dm))}${sizes[i]}`;
 }
 
 function getLanguageTag(filename: string): string {
@@ -93,26 +90,23 @@ function getLanguageTag(filename: string): string {
 function isTextFile(filename: string, extensions: string[]): boolean {
   const lowerName = filename.toLowerCase();
 
-  // Жесткий запрет для лок-файлов
   if (lowerName === "package-lock.json" || lowerName === "yarn.lock" || lowerName === "pnpm-lock.yaml" || lowerName === "bun.lockb") {
     return false;
   }
 
-  // Всегда разрешенные
   if (lowerName.endsWith("project.godot") || lowerName.endsWith("package.json") || lowerName === "dockerfile") return true;
 
   return extensions.some(ext => lowerName.endsWith(ext));
 }
 
 function shouldIgnore(path: string, ignorePatterns: string[]): boolean {
-  const normalizedPath = path.replace(/\\/g, '/');
+  const normalizedPath = path.replaceAll('\\', '/');
   const filename = normalizedPath.split('/').pop() || "";
 
   for (const pattern of ignorePatterns) {
     if (pattern.startsWith("*.")) {
       if (filename.endsWith(pattern.slice(1))) return true;
     } else {
-      // Точное совпадение папки или файла
       if (normalizedPath.includes(`/${pattern}/`) || normalizedPath.startsWith(`${pattern}/`) || normalizedPath === pattern) {
         return true;
       }
@@ -121,14 +115,10 @@ function shouldIgnore(path: string, ignorePatterns: string[]): boolean {
   return false;
 }
 
-// --- LOGIC: AGGRESSIVE PREPROCESSING ---
-// Уменьшает размер контекста, удаляя шум, который не нужен LLM для понимания логики
-
 function preprocessContent(content: string, extension: string): string {
   let cleaned = content;
 
   if (extension === 'tscn' || extension === 'tres') {
-    // 1. УДАЛЕНИЕ "ШУМНЫХ" ПОД-РЕСУРСОВ
     const noiseTypes = [
       'AtlasTexture', 'StyleBoxTexture', 'StyleBoxFlat', 'Theme',
       'TileSetAtlasSource', 'BitMap', 'Gradient', 'GradientTexture1D',
@@ -138,43 +128,34 @@ function preprocessContent(content: string, extension: string): string {
     ].join("|");
 
     const noiseRegex = new RegExp(`\\[sub_resource type="(${noiseTypes})"[\\s\\S]*?(?=\\n\\[|$)`, 'g');
-    cleaned = cleaned.replace(noiseRegex, "");
+    cleaned = cleaned.replaceAll(noiseRegex, "");
 
-    // 2. ОЧИСТКА ВНЕШНИХ РЕСУРСОВ (Картинки, звуки)
-    cleaned = cleaned.replace(/^\[ext_resource.*path=".*\.(png|jpg|jpeg|webp|svg|mp3|wav|ogg|ttf|otf)".*\]$/gm, "");
+    cleaned = cleaned.replaceAll(/^\[ext_resource.*path=".*\.(png|jpg|jpeg|webp|svg|mp3|wav|ogg|ttf|otf)".*\]$/gm, "");
 
-    // 3. СЖАТИЕ АНИМАЦИЙ
-    cleaned = cleaned.replace(/(\[sub_resource type="Animation"[^\]]*\])([\s\S]*?)(?=\[|$)/g, (match, header, body) => {
+    cleaned = cleaned.replaceAll(/(\[sub_resource type="Animation"[^\]]*\])([\s\S]*?)(?=\[|$)/g, (match, header, body) => {
       const nameMatch = body.match(/resource_name\s*=\s*"([^"]+)"/);
       const animName = nameMatch ? nameMatch[1] : "unnamed";
       return `${header}\n; Animation "${animName}" (data stripped)\n`;
     });
 
-    // 4. УДАЛЕНИЕ ТРЕКОВ АНИМАЦИИ
-    cleaned = cleaned.replace(/^tracks\/.*$/gm, "");
+    cleaned = cleaned.replaceAll(/^tracks\/.*$/gm, "");
 
-    // 5. ОЧИСТКА МАССИВОВ ДАННЫХ
     const arrayRegex = /\b(PackedByteArray|PackedVector2Array|PackedInt32Array|PackedFloat32Array|PackedStringArray|PackedColorArray)\s*\(([^)]*)\)/g;
-    cleaned = cleaned.replace(arrayRegex, '$1(...)');
+    cleaned = cleaned.replaceAll(arrayRegex, '$1(...)');
 
-    // 6. ОЧИСТКА СВОЙСТВ
-    cleaned = cleaned.replace(/^region_rect = .*$/gm, "");
+    cleaned = cleaned.replaceAll(/^region_rect = .*$/gm, "");
 
-    // 7. УДАЛЕНИЕ ПУСТЫХ СТРОК (сжатие вертикального пространства)
-    cleaned = cleaned.replace(/\n{3,}/g, "\n\n");
+    cleaned = cleaned.replaceAll(/\n{3,}/g, "\n\n");
   }
 
   if (extension === 'godot') {
-    // Упрощаем Input Map в конфиге
-    cleaned = cleaned.replace(/Object\((InputEvent[^,]+),[^)]+\)/g, "$1(...)");
-    cleaned = cleaned.replace(/"events": \[\]/g, "");
-    cleaned = cleaned.replace(/\n\n\[/g, "\n[");
+    cleaned = cleaned.replaceAll(/Object\((InputEvent[^,]+),[^)]+\)/g, "$1(...)");
+    cleaned = cleaned.replaceAll('"events": []', "");
+    cleaned = cleaned.replaceAll('\n\n[', "\n[");
   }
 
   return cleaned;
 }
-
-// --- LOGIC: TREE GENERATION ---
 
 interface FileSystemNode {
   _is_file?: boolean;
@@ -201,7 +182,9 @@ function generateTree(files: FileNode[]): string {
 
   let output = "";
   function traverse(node: FileSystemNode, depth: number) {
-    const keys = Object.keys(node).sort((a, b) => {
+    const keys = Object.keys(node);
+     
+    keys.sort((a, b) => {
       const nodeA = node[a] as FileSystemNode | undefined;
       const nodeB = node[b] as FileSystemNode | undefined;
       const aIsFile = nodeA?._is_file;
@@ -227,6 +210,20 @@ function generateTree(files: FileNode[]): string {
   return output;
 }
 
+// FIX: Вынесенная функция для unicorn/consistent-function-scoping
+// FIX: Используем file.text() вместо FileReader (unicorn/prefer-blob-reading-methods)
+const readFileAsText = (file: File): Promise<string> => {
+  return file.text();
+};
+
+// FIX: Вынесенная функция скоринга
+const calculateFileScore = (name: string) => {
+  if (name === 'project.godot' || name === 'package.json') return 0;
+  if (name.endsWith('.gd') || name.endsWith('.ts') || name.endsWith('.js') || name.endsWith('.py')) return 1;
+  if (name.endsWith('.tscn') || name.endsWith('.tsx')) return 2;
+  return 3;
+};
+
 // --- COMPONENT ---
 
 export function ProjectToContext() {
@@ -240,7 +237,6 @@ export function ProjectToContext() {
   const [progress, setProgress] = useState(0);
   const [result, setResult] = useState<string | null>(null);
 
-  // New Stats State
   const [stats, setStats] = useState<ProjectStats | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -253,9 +249,8 @@ export function ProjectToContext() {
 
   const handleDirectorySelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files) return;
-    const fileList = Array.from(e.target.files);
+    const fileList = [...e.target.files];
 
-    // --- AUTO-DETECT PRESET ---
     let detectedPreset: PresetKey | null = null;
     const fileNames = fileList.map(f => f.name);
 
@@ -298,32 +293,17 @@ export function ProjectToContext() {
     setStats(null);
   };
 
-  const readFileAsText = (file: File): Promise<string> => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(reader.result as string);
-      reader.onerror = reject;
-      reader.readAsText(file);
-    });
-  };
-
   const processFiles = async () => {
     setProcessing(true);
     setProgress(0);
     setResult(null);
 
-    // Сортировка: конфиги выше, код посередине, ассеты ниже
+    // FIX: Используем вынесенную функцию скоринга
+    // eslint-disable-next-line unicorn/no-array-sort
     const sortedFiles = [...files].sort((a, b) => {
-      const score = (name: string) => {
-        if (name === 'project.godot' || name === 'package.json') return 0;
-        if (name.endsWith('.gd') || name.endsWith('.ts') || name.endsWith('.js') || name.endsWith('.py')) return 1;
-        if (name.endsWith('.tscn') || name.endsWith('.tsx')) return 2;
-        return 3;
-      };
-      return score(a.name) - score(b.name);
+      return calculateFileScore(a.name) - calculateFileScore(b.name);
     });
 
-    // 1. Инициализация переменных статистики
     let totalOriginalBytes = 0;
     let totalCleanedBytes = 0;
     const composition: Record<string, number> = {};
@@ -332,7 +312,6 @@ export function ProjectToContext() {
 
     let processedCount = 0;
 
-    // 2. ФАЗА ЧТЕНИЯ И ОБРАБОТКИ
     for (const node of sortedFiles) {
       if (!node.isText) {
         processedCount++;
@@ -348,19 +327,16 @@ export function ProjectToContext() {
 
         totalCleanedBytes += cleanedText.length;
 
-        // Определяем язык для маппинга и статистики
         const langKey = getLanguageTag(node.name);
-        const reportLang = LANGUAGE_MAP[ext] || ext; // Для composition используем человекочитаемый ключ, если есть
+        const reportLang = LANGUAGE_MAP[ext] || ext;
         composition[reportLang] = (composition[reportLang] || 0) + 1;
 
-        // Сохраняем обработанные данные
         processedFilesData.push({
           node,
           content: cleanedText,
           langTag: langKey
         });
 
-        // Данные для топа файлов
         processedFileStats.push({
           path: node.path,
           size: cleanedText.length,
@@ -372,16 +348,15 @@ export function ProjectToContext() {
       }
 
       processedCount++;
-      // Первые 50% прогресса занимает чтение и обработка
       setProgress(Math.round((processedCount / sortedFiles.length) * 50));
       if (processedCount % 10 === 0) await new Promise(r => setTimeout(r, 0));
     }
 
-    // 3. РАСЧЕТ ИТОГОВОЙ СТАТИСТИКИ
     const estimatedTokens = Math.ceil(totalCleanedBytes / 4);
     const savingsBytes = totalOriginalBytes - totalCleanedBytes;
     const savingsPercent = totalOriginalBytes > 0 ? (savingsBytes / totalOriginalBytes) * 100 : 0;
 
+    // eslint-disable-next-line unicorn/no-array-sort
     const topFiles = processedFileStats.sort((a, b) => b.size - a.size).slice(0, 5);
 
     setStats({
@@ -396,9 +371,6 @@ export function ProjectToContext() {
       topFiles
     });
 
-    // 4. ФАЗА СБОРКИ ВЫХОДНОЙ СТРОКИ (XML + Markdown)
-
-    // Header с инструкциями и метриками для LLM
     let output = `<codebase_context>
 <instruction>
 The following is a flattened representation of a project codebase.
@@ -413,6 +385,7 @@ The following is a flattened representation of a project codebase.
   <file_count>${processedFilesData.length}</file_count>
   <top_languages>
     ${Object.entries(composition)
+        // eslint-disable-next-line unicorn/no-array-sort
         .sort(([, a], [, b]) => b - a)
         .slice(0, 3)
         .map(([lang, count]) => `${lang} (${count})`)
@@ -428,7 +401,6 @@ The following is a flattened representation of a project codebase.
 
     output += `<source_files>\n\n`;
 
-    // Сборка контента
     processedFilesData.forEach((item, idx) => {
       output += `<file path="${item.node.path}">\n`;
       output += "```" + item.langTag + "\n";
@@ -436,7 +408,6 @@ The following is a flattened representation of a project codebase.
       output += "\n```\n";
       output += `</file>\n\n`;
 
-      // Оставшиеся 50% прогресса
       if (idx % 10 === 0) setProgress(50 + Math.round((idx / processedFilesData.length) * 50));
     });
 
@@ -547,7 +518,7 @@ The following is a flattened representation of a project codebase.
               ~{stats.estimatedTokens.toLocaleString()}
             </div>
             <div className="text-[10px] text-blue-500 mt-1">
-              {(stats.estimatedTokens / 1000000 * 100).toFixed(1)}% от контекста 1M
+              {(stats.estimatedTokens / 1_000_000 * 100).toFixed(1)}% от контекста 1M
             </div>
           </div>
 

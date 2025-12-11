@@ -104,6 +104,7 @@ function useVideoFrameExtraction() {
   const frames = useMemo(() => {
     if (rawFrames.length < 2) return rawFrames;
     if (!extractionParams.symmetricLoop) return rawFrames;
+    // eslint-disable-next-line unicorn/no-array-reverse
     const loopBack = rawFrames.slice(1, -1).reverse();
     return [...rawFrames, ...loopBack];
   }, [rawFrames, extractionParams.symmetricLoop]);
@@ -307,7 +308,7 @@ function useVideoFrameExtraction() {
     setError(null);
 
     setTimeout(() => {
-      if (typeof gifshot !== 'undefined') {
+      if (gifshot !== undefined) {
         gifshot.createGIF({
           images: validFrames.map(f => f.dataUrl!),
           interval: 1 / gifParams.fps,

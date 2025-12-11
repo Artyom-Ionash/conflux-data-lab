@@ -10,7 +10,7 @@ const ZOOM_INTENSITY = 0.002;
 const PAN_BUTTON_CODE = 1; // Middle mouse button
 const STABILIZATION_DELAY = 150; // ms
 const AUTO_CONTRAST_PERIOD_DEFAULT = 5; // seconds
-const OVERLAY_SPREAD_SIZE = 50000;
+const OVERLAY_SPREAD_SIZE = 50_000;
 
 const THEME_DARK_BG = 'bg-[#111]';
 const THEME_LIGHT_BG = 'bg-[#e5e5e5]';

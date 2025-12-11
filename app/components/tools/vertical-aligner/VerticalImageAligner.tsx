@@ -13,7 +13,7 @@ import { Switch } from '../../ui/Switch';
 import { ToolLayout } from '../ToolLayout';
 
 // --- CONSTANTS ---
-const LIMIT_MAX_BROWSER = 16384; // Используется только как предел слайдера UI
+const LIMIT_MAX_BROWSER = 16_384; // Используется только как предел слайдера UI
 const VIEW_RESET_DELAY = 50; // ms
 const EXPORT_FILENAME = 'aligned-export';
 const MOUSE_BUTTON_LEFT = 0;
@@ -206,7 +206,7 @@ export function VerticalImageAligner() {
     const newImages: AlignImage[] = [];
     const isListEmpty = images.length === 0;
 
-    Array.from(files).forEach((file, index) => {
+    [...files].forEach((file, index) => {
       if (!file.type.startsWith('image/')) return;
       const url = URL.createObjectURL(file);
       const id = `${Date.now()}-${index}-${Math.random().toString(36).substr(2, 9)}`;
@@ -287,9 +287,9 @@ export function VerticalImageAligner() {
       const pngLink = document.createElement('a');
       pngLink.href = canvas.toDataURL('image/png');
       pngLink.download = `${EXPORT_FILENAME}.png`;
-      document.body.appendChild(pngLink);
+      document.body.append(pngLink);
       pngLink.click();
-      document.body.removeChild(pngLink);
+      pngLink.remove();
 
     } finally { setIsExporting(false); }
   }, [images, slotHeight, slotWidth]);

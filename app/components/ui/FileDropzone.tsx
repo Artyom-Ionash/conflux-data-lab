@@ -1,6 +1,6 @@
 'use client';
 
-import React, { ReactNode, useCallback,useEffect, useRef, useState } from 'react';
+import React, { ReactNode, useCallback, useEffect, useRef, useState } from 'react';
 
 // --- Helper: Validate File Type ---
 const isFileAccepted = (file: File, accept: string): boolean => {
@@ -56,7 +56,7 @@ export const FileDropzone = ({
 
   // Обработка списка файлов с валидацией
   const processFiles = useCallback((fileList: FileList | File[]) => {
-    const filesArray = Array.from(fileList);
+    const filesArray = [...fileList]; // FIX: unicorn/prefer-spread (можно было [...fileList], но здесь типизация FileList)
 
     // Фильтруем файлы согласно accept
     const validFiles = filesArray.filter(file => isFileAccepted(file, accept));
@@ -156,9 +156,8 @@ export const FileDropzone = ({
           ${className}
         `}
       >
-        {children ? (
-          children
-        ) : (
+        {/* FIX: unicorn/prefer-logical-operator-over-ternary */}
+        {children || (
           <div className="flex flex-col items-center justify-center pt-5 pb-6 pointer-events-none">
             <svg
               className={`w-8 h-8 mb-2 transition-colors ${isDragActive ? 'text-blue-500' : 'text-zinc-400 group-hover:text-zinc-500 dark:text-zinc-500 dark:group-hover:text-zinc-400'}`}

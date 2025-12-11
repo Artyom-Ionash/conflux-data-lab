@@ -3,8 +3,8 @@ export const HARDWARE_STANDARD_YEAR = "2025";
 export const TEXTURE_LIMITS = {
   SAFE_MOBILE: 4096,
   SAFE_PC: 8192,
-  MAX_BROWSER: 16384,
-  MAX_SLIDER: 20000,
+  MAX_BROWSER: 16_384,
+  MAX_SLIDER: 20_000,
 } as const;
 
 export const TEXTURE_ZONES = [

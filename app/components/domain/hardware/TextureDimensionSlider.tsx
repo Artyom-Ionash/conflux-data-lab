@@ -6,7 +6,8 @@ import {
   HARDWARE_STANDARD_YEAR,
   isPowerOfTwo,
   TEXTURE_LIMITS,
-  TEXTURE_ZONES} from '@/lib/domain/hardware/texture-standards';
+  TEXTURE_ZONES
+} from '@/lib/domain/hardware/texture-standards';
 
 interface TextureDimensionSliderProps {
   label: string;
@@ -37,7 +38,8 @@ export function TextureDimensionSlider({
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = Number(e.target.value);
-    if (!isNaN(val)) onChange(Math.min(val, max));
+    // FIX: unicorn/prefer-number-properties
+    if (!Number.isNaN(val)) onChange(Math.min(val, max));
   };
 
   const handlePoTClick = () => {

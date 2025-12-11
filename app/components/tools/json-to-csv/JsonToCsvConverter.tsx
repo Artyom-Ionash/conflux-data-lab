@@ -44,7 +44,7 @@ export function JsonToCsvConverter() {
             }
             const stringValue = String(value);
             if (stringValue.includes(',') || stringValue.includes('"') || stringValue.includes('\n')) {
-              return `"${stringValue.replace(/"/g, '""')}"`;
+              return `"${stringValue.replaceAll('"', '""')}"`;
             }
             return stringValue;
           }).join(',')

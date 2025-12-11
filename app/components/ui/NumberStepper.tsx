@@ -22,8 +22,10 @@ export function NumberStepper({
   disabled = false
 }: NumberStepperProps) {
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const val = parseFloat(e.target.value);
-    if (!isNaN(val)) {
+    // FIX: unicorn/prefer-number-properties (parseFloat -> Number.parseFloat - опционально, но лучше isNaN -> Number.isNaN)
+    const val = Number.parseFloat(e.target.value);
+    // FIX: unicorn/prefer-number-properties
+    if (!Number.isNaN(val)) {
       onChange(val);
     }
   };

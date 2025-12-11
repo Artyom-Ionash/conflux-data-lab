@@ -16,7 +16,7 @@ interface TextureLimitIndicatorProps {
 export function TextureLimitIndicator({ value, label, className }: TextureLimitIndicatorProps) {
   const { message, label: statusLabel, styles } = analyzeTextureSize(value);
 
-  const displayValue = value >= 10000
+  const displayValue = value >= 10_000
     ? (value / 1000).toFixed(1) + 'K'
     : value.toString() + 'px';
 
