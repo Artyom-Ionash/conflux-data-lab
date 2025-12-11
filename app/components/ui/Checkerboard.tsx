@@ -1,4 +1,4 @@
-import React from "react";
+import React from 'react';
 
 interface CheckerboardProps {
   children?: React.ReactNode;
@@ -10,16 +10,16 @@ interface CheckerboardProps {
 
 export function Checkerboard({
   children,
-  className = "",
+  className = '',
   size = 20,
-  color1 = "#333",
-  color2 = "transparent"
+  color1 = '#333',
+  color2 = 'transparent',
 }: CheckerboardProps) {
   return (
     <div className={`relative overflow-hidden ${className}`}>
       {/* Background Pattern */}
       <div
-        className="absolute inset-0 z-0 opacity-20 pointer-events-none"
+        className="pointer-events-none absolute inset-0 z-0 opacity-20"
         style={{
           backgroundImage: `
             linear-gradient(45deg, ${color1} 25%, ${color2} 25%), 
@@ -27,14 +27,12 @@ export function Checkerboard({
             linear-gradient(45deg, ${color2} 75%, ${color1} 75%), 
             linear-gradient(-45deg, ${color2} 75%, ${color1} 75%)
           `,
-          backgroundSize: `${size}px ${size}px`
+          backgroundSize: `${size}px ${size}px`,
         }}
       />
 
       {/* Content */}
-      <div className="relative z-10 w-full h-full">
-        {children}
-      </div>
+      <div className="relative z-10 h-full w-full">{children}</div>
     </div>
   );
 }

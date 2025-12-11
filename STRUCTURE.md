@@ -89,16 +89,17 @@ conflux-data-lab/
 ├── package.json # Конфигурация npm
 ├── tsconfig.json # Конфигурация TypeScript
 ├── next.config.ts # Конфигурация Next.js
+├── .prettierrc
 ├── scripts/ # Вспомогательные скрипты
 │   └── structure/
 │       ├── config.mjs
 │       └── update.mjs
-├── CHANGES_REVIEW.md # Обзор изменений
 ├── eslint.config.mjs # Конфигурация ESLint
 ├── next-env.d.ts
 ├── package-lock.json
 ├── postcss.config.mjs # Конфигурация PostCSS
-└── stylelint.config.mjs
+├── stylelint.config.mjs
+└── TECH_DEBT.md
 ```
 
 ## Ключевые особенности структуры

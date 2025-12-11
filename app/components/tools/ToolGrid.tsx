@@ -11,7 +11,7 @@ interface ToolGridProps {
 export function ToolGrid({ tools }: ToolGridProps) {
   if (tools.length === 0) {
     return (
-      <div className="text-center py-12 text-zinc-500 dark:text-zinc-400">
+      <div className="py-12 text-center text-zinc-500 dark:text-zinc-400">
         Инструменты не найдены
       </div>
     );

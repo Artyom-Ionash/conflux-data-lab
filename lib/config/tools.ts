@@ -1,4 +1,3 @@
-
 import { ToolConfig } from '../types/tools';
 
 // Порядок ключей определяет порядок отображения категорий на странице
@@ -26,23 +25,24 @@ export const tools: ToolConfig[] = [
     name: 'Vertical Image Aligner',
     description: 'Stack images vertically with equal width scaling.',
     category: 'sprites', // Обновлена категория
-    tags: ['image',  'align', 'spritesheet'],
+    tags: ['image', 'align', 'spritesheet'],
   },
   {
     id: 'monochrome-background-remover',
     name: 'Monochrome Remover',
     description: 'Remove background from monochrome images using luminance.',
     category: 'sprites', // Обновлена категория
-    tags: ['image',  'transparent','spritesheet'],
+    tags: ['image', 'transparent', 'spritesheet'],
   },
 
   // --- CONVERSION TOOLS ---
   {
     id: 'project-to-context',
     name: 'Project to LLM Context',
-    description: 'Convert a code project folder into a single Markdown file for LLM context (Godot, Next.js, etc).',
+    description:
+      'Convert a code project folder into a single Markdown file for LLM context (Godot, Next.js, etc).',
     category: 'conversion',
-    tags: ['llm', 'context',  'markdown', 'code', 'godot'],
+    tags: ['llm', 'context', 'markdown', 'code', 'godot'],
     featured: true,
   },
   {
@@ -54,14 +54,17 @@ export const tools: ToolConfig[] = [
   },
 ];
 
-export const toolsByCategory = tools.reduce((acc, tool) => {
-  const category = tool.category;
-  if (!acc[category]) {
-    acc[category] = [];
-  }
-  acc[category].push(tool);
-  return acc;
-}, {} as Record<string, ToolConfig[]>);
+export const toolsByCategory = tools.reduce(
+  (acc, tool) => {
+    const category = tool.category;
+    if (!acc[category]) {
+      acc[category] = [];
+    }
+    acc[category].push(tool);
+    return acc;
+  },
+  {} as Record<string, ToolConfig[]>
+);
 
 export function getToolById(id: string): ToolConfig | undefined {
   return tools.find((tool) => tool.id === id);

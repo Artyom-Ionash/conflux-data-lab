@@ -1,7 +1,7 @@
-import Image from "next/image";
-import React, { useEffect, useMemo, useState } from "react";
+import Image from 'next/image';
+import React, { useEffect, useMemo, useState } from 'react';
 
-import { Checkerboard } from "@/app/components/ui/Checkerboard";
+import { Checkerboard } from '@/app/components/ui/Checkerboard';
 
 interface MultiScalePreviewProps {
   frames: (string | null)[];
@@ -40,11 +40,11 @@ export function MultiScalePreview({ frames, fps }: MultiScalePreviewProps) {
   const currentSrc = validFrames[currentIndex];
 
   return (
-    <div className="flex flex-wrap items-center justify-center content-center gap-x-12 gap-y-12">
+    <div className="flex flex-wrap content-center items-center justify-center gap-x-12 gap-y-12">
       {PREVIEW_SCALES.map((size) => (
         <div key={size} className="flex flex-col items-center gap-4">
           <Checkerboard
-            className="border border-zinc-800 rounded-lg overflow-hidden shadow-[0_0_30px_rgba(0,0,0,0.5)] flex items-center justify-center transition-transform hover:scale-[1.02] bg-black/50"
+            className="flex items-center justify-center overflow-hidden rounded-lg border border-zinc-800 bg-black/50 shadow-[0_0_30px_rgba(0,0,0,0.5)] transition-transform hover:scale-[1.02]"
             size={20}
           >
             <div style={{ width: size, height: size }}>
@@ -54,12 +54,12 @@ export function MultiScalePreview({ frames, fps }: MultiScalePreviewProps) {
                 width={size}
                 height={size}
                 unoptimized // Важно для Data URL
-                className="w-full h-full object-contain"
+                className="h-full w-full object-contain"
                 style={{ imageRendering: size < PIXELATED_THRESHOLD ? 'pixelated' : 'auto' }}
               />
             </div>
           </Checkerboard>
-          <span className="text-sm font-mono font-bold text-zinc-400 bg-zinc-900/80 px-3 py-1.5 rounded-full border border-zinc-800">
+          <span className="rounded-full border border-zinc-800 bg-zinc-900/80 px-3 py-1.5 font-mono text-sm font-bold text-zinc-400">
             {size}x{size}
           </span>
         </div>

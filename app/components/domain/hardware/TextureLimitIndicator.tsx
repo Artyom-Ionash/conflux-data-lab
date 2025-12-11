@@ -5,7 +5,8 @@ import {
   analyzeTextureSize,
   HARDWARE_STANDARD_YEAR,
   TEXTURE_LIMITS,
-  TEXTURE_ZONES} from '@/lib/domain/hardware/texture-standards';
+  TEXTURE_ZONES,
+} from '@/lib/domain/hardware/texture-standards';
 
 interface TextureLimitIndicatorProps {
   value: number;
@@ -16,26 +17,26 @@ interface TextureLimitIndicatorProps {
 export function TextureLimitIndicator({ value, label, className }: TextureLimitIndicatorProps) {
   const { message, label: statusLabel, styles } = analyzeTextureSize(value);
 
-  const displayValue = value >= 10_000
-    ? (value / 1000).toFixed(1) + 'K'
-    : value.toString() + 'px';
+  const displayValue = value >= 10_000 ? (value / 1000).toFixed(1) + 'K' : value.toString() + 'px';
 
-  const uiZones = TEXTURE_ZONES.map(zone => ({
+  const uiZones = TEXTURE_ZONES.map((zone) => ({
     percent: zone.percent,
-    colorClass: zone.color
+    colorClass: zone.color,
   }));
 
   const tooltipContent = (
-    <div className="bg-zinc-950 text-zinc-100 text-xs p-3 rounded-lg shadow-2xl border border-zinc-800 leading-relaxed ring-1 ring-white/5">
-      <div className="flex items-center gap-2 mb-2 pb-2 border-b border-zinc-800/80">
-        <div className={`w-2 h-2 rounded-full shadow-[0_0_8px_currentColor] ${styles.marker}`}></div>
+    <div className="rounded-lg border border-zinc-800 bg-zinc-950 p-3 text-xs leading-relaxed text-zinc-100 shadow-2xl ring-1 ring-white/5">
+      <div className="mb-2 flex items-center gap-2 border-b border-zinc-800/80 pb-2">
+        <div
+          className={`h-2 w-2 rounded-full shadow-[0_0_8px_currentColor] ${styles.marker}`}
+        ></div>
         <span className={`font-bold tracking-wide ${styles.text}`}>{statusLabel}</span>
         <span className="text-zinc-600">•</span>
         <span className="font-mono text-zinc-300">{value}px</span>
       </div>
       <div className="mb-2 text-zinc-300">{message}</div>
-      <div className="flex justify-between items-center pt-1">
-        <span className="opacity-40 text-[10px] uppercase tracking-wider font-semibold">
+      <div className="flex items-center justify-between pt-1">
+        <span className="text-[10px] font-semibold tracking-wider uppercase opacity-40">
           Standards {HARDWARE_STANDARD_YEAR}
         </span>
       </div>

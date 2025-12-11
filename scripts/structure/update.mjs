@@ -31,14 +31,29 @@ if (existsSync(configPath)) {
 // =============================================================================
 
 const DEFAULT_IGNORE_PATTERNS = [
-  'node_modules', '.next', '.git', 'out', 'build', '.vercel',
-  'coverage', '.pnp', '.yarn', 'dist', '*.log', '.DS_Store', '*.tsbuildinfo',
+  'node_modules',
+  '.next',
+  '.git',
+  'out',
+  'build',
+  '.vercel',
+  'coverage',
+  '.pnp',
+  '.yarn',
+  'dist',
+  '*.log',
+  '.DS_Store',
+  '*.tsbuildinfo',
 ];
 
 const DEFAULT_PRIORITY_DIRS = ['app', 'lib', 'public'];
 const DEFAULT_PRIORITY_FILES = [
-  'README.md', 'ARCHITECTURE.md', 'STRUCTURE.md', 'package.json',
-  'tsconfig.json', 'next.config.ts',
+  'README.md',
+  'ARCHITECTURE.md',
+  'STRUCTURE.md',
+  'package.json',
+  'tsconfig.json',
+  'next.config.ts',
 ];
 
 const DEFAULT_DESCRIPTIONS = {
@@ -74,7 +89,8 @@ const PRIORITY_DIRS = config?.PRIORITY_DIRS || DEFAULT_PRIORITY_DIRS;
 const PRIORITY_FILES = config?.PRIORITY_FILES || DEFAULT_PRIORITY_FILES;
 const DESCRIPTIONS = config?.DESCRIPTIONS || DEFAULT_DESCRIPTIONS;
 
-const formatName = config?.formatName || ((name, relativePath, isDir) => isDir ? `${name}/` : name);
+const formatName =
+  config?.formatName || ((name, relativePath, isDir) => (isDir ? `${name}/` : name));
 const shouldShow = config?.shouldShow || (() => true);
 
 // =============================================================================
@@ -87,9 +103,7 @@ function shouldIgnore(path, name) {
       return false; // Skip negation patterns for now
     }
     if (pattern.includes('*')) {
-      const regex = new RegExp(
-        '^' + pattern.replace(/\*/g, '.*').replace(/\./g, '\\.') + '$'
-      );
+      const regex = new RegExp('^' + pattern.replace(/\*/g, '.*').replace(/\./g, '\\.') + '$');
       return regex.test(name);
     }
     return name === pattern || path.includes(`/${pattern}/`);

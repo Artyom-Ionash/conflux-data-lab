@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 
-import { categoryLabels,toolsByCategory } from '@/lib/config/tools';
+import { categoryLabels, toolsByCategory } from '@/lib/config/tools';
 
 import { ToolGrid } from '../../components/tools/ToolGrid';
 
@@ -47,4 +47,3 @@ export default async function CategoryPage({ params }: CategoryPageProps) {
     </div>
   );
 }
-

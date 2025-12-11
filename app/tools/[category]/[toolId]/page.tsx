@@ -47,16 +47,10 @@ export default async function ToolPage({ params }: ToolPageProps) {
       {/* Tool Header */}
       <div className="mb-8">
         <div className="mb-4 flex items-center gap-3">
-          <h1 className="text-3xl font-bold text-zinc-900 dark:text-zinc-100">
-            {tool.name}
-          </h1>
-          {tool.featured && (
-            <Badge variant="primary">Featured</Badge>
-          )}
+          <h1 className="text-3xl font-bold text-zinc-900 dark:text-zinc-100">{tool.name}</h1>
+          {tool.featured && <Badge variant="primary">Featured</Badge>}
         </div>
-        <p className="mb-4 text-lg text-zinc-600 dark:text-zinc-400">
-          {tool.description}
-        </p>
+        <p className="mb-4 text-lg text-zinc-600 dark:text-zinc-400">{tool.description}</p>
         <div className="flex flex-wrap gap-2">
           {tool.tags.map((tag) => (
             <Badge key={tag} variant="default">
@@ -72,10 +66,12 @@ export default async function ToolPage({ params }: ToolPageProps) {
       ) : (
         <div className="rounded-lg border border-zinc-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-900">
           <p className="text-zinc-600 dark:text-zinc-400">
-            Компонент для этого инструмента еще не реализован.
-            Создайте компонент в <code className="rounded bg-zinc-100 px-1.5 py-0.5 text-sm dark:bg-zinc-800">
+            Компонент для этого инструмента еще не реализован. Создайте компонент в{' '}
+            <code className="rounded bg-zinc-100 px-1.5 py-0.5 text-sm dark:bg-zinc-800">
               app/components/tools/{toolId}/
-            </code> и добавьте его в <code className="rounded bg-zinc-100 px-1.5 py-0.5 text-sm dark:bg-zinc-800">
+            </code>{' '}
+            и добавьте его в{' '}
+            <code className="rounded bg-zinc-100 px-1.5 py-0.5 text-sm dark:bg-zinc-800">
               lib/utils/tool-loader.tsx
             </code>
           </p>
@@ -84,4 +80,3 @@ export default async function ToolPage({ params }: ToolPageProps) {
     </div>
   );
 }
-

@@ -1,7 +1,7 @@
-"use client";
+'use client';
 
-import Image from "next/image";
-import { useEffect, useRef, useState } from "react";
+import Image from 'next/image';
+import { useEffect, useRef, useState } from 'react';
 
 interface FrameDiffOverlayProps {
   image1: string | null;
@@ -10,7 +10,12 @@ interface FrameDiffOverlayProps {
   onDataGenerated?: (url: string | null) => void;
 }
 
-export function FrameDiffOverlay({ image1, image2, isProcessing, onDataGenerated }: FrameDiffOverlayProps) {
+export function FrameDiffOverlay({
+  image1,
+  image2,
+  isProcessing,
+  onDataGenerated,
+}: FrameDiffOverlayProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [overlayDataUrl, setOverlayDataUrl] = useState<string | null>(null);
   const [processingDiff, setProcessingDiff] = useState(false);
@@ -26,7 +31,7 @@ export function FrameDiffOverlay({ image1, image2, isProcessing, onDataGenerated
       setProcessingDiff(true);
       try {
         const canvas = canvasRef.current;
-        const ctx = canvas?.getContext("2d");
+        const ctx = canvas?.getContext('2d');
         if (!ctx || !canvas) return;
 
         // Создаем изображения внутри промисов для корректной загрузки
@@ -34,8 +39,16 @@ export function FrameDiffOverlay({ image1, image2, isProcessing, onDataGenerated
         const lastImg = new window.Image();
 
         await Promise.all([
-          new Promise<void>((resolve, reject) => { firstImg.onload = () => resolve(); firstImg.onerror = reject; firstImg.src = image1; }),
-          new Promise<void>((resolve, reject) => { lastImg.onload = () => resolve(); lastImg.onerror = reject; lastImg.src = image2; }),
+          new Promise<void>((resolve, reject) => {
+            firstImg.onload = () => resolve();
+            firstImg.onerror = reject;
+            firstImg.src = image1;
+          }),
+          new Promise<void>((resolve, reject) => {
+            lastImg.onload = () => resolve();
+            lastImg.onerror = reject;
+            lastImg.src = image2;
+          }),
         ]);
 
         canvas.width = firstImg.width;
@@ -64,27 +77,41 @@ export function FrameDiffOverlay({ image1, image2, isProcessing, onDataGenerated
           const lastG = lastImageData.data[i + 1];
           const lastB = lastImageData.data[i + 2];
 
-          const firstIsBg = Math.abs(firstR - bgR) < threshold && Math.abs(firstG - bgG) < threshold && Math.abs(firstB - bgB) < threshold;
-          const lastIsBg = Math.abs(lastR - bgR) < threshold && Math.abs(lastG - bgG) < threshold && Math.abs(lastB - bgB) < threshold;
+          const firstIsBg =
+            Math.abs(firstR - bgR) < threshold &&
+            Math.abs(firstG - bgG) < threshold &&
+            Math.abs(firstB - bgB) < threshold;
+          const lastIsBg =
+            Math.abs(lastR - bgR) < threshold &&
+            Math.abs(lastG - bgG) < threshold &&
+            Math.abs(lastB - bgB) < threshold;
 
           if (firstIsBg && lastIsBg) {
             resultImageData.data[i + 3] = 0;
           } else if (!firstIsBg && lastIsBg) {
-            resultImageData.data[i] = 255; resultImageData.data[i + 1] = 0; resultImageData.data[i + 2] = 0; resultImageData.data[i + 3] = 200;
+            resultImageData.data[i] = 255;
+            resultImageData.data[i + 1] = 0;
+            resultImageData.data[i + 2] = 0;
+            resultImageData.data[i + 3] = 200;
           } else if (firstIsBg && !lastIsBg) {
-            resultImageData.data[i] = 0; resultImageData.data[i + 1] = 100; resultImageData.data[i + 2] = 255; resultImageData.data[i + 3] = 200;
+            resultImageData.data[i] = 0;
+            resultImageData.data[i + 1] = 100;
+            resultImageData.data[i + 2] = 255;
+            resultImageData.data[i + 3] = 200;
           } else {
-            resultImageData.data[i] = 200; resultImageData.data[i + 1] = 50; resultImageData.data[i + 2] = 255; resultImageData.data[i + 3] = 220;
+            resultImageData.data[i] = 200;
+            resultImageData.data[i + 1] = 50;
+            resultImageData.data[i + 2] = 255;
+            resultImageData.data[i + 3] = 220;
           }
         }
 
         ctx.putImageData(resultImageData, 0, 0);
-        const url = canvas.toDataURL("image/png");
+        const url = canvas.toDataURL('image/png');
         setOverlayDataUrl(url);
         if (onDataGenerated) onDataGenerated(url);
-
       } catch (error) {
-        console.error("Error processing diff:", error);
+        console.error('Error processing diff:', error);
       } finally {
         setProcessingDiff(false);
       }
@@ -103,7 +130,7 @@ export function FrameDiffOverlay({ image1, image2, isProcessing, onDataGenerated
   }
 
   return (
-    <div className="relative h-full w-full bg-zinc-100 dark:bg-zinc-950 group">
+    <div className="group relative h-full w-full bg-zinc-100 dark:bg-zinc-950">
       <canvas ref={canvasRef} className="hidden" />
 
       {overlayDataUrl && (
@@ -117,16 +144,20 @@ export function FrameDiffOverlay({ image1, image2, isProcessing, onDataGenerated
       )}
 
       {isLoading && (
-        <div className="absolute inset-0 z-10 flex items-center justify-center bg-white/60 dark:bg-black/60 backdrop-blur-[1px]">
+        <div className="absolute inset-0 z-10 flex items-center justify-center bg-white/60 backdrop-blur-[1px] dark:bg-black/60">
           <div className="h-5 w-5 animate-spin rounded-full border-2 border-zinc-300 border-t-blue-600"></div>
         </div>
       )}
 
       {/* Overlay Legend */}
       {overlayDataUrl && (
-        <div className="absolute bottom-0 left-0 right-0 p-2 bg-gradient-to-t from-black/70 to-transparent flex gap-3 text-[10px] text-white font-medium opacity-0 group-hover:opacity-100 transition-opacity z-20">
-          <span className="flex items-center gap-1"><div className="h-2 w-2 rounded-full bg-red-500 shadow-sm" /> Старт</span>
-          <span className="flex items-center gap-1"><div className="h-2 w-2 rounded-full bg-blue-500 shadow-sm" /> Финиш</span>
+        <div className="absolute right-0 bottom-0 left-0 z-20 flex gap-3 bg-gradient-to-t from-black/70 to-transparent p-2 text-[10px] font-medium text-white opacity-0 transition-opacity group-hover:opacity-100">
+          <span className="flex items-center gap-1">
+            <div className="h-2 w-2 rounded-full bg-red-500 shadow-sm" /> Старт
+          </span>
+          <span className="flex items-center gap-1">
+            <div className="h-2 w-2 rounded-full bg-blue-500 shadow-sm" /> Финиш
+          </span>
         </div>
       )}
     </div>

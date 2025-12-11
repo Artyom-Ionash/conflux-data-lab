@@ -22,63 +22,62 @@ type ToggleGroupItemProps = React.ComponentPropsWithoutRef<typeof ToggleGroupPri
 
 // --- Components ---
 
-const ToggleGroup = React.forwardRef<
-  HTMLDivElement,
-  ToggleGroupProps
->(({ className, children, gridCols, style, ...props }, ref) => { // <-- Убрали onKeyDown отсюда
+const ToggleGroup = React.forwardRef<HTMLDivElement, ToggleGroupProps>(
+  ({ className, children, gridCols, style, ...props }, ref) => {
+    // <-- Убрали onKeyDown отсюда
 
-  const baseStyles = "bg-zinc-100 dark:bg-zinc-800 p-1 rounded-lg gap-1";
-  const layoutStyles = gridCols ? "grid" : "inline-flex flex-row";
+    const baseStyles = 'bg-zinc-100 dark:bg-zinc-800 p-1 rounded-lg gap-1';
+    const layoutStyles = gridCols ? 'grid' : 'inline-flex flex-row';
 
-  const dynamicStyle: React.CSSProperties = gridCols
-    ? {
-      ...style,
-      gridTemplateColumns: `repeat(${gridCols}, minmax(0, 1fr))`
-    }
-    : style || {};
+    const dynamicStyle: React.CSSProperties = gridCols
+      ? {
+          ...style,
+          gridTemplateColumns: `repeat(${gridCols}, minmax(0, 1fr))`,
+        }
+      : style || {};
 
-  return (
-    <ToggleGroupPrimitive.Root
-      ref={ref}
-      className={cx(baseStyles, layoutStyles, className)}
-      style={dynamicStyle}
-      loop={true}
-      {...props} // <-- Теперь onKeyDown (если есть) передан здесь
-    >
-      {children}
-    </ToggleGroupPrimitive.Root>
-  );
-});
+    return (
+      <ToggleGroupPrimitive.Root
+        ref={ref}
+        className={cx(baseStyles, layoutStyles, className)}
+        style={dynamicStyle}
+        loop={true}
+        {...props} // <-- Теперь onKeyDown (если есть) передан здесь
+      >
+        {children}
+      </ToggleGroupPrimitive.Root>
+    );
+  }
+);
 
 ToggleGroup.displayName = ToggleGroupPrimitive.Root.displayName;
 
-const ToggleGroupItem = React.forwardRef<
-  HTMLButtonElement,
-  ToggleGroupItemProps
->(({ className, children, fullWidth, ...props }, ref) => (
-  <ToggleGroupPrimitive.Item
-    ref={ref}
-    className={cx(
-      // Базовая геометрия и фокус
-      "inline-flex items-center justify-center whitespace-nowrap rounded-md px-3 py-2 text-xs font-medium ring-offset-white transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-950 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50",
+const ToggleGroupItem = React.forwardRef<HTMLButtonElement, ToggleGroupItemProps>(
+  ({ className, children, fullWidth, ...props }, ref) => (
+    <ToggleGroupPrimitive.Item
+      ref={ref}
+      className={cx(
+        // Базовая геометрия и фокус
+        'inline-flex items-center justify-center rounded-md px-3 py-2 text-xs font-medium whitespace-nowrap ring-offset-white transition-all focus-visible:ring-2 focus-visible:ring-zinc-950 focus-visible:ring-offset-2 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50',
 
-      // Цвета (неактивный / ховер)
-      "text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-300",
+        // Цвета (неактивный / ховер)
+        'text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-300',
 
-      // Активное состояние (data-state=on)
-      "data-[state=on]:bg-white data-[state=on]:text-zinc-950 data-[state=on]:shadow-sm",
-      "dark:data-[state=on]:bg-zinc-700 dark:data-[state=on]:text-zinc-100",
+        // Активное состояние (data-state=on)
+        'data-[state=on]:bg-white data-[state=on]:text-zinc-950 data-[state=on]:shadow-sm',
+        'dark:data-[state=on]:bg-zinc-700 dark:data-[state=on]:text-zinc-100',
 
-      // Утилита для растягивания
-      fullWidth ? "col-span-full" : undefined,
+        // Утилита для растягивания
+        fullWidth ? 'col-span-full' : undefined,
 
-      className
-    )}
-    {...props}
-  >
-    {children}
-  </ToggleGroupPrimitive.Item>
-));
+        className
+      )}
+      {...props}
+    >
+      {children}
+    </ToggleGroupPrimitive.Item>
+  )
+);
 
 ToggleGroupItem.displayName = ToggleGroupPrimitive.Item.displayName;
 

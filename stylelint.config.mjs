@@ -1,38 +1,41 @@
 /** @type {import('stylelint').Config} */
-export default {
-  extends: ["stylelint-config-standard"],
+const stylelintConfig = {
+  extends: ['stylelint-config-standard'],
   rules: {
-    // --- Исправление ошибки import-notation ---
     // Разрешаем писать @import "tailwindcss" (строкой), а не url("...")
-    "import-notation": "string",
+    'import-notation': 'string',
 
-    // --- Специфика Tailwind v4 (оставляем как было) ---
-    "at-rule-no-unknown": [
+    // Разрешаем специфичные директивы Tailwind v4
+    'at-rule-no-unknown': [
       true,
       {
         ignoreAtRules: [
-          "tailwind",
-          "apply",
-          "variants",
-          "responsive",
-          "screen",
-          "layer",
-          "theme",
-          "import",
-          "plugin",
-          "utility",
-          "custom-variant",
+          'tailwind',
+          'apply',
+          'variants',
+          'responsive',
+          'screen',
+          'layer',
+          'theme',
+          'import',
+          'plugin',
+          'utility',
+          'custom-variant',
         ],
       },
     ],
-    "function-no-unknown": [
+    // Разрешаем функцию theme()
+    'function-no-unknown': [
       true,
       {
-        ignoreFunctions: ["theme"],
+        ignoreFunctions: ['theme'],
       },
     ],
-    "no-empty-source": null,
-    "selector-class-pattern": null,
-    "custom-property-pattern": null,
+    // Отключаем лишние проверки для Tailwind
+    'no-empty-source': null,
+    'selector-class-pattern': null,
+    'custom-property-pattern': null,
   },
 };
+
+export default stylelintConfig;

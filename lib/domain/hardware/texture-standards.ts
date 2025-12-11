@@ -1,4 +1,4 @@
-export const HARDWARE_STANDARD_YEAR = "2025";
+export const HARDWARE_STANDARD_YEAR = '2025';
 
 export const TEXTURE_LIMITS = {
   SAFE_MOBILE: 4096,
@@ -8,16 +8,16 @@ export const TEXTURE_LIMITS = {
 } as const;
 
 export const TEXTURE_ZONES = [
-  { percent: 20.48, color: "from-green-600 to-green-500" },   // Safe
-  { percent: 20.48, color: "from-yellow-500 to-yellow-400" }, // Warning
-  { percent: 40.96, color: "from-orange-500 to-orange-400" }, // Danger
-  { percent: 18.08, color: "from-red-600 to-red-500" },       // Critical
+  { percent: 20.48, color: 'from-green-600 to-green-500' }, // Safe
+  { percent: 20.48, color: 'from-yellow-500 to-yellow-400' }, // Warning
+  { percent: 40.96, color: 'from-orange-500 to-orange-400' }, // Danger
+  { percent: 18.08, color: 'from-red-600 to-red-500' }, // Critical
 ];
 
 export type TextureStatus = 'safe' | 'warning' | 'danger' | 'critical';
 
 export function isPowerOfTwo(x: number): boolean {
-  return (x > 0) && ((x & (x - 1)) === 0);
+  return x > 0 && (x & (x - 1)) === 0;
 }
 
 export function getNearestPoT(x: number): number {
@@ -36,8 +36,8 @@ export function analyzeTextureSize(dimension: number) {
         text: 'text-red-400',
         border: 'border-red-800',
         bg: 'bg-red-900/20',
-        marker: 'bg-red-500'
-      }
+        marker: 'bg-red-500',
+      },
     };
   }
   if (dimension > TEXTURE_LIMITS.SAFE_PC) {
@@ -51,8 +51,8 @@ export function analyzeTextureSize(dimension: number) {
         text: 'text-orange-400',
         border: 'border-orange-800',
         bg: 'bg-orange-900/20',
-        marker: 'bg-orange-500'
-      }
+        marker: 'bg-orange-500',
+      },
     };
   }
   if (dimension > TEXTURE_LIMITS.SAFE_MOBILE) {
@@ -66,8 +66,8 @@ export function analyzeTextureSize(dimension: number) {
         text: 'text-yellow-400',
         border: 'border-yellow-800',
         bg: 'bg-yellow-900/20',
-        marker: 'bg-yellow-500'
-      }
+        marker: 'bg-yellow-500',
+      },
     };
   }
   return {
@@ -80,7 +80,7 @@ export function analyzeTextureSize(dimension: number) {
       text: 'text-green-400',
       border: 'border-green-800',
       bg: 'bg-green-900/20',
-      marker: 'bg-green-500'
-    }
+      marker: 'bg-green-500',
+    },
   };
 }

@@ -1,4 +1,4 @@
-import React from "react";
+import React from 'react';
 
 export interface Zone {
   colorClass: string;
@@ -24,7 +24,7 @@ export function ZoneIndicator({
   markerColorClass, // Используем для цветного "Glow" эффекта
   label,
   tooltip,
-  className = "",
+  className = '',
 }: ZoneIndicatorProps) {
   const percentage = Math.max(0, Math.min((value / max) * 100, 100));
 
@@ -32,21 +32,20 @@ export function ZoneIndicator({
     <div className={`group relative flex flex-col justify-center ${className}`}>
       {/* Label Row */}
       {label && (
-        <div className="flex justify-between items-end mb-1.5 px-0.5">
-          <span className="text-[10px] uppercase font-bold text-zinc-400 tracking-wider">
+        <div className="mb-1.5 flex items-end justify-between px-0.5">
+          <span className="text-[10px] font-bold tracking-wider text-zinc-400 uppercase">
             {label}
           </span>
-          <span className="text-[10px] font-mono font-bold text-zinc-200 bg-zinc-800 px-1.5 rounded">
+          <span className="rounded bg-zinc-800 px-1.5 font-mono text-[10px] font-bold text-zinc-200">
             {displayValue}
           </span>
         </div>
       )}
 
       {/* Bar Container */}
-      <div className="relative h-3 w-full bg-zinc-900 rounded-sm shadow-inner cursor-help isolate">
-
+      <div className="relative isolate h-3 w-full cursor-help rounded-sm bg-zinc-900 shadow-inner">
         {/* Background Zones (Clipped) */}
-        <div className="absolute inset-0 flex opacity-90 rounded-sm overflow-hidden">
+        <div className="absolute inset-0 flex overflow-hidden rounded-sm opacity-90">
           {zones.map((zone, idx) => (
             <div
               key={idx}
@@ -58,23 +57,23 @@ export function ZoneIndicator({
 
         {/* Cursor Marker (High Contrast) */}
         <div
-          className="absolute top-[-3px] bottom-[-3px] w-1.5 z-20 transition-all duration-300 ease-out will-change-[left]"
+          className="absolute top-[-3px] bottom-[-3px] z-20 w-1.5 transition-all duration-300 ease-out will-change-[left]"
           style={{ left: `calc(${percentage}% - 3px)` }}
         >
           {/* The Needle itself: White with dark borders for max contrast */}
-          <div className="w-full h-full bg-white border-x border-black/40 shadow-[0_1px_3px_rgba(0,0,0,0.8)] rounded-[1px]" />
+          <div className="h-full w-full rounded-[1px] border-x border-black/40 bg-white shadow-[0_1px_3px_rgba(0,0,0,0.8)]" />
 
           {/* Colored Glow/Halo behind the needle */}
           <div
-            className={`absolute inset-0 w-full h-full opacity-60 blur-[4px] transition-colors duration-300 ${markerColorClass}`}
+            className={`absolute inset-0 h-full w-full opacity-60 blur-[4px] transition-colors duration-300 ${markerColorClass}`}
           />
         </div>
       </div>
 
       {/* Tooltip Slot */}
       {tooltip && (
-        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block z-50 w-72 pointer-events-none">
-          <div className="animate-in fade-in zoom-in-95 slide-in-from-bottom-2 duration-150 origin-bottom">
+        <div className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-2 hidden w-72 -translate-x-1/2 group-hover:block">
+          <div className="animate-in fade-in zoom-in-95 slide-in-from-bottom-2 origin-bottom duration-150">
             {tooltip}
           </div>
         </div>

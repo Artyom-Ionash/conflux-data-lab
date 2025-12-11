@@ -45,9 +45,9 @@ interface FileDropzoneProps {
 export const FileDropzone = ({
   onFilesSelected,
   multiple = false,
-  accept = "image/*",
-  label = "Загрузить изображение",
-  className = "",
+  accept = 'image/*',
+  label = 'Загрузить изображение',
+  className = '',
   enableWindowDrop = true,
   children,
 }: FileDropzoneProps) => {
@@ -55,19 +55,22 @@ export const FileDropzone = ({
   const inputRef = useRef<HTMLInputElement>(null);
 
   // Обработка списка файлов с валидацией
-  const processFiles = useCallback((fileList: FileList | File[]) => {
-    const filesArray = [...fileList]; // FIX: unicorn/prefer-spread (можно было [...fileList], но здесь типизация FileList)
+  const processFiles = useCallback(
+    (fileList: FileList | File[]) => {
+      const filesArray = [...fileList]; // FIX: unicorn/prefer-spread (можно было [...fileList], но здесь типизация FileList)
 
-    // Фильтруем файлы согласно accept
-    const validFiles = filesArray.filter(file => isFileAccepted(file, accept));
+      // Фильтруем файлы согласно accept
+      const validFiles = filesArray.filter((file) => isFileAccepted(file, accept));
 
-    if (validFiles.length > 0) {
-      onFilesSelected(validFiles);
-    } else {
-      // Опционально: можно добавить уведомление, что файлы не подошли по формату
-      console.warn("Файлы были проигнорированы, так как не соответствуют формату:", accept);
-    }
-  }, [accept, onFilesSelected]);
+      if (validFiles.length > 0) {
+        onFilesSelected(validFiles);
+      } else {
+        // Опционально: можно добавить уведомление, что файлы не подошли по формату
+        console.warn('Файлы были проигнорированы, так как не соответствуют формату:', accept);
+      }
+    },
+    [accept, onFilesSelected]
+  );
 
   // --- Global DnD (Window) ---
   useEffect(() => {
@@ -80,7 +83,7 @@ export const FileDropzone = ({
 
     const handleWindowDragLeave = (e: DragEvent) => {
       e.preventDefault();
-      if (e.relatedTarget === null || (e.relatedTarget as HTMLElement).nodeName === "HTML") {
+      if (e.relatedTarget === null || (e.relatedTarget as HTMLElement).nodeName === 'HTML') {
         setIsDragActive(false);
       }
     };
@@ -144,28 +147,33 @@ export const FileDropzone = ({
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
-        className={`
-          relative flex flex-col items-center justify-center cursor-pointer transition-all duration-200 group
-          ${isDragActive
-            ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20 dark:border-blue-400 scale-[1.01] shadow-lg ring-2 ring-blue-500/20'
-            : 'border-zinc-300 bg-zinc-50 hover:bg-zinc-100 dark:bg-zinc-800/50 dark:border-zinc-700 dark:hover:bg-zinc-800'
-          }
-          ${className.includes('border') ? '' : 'border-2 border-dashed rounded-lg'} 
-          ${className.includes('h-') ? '' : 'h-24'}
-          ${className.includes('w-') ? '' : 'w-full'}
-          ${className}
-        `}
+        className={`group relative flex cursor-pointer flex-col items-center justify-center transition-all duration-200 ${
+          isDragActive
+            ? 'scale-[1.01] border-blue-500 bg-blue-50 shadow-lg ring-2 ring-blue-500/20 dark:border-blue-400 dark:bg-blue-900/20'
+            : 'border-zinc-300 bg-zinc-50 hover:bg-zinc-100 dark:border-zinc-700 dark:bg-zinc-800/50 dark:hover:bg-zinc-800'
+        } ${className.includes('border') ? '' : 'rounded-lg border-2 border-dashed'} ${className.includes('h-') ? '' : 'h-24'} ${className.includes('w-') ? '' : 'w-full'} ${className} `}
       >
         {/* FIX: unicorn/prefer-logical-operator-over-ternary */}
         {children || (
-          <div className="flex flex-col items-center justify-center pt-5 pb-6 pointer-events-none">
+          <div className="pointer-events-none flex flex-col items-center justify-center pt-5 pb-6">
             <svg
-              className={`w-8 h-8 mb-2 transition-colors ${isDragActive ? 'text-blue-500' : 'text-zinc-400 group-hover:text-zinc-500 dark:text-zinc-500 dark:group-hover:text-zinc-400'}`}
-              aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 20 16"
+              className={`mb-2 h-8 w-8 transition-colors ${isDragActive ? 'text-blue-500' : 'text-zinc-400 group-hover:text-zinc-500 dark:text-zinc-500 dark:group-hover:text-zinc-400'}`}
+              aria-hidden="true"
+              xmlns="http://www.w3.org/2000/svg"
+              fill="none"
+              viewBox="0 0 20 16"
             >
-              <path stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 13h3a3 3 0 0 0 0-6h-.025A5.56 5.56 0 0 0 16 6.5 5.5 5.5 0 0 0 5.207 5.021C5.137 5.017 5.071 5 5 5a4 4 0 0 0 0 8h2.167M10 15V6m0 0L8 8m2-2 2 2" />
+              <path
+                stroke="currentColor"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth="2"
+                d="M13 13h3a3 3 0 0 0 0-6h-.025A5.56 5.56 0 0 0 16 6.5 5.5 5.5 0 0 0 5.207 5.021C5.137 5.017 5.071 5 5 5a4 4 0 0 0 0 8h2.167M10 15V6m0 0L8 8m2-2 2 2"
+              />
             </svg>
-            <p className={`text-xs font-medium transition-colors ${isDragActive ? 'text-blue-600 dark:text-blue-300' : 'text-zinc-500 dark:text-zinc-400'}`}>
+            <p
+              className={`text-xs font-medium transition-colors ${isDragActive ? 'text-blue-600 dark:text-blue-300' : 'text-zinc-500 dark:text-zinc-400'}`}
+            >
               {isDragActive ? (multiple ? 'Бросайте файлы сюда' : 'Бросайте файл сюда') : label}
             </p>
           </div>
@@ -182,7 +190,7 @@ export const FileDropzone = ({
       </div>
 
       {enableWindowDrop && isDragActive && (
-        <div className="fixed inset-0 z-[100] pointer-events-none border-4 border-blue-500/50 bg-blue-500/10 animate-pulse" />
+        <div className="pointer-events-none fixed inset-0 z-[100] animate-pulse border-4 border-blue-500/50 bg-blue-500/10" />
       )}
     </>
   );
@@ -204,10 +212,10 @@ export const FileDropzonePlaceholder = ({
   onUpload,
   multiple = false,
   enableWindowDrop = false,
-  className = "",
-  title = "Перетащите изображения сюда",
-  subTitle = "или кликните для выбора",
-  accept = "image/*"
+  className = '',
+  title = 'Перетащите изображения сюда',
+  subTitle = 'или кликните для выбора',
+  accept = 'image/*',
 }: FileDropzonePlaceholderProps) => {
   return (
     <FileDropzone
@@ -215,16 +223,23 @@ export const FileDropzonePlaceholder = ({
       multiple={multiple}
       enableWindowDrop={enableWindowDrop}
       accept={accept}
-      className={`w-full h-full border-none bg-transparent hover:bg-zinc-50/50 dark:hover:bg-zinc-900/50 transition-colors ${className}`}
+      className={`h-full w-full border-none bg-transparent transition-colors hover:bg-zinc-50/50 dark:hover:bg-zinc-900/50 ${className}`}
     >
-      <div className="flex flex-col items-center justify-center text-zinc-400 animate-in fade-in zoom-in-95 duration-300">
-        <div className="p-4 rounded-full bg-zinc-100 dark:bg-zinc-800 mb-4 transition-transform group-hover:scale-110 duration-200">
-          <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+      <div className="animate-in fade-in zoom-in-95 flex flex-col items-center justify-center text-zinc-400 duration-300">
+        <div className="mb-4 rounded-full bg-zinc-100 p-4 transition-transform duration-200 group-hover:scale-110 dark:bg-zinc-800">
+          <svg className="h-8 w-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth="2"
+              d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+            />
           </svg>
         </div>
-        <p className="text-lg font-medium mb-1 text-zinc-600 dark:text-zinc-300 text-center">{title}</p>
-        <p className="text-sm opacity-60 text-center">{subTitle}</p>
+        <p className="mb-1 text-center text-lg font-medium text-zinc-600 dark:text-zinc-300">
+          {title}
+        </p>
+        <p className="text-center text-sm opacity-60">{subTitle}</p>
       </div>
     </FileDropzone>
   );

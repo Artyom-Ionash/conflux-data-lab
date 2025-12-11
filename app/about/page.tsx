@@ -1,19 +1,19 @@
 export default function AboutPage() {
   return (
-    <div className="container mx-auto px-4 py-12 max-w-3xl">
-      <h1 className="text-4xl font-bold mb-6">О проекте</h1>
+    <div className="container mx-auto max-w-3xl px-4 py-12">
+      <h1 className="mb-6 text-4xl font-bold">О проекте</h1>
 
       <section className="mb-8">
-        <h2 className="text-2xl font-semibold mb-3">Концепция</h2>
-        <p className="text-zinc-600 dark:text-zinc-400 leading-relaxed">
-          Conflux Data Lab — это персональный швейцарский нож для работы с данными
-          и медиа-контентом. Проект создан как модульное портфолио, демонстрирующее
-          навыки в веб-разработке, обработке данных и UX-дизайне.
+        <h2 className="mb-3 text-2xl font-semibold">Концепция</h2>
+        <p className="leading-relaxed text-zinc-600 dark:text-zinc-400">
+          Conflux Data Lab — это персональный швейцарский нож для работы с данными и
+          медиа-контентом. Проект создан как модульное портфолио, демонстрирующее навыки в
+          веб-разработке, обработке данных и UX-дизайне.
         </p>
       </section>
 
       <section className="mb-8">
-        <h2 className="text-2xl font-semibold mb-3">Технологический стек</h2>
+        <h2 className="mb-3 text-2xl font-semibold">Технологический стек</h2>
         <ul className="grid grid-cols-2 gap-3">
           <li className="flex items-center gap-2">
             <span className="text-blue-600">▪</span> Next.js 16 (App Router)
@@ -37,10 +37,10 @@ export default function AboutPage() {
       </section>
 
       <section>
-        <h2 className="text-2xl font-semibold mb-3">Архитектура</h2>
-        <p className="text-zinc-600 dark:text-zinc-400 leading-relaxed mb-3">
-          Проект построен на принципах модульности и расширяемости. Каждый инструмент —
-          это независимый компонент с собственной логикой и UI.
+        <h2 className="mb-3 text-2xl font-semibold">Архитектура</h2>
+        <p className="mb-3 leading-relaxed text-zinc-600 dark:text-zinc-400">
+          Проект построен на принципах модульности и расширяемости. Каждый инструмент — это
+          независимый компонент с собственной логикой и UI.
         </p>
         <ul className="space-y-2 text-zinc-600 dark:text-zinc-400">
           <li>✓ Централизованная конфигурация инструментов</li>

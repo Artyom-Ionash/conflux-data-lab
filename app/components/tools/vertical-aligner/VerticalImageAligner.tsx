@@ -1,4 +1,3 @@
-
 'use client';
 
 import Image from 'next/image';
@@ -49,95 +48,115 @@ type AlignImage = {
   naturalHeight: number;
 };
 
-function revokeObjectURLSafely(url: string) { try { URL.revokeObjectURL(url); } catch { } }
+function revokeObjectURLSafely(url: string) {
+  try {
+    URL.revokeObjectURL(url);
+  } catch {}
+}
 
 // --- DRAGGABLE IMAGE SLOT ---
 interface DraggableImageSlotProps {
-  img: AlignImage; index: number; slotHeight: number; slotWidth: number;
-  getCanvasScale: () => number; onActivate: (id: string) => void; onUpdatePosition: (id: string, x: number, y: number) => void;
+  img: AlignImage;
+  index: number;
+  slotHeight: number;
+  slotWidth: number;
+  getCanvasScale: () => number;
+  onActivate: (id: string) => void;
+  onUpdatePosition: (id: string, x: number, y: number) => void;
 }
 
-const DraggableImageSlot = React.memo(({ img, index, slotHeight, slotWidth, getCanvasScale, onActivate, onUpdatePosition }: DraggableImageSlotProps) => {
-  const [isDragging, setIsDragging] = useState(false);
+const DraggableImageSlot = React.memo(
+  ({
+    img,
+    index,
+    slotHeight,
+    slotWidth,
+    getCanvasScale,
+    onActivate,
+    onUpdatePosition,
+  }: DraggableImageSlotProps) => {
+    const [isDragging, setIsDragging] = useState(false);
 
-  const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
-    if (e.button !== MOUSE_BUTTON_LEFT) return;
-    e.stopPropagation();
-    onActivate(img.id);
-    setIsDragging(true);
-    const target = e.currentTarget;
-    target.setPointerCapture(e.pointerId);
-    const startX = e.clientX;
-    const startY = e.clientY;
-    const initialOffsetX = img.offsetX;
-    const initialOffsetY = img.offsetY;
-    const scale = getCanvasScale();
+    const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+      if (e.button !== MOUSE_BUTTON_LEFT) return;
+      e.stopPropagation();
+      onActivate(img.id);
+      setIsDragging(true);
+      const target = e.currentTarget;
+      target.setPointerCapture(e.pointerId);
+      const startX = e.clientX;
+      const startY = e.clientY;
+      const initialOffsetX = img.offsetX;
+      const initialOffsetY = img.offsetY;
+      const scale = getCanvasScale();
 
-    const handlePointerMove = (moveEvent: globalThis.PointerEvent) => {
-      const dx = (moveEvent.clientX - startX) / scale;
-      const dy = (moveEvent.clientY - startY) / scale;
-      onUpdatePosition(img.id, initialOffsetX + dx, initialOffsetY + dy);
+      const handlePointerMove = (moveEvent: globalThis.PointerEvent) => {
+        const dx = (moveEvent.clientX - startX) / scale;
+        const dy = (moveEvent.clientY - startY) / scale;
+        onUpdatePosition(img.id, initialOffsetX + dx, initialOffsetY + dy);
+      };
+      const handlePointerUp = () => {
+        setIsDragging(false);
+        target.removeEventListener('pointermove', handlePointerMove as EventListener);
+        target.removeEventListener('pointerup', handlePointerUp as EventListener);
+      };
+      target.addEventListener('pointermove', handlePointerMove as EventListener);
+      target.addEventListener('pointerup', handlePointerUp as EventListener);
     };
-    const handlePointerUp = () => {
-      setIsDragging(false);
-      target.removeEventListener('pointermove', handlePointerMove as EventListener);
-      target.removeEventListener('pointerup', handlePointerUp as EventListener);
-    };
-    target.addEventListener('pointermove', handlePointerMove as EventListener);
-    target.addEventListener('pointerup', handlePointerUp as EventListener);
-  };
 
-  const zIndexClass = img.isActive ? `z-${Z_INDEX_SLOT_ACTIVE}` : `z-${Z_INDEX_SLOT_BASE}`;
-  const borderClass = img.isActive ? 'border-blue-500 ring-1 ring-blue-500' : 'border-zinc-300/30 hover:border-zinc-400/50';
+    const zIndexClass = img.isActive ? `z-${Z_INDEX_SLOT_ACTIVE}` : `z-${Z_INDEX_SLOT_BASE}`;
+    const borderClass = img.isActive
+      ? 'border-blue-500 ring-1 ring-blue-500'
+      : 'border-zinc-300/30 hover:border-zinc-400/50';
 
-  return (
-    <div
-      className={`absolute left-0 overflow-hidden group border-r border-dashed transition-colors
-        ${isDragging ? 'cursor-grabbing' : 'cursor-grab'}
-        ${borderClass} ${zIndexClass}
-      `}
-      style={{
-        top: index * slotHeight,
-        height: slotHeight,
-        width: slotWidth,
-        zIndex: img.isActive ? Z_INDEX_SLOT_ACTIVE : Z_INDEX_SLOT_BASE
-      }}
-      onPointerDown={handlePointerDown}
-    >
+    return (
       <div
-        className={`absolute top-1 left-1 bg-black/60 text-white text-[10px] px-1.5 py-0.5 rounded pointer-events-none select-none backdrop-blur-sm transition-opacity duration-200 ${img.isActive ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
-        style={{ zIndex: Z_INDEX_LABEL }}
-      >
-        {Math.round(img.offsetX)}, {Math.round(img.offsetY)}
-      </div>
-      <Image
-        src={img.url}
-        alt=""
-        draggable={false}
-        width={img.naturalWidth}
-        height={img.naturalHeight}
-        unoptimized // Важно для blob: URL
-        className="absolute select-none origin-top-left max-w-none"
+        className={`group absolute left-0 overflow-hidden border-r border-dashed transition-colors ${isDragging ? 'cursor-grabbing' : 'cursor-grab'} ${borderClass} ${zIndexClass} `}
         style={{
-          left: 0,
-          top: 0,
-          transform: `translate3d(${img.offsetX}px, ${img.offsetY}px, 0)`,
-          width: img.naturalWidth,
-          height: img.naturalHeight,
-          backfaceVisibility: 'hidden',
-          imageRendering: 'inherit'
+          top: index * slotHeight,
+          height: slotHeight,
+          width: slotWidth,
+          zIndex: img.isActive ? Z_INDEX_SLOT_ACTIVE : Z_INDEX_SLOT_BASE,
         }}
-      />
-    </div>
-  );
-});
+        onPointerDown={handlePointerDown}
+      >
+        <div
+          className={`pointer-events-none absolute top-1 left-1 rounded bg-black/60 px-1.5 py-0.5 text-[10px] text-white backdrop-blur-sm transition-opacity duration-200 select-none ${img.isActive ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
+          style={{ zIndex: Z_INDEX_LABEL }}
+        >
+          {Math.round(img.offsetX)}, {Math.round(img.offsetY)}
+        </div>
+        <Image
+          src={img.url}
+          alt=""
+          draggable={false}
+          width={img.naturalWidth}
+          height={img.naturalHeight}
+          unoptimized // Важно для blob: URL
+          className="absolute max-w-none origin-top-left select-none"
+          style={{
+            left: 0,
+            top: 0,
+            transform: `translate3d(${img.offsetX}px, ${img.offsetY}px, 0)`,
+            width: img.naturalWidth,
+            height: img.naturalHeight,
+            backfaceVisibility: 'hidden',
+            imageRendering: 'inherit',
+          }}
+        />
+      </div>
+    );
+  }
+);
 DraggableImageSlot.displayName = 'DraggableImageSlot';
 
 // --- MAIN COMPONENT ---
 export function VerticalImageAligner() {
   const [images, setImages] = useState<AlignImage[]>([]);
   const imagesRef = useRef(images);
-  useEffect(() => { imagesRef.current = images; }, [images]);
+  useEffect(() => {
+    imagesRef.current = images;
+  }, [images]);
 
   // Dimensions
   const [slotHeight, setSlotHeight] = useState(DEFAULT_SETTINGS.slotSize);
@@ -158,7 +177,7 @@ export function VerticalImageAligner() {
   const workspaceRef = useRef<CanvasRef>(null);
   const activeImageId = useMemo(() => images.find((img) => img.isActive)?.id ?? null, [images]);
 
-  useEffect(() => () => imagesRef.current.forEach(img => URL.revokeObjectURL(img.url)), []);
+  useEffect(() => () => imagesRef.current.forEach((img) => URL.revokeObjectURL(img.url)), []);
 
   const { bounds, totalHeight } = useMemo(() => {
     if (!images.length) return { bounds: { width: 1, height: 1 }, totalHeight: 0 };
@@ -168,16 +187,36 @@ export function VerticalImageAligner() {
   }, [images.length, slotHeight, slotWidth]);
 
   // --- Handlers ---
-  const getCanvasScale = useCallback(() => workspaceRef.current?.getTransform().scale || CANVAS_SCALE_DEFAULT, []);
+  const getCanvasScale = useCallback(
+    () => workspaceRef.current?.getTransform().scale || CANVAS_SCALE_DEFAULT,
+    []
+  );
 
   const handleUpdatePosition = useCallback((id: string, x: number, y: number) => {
-    setImages(prev => prev.map(img => img.id === id ? { ...img, offsetX: x, offsetY: y } : img));
+    setImages((prev) =>
+      prev.map((img) => (img.id === id ? { ...img, offsetX: x, offsetY: y } : img))
+    );
   }, []);
 
-  const handleCenterAllX = useCallback(() => setImages(prev => prev.map(img => ({ ...img, offsetX: Math.round((slotWidth - img.naturalWidth) / 2) }))), [slotWidth]);
-  const handleCenterAllY = useCallback(() => setImages(prev => prev.map(img => ({ ...img, offsetY: Math.round((slotHeight - img.naturalHeight) / 2) }))), [slotHeight]);
+  const handleCenterAllX = useCallback(
+    () =>
+      setImages((prev) =>
+        prev.map((img) => ({ ...img, offsetX: Math.round((slotWidth - img.naturalWidth) / 2) }))
+      ),
+    [slotWidth]
+  );
+  const handleCenterAllY = useCallback(
+    () =>
+      setImages((prev) =>
+        prev.map((img) => ({ ...img, offsetY: Math.round((slotHeight - img.naturalHeight) / 2) }))
+      ),
+    [slotHeight]
+  );
 
-  const handleActivate = useCallback((id: string) => setImages(prev => prev.map(x => ({ ...x, isActive: x.id === id }))), []);
+  const handleActivate = useCallback(
+    (id: string) => setImages((prev) => prev.map((x) => ({ ...x, isActive: x.id === id }))),
+    []
+  );
 
   const handleRemoveImage = useCallback((id: string) => {
     setImages((prev) => {
@@ -187,12 +226,17 @@ export function VerticalImageAligner() {
     });
   }, []);
 
-  const handleDragStart = (e: React.DragEvent, index: number) => { setDraggingListIndex(index); };
+  const handleDragStart = (e: React.DragEvent, index: number) => {
+    setDraggingListIndex(index);
+  };
 
   const handleDrop = (e: React.DragEvent, targetIndex: number) => {
     e.preventDefault();
-    if (draggingListIndex === null || draggingListIndex === targetIndex) { setDraggingListIndex(null); return; }
-    setImages(prev => {
+    if (draggingListIndex === null || draggingListIndex === targetIndex) {
+      setDraggingListIndex(null);
+      return;
+    }
+    setImages((prev) => {
       const copy = [...prev];
       const [item] = copy.splice(draggingListIndex, 1);
       copy.splice(targetIndex, 0, item);
@@ -201,69 +245,98 @@ export function VerticalImageAligner() {
     setDraggingListIndex(null);
   };
 
-  const processFiles = useCallback((files: File[]) => {
-    if (!files || files.length === 0) return;
-    const newImages: AlignImage[] = [];
-    const isListEmpty = images.length === 0;
+  const processFiles = useCallback(
+    (files: File[]) => {
+      if (!files || files.length === 0) return;
+      const newImages: AlignImage[] = [];
+      const isListEmpty = images.length === 0;
 
-    [...files].forEach((file, index) => {
-      if (!file.type.startsWith('image/')) return;
-      const url = URL.createObjectURL(file);
-      const id = `${Date.now()}-${index}-${Math.random().toString(36).substr(2, 9)}`;
-      newImages.push({ id, file, url, name: file.name, offsetX: 0, offsetY: 0, isActive: isListEmpty && index === 0, naturalWidth: 0, naturalHeight: 0 });
-    });
+      [...files].forEach((file, index) => {
+        if (!file.type.startsWith('image/')) return;
+        const url = URL.createObjectURL(file);
+        const id = `${Date.now()}-${index}-${Math.random().toString(36).substr(2, 9)}`;
+        newImages.push({
+          id,
+          file,
+          url,
+          name: file.name,
+          offsetX: 0,
+          offsetY: 0,
+          isActive: isListEmpty && index === 0,
+          naturalWidth: 0,
+          naturalHeight: 0,
+        });
+      });
 
-    setImages((prev) => [...prev, ...newImages]);
+      setImages((prev) => [...prev, ...newImages]);
 
-    newImages.forEach((item, idx) => {
-      // Используем window.Image для обработки данных
-      const img = new window.Image();
-      img.onload = () => {
-        if (isListEmpty && idx === 0) {
-          setSlotHeight(img.height);
-          setFrameStepX(img.height);
+      newImages.forEach((item, idx) => {
+        // Используем window.Image для обработки данных
+        const img = new window.Image();
+        img.onload = () => {
+          if (isListEmpty && idx === 0) {
+            setSlotHeight(img.height);
+            setFrameStepX(img.height);
 
-          try {
-            const tempCanvas = document.createElement('canvas');
-            tempCanvas.width = 1;
-            tempCanvas.height = 1;
-            const tempCtx = tempCanvas.getContext('2d');
-            if (tempCtx) {
-              tempCtx.drawImage(img, 0, 0, 1, 1, 0, 0, 1, 1);
-              const [r, g, b] = tempCtx.getImageData(0, 0, 1, 1).data;
-              const toHex = (c: number) => c.toString(16).padStart(2, '0');
-              const hex = `#${toHex(r)}${toHex(g)}${toHex(b)}`;
-              workspaceRef.current?.setBackgroundColor(hex);
+            try {
+              const tempCanvas = document.createElement('canvas');
+              tempCanvas.width = 1;
+              tempCanvas.height = 1;
+              const tempCtx = tempCanvas.getContext('2d');
+              if (tempCtx) {
+                tempCtx.drawImage(img, 0, 0, 1, 1, 0, 0, 1, 1);
+                const [r, g, b] = tempCtx.getImageData(0, 0, 1, 1).data;
+                const toHex = (c: number) => c.toString(16).padStart(2, '0');
+                const hex = `#${toHex(r)}${toHex(g)}${toHex(b)}`;
+                workspaceRef.current?.setBackgroundColor(hex);
+              }
+            } catch (e) {
+              console.warn('Could not extract color from image', e);
             }
-          } catch (e) {
-            console.warn("Could not extract color from image", e);
+
+            setTimeout(() => {
+              workspaceRef.current?.resetView(img.width, img.height);
+            }, VIEW_RESET_DELAY);
           }
 
-          setTimeout(() => {
-            workspaceRef.current?.resetView(img.width, img.height);
-          }, VIEW_RESET_DELAY);
-        }
-
-        setSlotWidth(prev => { if (isListEmpty && idx === 0) return img.width; return Math.max(prev, img.width); });
-        setImages(current => current.map(ex => ex.id === item.id ? { ...ex, naturalWidth: img.width, naturalHeight: img.height } : ex));
-      };
-      img.src = item.url;
-    });
-  }, [images.length]);
+          setSlotWidth((prev) => {
+            if (isListEmpty && idx === 0) return img.width;
+            return Math.max(prev, img.width);
+          });
+          setImages((current) =>
+            current.map((ex) =>
+              ex.id === item.id ? { ...ex, naturalWidth: img.width, naturalHeight: img.height } : ex
+            )
+          );
+        };
+        img.src = item.url;
+      });
+    },
+    [images.length]
+  );
 
   const handleExport = useCallback(async () => {
     if (!images.length) return; // Removed isCriticalHeight check
     setIsExporting(true);
     try {
       // Используем window.Image для экспорта
-      const loaded = await Promise.all(images.map((item) => new Promise<{ meta: AlignImage; img: HTMLImageElement }>((resolve, reject) => {
-        const i = new window.Image(); i.onload = () => resolve({ meta: item, img: i }); i.onerror = () => reject(); i.src = item.url;
-      })));
+      const loaded = await Promise.all(
+        images.map(
+          (item) =>
+            new Promise<{ meta: AlignImage; img: HTMLImageElement }>((resolve, reject) => {
+              const i = new window.Image();
+              i.onload = () => resolve({ meta: item, img: i });
+              i.onerror = () => reject();
+              i.src = item.url;
+            })
+        )
+      );
 
       const finalW = slotWidth;
       const finalH = images.length * slotHeight;
       const canvas = document.createElement('canvas');
-      canvas.width = finalW; canvas.height = finalH;
+      canvas.width = finalW;
+      canvas.height = finalH;
       const ctx = canvas.getContext('2d');
       if (!ctx) return;
 
@@ -279,7 +352,9 @@ export function VerticalImageAligner() {
       loaded.forEach(({ meta, img }, index) => {
         const slotY = index * slotHeight;
         ctx.save();
-        ctx.beginPath(); ctx.rect(0, slotY, slotWidth, slotHeight); ctx.clip();
+        ctx.beginPath();
+        ctx.rect(0, slotY, slotWidth, slotHeight);
+        ctx.clip();
         ctx.drawImage(img, meta.offsetX, slotY + meta.offsetY, img.width, img.height);
         ctx.restore();
       });
@@ -290,8 +365,9 @@ export function VerticalImageAligner() {
       document.body.append(pngLink);
       pngLink.click();
       pngLink.remove();
-
-    } finally { setIsExporting(false); }
+    } finally {
+      setIsExporting(false);
+    }
   }, [images, slotHeight, slotWidth]);
 
   const sidebarContent = (
@@ -307,66 +383,163 @@ export function VerticalImageAligner() {
             <button
               onClick={handleExport}
               disabled={isExporting}
-              className={`w-full rounded-md py-2.5 text-sm font-semibold text-white transition-all shadow-sm bg-blue-600 hover:bg-blue-700 disabled:opacity-50 hover:shadow-md`}
+              className={`w-full rounded-md bg-blue-600 py-2.5 text-sm font-semibold text-white shadow-sm transition-all hover:bg-blue-700 hover:shadow-md disabled:opacity-50`}
             >
               {isExporting ? 'Экспорт...' : 'Скачать PNG'}
             </button>
           </div>
 
-          <div className="p-4 bg-zinc-50 dark:bg-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-700">
-            <div className="text-xs font-bold text-zinc-500 mb-4 uppercase tracking-wide">Размеры слота</div>
+          <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-4 dark:border-zinc-700 dark:bg-zinc-800">
+            <div className="mb-4 text-xs font-bold tracking-wide text-zinc-500 uppercase">
+              Размеры слота
+            </div>
 
             <div className="flex flex-col gap-6">
-              <TextureDimensionSlider label="Ширина" value={slotWidth} onChange={setSlotWidth} max={LIMIT_MAX_BROWSER} />
-              <TextureDimensionSlider label="Высота" value={slotHeight} onChange={setSlotHeight} max={LIMIT_MAX_BROWSER} />
+              <TextureDimensionSlider
+                label="Ширина"
+                value={slotWidth}
+                onChange={setSlotWidth}
+                max={LIMIT_MAX_BROWSER}
+              />
+              <TextureDimensionSlider
+                label="Высота"
+                value={slotHeight}
+                onChange={setSlotHeight}
+                max={LIMIT_MAX_BROWSER}
+              />
             </div>
 
-            <div className="mt-4 pt-3 border-t border-zinc-200 dark:border-zinc-700 text-xs font-medium text-zinc-500 text-center flex justify-between">
+            <div className="mt-4 flex justify-between border-t border-zinc-200 pt-3 text-center text-xs font-medium text-zinc-500 dark:border-zinc-700">
               <span>Итого:</span>
-              <span className="font-mono text-zinc-900 dark:text-zinc-100">{slotWidth} x {totalHeight} px</span>
+              <span className="font-mono text-zinc-900 dark:text-zinc-100">
+                {slotWidth} x {totalHeight} px
+              </span>
             </div>
           </div>
 
-          <div className="p-4 bg-zinc-50 dark:bg-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-700">
-            <Switch label="ЗЕЛЕНАЯ СЕТКА (КАДР)" checked={showFrameGrid} onCheckedChange={setShowFrameGrid} />
-            {showFrameGrid && <div className="mt-2 pt-4 border-t border-zinc-200 dark:border-zinc-700">
-              <Slider label="Шаг X" value={frameStepX} onChange={setFrameStepX} max={slotWidth * 2} statusColor="green" />
-            </div>}
+          <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-4 dark:border-zinc-700 dark:bg-zinc-800">
+            <Switch
+              label="ЗЕЛЕНАЯ СЕТКА (КАДР)"
+              checked={showFrameGrid}
+              onCheckedChange={setShowFrameGrid}
+            />
+            {showFrameGrid && (
+              <div className="mt-2 border-t border-zinc-200 pt-4 dark:border-zinc-700">
+                <Slider
+                  label="Шаг X"
+                  value={frameStepX}
+                  onChange={setFrameStepX}
+                  max={slotWidth * 2}
+                  statusColor="green"
+                />
+              </div>
+            )}
           </div>
 
-          <div className="p-4 bg-zinc-50 dark:bg-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-700">
-            <Switch label="КРАСНАЯ СЕТКА (СДВИГ)" checked={showRedGrid} onCheckedChange={setShowRedGrid} />
-            {showRedGrid && <div className="mt-2 pt-4 border-t border-zinc-200 dark:border-zinc-700">
-              <Slider label="Сдвиг X" value={redGridOffsetX} onChange={setRedGridOffsetX} min={-slotWidth} max={slotWidth} statusColor="red" />
-              <Slider label="Сдвиг Y" value={redGridOffsetY} onChange={setRedGridOffsetY} min={-slotHeight} max={slotHeight} statusColor="red" />
-            </div>}
+          <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-4 dark:border-zinc-700 dark:bg-zinc-800">
+            <Switch
+              label="КРАСНАЯ СЕТКА (СДВИГ)"
+              checked={showRedGrid}
+              onCheckedChange={setShowRedGrid}
+            />
+            {showRedGrid && (
+              <div className="mt-2 border-t border-zinc-200 pt-4 dark:border-zinc-700">
+                <Slider
+                  label="Сдвиг X"
+                  value={redGridOffsetX}
+                  onChange={setRedGridOffsetX}
+                  min={-slotWidth}
+                  max={slotWidth}
+                  statusColor="red"
+                />
+                <Slider
+                  label="Сдвиг Y"
+                  value={redGridOffsetY}
+                  onChange={setRedGridOffsetY}
+                  min={-slotHeight}
+                  max={slotHeight}
+                  statusColor="red"
+                />
+              </div>
+            )}
           </div>
 
           <div className="space-y-1.5">
-            <div className="flex items-center justify-between pb-1 px-1">
-              <span className="text-xs font-bold text-zinc-500 uppercase tracking-wide">Слои</span>
+            <div className="flex items-center justify-between px-1 pb-1">
+              <span className="text-xs font-bold tracking-wide text-zinc-500 uppercase">Слои</span>
               <div className="flex gap-2">
-                <button onClick={handleCenterAllX} className="p-1 hover:bg-zinc-100 dark:hover:bg-zinc-700 rounded text-zinc-500 transition-colors text-xs font-mono font-bold">|X|</button>
-                <button onClick={handleCenterAllY} className="p-1 hover:bg-zinc-100 dark:hover:bg-zinc-700 rounded text-zinc-500 transition-colors text-xs font-mono font-bold">≡Y≡</button>
+                <button
+                  onClick={handleCenterAllX}
+                  className="rounded p-1 font-mono text-xs font-bold text-zinc-500 transition-colors hover:bg-zinc-100 dark:hover:bg-zinc-700"
+                >
+                  |X|
+                </button>
+                <button
+                  onClick={handleCenterAllY}
+                  className="rounded p-1 font-mono text-xs font-bold text-zinc-500 transition-colors hover:bg-zinc-100 dark:hover:bg-zinc-700"
+                >
+                  ≡Y≡
+                </button>
               </div>
             </div>
             {images.map((img, i) => (
-              <div key={img.id} draggable onDragStart={(e) => handleDragStart(e, i)} onDragOver={e => e.preventDefault()} onDrop={(e) => handleDrop(e, i)}
-                className={`flex items-center gap-3 p-2.5 text-sm rounded-md border cursor-pointer select-none transition-colors ${img.isActive ? 'bg-blue-50 border-blue-200 text-blue-800 dark:bg-blue-900/30 dark:border-blue-800 dark:text-blue-100 shadow-sm' : 'bg-white dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 hover:border-zinc-300'}`}
+              <div
+                key={img.id}
+                draggable
+                onDragStart={(e) => handleDragStart(e, i)}
+                onDragOver={(e) => e.preventDefault()}
+                onDrop={(e) => handleDrop(e, i)}
+                className={`flex cursor-pointer items-center gap-3 rounded-md border p-2.5 text-sm transition-colors select-none ${img.isActive ? 'border-blue-200 bg-blue-50 text-blue-800 shadow-sm dark:border-blue-800 dark:bg-blue-900/30 dark:text-blue-100' : 'border-zinc-200 bg-white hover:border-zinc-300 dark:border-zinc-700 dark:bg-zinc-800'}`}
                 onClick={() => handleActivate(img.id)}
               >
-                <span className="font-mono text-zinc-400 w-6">#{i + 1}</span>
-                <span className="truncate flex-1 font-medium">{img.name}</span>
-                <button onClick={(e) => { e.stopPropagation(); handleRemoveImage(img.id); }} className="text-zinc-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 p-1.5 rounded transition-colors">✕</button>
+                <span className="w-6 font-mono text-zinc-400">#{i + 1}</span>
+                <span className="flex-1 truncate font-medium">{img.name}</span>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleRemoveImage(img.id);
+                  }}
+                  className="rounded p-1.5 text-zinc-400 transition-colors hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-900/30"
+                >
+                  ✕
+                </button>
               </div>
             ))}
           </div>
 
           {activeImageId && (
-            <div className="p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
-              <p className="font-bold text-xs mb-3 text-yellow-800 dark:text-yellow-200 uppercase tracking-wide">Смещение активного слоя</p>
-              <Slider label="X (px)" value={Math.round(images.find(i => i.id === activeImageId)?.offsetX || 0)} onChange={(val) => handleUpdatePosition(activeImageId, val, (images.find(i => i.id === activeImageId)?.offsetY || 0))} min={-slotWidth} max={slotWidth} statusColor="yellow" />
-              <Slider label="Y (px)" value={Math.round(images.find(i => i.id === activeImageId)?.offsetY || 0)} onChange={(val) => handleUpdatePosition(activeImageId, (images.find(i => i.id === activeImageId)?.offsetX || 0), val)} min={-slotHeight} max={slotHeight} statusColor="yellow" />
+            <div className="rounded-lg border border-yellow-200 bg-yellow-50 p-4 dark:border-yellow-800 dark:bg-yellow-900/20">
+              <p className="mb-3 text-xs font-bold tracking-wide text-yellow-800 uppercase dark:text-yellow-200">
+                Смещение активного слоя
+              </p>
+              <Slider
+                label="X (px)"
+                value={Math.round(images.find((i) => i.id === activeImageId)?.offsetX || 0)}
+                onChange={(val) =>
+                  handleUpdatePosition(
+                    activeImageId,
+                    val,
+                    images.find((i) => i.id === activeImageId)?.offsetY || 0
+                  )
+                }
+                min={-slotWidth}
+                max={slotWidth}
+                statusColor="yellow"
+              />
+              <Slider
+                label="Y (px)"
+                value={Math.round(images.find((i) => i.id === activeImageId)?.offsetY || 0)}
+                onChange={(val) =>
+                  handleUpdatePosition(
+                    activeImageId,
+                    images.find((i) => i.id === activeImageId)?.offsetX || 0,
+                    val
+                  )
+                }
+                min={-slotHeight}
+                max={slotHeight}
+                statusColor="yellow"
+              />
             </div>
           )}
         </>
@@ -386,34 +559,43 @@ export function VerticalImageAligner() {
         defaultBackgroundColor={DEFAULT_SETTINGS.bgColor}
         placeholder={
           !images.length ? (
-            <FileDropzonePlaceholder onUpload={processFiles} multiple={true} title="Перетащите изображения для склейки" />
+            <FileDropzonePlaceholder
+              onUpload={processFiles}
+              multiple={true}
+              title="Перетащите изображения для склейки"
+            />
           ) : null
         }
       >
         {showRedGrid && (
-          <div className={`absolute inset-0 pointer-events-none opacity-50`}
+          <div
+            className={`pointer-events-none absolute inset-0 opacity-50`}
             style={{
               zIndex: Z_INDEX_GRID_RED,
               backgroundImage: `linear-gradient(to right, ${redGridColor} 1px, transparent 1px), linear-gradient(to bottom, ${redGridColor} 1px, transparent 1px)`,
               backgroundSize: `${frameStepX}px ${slotHeight}px`,
-              backgroundPosition: `${redGridOffsetX}px ${redGridOffsetY}px`
+              backgroundPosition: `${redGridOffsetX}px ${redGridOffsetY}px`,
             }}
           />
         )}
         {showFrameGrid && (
-          <div className={`absolute inset-0 pointer-events-none opacity-80`}
+          <div
+            className={`pointer-events-none absolute inset-0 opacity-80`}
             style={{
               zIndex: Z_INDEX_GRID_FRAME,
               backgroundImage: `linear-gradient(to right, ${frameBorderColor} ${GRID_FRAME_DASH}px, transparent ${GRID_FRAME_DASH}px), linear-gradient(to bottom, ${frameBorderColor} ${GRID_FRAME_DASH}px, transparent ${GRID_FRAME_DASH}px)`,
               backgroundSize: `${frameStepX}px ${slotHeight}px`,
-              backgroundPosition: GRID_FRAME_OFFSET_CSS
+              backgroundPosition: GRID_FRAME_OFFSET_CSS,
             }}
           />
         )}
         {images.map((img, i) => (
           <DraggableImageSlot
-            key={img.id} img={img} index={i}
-            slotHeight={slotHeight} slotWidth={slotWidth}
+            key={img.id}
+            img={img}
+            index={i}
+            slotHeight={slotHeight}
+            slotWidth={slotWidth}
             getCanvasScale={getCanvasScale}
             onActivate={handleActivate}
             onUpdatePosition={handleUpdatePosition}

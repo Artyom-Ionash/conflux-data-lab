@@ -176,7 +176,7 @@ export const DESCRIPTIONS = {
  * @param {boolean} isDirectory - является ли директорией
  * @returns {string} - отформатированное имя
  */
- 
+
 export function formatName(name, _relativePath, isDirectory) {
   // Добавьте слэш к директориям
   if (isDirectory) {

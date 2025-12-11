@@ -1,6 +1,6 @@
-"use client";
+'use client';
 
-import React, { useCallback, useRef, useState } from "react";
+import React, { useCallback, useRef, useState } from 'react';
 
 interface RangeSliderProps {
   min: number;
@@ -21,33 +21,27 @@ export function RangeSlider({
   value,
   onValueChange,
   minStepsBetweenThumbs = 0,
-  className = "",
+  className = '',
   formatTooltip,
 }: RangeSliderProps) {
-  const [isDragging, setIsDragging] = useState<"min" | "max" | null>(null);
+  const [isDragging, setIsDragging] = useState<'min' | 'max' | null>(null);
   const [hoverInfo, setHoverInfo] = useState<{
     value: number;
     pixelX: number;
-    targetThumb: "min" | "max";
+    targetThumb: 'min' | 'max';
   } | null>(null);
 
   const containerRef = useRef<HTMLDivElement>(null);
 
   // --- Helpers ---
 
-  const getPercent = useCallback(
-    (val: number) => ((val - min) / (max - min)) * 100,
-    [min, max]
-  );
+  const getPercent = useCallback((val: number) => ((val - min) / (max - min)) * 100, [min, max]);
 
   const getValueFromPointer = useCallback(
     (clientX: number) => {
       if (!containerRef.current) return min;
       const rect = containerRef.current.getBoundingClientRect();
-      const percentage = Math.min(
-        1,
-        Math.max(0, (clientX - rect.left) / rect.width)
-      );
+      const percentage = Math.min(1, Math.max(0, (clientX - rect.left) / rect.width));
       const rawValue = min + percentage * (max - min);
       const steppedValue = Math.round(rawValue / step) * step;
       return Number(steppedValue.toFixed(2));
@@ -64,15 +58,15 @@ export function RangeSlider({
     const distMin = Math.abs(newValue - value[0]);
     const distMax = Math.abs(newValue - value[1]);
 
-    let target: "min" | "max";
-    if (distMin < distMax) target = "min";
-    else target = "max";
+    let target: 'min' | 'max';
+    if (distMin < distMax) target = 'min';
+    else target = 'max';
 
     const nextValues = [...value] as [number, number];
     // Определяем индекс для колбэка
-    const activeIndex = target === "min" ? 0 : 1;
+    const activeIndex = target === 'min' ? 0 : 1;
 
-    if (target === "min") {
+    if (target === 'min') {
       const limit = value[1] - step * minStepsBetweenThumbs;
       nextValues[0] = Math.min(newValue, limit);
     } else {
@@ -92,9 +86,9 @@ export function RangeSlider({
     // 1. Logic: Dragging
     if (isDragging && containerRef.current) {
       const nextValues = [...value] as [number, number];
-      const activeIndex = isDragging === "min" ? 0 : 1;
+      const activeIndex = isDragging === 'min' ? 0 : 1;
 
-      if (isDragging === "min") {
+      if (isDragging === 'min') {
         const limit = value[1] - step * minStepsBetweenThumbs;
         nextValues[0] = Math.min(Math.max(valUnderCursor, min), limit);
       } else {
@@ -114,7 +108,7 @@ export function RangeSlider({
 
       const distMin = Math.abs(valUnderCursor - value[0]);
       const distMax = Math.abs(valUnderCursor - value[1]);
-      const targetThumb = distMin <= distMax ? "min" : "max";
+      const targetThumb = distMin <= distMax ? 'min' : 'max';
 
       setHoverInfo({
         value: valUnderCursor,
@@ -142,34 +136,34 @@ export function RangeSlider({
   let tooltipData = null;
 
   if (isDragging) {
-    const activeVal = isDragging === "min" ? value[0] : value[1];
+    const activeVal = isDragging === 'min' ? value[0] : value[1];
     tooltipData = {
       value: activeVal,
-      label: isDragging === "min" ? "Start" : "End",
-      isMin: isDragging === "min",
-      style: { left: `${getPercent(activeVal)}%` }
+      label: isDragging === 'min' ? 'Start' : 'End',
+      isMin: isDragging === 'min',
+      style: { left: `${getPercent(activeVal)}%` },
     };
   } else if (hoverInfo) {
     tooltipData = {
       value: hoverInfo.value,
-      label: hoverInfo.targetThumb === "min" ? "Start" : "End",
-      isMin: hoverInfo.targetThumb === "min",
-      style: { left: hoverInfo.pixelX }
+      label: hoverInfo.targetThumb === 'min' ? 'Start' : 'End',
+      isMin: hoverInfo.targetThumb === 'min',
+      style: { left: hoverInfo.pixelX },
     };
   }
 
   return (
     <div
-      className={`relative w-full h-6 flex items-center select-none touch-none group ${className}`}
+      className={`group relative flex h-6 w-full touch-none items-center select-none ${className}`}
       ref={containerRef}
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
       onPointerLeave={handlePointerLeave}
     >
-      <div className="absolute w-full h-1.5 bg-zinc-200 dark:bg-zinc-800 rounded-full overflow-hidden">
+      <div className="absolute h-1.5 w-full overflow-hidden rounded-full bg-zinc-200 dark:bg-zinc-800">
         <div
-          className="absolute h-full bg-blue-500 dark:bg-blue-600 opacity-80"
+          className="absolute h-full bg-blue-500 opacity-80 dark:bg-blue-600"
           style={{
             left: `${minPercent}%`,
             width: `${maxPercent - minPercent}%`,
@@ -179,36 +173,32 @@ export function RangeSlider({
 
       {tooltipData && (
         <div
-          className="absolute top-0 transform -translate-x-1/2 -translate-y-full pointer-events-none z-30 pb-2 transition-all duration-75"
+          className="pointer-events-none absolute top-0 z-30 -translate-x-1/2 -translate-y-full transform pb-2 transition-all duration-75"
           style={tooltipData.style}
         >
-          <div className="bg-zinc-900 text-white text-[10px] font-mono py-1 px-2 rounded shadow-lg border border-zinc-700 whitespace-nowrap flex items-center gap-1.5">
+          <div className="flex items-center gap-1.5 rounded border border-zinc-700 bg-zinc-900 px-2 py-1 font-mono text-[10px] whitespace-nowrap text-white shadow-lg">
             <span className="font-bold">
               {formatTooltip ? formatTooltip(tooltipData.value) : tooltipData.value.toFixed(2)}
             </span>
-            <span className={`text-[9px] uppercase tracking-wide flex items-center font-bold ${tooltipData.isMin ? 'text-blue-400' : 'text-purple-400'}`}>
+            <span
+              className={`flex items-center text-[9px] font-bold tracking-wide uppercase ${tooltipData.isMin ? 'text-blue-400' : 'text-purple-400'}`}
+            >
               {tooltipData.isMin ? '← Start' : 'End →'}
             </span>
           </div>
-          <div className="w-0 h-0 border-l-[4px] border-l-transparent border-r-[4px] border-r-transparent border-t-[4px] border-t-zinc-700 absolute left-1/2 -translate-x-1/2 bottom-1" />
+          <div className="absolute bottom-1 left-1/2 h-0 w-0 -translate-x-1/2 border-t-[4px] border-r-[4px] border-l-[4px] border-t-zinc-700 border-r-transparent border-l-transparent" />
         </div>
       )}
 
       {/* Min Thumb */}
       <div
-        className={`absolute w-4 h-4 rounded-full shadow-md border-2 transition-transform duration-75
-          ${isDragging === "min" ? "scale-125 border-blue-500 bg-white z-20" : "bg-white border-zinc-300 dark:border-zinc-500 z-10"}
-          ${(hoverInfo?.targetThumb === "min" && !isDragging) ? "ring-2 ring-blue-400/50 scale-110" : ""}
-        `}
+        className={`absolute h-4 w-4 rounded-full border-2 shadow-md transition-transform duration-75 ${isDragging === 'min' ? 'z-20 scale-125 border-blue-500 bg-white' : 'z-10 border-zinc-300 bg-white dark:border-zinc-500'} ${hoverInfo?.targetThumb === 'min' && !isDragging ? 'scale-110 ring-2 ring-blue-400/50' : ''} `}
         style={{ left: `calc(${minPercent}% - 8px)` }}
       />
 
       {/* Max Thumb */}
       <div
-        className={`absolute w-4 h-4 rounded-full shadow-md border-2 transition-transform duration-75
-          ${isDragging === "max" ? "scale-125 border-blue-500 bg-white z-20" : "bg-white border-zinc-300 dark:border-zinc-500 z-10"}
-          ${(hoverInfo?.targetThumb === "max" && !isDragging) ? "ring-2 ring-purple-400/50 scale-110" : ""}
-        `}
+        className={`absolute h-4 w-4 rounded-full border-2 shadow-md transition-transform duration-75 ${isDragging === 'max' ? 'z-20 scale-125 border-blue-500 bg-white' : 'z-10 border-zinc-300 bg-white dark:border-zinc-500'} ${hoverInfo?.targetThumb === 'max' && !isDragging ? 'scale-110 ring-2 ring-purple-400/50' : ''} `}
         style={{ left: `calc(${maxPercent}% - 8px)` }}
       />
     </div>
