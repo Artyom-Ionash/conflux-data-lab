@@ -22,6 +22,7 @@ const PRESETS = {
       '.txt',
       '.md',
       '.py',
+      '.gitignore',
     ],
     hardIgnore: [
       '.git',
@@ -41,16 +42,27 @@ const PRESETS = {
   nextjs: {
     name: 'Next.js / React',
     textExtensions: [
+      // Code
       '.ts',
       '.tsx',
       '.js',
       '.jsx',
+      '.mjs', // ESLint config often uses .mjs
+      '.cjs',
+      // Styles
       '.css',
       '.scss',
+      '.sass',
+      // Data / Configs
       '.json',
       '.md',
+      '.yaml',
+      '.yml',
+      '.toml',
       '.env.example',
-      '.config.js',
+      // Specific Config extensions
+      '.conf',
+      '.xml',
     ],
     hardIgnore: [
       '.git',
@@ -59,16 +71,20 @@ const PRESETS = {
       'dist',
       'build',
       'coverage',
-      'package-lock.json',
+      'package-lock.json', // Still ignore lock files as they are too huge
       'yarn.lock',
       'pnpm-lock.yaml',
       '.DS_Store',
+      '.vercel',
+      '.turbo',
     ],
   },
 };
 
 const LANGUAGE_MAP: Record<string, string> = {
   js: 'javascript',
+  mjs: 'javascript',
+  cjs: 'javascript',
   jsx: 'javascript',
   ts: 'typescript',
   tsx: 'typescript',
@@ -79,7 +95,9 @@ const LANGUAGE_MAP: Record<string, string> = {
   html: 'html',
   css: 'css',
   scss: 'scss',
+  sass: 'scss',
   json: 'json',
+  json5: 'json',
   md: 'markdown',
   txt: 'text',
   godot: 'ini',
@@ -87,6 +105,14 @@ const LANGUAGE_MAP: Record<string, string> = {
   tres: 'ini',
   yaml: 'yaml',
   yml: 'yaml',
+  toml: 'toml',
+  xml: 'xml',
+  // Config specific mappings
+  gitignore: 'gitignore',
+  editorconfig: 'ini',
+  prettierrc: 'json',
+  eslintrc: 'json',
+  sworc: 'json',
 };
 
 type PresetKey = keyof typeof PRESETS;
@@ -126,29 +152,56 @@ function formatBytes(bytes: number, decimals = 0) {
 }
 
 function getLanguageTag(filename: string): string {
-  const ext = filename.split('.').pop()?.toLowerCase() || 'text';
+  const parts = filename.toLowerCase().split('.');
+  const ext = parts.pop() || 'text';
+
+  // Handle dotfiles like .gitignore or .eslintrc
+  if (parts.length === 0 || (parts.length === 1 && parts[0] === '')) {
+    return LANGUAGE_MAP[ext] || 'text';
+  }
+
   return LANGUAGE_MAP[ext] || ext;
 }
 
 function isTextFile(filename: string, extensions: string[]): boolean {
   const lowerName = filename.toLowerCase();
 
+  // 1. Explicitly Blocked (Heavy binaries or huge locks)
   if (
     lowerName === 'package-lock.json' ||
     lowerName === 'yarn.lock' ||
     lowerName === 'pnpm-lock.yaml' ||
-    lowerName === 'bun.lockb'
+    lowerName === 'bun.lockb' ||
+    lowerName.endsWith('.png') ||
+    lowerName.endsWith('.jpg') ||
+    lowerName.endsWith('.ico')
   ) {
     return false;
   }
 
-  if (
-    lowerName.endsWith('project.godot') ||
-    lowerName.endsWith('package.json') ||
-    lowerName === 'dockerfile'
-  )
-    return true;
+  // 2. Explicitly Allowed Config Files (Whitelist)
+  // These should be included regardless of the extension list settings
+  const configWhitelist = [
+    'project.godot',
+    'package.json',
+    'tsconfig.json',
+    'jsconfig.json',
+    'dockerfile',
+    '.gitignore',
+    '.editorconfig',
+    '.npmrc',
+    '.prettierrc',
+    '.eslintrc',
+    '.sworc' // Vercel/Next configs sometimes
+  ];
 
+  if (configWhitelist.includes(lowerName)) return true;
+
+  // Also check for config patterns (e.g. .eslintrc.json)
+  if (lowerName.startsWith('.eslintrc') || lowerName.startsWith('.prettierrc')) return true;
+  if (lowerName.startsWith('eslint.config') || lowerName.startsWith('next.config') || lowerName.startsWith('tailwind.config') || lowerName.startsWith('postcss.config') || lowerName.startsWith('vite.config')) return true;
+
+  // 3. Check against User Settings (Extensions)
   return extensions.some((ext) => lowerName.endsWith(ext));
 }
 
@@ -289,18 +342,34 @@ function generateTree(files: FileNode[]): string {
   return output;
 }
 
-// FIX: Вынесенная функция для unicorn/consistent-function-scoping
-// FIX: Используем file.text() вместо FileReader (unicorn/prefer-blob-reading-methods)
 const readFileAsText = (file: File): Promise<string> => {
   return file.text();
 };
 
-// FIX: Вынесенная функция скоринга
 const calculateFileScore = (name: string) => {
-  if (name === 'project.godot' || name === 'package.json') return 0;
-  if (name.endsWith('.gd') || name.endsWith('.ts') || name.endsWith('.js') || name.endsWith('.py'))
+  const lower = name.toLowerCase();
+  // 1. Critical Manifests
+  if (lower === 'package.json' || lower === 'project.godot') return 0;
+
+  // 2. High Value Configs (Linter, TS, Git, Env)
+  // Giving them 0.5 ensures they are right after package.json but before code
+  if (
+    lower.includes('tsconfig') ||
+    lower.includes('eslint') ||
+    lower.includes('prettier') ||
+    lower.includes('gitignore') ||
+    lower.includes('next.config') ||
+    lower.includes('tailwind.config')
+  ) return 0.5;
+
+  // 3. Source Code
+  if (lower.endsWith('.gd') || lower.endsWith('.ts') || lower.endsWith('.js') || lower.endsWith('.tsx') || lower.endsWith('.jsx') || lower.endsWith('.py'))
     return 1;
-  if (name.endsWith('.tscn') || name.endsWith('.tsx')) return 2;
+
+  // 4. Scenes / Components
+  if (lower.endsWith('.tscn')) return 2;
+
+  // 5. Assets / Others
   return 3;
 };
 
@@ -341,6 +410,7 @@ export function ProjectToContext() {
     } else if (
       fileNames.includes('next.config.js') ||
       fileNames.includes('next.config.ts') ||
+      fileNames.includes('next.config.mjs') || // Added mjs check
       fileNames.includes('package.json')
     ) {
       detectedPreset = 'nextjs';
@@ -390,7 +460,6 @@ export function ProjectToContext() {
     setProgress(0);
     setResult(null);
 
-    // FIX: Используем вынесенную функцию скоринга
     // eslint-disable-next-line unicorn/no-array-sort
     const sortedFiles = [...files].sort((a, b) => {
       return calculateFileScore(a.name) - calculateFileScore(b.name);
@@ -420,7 +489,10 @@ export function ProjectToContext() {
         totalCleanedBytes += cleanedText.length;
 
         const langKey = getLanguageTag(node.name);
-        const reportLang = LANGUAGE_MAP[ext] || ext;
+        // Better Reporting for Configs
+        let reportLang = LANGUAGE_MAP[ext] || ext;
+        if (node.name.includes('config') || node.name.startsWith('.')) reportLang = 'config/meta';
+
         composition[reportLang] = (composition[reportLang] || 0) + 1;
 
         processedFilesData.push({
@@ -476,11 +548,11 @@ The following is a flattened representation of a project codebase.
   <file_count>${processedFilesData.length}</file_count>
   <top_languages>
     ${Object.entries(composition)
-      // eslint-disable-next-line unicorn/no-array-sort
-      .sort(([, a], [, b]) => b - a)
-      .slice(0, 3)
-      .map(([lang, count]) => `${lang} (${count})`)
-      .join(', ')}
+        // eslint-disable-next-line unicorn/no-array-sort
+        .sort(([, a], [, b]) => b - a)
+        .slice(0, 3)
+        .map(([lang, count]) => `${lang} (${count})`)
+        .join(', ')}
   </top_languages>
 </project_metrics>
 
@@ -556,11 +628,10 @@ The following is a flattened representation of a project codebase.
             <button
               key={key}
               onClick={() => handlePresetChange(key)}
-              className={`rounded border px-3 py-1.5 text-xs font-medium transition-colors ${
-                selectedPreset === key
+              className={`rounded border px-3 py-1.5 text-xs font-medium transition-colors ${selectedPreset === key
                   ? 'border-blue-300 bg-blue-100 text-blue-800 dark:border-blue-700 dark:bg-blue-900/30 dark:text-blue-300'
                   : 'border-zinc-200 bg-white text-zinc-600 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-400'
-              }`}
+                }`}
             >
               {PRESETS[key].name}
             </button>
@@ -593,9 +664,8 @@ The following is a flattened representation of a project codebase.
       <button
         onClick={processFiles}
         disabled={files.length === 0 || processing}
-        className={`w-full rounded-lg py-3 font-bold text-white shadow-sm transition-all ${
-          files.length === 0 ? 'bg-zinc-300 dark:bg-zinc-700' : 'bg-blue-600 hover:bg-blue-700'
-        }`}
+        className={`w-full rounded-lg py-3 font-bold text-white shadow-sm transition-all ${files.length === 0 ? 'bg-zinc-300 dark:bg-zinc-700' : 'bg-blue-600 hover:bg-blue-700'
+          }`}
       >
         {processing ? `Обработка ${progress}%...` : 'Сгенерировать'}
       </button>
