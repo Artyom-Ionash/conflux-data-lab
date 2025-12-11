@@ -11,9 +11,7 @@ import { ToolLayout } from "../ToolLayout";
 const PRESETS = {
   godot: {
     name: "Godot 4 (Logic Only)",
-    // Файлы, содержимое которых мы ХОТИМ читать
     textExtensions: [".gd", ".tscn", ".godot", ".tres", ".cfg", ".gdshader", ".json", ".txt", ".md", ".py"],
-    // Папки и файлы, которые мы вообще НЕ ХОТИМ видеть (даже в дереве)
     hardIgnore: [
       ".git", ".godot", ".import", "builds", "__pycache__", "node_modules",
       ".next", ".vscode", ".idea", "*.uid", "*.import"
@@ -21,9 +19,30 @@ const PRESETS = {
   },
   nextjs: {
     name: "Next.js / React",
-    textExtensions: [".ts", ".tsx", ".js", ".jsx", ".css", ".scss", ".json", ".md", ".env.example"],
+    textExtensions: [".ts", ".tsx", ".js", ".jsx", ".css", ".scss", ".json", ".md", ".env.example", ".config.js"],
     hardIgnore: [".git", "node_modules", ".next", "dist", "build", "coverage", "package-lock.json", "yarn.lock"]
   }
+};
+
+// Explicit mapping for Gemini's syntax highlighter
+const LANGUAGE_MAP: Record<string, string> = {
+  js: "javascript",
+  jsx: "javascript", // or jsx
+  ts: "typescript",
+  tsx: "typescript", // or tsx
+  py: "python",
+  gd: "gdscript",
+  shader: "glsl",
+  gdshader: "glsl",
+  html: "html",
+  css: "css",
+  scss: "scss",
+  json: "json",
+  md: "markdown",
+  txt: "text",
+  godot: "ini", // Godot configs look like INI
+  tscn: "ini",
+  tres: "ini"
 };
 
 type PresetKey = keyof typeof PRESETS;
@@ -47,14 +66,16 @@ function formatBytes(bytes: number, decimals = 0) {
   return `${parseFloat((bytes / Math.pow(k, i)).toFixed(dm))}${sizes[i]}`;
 }
 
+function getLanguageTag(filename: string): string {
+  const ext = filename.split('.').pop()?.toLowerCase() || "text";
+  return LANGUAGE_MAP[ext] || ext;
+}
+
 function isTextFile(filename: string, extensions: string[]): boolean {
   const lowerName = filename.toLowerCase();
-
-  // Жесткий запрет для лок-файлов, независимо от расширения .json или .yaml
   if (lowerName === "package-lock.json" || lowerName === "yarn.lock" || lowerName === "pnpm-lock.yaml" || lowerName === "bun.lockb") {
     return false;
   }
-
   if (lowerName.endsWith("project.godot") || lowerName.endsWith("package.json") || lowerName === "dockerfile") return true;
   return extensions.some(ext => lowerName.endsWith(ext));
 }
@@ -76,13 +97,12 @@ function shouldIgnore(path: string, ignorePatterns: string[]): boolean {
 }
 
 // --- LOGIC: AGGRESSIVE PREPROCESSING ---
+// Keeps the file size small and removes noise that confuses LLMs
 
 function preprocessContent(content: string, extension: string): string {
   let cleaned = content;
 
   if (extension === 'tscn' || extension === 'tres') {
-
-    // 1. УДАЛЕНИЕ "ШУМНЫХ" ПОД-РЕСУРСОВ
     const noiseTypes = [
       'AtlasTexture', 'StyleBoxTexture', 'StyleBoxFlat', 'Theme',
       'TileSetAtlasSource', 'BitMap', 'Gradient', 'GradientTexture1D',
@@ -93,33 +113,20 @@ function preprocessContent(content: string, extension: string): string {
 
     const noiseRegex = new RegExp(`\\[sub_resource type="(${noiseTypes})"[\\s\\S]*?(?=\\n\\[|$)`, 'g');
     cleaned = cleaned.replace(noiseRegex, "");
-
-    // 2. ОЧИСТКА ВНЕШНИХ РЕСУРСОВ (ExtResource)
     cleaned = cleaned.replace(/^\[ext_resource.*path=".*\.(png|jpg|jpeg|webp|svg|mp3|wav|ogg|ttf|otf)".*\]$/gm, "");
-
-    // 3. СЖАТИЕ АНИМАЦИЙ
     cleaned = cleaned.replace(/(\[sub_resource type="Animation"[^\]]*\])([\s\S]*?)(?=\[|$)/g, (match, header, body) => {
       const nameMatch = body.match(/resource_name\s*=\s*"([^"]+)"/);
       const animName = nameMatch ? nameMatch[1] : "unnamed";
       return `${header}\n; Animation "${animName}" (data stripped)\n`;
     });
-
-    // 4. УДАЛЕНИЕ ТРЕКОВ АНИМАЦИИ
     cleaned = cleaned.replace(/^tracks\/.*$/gm, "");
-
-    // 5. ОЧИСТКА МАССИВОВ ДАННЫХ
     const arrayRegex = /\b(PackedByteArray|PackedVector2Array|PackedInt32Array|PackedFloat32Array|PackedStringArray|PackedColorArray)\s*\(([^)]*)\)/g;
     cleaned = cleaned.replace(arrayRegex, '$1(...)');
-
-    // 6. ОЧИСТКА СВОЙСТВ УЗЛОВ
     cleaned = cleaned.replace(/^region_rect = .*$/gm, "");
-
-    // 7. УДАЛЕНИЕ ПУСТЫХ СТРОК
     cleaned = cleaned.replace(/\n{3,}/g, "\n\n");
   }
 
   if (extension === 'godot') {
-    // Упрощаем Input Map
     cleaned = cleaned.replace(/Object\((InputEvent[^,]+),[^)]+\)/g, "$1(...)");
     cleaned = cleaned.replace(/"events": \[\]/g, "");
     cleaned = cleaned.replace(/\n\n\[/g, "\n[");
@@ -154,14 +161,12 @@ function generateTree(files: FileNode[]): string {
   });
 
   let output = "";
-
   function traverse(node: FileSystemNode, depth: number) {
     const keys = Object.keys(node).sort((a, b) => {
       const nodeA = node[a] as FileSystemNode | undefined;
       const nodeB = node[b] as FileSystemNode | undefined;
       const aIsFile = nodeA?._is_file;
       const bIsFile = nodeB?._is_file;
-
       if (!aIsFile && bIsFile) return -1;
       if (aIsFile && !bIsFile) return 1;
       return a.localeCompare(b);
@@ -169,10 +174,8 @@ function generateTree(files: FileNode[]): string {
 
     keys.forEach(key => {
       if (key === '_is_file' || key === 'size' || key === 'isText') return;
-
       const item = node[key] as FileSystemNode;
       const indent = "  ".repeat(depth);
-
       if (item._is_file) {
         output += `${indent}${key} (${formatBytes(item.size as number)})\n`;
       } else {
@@ -181,7 +184,6 @@ function generateTree(files: FileNode[]): string {
       }
     });
   }
-
   traverse(root, 0);
   return output;
 }
@@ -212,7 +214,6 @@ export function ProjectToContext() {
     if (!e.target.files) return;
     const fileList = Array.from(e.target.files);
 
-    // --- АВТОМАТИЧЕСКОЕ ОПРЕДЕЛЕНИЕ ТИПА ПРОЕКТА ---
     let detectedPreset: PresetKey | null = null;
     const fileNames = fileList.map(f => f.name);
 
@@ -222,33 +223,25 @@ export function ProjectToContext() {
       detectedPreset = "nextjs";
     }
 
-    // Если определили новый пресет, применяем его настройки НЕМЕДЛЕННО для текущей обработки
     let activeIgnoreStr = customIgnore;
     let activeExtStr = customExtensions;
 
     if (detectedPreset && detectedPreset !== selectedPreset) {
       const preset = PRESETS[detectedPreset];
-
-      // Обновляем стейт UI (для отображения)
       setSelectedPreset(detectedPreset);
       setCustomExtensions(preset.textExtensions.join(", "));
       setCustomIgnore(preset.hardIgnore.join(", "));
-
-      // Обновляем локальные переменные (для логики фильтрации ниже)
       activeExtStr = preset.textExtensions.join(", ");
       activeIgnoreStr = preset.hardIgnore.join(", ");
     }
-    // ------------------------------------------------
 
     const ignoreList = activeIgnoreStr.split(",").map(s => s.trim()).filter(s => s.length > 0);
     const extList = activeExtStr.split(",").map(s => s.trim()).filter(s => s.length > 0);
 
     const nodes: FileNode[] = [];
-
     fileList.forEach(f => {
       const path = f.webkitRelativePath || f.name;
       if (shouldIgnore(path, ignoreList)) return;
-
       nodes.push({
         path: path,
         name: f.name,
@@ -288,15 +281,29 @@ export function ProjectToContext() {
       return score(a.name) - score(b.name);
     });
 
-    let output = "# Project Context\n\n";
+    // --- GEMINI-OPTIMIZED HEADER ---
+    // Используем XML для структуры и естественный язык для инструкций
+    let output = `<codebase_context>
+<instruction>
+The following is a flattened representation of a project codebase. 
+1. Use the <directory_structure> to understand the file hierarchy.
+2. Each file is wrapped in a <file> tag with its path attribute.
+3. Code blocks utilize standard Markdown triple backticks with language tags for correct syntax highlighting.
+</instruction>
+
+`;
 
     if (includeTree) {
-      output += "## Project Structure\n\n```text\n";
-      output += generateTree(sortedFiles);
-      output += "```\n\n";
+      output += `<directory_structure>
+\`\`\`text
+${generateTree(sortedFiles)}
+\`\`\`
+</directory_structure>
+
+`;
     }
 
-    output += "## File Contents\n\n";
+    output += `<source_files>\n\n`;
 
     let processedCount = 0;
     let textFileCount = 0;
@@ -309,23 +316,29 @@ export function ProjectToContext() {
 
       textFileCount++;
 
-      output += `--- START OF FILE: ${node.path} ---\n`;
+      // XML Wrapper for explicit context boundaries
+      output += `<file path="${node.path}">\n`;
       try {
         const originalText = await readFileAsText(node.file);
         const ext = node.name.split('.').pop() || "txt";
         const cleanedText = preprocessContent(originalText, ext);
+        const langTag = getLanguageTag(node.name);
 
-        output += "```" + (ext === 'gd' ? 'gdscript' : ext) + "\n";
+        // Markdown block for Model's "Code Mode" activation
+        output += "```" + langTag + "\n";
         output += cleanedText;
-        output += "\n```\n\n";
+        output += "\n```\n";
       } catch {
-        output += `(Error reading file)\n\n`;
+        output += `(Error reading file)\n`;
       }
+      output += `</file>\n\n`;
 
       processedCount++;
       setProgress(Math.round((processedCount / sortedFiles.length) * 100));
       if (processedCount % 5 === 0) await new Promise(r => setTimeout(r, 0));
     }
+
+    output += `</source_files>\n</codebase_context>`;
 
     setResult(output);
     setStats({
@@ -342,7 +355,7 @@ export function ProjectToContext() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = "project_context.md";
+    a.download = "gemini_context.md"; // Updated filename
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -385,8 +398,8 @@ export function ProjectToContext() {
               key={key}
               onClick={() => handlePresetChange(key)}
               className={`px-3 py-1.5 rounded text-xs font-medium transition-colors border ${selectedPreset === key
-                  ? 'bg-blue-100 border-blue-300 text-blue-800 dark:bg-blue-900/30 dark:border-blue-700 dark:text-blue-300'
-                  : 'bg-white dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400'
+                ? 'bg-blue-100 border-blue-300 text-blue-800 dark:bg-blue-900/30 dark:border-blue-700 dark:text-blue-300'
+                : 'bg-white dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400'
                 }`}
             >
               {PRESETS[key].name}
@@ -423,7 +436,7 @@ export function ProjectToContext() {
         className={`w-full py-3 rounded-lg font-bold text-white transition-all shadow-sm ${files.length === 0 ? 'bg-zinc-300 dark:bg-zinc-700' : 'bg-blue-600 hover:bg-blue-700'
           }`}
       >
-        {processing ? `Обработка ${progress}%...` : "Сгенерировать"}
+        {processing ? `Обработка ${progress}%...` : "Сгенерировать Context"}
       </button>
 
       {stats && (
@@ -466,7 +479,7 @@ export function ProjectToContext() {
             <div className="w-16 h-16 mb-4 rounded-full bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center">
               <span className="text-2xl">🤖</span>
             </div>
-            <p>Генератор контекста для LLM (Ultra Optimized)</p>
+            <p>Генератор контекста для LLM (Ultra Optimized for Gemini)</p>
           </div>
         )}
       </div>
