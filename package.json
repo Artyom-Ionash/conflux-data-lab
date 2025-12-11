@@ -8,6 +8,9 @@
     "start": "next start",
     "lint": "eslint",
     "lint:fix": "eslint --fix",
+    "stylelint": "stylelint \"**/*.css\"",
+    "stylelint:fix": "stylelint \"**/*.css\" --fix",
+    "format": "npm run lint:fix && npm run stylelint:fix",
     "prepare": "husky install",
     "update-structure": "node scripts/structure/update.mjs"
   },
@@ -32,9 +35,12 @@
     "eslint-config-next": "16.0.5",
     "eslint-plugin-boundaries": "^5.3.1",
     "eslint-plugin-simple-import-sort": "^12.1.1",
+    "eslint-plugin-tailwindcss": "^3.18.2",
     "eslint-plugin-unicorn": "^62.0.0",
     "husky": "^9.1.7",
     "lint-staged": "^16.2.7",
+    "stylelint": "^16.26.1",
+    "stylelint-config-standard": "^39.0.1",
     "tailwindcss": "^4",
     "typescript": "^5"
   },

@@ -1,13 +1,17 @@
 import { defineConfig, globalIgnores } from "eslint/config";
 import nextVitals from "eslint-config-next/core-web-vitals";
 import nextTs from "eslint-config-next/typescript";
-import boundaries from "eslint-plugin-boundaries";
 import simpleImportSort from "eslint-plugin-simple-import-sort";
+import boundaries from "eslint-plugin-boundaries";
 import eslintPluginUnicorn from "eslint-plugin-unicorn";
+import tailwind from "eslint-plugin-tailwindcss";
 
 const eslintConfig = defineConfig([
+  // 1. Базовые конфиги
   ...nextVitals,
   ...nextTs,
+  // Подключаем рекомендуемый конфиг Tailwind (он добавит правила сортировки)
+  ...tailwind.configs["flat/recommended"],
 
   globalIgnores([
     ".next/**",
@@ -22,6 +26,7 @@ const eslintConfig = defineConfig([
       "simple-import-sort": simpleImportSort,
       "boundaries": boundaries,
       "unicorn": eslintPluginUnicorn,
+      // tailwind плагин уже подключен через spread выше
     },
     settings: {
       "boundaries/include": ["app/**/*", "lib/**/*"],
@@ -32,16 +37,28 @@ const eslintConfig = defineConfig([
         { type: "ui", pattern: "app/components/ui/*", mode: "folder" },
         { type: "lib", pattern: "lib/(config|utils|types)/*", mode: "folder" },
       ],
+      // Настройки Tailwind плагина
+      tailwindcss: {
+        callees: ["classnames", "clsx", "ctl", "cn"], // Если используете утилиту cn()
+        // В v4 конфига может не быть, поэтому плагин может ругаться в консоль, 
+        // но сортировка работать будет.
+        removeDuplicates: true,
+      },
     },
     rules: {
       // ИМПОРТЫ
       "simple-import-sort/imports": "error",
       "simple-import-sort/exports": "error",
 
-      // UNICORN BASE
-      ...eslintPluginUnicorn.configs["flat/recommended"].rules,
+      // TAILWIND
+      // Автоматическая сортировка классов (главная фича!)
+      "tailwindcss/classnames-order": "warn",
+      // В v4 классы генерируются на лету из CSS, плагин их "не видит".
+      // Обязательно отключаем, иначе будет куча ложных ошибок.
+      "tailwindcss/no-custom-classname": "off",
 
-      // --- ОТКЛЮЧАЕМ ШУМНЫЕ ПРАВИЛА ---
+      // UNICORN (Ваша текущая рабочая настройка)
+      ...eslintPluginUnicorn.configs["flat/recommended"].rules,
       "unicorn/prevent-abbreviations": "off",
       "unicorn/filename-case": "off",
       "unicorn/no-null": "off",
@@ -53,25 +70,22 @@ const eslintConfig = defineConfig([
       "unicorn/no-array-for-each": "off",
       "unicorn/no-nested-ternary": "off",
       "unicorn/import-style": "off",
-      
-      // Новые отключения (на основе вашего лога)
-      "unicorn/prefer-global-this": "off",          // window is fine
-      "unicorn/no-negated-condition": "off",        // if (!x) is fine
-      "unicorn/no-lonely-if": "off",                // else { if } is sometimes readable
-      "unicorn/explicit-length-check": "off",       // if (arr.length) is fine
-      "unicorn/prefer-set-has": "off",              // array.includes is fine for small lists
-      "unicorn/prefer-ternary": "off",              // if/else is often more readable
-      "unicorn/no-for-loop": "off",                 // classical for loops are sometimes needed
-      "unicorn/prefer-type-error": "off",           // new Error() is generic enough
-      "unicorn/empty-brace-spaces": "off",          // Prettier handles this
-      "unicorn/prefer-string-slice": "off",         // substr is legacy but works
-      "unicorn/prefer-math-min-max": "off",         // Ternary is sometimes clearer
-      "unicorn/prefer-string-raw": "off",           // Too pedantic for regex
-
-      // Оставляем предупреждениями
       "unicorn/no-array-sort": "warn",
       "unicorn/no-array-reverse": "warn",
       "unicorn/consistent-function-scoping": "warn",
+      // Доп. отключения из прошлого лога
+      "unicorn/prefer-global-this": "off",
+      "unicorn/no-negated-condition": "off",
+      "unicorn/no-lonely-if": "off",
+      "unicorn/explicit-length-check": "off",
+      "unicorn/prefer-set-has": "off",
+      "unicorn/prefer-ternary": "off",
+      "unicorn/no-for-loop": "off",
+      "unicorn/prefer-type-error": "off",
+      "unicorn/empty-brace-spaces": "off",
+      "unicorn/prefer-string-slice": "off",
+      "unicorn/prefer-math-min-max": "off",
+      "unicorn/prefer-string-raw": "off",
 
       // BOUNDARIES
       "boundaries/element-types": [
