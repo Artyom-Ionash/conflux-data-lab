@@ -452,7 +452,7 @@ The following is a flattened representation of a project codebase.
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = "gemini_context.md";
+    a.download = "gemini_context.txt";
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -595,7 +595,7 @@ The following is a flattened representation of a project codebase.
             headerActions={
               <div className="flex gap-2">
                 <button onClick={copyToClipboard} className="text-xs bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 px-3 py-1.5 rounded transition-colors">Копировать</button>
-                <button onClick={downloadResult} className="text-xs bg-blue-600 text-white hover:bg-blue-700 px-3 py-1.5 rounded font-bold shadow-sm">Скачать .md</button>
+                <button onClick={downloadResult} className="text-xs bg-blue-600 text-white hover:bg-blue-700 px-3 py-1.5 rounded font-bold shadow-sm">Скачать .txt</button>
               </div>
             }
           >
