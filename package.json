@@ -51,5 +51,8 @@
     "*.{ts,tsx,js,jsx}": [
       "eslint --fix"
     ]
-  }
+  },
+  "browserslist": [
+    "baseline newly available"
+  ]
 }

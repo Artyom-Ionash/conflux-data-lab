@@ -1,12 +1,13 @@
 # 🔄 Conflux Data Lab
 
-> Модульное портфолио инструментов для обработки данных и медиа-контента.
+> Модульное портфолио инструментов для обработки данных и медиа-контента, построенное на современном стеке с акцентом на качество кода и производительность.
 
 [![Next.js](https://img.shields.io/badge/Next.js-16-black)](https://nextjs.org/)
-[![TypeScript](https://img.shields.io/badge/TypeScript-5-blue)](https://www.typescriptlang.org/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5-blue)](https://www.typescriptlang.org/) [![ES2022](https://img.shields.io/badge/target-ES2022-3178c6)](https://www.typescriptlang.org/tsconfig#target)
 [![Tailwind CSS](https://img.shields.io/badge/Tailwind-4-38bdf8)](https://tailwindcss.com/)
+[![ESLint](https://img.shields.io/badge/ESLint-Strict-4b32c3)](https://eslint.org/)
 
-[🚀 Live Demo](https://conflux-data-lab.vercel.app)
+[🚀 Live Demo](https://conflux-data-lab.vercel.app) | [📚 Архитектура](./ARCHITECTURE.md)
 
 ## ✨ Возможности
 
@@ -15,6 +16,14 @@
 - 🎨 **Monochrome Background Remover** — удаление фона с учетом яркости (Luminance mask).
 - 🔄 **Project to Context** — упаковка кода проекта в один Markdown-файл для LLM.
 - 📊 **Data Converters** — JSON ↔ CSV и другие утилиты.
+
+## 🛠 Технические особенности
+
+Конфигурация проекта заточена на современный стек и качество кода:
+*   **TypeScript** с целевым стандартом `ES2022`.
+*   **Строгий линтинг** (ESLint) с правилами для иммутабельного кода.
+*   **Оптимизированная сборка** под актуальные браузеры через `browserslist: "baseline newly available"`.
+*   **Чёткое разделение слоёв** по адаптированным принципам FSD (подробнее в [ARCHITECTURE.md](./ARCHITECTURE.md)).
 
 ## 🚀 Быстрый старт
 
@@ -27,4 +36,3 @@ npm install
 
 # 3. Запуск dev-сервера
 npm run dev
-```

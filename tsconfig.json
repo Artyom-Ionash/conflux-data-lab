@@ -1,7 +1,9 @@
 {
   "compilerOptions": {
-    "target": "ES2017",
+    // Безопасный и современный стандарт для Node 18+
+    "target": "ES2022",
     "lib": ["dom", "dom.iterable", "esnext"],
+
     "allowJs": true,
     "skipLibCheck": true,
     "strict": true,
@@ -21,6 +23,7 @@
     "paths": {
       "@/*": ["./*"]
     },
+    // Добавьте это, если VS Code не видит типов из node_modules
     "typeRoots": ["./types", "./node_modules/@types"]
   },
   "include": [
