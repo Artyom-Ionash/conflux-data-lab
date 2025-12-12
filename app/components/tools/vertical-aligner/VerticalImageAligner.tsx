@@ -6,13 +6,13 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { rgbToHex } from '@/lib/utils/colors';
 import { downloadDataUrl, loadImage, revokeObjectURLSafely } from '@/lib/utils/media';
 
-import { TextureDimensionSlider } from '../../domain/hardware/TextureDimensionSlider';
-import { Canvas, CanvasRef } from '../../ui/Canvas';
+import { TextureDimensionSlider } from '../../entities/hardware/TextureDimensionSlider';
+import { Canvas, CanvasRef } from '../../primitives/Canvas';
 // Импортируем ControlSection и ControlLabel из одного файла
-import { ControlLabel, ControlSection } from '../../ui/ControlSection';
-import { FileDropzone, FileDropzonePlaceholder } from '../../ui/FileDropzone';
-import { Slider } from '../../ui/Slider';
-import { Switch } from '../../ui/Switch';
+import { ControlLabel, ControlSection } from '../../primitives/ControlSection';
+import { FileDropzone, FileDropzonePlaceholder } from '../../primitives/FileDropzone';
+import { Slider } from '../../primitives/Slider';
+import { Switch } from '../../primitives/Switch';
 import { ToolLayout } from '../ToolLayout';
 
 // --- CONSTANTS ---

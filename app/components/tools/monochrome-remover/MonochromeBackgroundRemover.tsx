@@ -6,12 +6,12 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { hexToRgb, invertHex, rgbToHex } from '@/lib/utils/colors';
 import { downloadDataUrl, loadImage } from '@/lib/utils/media';
 
-import { Canvas, CanvasRef } from '../../ui/Canvas';
-import { ColorInput } from '../../ui/ColorInput';
-import { ControlLabel, ControlSection } from '../../ui/ControlSection';
-import { FileDropzone, FileDropzonePlaceholder } from '../../ui/FileDropzone';
-import { Slider } from '../../ui/Slider';
-import { ToggleGroup, ToggleGroupItem } from '../../ui/ToggleGroup';
+import { Canvas, CanvasRef } from '../../primitives/Canvas';
+import { ColorInput } from '../../primitives/ColorInput';
+import { ControlLabel, ControlSection } from '../../primitives/ControlSection';
+import { FileDropzone, FileDropzonePlaceholder } from '../../primitives/FileDropzone';
+import { Slider } from '../../primitives/Slider';
+import { ToggleGroup, ToggleGroupItem } from '../../primitives/ToggleGroup';
 import { ToolLayout } from '../ToolLayout';
 
 // --- CONSTANTS & CONFIG ---

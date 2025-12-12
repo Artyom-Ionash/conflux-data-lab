@@ -11,7 +11,7 @@ conflux-data-lab/
 │
 ├── app/ # Next.js App Router
 │   ├── components/
-│   │   ├── domain/
+│   │   ├── entities/
 │   │   │   ├── hardware/
 │   │   │   │   ├── TextureDimensionSlider.tsx
 │   │   │   │   └── TextureLimitIndicator.tsx
@@ -26,37 +26,37 @@ conflux-data-lab/
 │   │   ├── layout/
 │   │   │   ├── Footer.tsx
 │   │   │   └── Header.tsx
-│   │   ├── tools/
-│   │   │   ├── json-to-csv/
-│   │   │   │   └── JsonToCsvConverter.tsx
-│   │   │   ├── monochrome-remover/
-│   │   │   │   └── MonochromeBackgroundRemover.tsx
-│   │   │   ├── project-to-context/
-│   │   │   │   └── ProjectToContext.tsx
-│   │   │   ├── vertical-aligner/
-│   │   │   │   └── VerticalImageAligner.tsx
-│   │   │   ├── video-frame-extractor/
-│   │   │   │   └── VideoFrameExtractor.tsx
-│   │   │   ├── ToolCard.tsx
-│   │   │   ├── ToolGrid.tsx
-│   │   │   └── ToolLayout.tsx
-│   │   └── ui/
-│   │       ├── Badge.tsx
-│   │       ├── Canvas.tsx
-│   │       ├── Card.tsx
-│   │       ├── Checkerboard.tsx
-│   │       ├── ColorInput.tsx
-│   │       ├── ControlSection.tsx
-│   │       ├── FileDropzone.tsx
-│   │       ├── ImageSequencePlayer.tsx
-│   │       ├── Modal.tsx
-│   │       ├── NumberStepper.tsx
-│   │       ├── ProcessingOverlay.tsx
-│   │       ├── RangeSlider.tsx
-│   │       ├── Slider.tsx
-│   │       ├── Switch.tsx
-│   │       ├── ToggleGroup.tsx
-│   │       └── ZoneIndicator.tsx
+│   │   ├── primitives/
+│   │   │   ├── Badge.tsx
+│   │   │   ├── Canvas.tsx
+│   │   │   ├── Card.tsx
+│   │   │   ├── Checkerboard.tsx
+│   │   │   ├── ColorInput.tsx
+│   │   │   ├── ControlSection.tsx
+│   │   │   ├── FileDropzone.tsx
+│   │   │   ├── ImageSequencePlayer.tsx
+│   │   │   ├── Modal.tsx
+│   │   │   ├── NumberStepper.tsx
+│   │   │   ├── ProcessingOverlay.tsx
+│   │   │   ├── RangeSlider.tsx
+│   │   │   ├── Slider.tsx
+│   │   │   ├── Switch.tsx
+│   │   │   ├── ToggleGroup.tsx
+│   │   │   └── ZoneIndicator.tsx
+│   │   └── tools/
+│   │       ├── json-to-csv/
+│   │       │   └── JsonToCsvConverter.tsx
+│   │       ├── monochrome-remover/
+│   │       │   └── MonochromeBackgroundRemover.tsx
+│   │       ├── project-to-context/
+│   │       │   └── ProjectToContext.tsx
+│   │       ├── vertical-aligner/
+│   │       │   └── VerticalImageAligner.tsx
+│   │       ├── video-frame-extractor/
+│   │       │   └── VideoFrameExtractor.tsx
+│   │       ├── ToolCard.tsx
+│   │       ├── ToolGrid.tsx
+│   │       └── ToolLayout.tsx
 │   ├── about/
 │   │   └── page.tsx
 │   ├── tools/

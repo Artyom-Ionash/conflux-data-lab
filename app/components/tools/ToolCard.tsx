@@ -1,7 +1,7 @@
 import { ToolConfig } from '@/lib/types/tools'; // <-- 1. Импортируем правильное имя
 
-import { Badge } from '../ui/Badge';
-import { Card } from '../ui/Card';
+import { Badge } from '../primitives/Badge';
+import { Card } from '../primitives/Card';
 
 interface ToolCardProps {
   tool: ToolConfig; // <-- 2. Используем правильный тип здесь

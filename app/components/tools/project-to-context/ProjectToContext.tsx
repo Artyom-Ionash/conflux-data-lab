@@ -2,8 +2,8 @@
 
 import React, { useRef, useState } from 'react';
 
-import { Card } from '../../ui/Card';
-import { Switch } from '../../ui/Switch';
+import { Card } from '../../primitives/Card';
+import { Switch } from '../../primitives/Switch';
 import { ToolLayout } from '../ToolLayout';
 
 // --- CONFIGURATION ---
@@ -475,7 +475,6 @@ export function ProjectToContext() {
     setProgress(0);
     setResult(null);
 
-    // eslint-disable-next-line unicorn/no-array-sort
     const sortedFiles = [...files].sort((a, b) => {
       return calculateFileScore(a.name) - calculateFileScore(b.name);
     });
@@ -534,7 +533,6 @@ export function ProjectToContext() {
     const savingsBytes = totalOriginalBytes - totalCleanedBytes;
     const savingsPercent = totalOriginalBytes > 0 ? (savingsBytes / totalOriginalBytes) * 100 : 0;
 
-    // eslint-disable-next-line unicorn/no-array-sort
     const topFiles = processedFileStats.sort((a, b) => b.size - a.size).slice(0, 5);
 
     setStats({
@@ -563,7 +561,6 @@ The following is a flattened representation of a project codebase.
   <file_count>${processedFilesData.length}</file_count>
   <top_languages>
     ${Object.entries(composition)
-      // eslint-disable-next-line unicorn/no-array-sort
       .sort(([, a], [, b]) => b - a)
       .slice(0, 3)
       .map(([lang, count]) => `${lang} (${count})`)

@@ -7,24 +7,24 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { TEXTURE_LIMITS } from '@/lib/domain/hardware/texture-standards';
 
 // --- DOMAIN IMPORTS ---
-import { TextureLimitIndicator } from '../../domain/hardware/TextureLimitIndicator';
-import { FrameDiffOverlay } from '../../domain/video/analysis/FrameDiffOverlay';
+import { TextureLimitIndicator } from '../../entities/hardware/TextureLimitIndicator';
+import { FrameDiffOverlay } from '../../entities/video/analysis/FrameDiffOverlay';
 // --- EXTRACTED COMPONENTS ---
-import { DualHoverPreview } from '../../domain/video/DualHoverPreview';
-import { MultiScalePreview } from '../../domain/video/MultiScalePreview';
-import { RangeVideoPlayer } from '../../domain/video/player/RangeVideoPlayer';
-import { SpriteFrameList } from '../../domain/video/SpriteFrameList';
+import { DualHoverPreview } from '../../entities/video/DualHoverPreview';
+import { MultiScalePreview } from '../../entities/video/MultiScalePreview';
+import { RangeVideoPlayer } from '../../entities/video/player/RangeVideoPlayer';
+import { SpriteFrameList } from '../../entities/video/SpriteFrameList';
 // --- UI IMPORTS ---
-import { Card } from '../../ui/Card';
-import { ColorInput } from '../../ui/ColorInput';
-import { ControlLabel, ControlSection } from '../../ui/ControlSection';
-import { FileDropzone, FileDropzonePlaceholder } from '../../ui/FileDropzone';
-import { ImageSequencePlayer } from '../../ui/ImageSequencePlayer';
-import { Modal } from '../../ui/Modal';
-import { NumberStepper } from '../../ui/NumberStepper';
-import { ProcessingOverlay } from '../../ui/ProcessingOverlay';
-import { RangeSlider } from '../../ui/RangeSlider';
-import { Switch } from '../../ui/Switch';
+import { Card } from '../../primitives/Card';
+import { ColorInput } from '../../primitives/ColorInput';
+import { ControlLabel, ControlSection } from '../../primitives/ControlSection';
+import { FileDropzone, FileDropzonePlaceholder } from '../../primitives/FileDropzone';
+import { ImageSequencePlayer } from '../../primitives/ImageSequencePlayer';
+import { Modal } from '../../primitives/Modal';
+import { NumberStepper } from '../../primitives/NumberStepper';
+import { ProcessingOverlay } from '../../primitives/ProcessingOverlay';
+import { RangeSlider } from '../../primitives/RangeSlider';
+import { Switch } from '../../primitives/Switch';
 import { ToolLayout } from '../ToolLayout';
 
 // --- CONSTANTS ---
@@ -120,7 +120,6 @@ function useVideoFrameExtraction() {
   const frames = useMemo(() => {
     if (rawFrames.length < 2) return rawFrames;
     if (!extractionParams.symmetricLoop) return rawFrames;
-    // eslint-disable-next-line unicorn/no-array-reverse
     const loopBack = rawFrames.slice(1, -1).reverse();
     return [...rawFrames, ...loopBack];
   }, [rawFrames, extractionParams.symmetricLoop]);

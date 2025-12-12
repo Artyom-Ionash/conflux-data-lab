@@ -5,7 +5,7 @@ import { notFound } from 'next/navigation';
 import { categoryLabels, getToolById } from '@/lib/config/tools';
 import { getToolComponent } from '@/lib/utils/tool-loader';
 
-import { Badge } from '../../../components/ui/Badge';
+import { Badge } from '../../../components/primitives/Badge';
 
 interface ToolPageProps {
   params: Promise<{

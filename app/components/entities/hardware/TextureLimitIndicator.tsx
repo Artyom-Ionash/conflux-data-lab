@@ -1,6 +1,6 @@
 import React from 'react';
 
-import { ZoneIndicator } from '@/app/components/ui/ZoneIndicator';
+import { ZoneIndicator } from '@/app/components/primitives/ZoneIndicator';
 import {
   analyzeTextureSize,
   HARDWARE_STANDARD_YEAR,
