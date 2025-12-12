@@ -3,13 +3,13 @@
 import Image from 'next/image';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
-import { TextureDimensionSlider } from '@/app/components/domain/hardware/TextureDimensionSlider';
-// Импортируем ControlSection и ControlLabel из одного файла
-import { ControlLabel, ControlSection } from '@/app/components/ui/ControlSection';
 import { rgbToHex } from '@/lib/utils/colors';
 import { downloadDataUrl, loadImage, revokeObjectURLSafely } from '@/lib/utils/media';
 
+import { TextureDimensionSlider } from '../../domain/hardware/TextureDimensionSlider';
 import { Canvas, CanvasRef } from '../../ui/Canvas';
+// Импортируем ControlSection и ControlLabel из одного файла
+import { ControlLabel, ControlSection } from '../../ui/ControlSection';
 import { FileDropzone, FileDropzonePlaceholder } from '../../ui/FileDropzone';
 import { Slider } from '../../ui/Slider';
 import { Switch } from '../../ui/Switch';

@@ -3,12 +3,12 @@
 import Image from 'next/image';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 
-import { ColorInput } from '@/app/components/ui/ColorInput';
-import { ControlLabel, ControlSection } from '@/app/components/ui/ControlSection';
 import { hexToRgb, invertHex, rgbToHex } from '@/lib/utils/colors';
 import { downloadDataUrl, loadImage } from '@/lib/utils/media';
 
 import { Canvas, CanvasRef } from '../../ui/Canvas';
+import { ColorInput } from '../../ui/ColorInput';
+import { ControlLabel, ControlSection } from '../../ui/ControlSection';
 import { FileDropzone, FileDropzonePlaceholder } from '../../ui/FileDropzone';
 import { Slider } from '../../ui/Slider';
 import { ToggleGroup, ToggleGroupItem } from '../../ui/ToggleGroup';

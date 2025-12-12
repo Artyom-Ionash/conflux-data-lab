@@ -4,25 +4,25 @@ import type { CreateGIFResult } from 'gifshot';
 import gifshot from 'gifshot';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
-// --- DOMAIN IMPORTS ---
-import { TextureLimitIndicator } from '@/app/components/domain/hardware/TextureLimitIndicator';
-import { FrameDiffOverlay } from '@/app/components/domain/video/analysis/FrameDiffOverlay';
-// --- EXTRACTED COMPONENTS ---
-import { DualHoverPreview } from '@/app/components/domain/video/DualHoverPreview';
-import { MultiScalePreview } from '@/app/components/domain/video/MultiScalePreview';
-import { RangeVideoPlayer } from '@/app/components/domain/video/player/RangeVideoPlayer';
-import { SpriteFrameList } from '@/app/components/domain/video/SpriteFrameList';
-import { ColorInput } from '@/app/components/ui/ColorInput';
-import { ControlLabel, ControlSection } from '@/app/components/ui/ControlSection';
-import { ProcessingOverlay } from '@/app/components/ui/ProcessingOverlay';
 import { TEXTURE_LIMITS } from '@/lib/domain/hardware/texture-standards';
 
+// --- DOMAIN IMPORTS ---
+import { TextureLimitIndicator } from '../../domain/hardware/TextureLimitIndicator';
+import { FrameDiffOverlay } from '../../domain/video/analysis/FrameDiffOverlay';
+// --- EXTRACTED COMPONENTS ---
+import { DualHoverPreview } from '../../domain/video/DualHoverPreview';
+import { MultiScalePreview } from '../../domain/video/MultiScalePreview';
+import { RangeVideoPlayer } from '../../domain/video/player/RangeVideoPlayer';
+import { SpriteFrameList } from '../../domain/video/SpriteFrameList';
 // --- UI IMPORTS ---
 import { Card } from '../../ui/Card';
+import { ColorInput } from '../../ui/ColorInput';
+import { ControlLabel, ControlSection } from '../../ui/ControlSection';
 import { FileDropzone, FileDropzonePlaceholder } from '../../ui/FileDropzone';
 import { ImageSequencePlayer } from '../../ui/ImageSequencePlayer';
 import { Modal } from '../../ui/Modal';
 import { NumberStepper } from '../../ui/NumberStepper';
+import { ProcessingOverlay } from '../../ui/ProcessingOverlay';
 import { RangeSlider } from '../../ui/RangeSlider';
 import { Switch } from '../../ui/Switch';
 import { ToolLayout } from '../ToolLayout';
