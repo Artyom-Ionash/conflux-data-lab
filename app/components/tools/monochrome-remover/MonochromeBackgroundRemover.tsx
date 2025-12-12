@@ -3,8 +3,10 @@
 import Image from 'next/image';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 
-import { hexToRgb, invertHex, rgbToHex } from '@/lib/utils/colors'; // <-- New Import
-import { downloadDataUrl, loadImage } from '@/lib/utils/media'; // <-- New Import
+import { ColorInput } from '@/app/components/ui/ColorInput';
+import { ControlLabel, ControlSection } from '@/app/components/ui/ControlSection';
+import { hexToRgb, invertHex, rgbToHex } from '@/lib/utils/colors';
+import { downloadDataUrl, loadImage } from '@/lib/utils/media';
 
 import { Canvas, CanvasRef } from '../../ui/Canvas';
 import { FileDropzone, FileDropzonePlaceholder } from '../../ui/FileDropzone';
@@ -83,7 +85,6 @@ export function MonochromeBackgroundRemover() {
 
   const loadOriginalToCanvas = async (url: string) => {
     try {
-      // REFACTOR: Использование loadImage
       const img = await loadImage(url);
 
       setImgDimensions({ w: img.width, h: img.height });
@@ -124,7 +125,6 @@ export function MonochromeBackgroundRemover() {
       const imageData = sourceCtx.getImageData(0, 0, width, height);
       const data = imageData.data;
 
-      // REFACTOR: Использование hexToRgb из утилит
       const targetRGB = hexToRgb(targetColor);
       const contourRGB = hexToRgb(contourColor);
 
@@ -333,7 +333,6 @@ export function MonochromeBackgroundRemover() {
     loadOriginalToCanvas(url);
 
     try {
-      // REFACTOR: Использование loadImage вместо new Image()
       const img = await loadImage(url);
       const c = document.createElement('canvas');
       c.width = 1;
@@ -342,7 +341,6 @@ export function MonochromeBackgroundRemover() {
       if (cx) {
         cx.drawImage(img, 0, 0);
         const p = cx.getImageData(0, 0, 1, 1).data;
-        // REFACTOR: Использование rgbToHex и invertHex
         const hex = rgbToHex(p[OFFSET_R], p[OFFSET_G], p[OFFSET_B]);
         setTargetColor(hex);
         setContourColor(invertHex(hex));
@@ -354,7 +352,6 @@ export function MonochromeBackgroundRemover() {
 
   const handleDownload = () => {
     if (previewCanvasRef.current) {
-      // REFACTOR: Использование downloadDataUrl
       downloadDataUrl(previewCanvasRef.current.toDataURL('image/png'), DOWNLOAD_FILENAME);
     }
   };
@@ -409,7 +406,6 @@ export function MonochromeBackgroundRemover() {
     const ctx = sourceCanvasRef.current.getContext('2d', { willReadFrequently: true });
     if (ctx) {
       const p = ctx.getImageData(x, y, 1, 1).data;
-      // REFACTOR: Использование rgbToHex
       setTargetColor(rgbToHex(p[OFFSET_R], p[OFFSET_G], p[OFFSET_B]));
     }
   };
@@ -421,7 +417,7 @@ export function MonochromeBackgroundRemover() {
   const sidebarContent = (
     <div className="flex flex-col gap-6 pb-4">
       <div className="space-y-2">
-        <label className="block text-xs font-bold text-zinc-400 uppercase">Исходник</label>
+        <ControlLabel>Исходник</ControlLabel>
         <FileDropzone
           onFilesSelected={handleFilesSelected}
           multiple={false}
@@ -431,8 +427,7 @@ export function MonochromeBackgroundRemover() {
 
       {originalUrl && (
         <div className="animate-fade-in space-y-6">
-          <div className="space-y-2">
-            <label className="block text-xs font-bold text-zinc-400 uppercase">Режим</label>
+          <ControlSection title="Режим">
             <ToggleGroup
               type="single"
               value={processingMode}
@@ -460,9 +455,9 @@ export function MonochromeBackgroundRemover() {
                 3. Заливка обновляется <b>автоматически</b>.
               </div>
             )}
-          </div>
+          </ControlSection>
 
-          <div className="space-y-2">
+          <ControlSection>
             <div className="flex flex-col gap-2">
               <div className="flex items-center gap-3">
                 <div className="group relative h-8 w-8 flex-shrink-0 cursor-crosshair overflow-hidden rounded border bg-white dark:border-zinc-700">
@@ -476,16 +471,9 @@ export function MonochromeBackgroundRemover() {
                   />
                 </div>
                 <div className="flex flex-1 items-center gap-2 rounded border bg-zinc-50 p-2 dark:border-zinc-700 dark:bg-zinc-800">
-                  <input
-                    type="color"
-                    value={targetColor}
-                    onChange={(e) => setTargetColor(e.target.value)}
-                    className="h-6 w-6 cursor-pointer border-none bg-transparent"
-                  />
+                  <ColorInput value={targetColor} onChange={setTargetColor} size="sm" />
                   <div className="flex flex-col">
-                    <span className="text-[10px] font-bold text-zinc-500 uppercase">
-                      Цель (Фон)
-                    </span>
+                    <ControlLabel className="text-[10px]! opacity-70">Цель (Фон)</ControlLabel>
                     <span className="font-mono text-xs font-bold uppercase">{targetColor}</span>
                   </div>
                 </div>
@@ -494,24 +482,17 @@ export function MonochromeBackgroundRemover() {
               <div className="flex items-center gap-3">
                 <div className="h-8 w-8 flex-shrink-0" />
                 <div className="flex flex-1 items-center gap-2 rounded border bg-zinc-50 p-2 dark:border-zinc-700 dark:bg-zinc-800">
-                  <input
-                    type="color"
-                    value={contourColor}
-                    onChange={(e) => setContourColor(e.target.value)}
-                    className="h-6 w-6 cursor-pointer border-none bg-transparent"
-                  />
+                  <ColorInput value={contourColor} onChange={setContourColor} size="sm" />
                   <div className="flex flex-col">
-                    <span className="text-[10px] font-bold text-zinc-500 uppercase">
-                      Контур / Окрас
-                    </span>
+                    <ControlLabel className="text-[10px]! opacity-70">Контур / Окрас</ControlLabel>
                     <span className="font-mono text-xs font-bold uppercase">{contourColor}</span>
                   </div>
                 </div>
               </div>
             </div>
-          </div>
+          </ControlSection>
 
-          <div className="space-y-4 rounded-lg border border-zinc-100 bg-zinc-50 p-3 dark:border-zinc-800 dark:bg-zinc-800/50">
+          <ControlSection>
             <Slider
               label="Допуск (%)"
               value={tolerances[processingMode]}
@@ -530,9 +511,7 @@ export function MonochromeBackgroundRemover() {
             )}
             <div className="border-t border-zinc-200 pt-2 dark:border-zinc-700/50">
               <div className="mb-3 flex justify-between text-xs">
-                <span className="font-bold tracking-wide text-zinc-500 uppercase">
-                  Удаление ореолов
-                </span>
+                <ControlLabel>Удаление ореолов</ControlLabel>
               </div>
               <Slider
                 label="Сжатие (Choke)"
@@ -559,7 +538,7 @@ export function MonochromeBackgroundRemover() {
                 step={1}
               />
             </div>
-          </div>
+          </ControlSection>
 
           {processingMode === 'flood-clear' && (
             <div className="space-y-3 rounded-lg border border-blue-100 bg-blue-50 p-3 dark:border-blue-900/30 dark:bg-blue-900/10">

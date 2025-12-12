@@ -12,6 +12,9 @@ import { DualHoverPreview } from '@/app/components/domain/video/DualHoverPreview
 import { MultiScalePreview } from '@/app/components/domain/video/MultiScalePreview';
 import { RangeVideoPlayer } from '@/app/components/domain/video/player/RangeVideoPlayer';
 import { SpriteFrameList } from '@/app/components/domain/video/SpriteFrameList';
+import { ColorInput } from '@/app/components/ui/ColorInput';
+import { ControlLabel, ControlSection } from '@/app/components/ui/ControlSection';
+import { ProcessingOverlay } from '@/app/components/ui/ProcessingOverlay';
 import { TEXTURE_LIMITS } from '@/lib/domain/hardware/texture-standards';
 
 // --- UI IMPORTS ---
@@ -424,7 +427,6 @@ export function VideoFrameExtractor() {
     spacing: 0,
     bg: 'transparent',
   });
-  const [pickerValue, setPickerValue] = useState('#ffffff');
   const [diffDataUrl, setDiffDataUrl] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
@@ -486,11 +488,6 @@ export function VideoFrameExtractor() {
     } catch (e: unknown) {
       alert(e instanceof Error ? e.message : 'Ошибка генерации');
     }
-  };
-
-  const handleColorChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setPickerValue(e.target.value);
-    setSpriteOptions((p) => ({ ...p, bg: e.target.value }));
   };
 
   const aspectRatioStyle = useMemo(() => {
@@ -583,9 +580,7 @@ export function VideoFrameExtractor() {
                   {/* Top Bar: Stepper & Time Indicator */}
                   <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3">
                     <div className="flex flex-wrap items-center gap-6">
-                      <span className="text-xs font-bold tracking-wide text-zinc-500 uppercase">
-                        Диапазон
-                      </span>
+                      <ControlLabel>Диапазон</ControlLabel>
                       <div className="hidden h-6 w-px bg-zinc-200 sm:block dark:bg-zinc-700"></div>
                       <NumberStepper
                         label="Шаг (сек)"
@@ -648,11 +643,7 @@ export function VideoFrameExtractor() {
               {/* 1. Source Video */}
               <Card
                 className="flex flex-col overflow-hidden shadow-sm"
-                title={
-                  <span className="text-xs font-bold tracking-wide text-zinc-500 uppercase">
-                    Исходное видео
-                  </span>
-                }
+                title={<ControlLabel>Исходное видео</ControlLabel>}
                 contentClassName="p-0"
               >
                 <div className="relative w-full bg-black" style={aspectRatioStyle}>
@@ -668,11 +659,7 @@ export function VideoFrameExtractor() {
               {/* 2. Diff Overlay */}
               <Card
                 className="flex flex-col overflow-hidden shadow-sm"
-                title={
-                  <span className="text-xs font-bold tracking-wide text-zinc-500 uppercase">
-                    Разница
-                  </span>
-                }
+                title={<ControlLabel>Разница</ControlLabel>}
                 headerActions={
                   diffDataUrl ? (
                     <button
@@ -710,9 +697,7 @@ export function VideoFrameExtractor() {
                 className="flex flex-col overflow-hidden shadow-sm"
                 title={
                   <div className="flex items-center gap-4">
-                    <span className="text-xs font-bold tracking-wide text-zinc-500 uppercase">
-                      Спрайт
-                    </span>
+                    <ControlLabel>Спрайт</ControlLabel>
                     <NumberStepper
                       label="Скорость %"
                       value={Math.round(
@@ -772,16 +757,13 @@ export function VideoFrameExtractor() {
                         height={videoDimensions?.height || 200}
                         onDrawOverlay={handleDrawOverlay}
                       />
-                      {status.isProcessing && (
-                        <div className="absolute inset-0 flex flex-col justify-end bg-black/5 backdrop-blur-[1px]">
-                          <div className="h-1 w-full bg-black/10">
-                            <div
-                              className="h-full bg-blue-500 transition-all duration-200"
-                              style={{ width: `${status.progress}%` }}
-                            />
-                          </div>
-                        </div>
-                      )}
+
+                      <ProcessingOverlay
+                        isVisible={status.isProcessing}
+                        progress={status.progress}
+                        message="Обработка..."
+                      />
+
                       <div className="absolute inset-0 flex items-center justify-center bg-black/0 transition-colors group-hover:bg-black/10">
                         <div className="scale-95 transform rounded-full bg-black/70 px-3 py-1.5 text-xs font-bold text-white opacity-0 backdrop-blur-sm transition-opacity group-hover:scale-100 group-hover:opacity-100">
                           Открыть масштабы ⤢
@@ -798,81 +780,11 @@ export function VideoFrameExtractor() {
             </div>
 
             {/* SPRITE SHEET SETTINGS & LIST */}
-            <Card
-              className="flex flex-col shadow-sm"
-              title={
-                <div className="flex items-center gap-6">
-                  <span className="text-xs font-bold tracking-wide text-zinc-500 uppercase">
-                    Спрайт-лист
-                  </span>
-                  {frames.length > 0 && (
-                    <div className="flex items-center gap-4">
-                      <Switch
-                        label="Loop"
-                        checked={extractionParams.symmetricLoop}
-                        onCheckedChange={(c) =>
-                          setExtractionParams((p) => ({ ...p, symmetricLoop: c }))
-                        }
-                        className="gap-2 text-xs font-medium whitespace-nowrap"
-                      />
-                      <div className="h-6 w-px bg-zinc-200 dark:bg-zinc-700"></div>
-
-                      <NumberStepper
-                        label="Высота"
-                        value={spriteOptions.maxHeight}
-                        onChange={(v) => setSpriteOptions((p) => ({ ...p, maxHeight: v }))}
-                        step={10}
-                        min={10}
-                        max={2000}
-                      />
-                      <div className="h-6 w-px bg-zinc-200 dark:bg-zinc-700"></div>
-                      <NumberStepper
-                        label="Отступ"
-                        value={spriteOptions.spacing}
-                        onChange={(v) => setSpriteOptions((p) => ({ ...p, spacing: v }))}
-                        step={1}
-                        min={0}
-                        max={100}
-                      />
-
-                      {/* Color Picker */}
-                      <div className="relative h-8 w-8 cursor-pointer overflow-hidden rounded-lg border border-zinc-200 shadow-sm transition-colors hover:border-zinc-400 dark:border-zinc-700">
-                        <input
-                          type="color"
-                          className="absolute inset-0 z-10 h-full w-full cursor-pointer opacity-0"
-                          value={pickerValue}
-                          onInput={handleColorChange}
-                        />
-                        <div
-                          className="absolute inset-0 z-0 bg-white"
-                          style={{
-                            backgroundImage:
-                              'linear-gradient(45deg, #ccc 25%, transparent 25%), linear-gradient(-45deg, #ccc 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #ccc 75%), linear-gradient(-45deg, transparent 75%, #ccc 75%)',
-                            backgroundSize: '8px 8px',
-                          }}
-                        />
-                        <div
-                          className="absolute inset-0 z-1"
-                          style={{
-                            backgroundColor:
-                              spriteOptions.bg === 'transparent' ? 'transparent' : spriteOptions.bg,
-                          }}
-                        />
-                      </div>
-                      {spriteOptions.bg !== 'transparent' && (
-                        <button
-                          onClick={() => setSpriteOptions((p) => ({ ...p, bg: 'transparent' }))}
-                          className="text-xs text-red-500 hover:text-red-700"
-                        >
-                          Сброс
-                        </button>
-                      )}
-                    </div>
-                  )}
-                </div>
-              }
-              headerActions={
-                frames.length > 0 ? (
+            <ControlSection
+              title="Спрайт-лист"
+              className="shadow-sm"
+              headerRight={
+                frames.length > 0 && (
                   <div className="flex items-center gap-4">
                     <NumberStepper
                       label="Кадров"
@@ -891,10 +803,49 @@ export function VideoFrameExtractor() {
                       Скачать PNG
                     </button>
                   </div>
-                ) : undefined
+                )
               }
-              contentClassName="p-0"
             >
+              {frames.length > 0 && (
+                <div className="mb-4 flex items-center gap-4">
+                  <Switch
+                    label="Loop"
+                    checked={extractionParams.symmetricLoop}
+                    onCheckedChange={(c) =>
+                      setExtractionParams((p) => ({ ...p, symmetricLoop: c }))
+                    }
+                    className="gap-2 text-xs font-medium whitespace-nowrap"
+                  />
+                  <div className="h-6 w-px bg-zinc-200 dark:bg-zinc-700"></div>
+
+                  <NumberStepper
+                    label="Высота"
+                    value={spriteOptions.maxHeight}
+                    onChange={(v) => setSpriteOptions((p) => ({ ...p, maxHeight: v }))}
+                    step={10}
+                    min={10}
+                    max={2000}
+                  />
+                  <div className="h-6 w-px bg-zinc-200 dark:bg-zinc-700"></div>
+                  <NumberStepper
+                    label="Отступ"
+                    value={spriteOptions.spacing}
+                    onChange={(v) => setSpriteOptions((p) => ({ ...p, spacing: v }))}
+                    step={1}
+                    min={0}
+                    max={100}
+                  />
+
+                  {/* Replaced manual picker with ColorInput */}
+                  <ColorInput
+                    value={spriteOptions.bg === 'transparent' ? null : spriteOptions.bg}
+                    onChange={(v) => setSpriteOptions((p) => ({ ...p, bg: v }))}
+                    allowTransparent
+                    onClear={() => setSpriteOptions((p) => ({ ...p, bg: 'transparent' }))}
+                  />
+                </div>
+              )}
+
               <div className="custom-scrollbar overflow-x-auto bg-zinc-100 p-4 dark:bg-zinc-950">
                 <SpriteFrameList
                   frames={frames}
@@ -904,7 +855,7 @@ export function VideoFrameExtractor() {
                   videoAspectRatio={videoRatio}
                 />
               </div>
-            </Card>
+            </ControlSection>
           </div>
         )}
 

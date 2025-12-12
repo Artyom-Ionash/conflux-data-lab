@@ -4,8 +4,10 @@ import Image from 'next/image';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { TextureDimensionSlider } from '@/app/components/domain/hardware/TextureDimensionSlider';
-import { rgbToHex } from '@/lib/utils/colors'; // <-- New Import
-import { downloadDataUrl, loadImage, revokeObjectURLSafely } from '@/lib/utils/media'; // <-- New Import
+// Импортируем ControlSection и ControlLabel из одного файла
+import { ControlLabel, ControlSection } from '@/app/components/ui/ControlSection';
+import { rgbToHex } from '@/lib/utils/colors';
+import { downloadDataUrl, loadImage, revokeObjectURLSafely } from '@/lib/utils/media';
 
 import { Canvas, CanvasRef } from '../../ui/Canvas';
 import { FileDropzone, FileDropzonePlaceholder } from '../../ui/FileDropzone';
@@ -270,7 +272,6 @@ export function VerticalImageAligner() {
 
       setImages((prev) => [...prev, ...newImages]);
 
-      // REFACTOR: Используем loadImage из утилит
       newImages.forEach(async (item, idx) => {
         try {
           const img = await loadImage(item.url);
@@ -287,7 +288,6 @@ export function VerticalImageAligner() {
               if (tempCtx) {
                 tempCtx.drawImage(img, 0, 0, 1, 1, 0, 0, 1, 1);
                 const [r, g, b] = tempCtx.getImageData(0, 0, 1, 1).data;
-                // REFACTOR: Используем rgbToHex
                 const hex = rgbToHex(r, g, b);
                 workspaceRef.current?.setBackgroundColor(hex);
               }
@@ -322,7 +322,6 @@ export function VerticalImageAligner() {
     if (!images.length) return;
     setIsExporting(true);
     try {
-      // REFACTOR: Использование loadImage и Promise.all для загрузки всех картинок
       const loaded = await Promise.all(
         images.map(async (item) => {
           const img = await loadImage(item.url);
@@ -357,7 +356,6 @@ export function VerticalImageAligner() {
         ctx.restore();
       });
 
-      // REFACTOR: Использование downloadDataUrl
       downloadDataUrl(canvas.toDataURL('image/png'), EXPORT_FILENAME);
     } catch (e) {
       console.error('Export failed', e);
@@ -384,11 +382,7 @@ export function VerticalImageAligner() {
             </button>
           </div>
 
-          <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-4 dark:border-zinc-700 dark:bg-zinc-800">
-            <div className="mb-4 text-xs font-bold tracking-wide text-zinc-500 uppercase">
-              Размеры слота
-            </div>
-
+          <ControlSection title="Размеры слота">
             <div className="flex flex-col gap-6">
               <TextureDimensionSlider
                 label="Ширина"
@@ -410,14 +404,10 @@ export function VerticalImageAligner() {
                 {slotWidth} x {totalHeight} px
               </span>
             </div>
-          </div>
+          </ControlSection>
 
-          <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-4 dark:border-zinc-700 dark:bg-zinc-800">
-            <Switch
-              label="ЗЕЛЕНАЯ СЕТКА (КАДР)"
-              checked={showFrameGrid}
-              onCheckedChange={setShowFrameGrid}
-            />
+          <ControlSection title="Зеленая сетка (Кадр)">
+            <Switch checked={showFrameGrid} onCheckedChange={setShowFrameGrid} label="Отображать" />
             {showFrameGrid && (
               <div className="mt-2 border-t border-zinc-200 pt-4 dark:border-zinc-700">
                 <Slider
@@ -429,14 +419,10 @@ export function VerticalImageAligner() {
                 />
               </div>
             )}
-          </div>
+          </ControlSection>
 
-          <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-4 dark:border-zinc-700 dark:bg-zinc-800">
-            <Switch
-              label="КРАСНАЯ СЕТКА (СДВИГ)"
-              checked={showRedGrid}
-              onCheckedChange={setShowRedGrid}
-            />
+          <ControlSection title="Красная сетка (Сдвиг)">
+            <Switch checked={showRedGrid} onCheckedChange={setShowRedGrid} label="Отображать" />
             {showRedGrid && (
               <div className="mt-2 border-t border-zinc-200 pt-4 dark:border-zinc-700">
                 <Slider
@@ -457,11 +443,11 @@ export function VerticalImageAligner() {
                 />
               </div>
             )}
-          </div>
+          </ControlSection>
 
           <div className="space-y-1.5">
             <div className="flex items-center justify-between px-1 pb-1">
-              <span className="text-xs font-bold tracking-wide text-zinc-500 uppercase">Слои</span>
+              <ControlLabel>Слои</ControlLabel>
               <div className="flex gap-2">
                 <button
                   onClick={handleCenterAllX}

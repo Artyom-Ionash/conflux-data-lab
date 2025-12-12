@@ -11,6 +11,9 @@ import React, {
   useState,
 } from 'react';
 
+import { ColorInput } from './ColorInput';
+import { ProcessingOverlay } from './ProcessingOverlay';
+
 // --- CONSTANTS ---
 const DEFAULT_SCALE_MIN = 0.05;
 const DEFAULT_SCALE_MAX = 50;
@@ -102,8 +105,6 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(
 
     // null означает "прозрачный", string - HEX цвет
     const [canvasBgColor, setCanvasBgColor] = useState<string | null>(defaultBackgroundColor);
-    // Храним последний выбранный цвет для инпута, чтобы он не сбрасывался в черный при выборе прозрачности
-    const [pickerValue, setPickerValue] = useState<string>(defaultBackgroundColor || '#ffffff');
 
     const activeTheme = propTheme || internalTheme;
     const panStartRef = useRef<Point | null>(null);
@@ -201,7 +202,6 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(
       getBackgroundColor: () => canvasBgColor,
       setBackgroundColor: (color: string | null) => {
         setCanvasBgColor(color);
-        if (color) setPickerValue(color);
       },
     }));
 
@@ -264,12 +264,6 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(
       }
     };
 
-    const handleColorChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-      const val = e.target.value;
-      setPickerValue(val);
-      setCanvasBgColor(val);
-    };
-
     const isDark = activeTheme === 'dark';
     const bgClass = isDark ? THEME_DARK_BG : THEME_LIGHT_BG;
     const gridOpacity = isDark ? GRID_OPACITY_DARK : GRID_OPACITY_LIGHT;
@@ -294,59 +288,14 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(
         }}
       >
         <div className="absolute top-4 left-1/2 z-30 flex -translate-x-1/2 items-center gap-2 rounded-full border border-zinc-200 bg-white/90 px-3 py-2 shadow-lg backdrop-blur dark:border-zinc-700 dark:bg-zinc-900/90">
-          {/* Блок выбора цвета */}
-          <div
-            className="mr-2 flex items-center gap-1.5 border-r border-zinc-200 pr-2 dark:border-zinc-700"
-            title="Цвет фона (стандартный инпут не поддерживает прозрачность)"
-          >
-            <div className="group relative h-6 w-6 cursor-pointer overflow-hidden rounded-full border border-zinc-300 shadow-sm transition-transform hover:scale-105 dark:border-zinc-600">
-              {/* Нативный инпут поверх всего, но полностью невидимый */}
-              <input
-                type="color"
-                className="absolute inset-0 z-10 m-0 h-[150%] w-[150%] -translate-x-1/4 -translate-y-1/4 cursor-pointer p-0 opacity-0"
-                value={pickerValue}
-                onInput={handleColorChange}
-              />
-
-              {/* Визуальное отображение "под" инпутом */}
-              <div
-                className="absolute inset-0 z-0 bg-white"
-                style={{
-                  backgroundImage: `linear-gradient(45deg, #ccc 25%, transparent 25%), linear-gradient(-45deg, #ccc 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #ccc 75%), linear-gradient(-45deg, transparent 75%, #ccc 75%)`,
-                  backgroundSize: '8px 8px',
-                  backgroundPosition: '0 0, 0 4px, 4px -4px, -4px 0px',
-                }}
-              />
-
-              {/* Слой цвета (если выбран) */}
-              <div
-                className="absolute inset-0 z-1 transition-colors duration-200"
-                style={{ backgroundColor: canvasBgColor || 'transparent' }}
-              />
-            </div>
-
-            {/* Кнопка сброса на прозрачный */}
-            {canvasBgColor !== null && (
-              <button
-                onClick={() => setCanvasBgColor(null)}
-                className="flex h-5 w-5 items-center justify-center rounded-full text-zinc-400 transition-colors hover:bg-zinc-100 hover:text-red-500 dark:hover:bg-zinc-800"
-                title="Сбросить на прозрачный"
-              >
-                <svg
-                  width="12"
-                  height="12"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="3"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <line x1="18" y1="6" x2="6" y2="18"></line>
-                  <line x1="6" y1="6" x2="18" y2="18"></line>
-                </svg>
-              </button>
-            )}
+          <div className="mr-2 border-r border-zinc-200 pr-2 dark:border-zinc-700">
+            <ColorInput
+              value={canvasBgColor}
+              onChange={(v) => setCanvasBgColor(v)}
+              allowTransparent
+              onClear={() => setCanvasBgColor(null)}
+              size="sm"
+            />
           </div>
 
           <button
@@ -468,32 +417,7 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(
           </div>
         )}
 
-        {isLoading && (
-          <div className="pointer-events-none absolute inset-0 z-50 flex items-center justify-center bg-black/20 backdrop-blur-[2px]">
-            <div className="flex flex-col items-center gap-3 rounded-lg bg-white p-4 shadow-xl dark:bg-zinc-900">
-              <svg
-                className="h-8 w-8 animate-spin text-blue-600"
-                xmlns="http://www.w3.org/2000/svg"
-                fill="none"
-                viewBox="0 0 24 24"
-              >
-                <circle
-                  className="opacity-25"
-                  cx="12"
-                  cy="12"
-                  r="10"
-                  stroke="currentColor"
-                  strokeWidth="4"
-                ></circle>
-                <path
-                  className="opacity-75"
-                  fill="currentColor"
-                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                ></path>
-              </svg>
-            </div>
-          </div>
-        )}
+        <ProcessingOverlay isVisible={isLoading} />
 
         <div className="pointer-events-none absolute bottom-4 left-1/2 z-50 -translate-x-1/2 rounded bg-white/50 px-2 py-1 text-[10px] text-zinc-500 opacity-50 backdrop-blur-sm dark:bg-black/50">
           Средняя кнопка мыши для перемещения

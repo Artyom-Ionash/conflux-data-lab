@@ -45,10 +45,13 @@ conflux-data-lab/
 │   │       ├── Canvas.tsx
 │   │       ├── Card.tsx
 │   │       ├── Checkerboard.tsx
+│   │       ├── ColorInput.tsx
+│   │       ├── ControlSection.tsx
 │   │       ├── FileDropzone.tsx
 │   │       ├── ImageSequencePlayer.tsx
 │   │       ├── Modal.tsx
 │   │       ├── NumberStepper.tsx
+│   │       ├── ProcessingOverlay.tsx
 │   │       ├── RangeSlider.tsx
 │   │       ├── Slider.tsx
 │   │       ├── Switch.tsx
