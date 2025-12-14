@@ -1,9 +1,25 @@
 'use client';
 
+import {
+  closestCenter,
+  DndContext,
+  DragEndEvent,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+} from '@dnd-kit/core';
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import Image from 'next/image';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
-import { useDraggableList } from '@/lib/hooks/use-draggable-list'; // NEW HOOK
 import { rgbToHex } from '@/lib/utils/colors';
 import { downloadDataUrl, loadImage, revokeObjectURLSafely } from '@/lib/utils/media';
 
@@ -52,7 +68,58 @@ type AlignImage = {
   naturalHeight: number;
 };
 
-// --- DRAGGABLE IMAGE SLOT ---
+// --- COMPONENTS ---
+
+// 1. Sortable Item for Sidebar (DND-KIT)
+interface SortableLayerItemProps {
+  img: AlignImage;
+  index: number;
+  onActivate: (id: string) => void;
+  onRemove: (id: string) => void;
+}
+
+function SortableLayerItem({ img, index, onActivate, onRemove }: SortableLayerItemProps) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: img.id,
+  });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    zIndex: isDragging ? 100 : 'auto',
+    opacity: isDragging ? 0.5 : 1,
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      {...attributes}
+      {...listeners}
+      className={`flex cursor-grab items-center gap-3 rounded-md border p-2.5 text-sm transition-colors select-none active:cursor-grabbing ${
+        img.isActive
+          ? 'border-blue-200 bg-blue-50 text-blue-800 shadow-sm dark:border-blue-800 dark:bg-blue-900/30 dark:text-blue-100'
+          : 'border-zinc-200 bg-white hover:border-zinc-300 dark:border-zinc-700 dark:bg-zinc-800'
+      }`}
+      onClick={() => onActivate(img.id)}
+    >
+      <span className="w-6 font-mono text-zinc-400">#{index + 1}</span>
+      <span className="flex-1 truncate font-medium">{img.name}</span>
+      <button
+        onPointerDown={(e) => e.stopPropagation()} // Prevent drag start when clicking delete
+        onClick={(e) => {
+          e.stopPropagation();
+          onRemove(img.id);
+        }}
+        className="rounded p-1.5 text-zinc-400 transition-colors hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-900/30"
+      >
+        ✕
+      </button>
+    </div>
+  );
+}
+
+// 2. Draggable Slot for Canvas (Manual Pointer Events for X/Y positioning)
 interface DraggableImageSlotProps {
   img: AlignImage;
   index: number;
@@ -152,8 +219,18 @@ DraggableImageSlot.displayName = 'DraggableImageSlot';
 // --- MAIN COMPONENT ---
 export function VerticalImageAligner() {
   const [images, setImages] = useState<AlignImage[]>([]);
-  // Использование нового хука
-  const { handleDragStart, handleDragOver, handleDrop } = useDraggableList(images, setImages);
+
+  // DND-KIT SENSORS
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 5, // Начинаем драг только после сдвига на 5px (чтобы клик работал)
+      },
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
 
   const imagesRef = useRef(images);
   useEffect(() => {
@@ -194,6 +271,18 @@ export function VerticalImageAligner() {
     () => workspaceRef.current?.getTransform().scale || CANVAS_SCALE_DEFAULT,
     []
   );
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+
+    if (over && active.id !== over.id) {
+      setImages((items) => {
+        const oldIndex = items.findIndex((i) => i.id === active.id);
+        const newIndex = items.findIndex((i) => i.id === over.id);
+        return arrayMove(items, oldIndex, newIndex);
+      });
+    }
+  };
 
   const handleUpdatePosition = useCallback((id: string, x: number, y: number) => {
     setImages((prev) =>
@@ -446,29 +535,30 @@ export function VerticalImageAligner() {
                 </button>
               </div>
             </div>
-            {images.map((img, i) => (
-              <div
-                key={img.id}
-                draggable
-                onDragStart={(e) => handleDragStart(e, i)}
-                onDragOver={handleDragOver}
-                onDrop={(e) => handleDrop(e, i)}
-                className={`flex cursor-pointer items-center gap-3 rounded-md border p-2.5 text-sm transition-colors select-none ${img.isActive ? 'border-blue-200 bg-blue-50 text-blue-800 shadow-sm dark:border-blue-800 dark:bg-blue-900/30 dark:text-blue-100' : 'border-zinc-200 bg-white hover:border-zinc-300 dark:border-zinc-700 dark:bg-zinc-800'}`}
-                onClick={() => handleActivate(img.id)}
+
+            {/* DND LIST INTEGRATION */}
+            <DndContext
+              sensors={sensors}
+              collisionDetection={closestCenter}
+              onDragEnd={handleDragEnd}
+            >
+              <SortableContext
+                items={images.map((i) => i.id)}
+                strategy={verticalListSortingStrategy}
               >
-                <span className="w-6 font-mono text-zinc-400">#{i + 1}</span>
-                <span className="flex-1 truncate font-medium">{img.name}</span>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleRemoveImage(img.id);
-                  }}
-                  className="rounded p-1.5 text-zinc-400 transition-colors hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-900/30"
-                >
-                  ✕
-                </button>
-              </div>
-            ))}
+                <div className="flex flex-col gap-1">
+                  {images.map((img, i) => (
+                    <SortableLayerItem
+                      key={img.id}
+                      img={img}
+                      index={i}
+                      onActivate={handleActivate}
+                      onRemove={handleRemoveImage}
+                    />
+                  ))}
+                </div>
+              </SortableContext>
+            </DndContext>
           </div>
 
           {activeImageId && (

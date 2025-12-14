@@ -1,7 +1,13 @@
 /**
  * Утилиты для работы с цветом.
- * Используются в инструментах анализа изображений и генерации палитр.
+ * Использует библиотеку colord для надежного парсинга и конвертации.
  */
+
+import { colord, extend } from 'colord';
+import namesPlugin from 'colord/plugins/names';
+
+// Расширяем colord для поддержки имен цветов ('red', 'blue', 'transparent')
+extend([namesPlugin]);
 
 export interface RGB {
   r: number;
@@ -9,50 +15,44 @@ export interface RGB {
   b: number;
 }
 
-// Константы для парсинга
-const HEX_BASE = 16;
-const RGB_MAX = 255;
 export const PIXEL_STRIDE = 4; // R, G, B, A
 
 /**
- * Преобразует HEX строку (например, "#ffffff" или "000") в объект RGB.
+ * Парсит ЛЮБОЙ валидный CSS цвет (hex, rgb, rgba, hsl, name) в RGB объект.
+ * Возвращает null, если цвет невалиден.
  */
-export function hexToRgb(hex: string): RGB | null {
-  // Поддержка полных (#RRGGBB) и сокращенных (#RGB) форматов
-  const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-  return result
-    ? {
-        r: Number.parseInt(result[1], HEX_BASE),
-        g: Number.parseInt(result[2], HEX_BASE),
-        b: Number.parseInt(result[3], HEX_BASE),
-      }
-    : null;
+export function hexToRgb(input: string): RGB | null {
+  const c = colord(input);
+  if (!c.isValid()) return null;
+
+  const { r, g, b } = c.toRgb();
+  return { r, g, b };
 }
 
-const toHex = (c: number) => {
-  const hex = Math.max(0, Math.min(RGB_MAX, Math.round(c))).toString(HEX_BASE);
-  return hex.length === 1 ? '0' + hex : hex;
-};
-
 /**
- * Преобразует RGB компоненты в HEX строку.
+ * Надежно преобразует RGB компоненты в HEX строку.
  */
 export function rgbToHex(r: number, g: number, b: number): string {
-  return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
+  return colord({ r, g, b }).toHex();
 }
 
 /**
- * Инвертирует цвет (создает негатив). Полезно для контрастных обводок.
+ * Инвертирует цвет (создает негатив).
+ * Поддерживает любой входной формат, возвращает HEX.
  */
-export function invertHex(hex: string): string {
-  const rgb = hexToRgb(hex);
-  if (!rgb) return '#000000';
-  return rgbToHex(RGB_MAX - rgb.r, RGB_MAX - rgb.g, RGB_MAX - rgb.b);
+export function invertHex(input: string): string {
+  const c = colord(input);
+  // Если входной цвет невалиден (например 'transparent' или null), возвращаем черный
+  if (!c.isValid()) return '#000000';
+  return c.invert().toHex();
 }
+
+// --- High Performance Helpers (Без аллокации объектов) ---
+// Эти функции вызываются миллионы раз в циклах обработки изображений.
+// Использование colord здесь убьет производительность, поэтому оставляем Math.hypot.
 
 /**
  * Вычисляет евклидово расстояние между двумя цветами в пространстве RGB.
- * Чем меньше значение, тем более похожи цвета.
  */
 export function getColorDistance(
   r1: number,
