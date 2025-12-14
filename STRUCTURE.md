@@ -75,6 +75,7 @@ conflux-data-lab/
 │   │   ├── parsers/
 │   │   │   └── godot-scene.ts
 │   │   ├── colors.ts
+│   │   ├── file-tree.ts
 │   │   ├── media.ts
 │   │   └── tool-loader.tsx
 │   ├── hooks/
@@ -82,8 +83,11 @@ conflux-data-lab/
 │   ├── config/
 │   │   └── tools.ts
 │   └── domain/
-│       └── hardware/
-│           └── texture-standards.ts
+│       ├── hardware/
+│       │   └── texture-standards.ts
+│       └── image/
+│           ├── filters.ts
+│           └── sprite-generator.ts
 ├── public/ # Статические файлы
 │   ├── file.svg
 │   ├── globe.svg

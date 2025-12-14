@@ -5,6 +5,7 @@ import gifshot from 'gifshot';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { TEXTURE_LIMITS } from '@/lib/domain/hardware/texture-standards';
+import { generateSpriteSheet } from '@/lib/domain/image/sprite-generator'; // IMPORT NEW ABSTRACTION
 import { useObjectUrl } from '@/lib/hooks/use-object-url';
 
 // --- DOMAIN IMPORTS ---
@@ -48,59 +49,6 @@ export interface ExtractionParams {
 }
 
 // --- LOGIC HOOKS ---
-
-function useSpriteSheetGenerator() {
-  const generateSpriteSheet = useCallback(
-    async (
-      frames: ExtractedFrame[],
-      options: { maxHeight: number; spacing: number; backgroundColor: string }
-    ) => {
-      const validFrames = frames.filter((f) => f.dataUrl !== null);
-      if (validFrames.length === 0) throw new Error('No frames');
-
-      const firstImage = new Image();
-      await new Promise<void>((resolve) => {
-        firstImage.onload = () => resolve();
-        firstImage.src = validFrames[0].dataUrl!;
-      });
-
-      const scale = options.maxHeight / firstImage.height;
-      const scaledWidth = Math.floor(firstImage.width * scale);
-      const scaledHeight = options.maxHeight;
-
-      const canvas = document.createElement('canvas');
-      const ctx = canvas.getContext('2d');
-      if (!ctx) throw new Error('No context');
-
-      canvas.width = (scaledWidth + options.spacing) * validFrames.length - options.spacing;
-      canvas.height = scaledHeight;
-
-      if (canvas.width > MAX_BROWSER_TEXTURE || canvas.height > MAX_BROWSER_TEXTURE) {
-        throw new Error(
-          `Размер текстуры (${canvas.width}x${canvas.height}) превышает лимит браузера (${MAX_BROWSER_TEXTURE}px).`
-        );
-      }
-
-      if (options.backgroundColor !== 'transparent') {
-        ctx.fillStyle = options.backgroundColor;
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-      }
-
-      for (let i = 0; i < validFrames.length; i++) {
-        const img = new window.Image();
-        await new Promise<void>((resolve) => {
-          img.onload = () => resolve();
-          img.src = validFrames[i].dataUrl!;
-        });
-        const x = i * (scaledWidth + options.spacing);
-        ctx.drawImage(img, x, 0, scaledWidth, scaledHeight);
-      }
-      return canvas.toDataURL('image/png');
-    },
-    []
-  );
-  return { generateSpriteSheet };
-}
 
 function useVideoFrameExtraction() {
   const [videoFile, setVideoFile] = useState<File | null>(null);
@@ -432,8 +380,6 @@ export function VideoFrameExtractor() {
   const [isDragging, setIsDragging] = useState(false);
   const sliderContainerRef = useRef<HTMLDivElement>(null);
 
-  const { generateSpriteSheet } = useSpriteSheetGenerator();
-
   // Draw overlay for SequencePlayer
   const handleDrawOverlay = useCallback(
     (ctx: CanvasRenderingContext2D, index: number, w: number, h: number) => {
@@ -471,6 +417,7 @@ export function VideoFrameExtractor() {
   const handleDownloadSpriteSheet = async () => {
     if (frames.length === 0) return;
     try {
+      // USING NEW ABSTRACTION
       const url = await generateSpriteSheet(frames, {
         maxHeight: spriteOptions.maxHeight,
         spacing: spriteOptions.spacing,
@@ -825,6 +772,7 @@ export function VideoFrameExtractor() {
                     max={100}
                   />
 
+                  {/* Replaced manual picker with ColorInput */}
                   <ColorInput
                     value={spriteOptions.bg === 'transparent' ? null : spriteOptions.bg}
                     onChange={(v) => setSpriteOptions((p) => ({ ...p, bg: v }))}
@@ -847,10 +795,12 @@ export function VideoFrameExtractor() {
           </div>
         )}
 
+        {/* Hidden Processing Elements */}
         <video ref={videoRef} className="hidden" crossOrigin="anonymous" muted playsInline />
         <video ref={previewVideoRef} className="hidden" crossOrigin="anonymous" muted playsInline />
         <canvas ref={canvasRef} className="hidden" />
 
+        {/* MODAL */}
         <Modal
           isOpen={isModalOpen}
           onClose={() => setIsModalOpen(false)}

@@ -3,8 +3,16 @@
 import Image from 'next/image';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 
+import {
+  applyBlur,
+  applyColorFilter,
+  applyEdgePaint,
+  applyFloodFillMask,
+  applyMorphologyChoke,
+  Point,
+} from '@/lib/domain/image/filters'; // IMPORTS
 import { useObjectUrl } from '@/lib/hooks/use-object-url';
-import { getColorDistance, hexToRgb, invertHex, PIXEL_STRIDE, rgbToHex } from '@/lib/utils/colors';
+import { hexToRgb, invertHex, PIXEL_STRIDE, rgbToHex } from '@/lib/utils/colors';
 import { downloadDataUrl, getTopLeftPixelColor, loadImage } from '@/lib/utils/media';
 
 import { Canvas, CanvasRef } from '../../primitives/Canvas';
@@ -25,7 +33,6 @@ const OFFSET_R = 0;
 const OFFSET_G = 1;
 const OFFSET_B = 2;
 const OFFSET_A = 3;
-const PERCENTAGE_MAX = 100;
 const MAX_RGB_DISTANCE = Math.sqrt(3 * RGB_MAX ** 2);
 const DOWNLOAD_FILENAME = 'removed_bg.png';
 
@@ -40,10 +47,6 @@ const DEFAULT_SETTINGS = {
 };
 
 type ProcessingMode = 'remove' | 'keep' | 'flood-clear';
-interface Point {
-  x: number;
-  y: number;
-}
 
 export function MonochromeBackgroundRemover() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -127,162 +130,48 @@ export function MonochromeBackgroundRemover() {
         return;
       }
 
-      const tolVal = (tolerances[processingMode] / PERCENTAGE_MAX) * MAX_RGB_DISTANCE;
-      const smoothVal = (smoothness / PERCENTAGE_MAX) * MAX_RGB_DISTANCE;
+      let alphaChannel: Uint8Array;
 
-      const getDist = (i: number, rgb: { r: number; g: number; b: number }) =>
-        getColorDistance(
-          data[i + OFFSET_R],
-          data[i + OFFSET_G],
-          data[i + OFFSET_B],
-          rgb.r,
-          rgb.g,
-          rgb.b
-        );
-
-      const alphaChannel = new Uint8Array(width * height);
-
+      // 1. GENERATE BASE ALPHA MASK
       if (processingMode === 'flood-clear') {
-        if (floodPoints.length === 0) {
-          previewCtx.putImageData(imageData, 0, 0);
-          setIsProcessing(false);
-          return;
-        }
-
-        alphaChannel.fill(RGB_MAX);
-        const visited = new Uint8Array(width * height);
-        floodPoints.forEach((pt) => {
-          const startX = Math.floor(pt.x);
-          const startY = Math.floor(pt.y);
-          if (startX < 0 || startX >= width || startY < 0 || startY >= height) return;
-
-          const stack = [startX, startY];
-          while (stack.length) {
-            const y = stack.pop()!;
-            const x = stack.pop()!;
-            const idx = y * width + x;
-
-            if (visited[idx]) continue;
-            visited[idx] = 1;
-
-            if (getDist(idx * PIXEL_STRIDE, contourRGB) <= tolVal) continue;
-
-            alphaChannel[idx] = 0;
-
-            if (x > 0) stack.push(x - 1, y);
-            if (x < width - 1) stack.push(x + 1, y);
-            if (y > 0) stack.push(x, y - 1);
-            if (y < height - 1) stack.push(x, y + 1);
-          }
-        });
+        alphaChannel = applyFloodFillMask(
+          data,
+          width,
+          height,
+          floodPoints,
+          contourRGB,
+          tolerances['flood-clear'],
+          MAX_RGB_DISTANCE
+        );
       } else {
-        for (let i = 0, idx = 0; i < data.length; i += PIXEL_STRIDE, idx++) {
-          const dist = getDist(i, targetRGB);
-          let alpha = RGB_MAX;
-
-          if (processingMode === 'remove') {
-            if (dist <= tolVal) alpha = 0;
-            else if (dist <= tolVal + smoothVal && smoothVal > 0) {
-              alpha = Math.floor(RGB_MAX * ((dist - tolVal) / smoothVal));
-            }
-          } else if (processingMode === 'keep') {
-            if (dist > tolVal + smoothVal) alpha = 0;
-            else if (dist > tolVal && smoothVal > 0) {
-              alpha = Math.floor(RGB_MAX * (1 - (dist - tolVal) / smoothVal));
-            }
-          }
-          alphaChannel[idx] = alpha;
-        }
+        alphaChannel = applyColorFilter(
+          data,
+          width,
+          height,
+          targetRGB,
+          tolerances[processingMode],
+          smoothness,
+          processingMode,
+          MAX_RGB_DISTANCE
+        );
       }
 
+      // 2. APPLY MORPHOLOGY (Erode/Choke)
       if (edgeChoke > 0) {
-        const eroded = new Uint8Array(alphaChannel);
-        const r = edgeChoke;
-        for (let y = 0; y < height; y++) {
-          for (let x = 0; x < width; x++) {
-            const i = y * width + x;
-            if (alphaChannel[i] === 0) continue;
-
-            let hit = false;
-            loop: for (let ky = -r; ky <= r; ky++) {
-              for (let kx = -r; kx <= r; kx++) {
-                const ny = y + ky;
-                const nx = x + kx;
-                if (
-                  nx >= 0 &&
-                  nx < width &&
-                  ny >= 0 &&
-                  ny < height &&
-                  alphaChannel[ny * width + nx] === 0
-                ) {
-                  hit = true;
-                  break loop;
-                }
-              }
-            }
-            if (hit) eroded[i] = 0;
-          }
-        }
-        alphaChannel.set(eroded);
+        alphaChannel = applyMorphologyChoke(alphaChannel, width, height, edgeChoke);
       }
 
+      // 3. APPLY BLUR
       if (edgeBlur > 0) {
-        const blurred = new Uint8Array(alphaChannel);
-        const r = Math.max(1, edgeBlur);
-        for (let y = 0; y < height; y++) {
-          for (let x = 0; x < width; x++) {
-            let sum = 0,
-              count = 0;
-            for (let ky = -r; ky <= r; ky++) {
-              for (let kx = -r; kx <= r; kx++) {
-                const ny = y + ky;
-                const nx = x + kx;
-                if (nx >= 0 && nx < width && ny >= 0 && ny < height) {
-                  sum += alphaChannel[ny * width + nx];
-                  count++;
-                }
-              }
-            }
-            blurred[y * width + x] = Math.floor(sum / count);
-          }
-        }
-        alphaChannel.set(blurred);
+        alphaChannel = applyBlur(alphaChannel, width, height, edgeBlur);
       }
 
+      // 4. APPLY EDGE PAINT (Modifies RGB)
       if (edgePaint > 0) {
-        const r = edgePaint;
-        for (let y = 0; y < height; y++) {
-          for (let x = 0; x < width; x++) {
-            const i = y * width + x;
-            if (alphaChannel[i] === 0) continue;
-
-            let isEdge = false;
-            loop2: for (let ky = -r; ky <= r; ky++) {
-              for (let kx = -r; kx <= r; kx++) {
-                const ny = y + ky;
-                const nx = x + kx;
-                if (
-                  nx >= 0 &&
-                  nx < width &&
-                  ny >= 0 &&
-                  ny < height &&
-                  alphaChannel[ny * width + nx] === 0
-                ) {
-                  isEdge = true;
-                  break loop2;
-                }
-              }
-            }
-            if (isEdge) {
-              const p = i * PIXEL_STRIDE;
-              data[p + OFFSET_R] = contourRGB.r;
-              data[p + OFFSET_G] = contourRGB.g;
-              data[p + OFFSET_B] = contourRGB.b;
-            }
-          }
-        }
+        applyEdgePaint(data, alphaChannel, width, height, edgePaint, contourRGB);
       }
 
+      // 5. MERGE ALPHA
       for (let i = 0, idx = 0; i < data.length; i += PIXEL_STRIDE, idx++) {
         data[i + OFFSET_A] = alphaChannel[idx];
       }
@@ -302,6 +191,10 @@ export function MonochromeBackgroundRemover() {
     edgeBlur,
     edgePaint,
   ]);
+
+  // ... (Effects and Handlers match previous version) ...
+  // For brevity, skipping the useEffects and handlers which are identical to previous step
+  // They just need to stay as they were (with requestAnimationFrame fixes).
 
   useEffect(() => {
     if (originalUrl) {
@@ -340,14 +233,10 @@ export function MonochromeBackgroundRemover() {
     try {
       const tempUrl = URL.createObjectURL(file);
       const img = await loadImage(tempUrl);
-
-      // ИСПОЛЬЗОВАНИЕ НОВОЙ АБСТРАКЦИИ
       const { r, g, b } = getTopLeftPixelColor(img);
       const hex = rgbToHex(r, g, b);
-
       setTargetColor(hex);
       setContourColor(invertHex(hex));
-
       URL.revokeObjectURL(tempUrl);
     } catch (e) {
       console.error(e);
@@ -418,6 +307,7 @@ export function MonochromeBackgroundRemover() {
   const clearAllPoints = () => setFloodPoints([]);
   const handleRunFloodFill = () => setManualTrigger((prev) => prev + 1);
 
+  // Sidebar code (Unchanged from last step, just structure)
   const sidebarContent = (
     <div className="flex flex-col gap-6 pb-4">
       <div className="space-y-2">

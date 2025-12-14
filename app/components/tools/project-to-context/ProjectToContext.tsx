@@ -2,7 +2,7 @@
 
 import React, { useRef, useState } from 'react';
 
-// ИМПОРТ НОВОЙ АБСТРАКЦИИ
+import { formatBytes, generateAsciiTree } from '@/lib/utils/file-tree'; // IMPORT NEW ABSTRACTIONS
 import { GodotSceneParser } from '@/lib/utils/parsers/godot-scene';
 
 import { Card } from '../../primitives/Card';
@@ -40,14 +40,13 @@ const PRESETS = {
       '*.uid',
       '*.import',
       '.DS_Store',
-      // Исключение файлов лицензий и документации
       'LICENSE',
       'LICENSE.txt',
       'LICENCE',
       'LICENCE.txt',
       'COPYING',
-      'README.md', // Игнорируем общий README
-      'CHANGELOG.md', // Игнорируем журнал изменений
+      'README.md',
+      'CHANGELOG.md',
       'THIRDPARTY.md',
       'NOTICE',
     ],
@@ -55,25 +54,21 @@ const PRESETS = {
   nextjs: {
     name: 'Next.js / React',
     textExtensions: [
-      // Code
       '.ts',
       '.tsx',
       '.js',
       '.jsx',
       '.mjs',
       '.cjs',
-      // Styles
       '.css',
       '.scss',
       '.sass',
-      // Data / Configs
       '.json',
       '.md',
       '.yaml',
       '.yml',
       '.toml',
       '.env.example',
-      // Specific Config extensions
       '.conf',
       '.xml',
     ],
@@ -90,14 +85,13 @@ const PRESETS = {
       '.DS_Store',
       '.vercel',
       '.turbo',
-      // Исключение файлов лицензий и документации
       'LICENSE',
       'LICENSE.txt',
       'LICENCE',
       'LICENCE.txt',
       'COPYING',
-      'README.md', // Игнорируем общий README
-      'CHANGELOG.md', // Игнорируем журнал изменений
+      'README.md',
+      'CHANGELOG.md',
       'THIRDPARTY.md',
       'NOTICE',
     ],
@@ -130,7 +124,6 @@ const LANGUAGE_MAP: Record<string, string> = {
   yml: 'yaml',
   toml: 'toml',
   xml: 'xml',
-  // Config specific mappings
   gitignore: 'gitignore',
   editorconfig: 'ini',
   prettierrc: 'json',
@@ -165,15 +158,6 @@ interface ProjectStats {
 
 // --- HELPERS ---
 
-function formatBytes(bytes: number, decimals = 0) {
-  if (!+bytes) return '0B';
-  const k = 1024;
-  const dm = decimals < 0 ? 0 : decimals;
-  const sizes = ['B', 'KB', 'MB', 'GB'];
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return `${Number.parseFloat((bytes / Math.pow(k, i)).toFixed(dm))}${sizes[i]}`;
-}
-
 function getLanguageTag(filename: string): string {
   const parts = filename.toLowerCase().split('.');
   const ext = parts.pop() || 'text';
@@ -190,7 +174,6 @@ function getLanguageTag(filename: string): string {
 function isTextFile(filename: string, extensions: string[]): boolean {
   const lowerName = filename.toLowerCase();
 
-  // 1. Explicitly Blocked
   if (
     lowerName === 'package-lock.json' ||
     lowerName === 'yarn.lock' ||
@@ -203,7 +186,6 @@ function isTextFile(filename: string, extensions: string[]): boolean {
     return false;
   }
 
-  // 2. Explicitly Allowed Config Files
   const configWhitelist = [
     'project.godot',
     'package.json',
@@ -230,7 +212,6 @@ function isTextFile(filename: string, extensions: string[]): boolean {
   )
     return true;
 
-  // 3. Check against User Settings
   return extensions.some((ext) => lowerName.endsWith(ext));
 }
 
@@ -242,18 +223,15 @@ function shouldIgnore(path: string, ignorePatterns: string[]): boolean {
   for (const pattern of ignorePatterns) {
     const lowerPattern = pattern.toLowerCase();
 
-    // 1. Обработка паттернов с подстановочными знаками (*.ext)
     if (lowerPattern.startsWith('*.')) {
       if (lowerFilename.endsWith(lowerPattern.slice(1))) return true;
       continue;
     }
 
-    // 2. Обработка точных совпадений имен файлов (например, 'LICENSE')
     if (lowerFilename === lowerPattern) {
       return true;
     }
 
-    // 3. Обработка путей (например, 'node_modules')
     if (
       normalizedPath.includes(`/${lowerPattern}/`) ||
       normalizedPath.startsWith(`${lowerPattern}/`)
@@ -264,7 +242,6 @@ function shouldIgnore(path: string, ignorePatterns: string[]): boolean {
   return false;
 }
 
-// Old preprocessor for non-TSCN files
 function preprocessContent(content: string, extension: string): string {
   let cleaned = content;
 
@@ -311,69 +288,13 @@ function preprocessContent(content: string, extension: string): string {
   return cleaned;
 }
 
-interface FileSystemNode {
-  _is_file?: boolean;
-  size?: number;
-  isText?: boolean;
-  [key: string]: FileSystemNode | boolean | number | undefined;
-}
-
-function generateTree(files: FileNode[]): string {
-  const root: FileSystemNode = {};
-
-  files.forEach((node) => {
-    const parts = node.path.split('/');
-    let current = root;
-    parts.forEach((part, index) => {
-      if (index === parts.length - 1) {
-        current[part] = { _is_file: true, size: node.size, isText: node.isText };
-      } else {
-        if (!current[part]) current[part] = {};
-        current = current[part] as FileSystemNode;
-      }
-    });
-  });
-
-  let output = '';
-  function traverse(node: FileSystemNode, depth: number) {
-    const keys = Object.keys(node);
-
-    keys.sort((a, b) => {
-      const nodeA = node[a] as FileSystemNode | undefined;
-      const nodeB = node[b] as FileSystemNode | undefined;
-      const aIsFile = nodeA?._is_file;
-      const bIsFile = nodeB?._is_file;
-      if (!aIsFile && bIsFile) return -1;
-      if (aIsFile && !bIsFile) return 1;
-      return a.localeCompare(b);
-    });
-
-    keys.forEach((key) => {
-      if (key === '_is_file' || key === 'size' || key === 'isText') return;
-      const item = node[key] as FileSystemNode;
-      const indent = '  '.repeat(depth);
-      if (item._is_file) {
-        output += `${indent}${key} (${formatBytes(item.size as number)})\n`;
-      } else {
-        output += `${indent}${key}/\n`;
-        traverse(item, depth + 1);
-      }
-    });
-  }
-  traverse(root, 0);
-  return output;
-}
-
 const readFileAsText = (file: File): Promise<string> => {
   return file.text();
 };
 
 const calculateFileScore = (name: string) => {
   const lower = name.toLowerCase();
-  // 1. Critical Manifests
   if (lower === 'package.json' || lower === 'project.godot') return 0;
-
-  // 2. High Value Configs
   if (
     lower.includes('tsconfig') ||
     lower.includes('eslint') ||
@@ -383,8 +304,6 @@ const calculateFileScore = (name: string) => {
     lower.includes('tailwind.config')
   )
     return 0.5;
-
-  // 3. Source Code
   if (
     lower.endsWith('.gd') ||
     lower.endsWith('.ts') ||
@@ -394,11 +313,7 @@ const calculateFileScore = (name: string) => {
     lower.endsWith('.py')
   )
     return 1;
-
-  // 4. Scenes / Components
   if (lower.endsWith('.tscn')) return 2;
-
-  // 5. Assets / Others
   return 3;
 };
 
@@ -493,7 +408,6 @@ export function ProjectToContext() {
       return calculateFileScore(a.name) - calculateFileScore(b.name);
     });
 
-    // Использование новой абстракции
     const sceneParser = new GodotSceneParser();
 
     let totalOriginalBytes = 0;
@@ -518,7 +432,6 @@ export function ProjectToContext() {
         let cleanedText = '';
         let langKey = getLanguageTag(node.name);
 
-        // --- INTELLIGENT ROUTING ---
         if (ext === 'tscn') {
           try {
             const treeOutput = sceneParser.parse(originalText);
@@ -607,7 +520,8 @@ The following is a flattened representation of a project codebase.
 `;
 
     if (includeTree) {
-      output += `<directory_structure>\n\`\`\`text\n${generateTree(
+      // USE NEW ABSTRACTION
+      output += `<directory_structure>\n\`\`\`text\n${generateAsciiTree(
         sortedFiles
       )}\n\`\`\`\n</directory_structure>\n\n`;
     }
