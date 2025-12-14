@@ -3,8 +3,9 @@
 import Image from 'next/image';
 import { useEffect, useRef, useState } from 'react';
 
-import { areColorsSimilar } from '@/lib/utils/colors'; // UPDATE
-import { loadImage } from '@/lib/utils/media';
+import { getCanvasFromImage } from '@/app/components/primitives/Canvas';
+import { areColorsSimilar } from '@/lib/utils/colors';
+import { getTopLeftPixelColor, loadImage } from '@/lib/utils/media';
 
 interface FrameDiffOverlayProps {
   image1: string | null;
@@ -39,19 +40,21 @@ export function FrameDiffOverlay({
 
         const [firstImg, lastImg] = await Promise.all([loadImage(image1), loadImage(image2)]);
 
+        // 1. Получаем эталонный цвет фона (верхний левый пиксель)
+        // Используем новую абстракцию для чистоты кода
+        const bg = getTopLeftPixelColor(firstImg);
+
+        // 2. Настройка основного холста
         canvas.width = firstImg.width;
         canvas.height = firstImg.height;
         ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-        ctx.drawImage(firstImg, 0, 0);
-        const firstImageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        // 3. Получение полных данных
+        const { ctx: ctx1 } = getCanvasFromImage(firstImg);
+        const { ctx: ctx2 } = getCanvasFromImage(lastImg);
 
-        ctx.drawImage(lastImg, 0, 0);
-        const lastImageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-
-        const bgR = firstImageData.data[0];
-        const bgG = firstImageData.data[1];
-        const bgB = firstImageData.data[2];
+        const firstImageData = ctx1.getImageData(0, 0, canvas.width, canvas.height);
+        const lastImageData = ctx2.getImageData(0, 0, canvas.width, canvas.height);
 
         const resultImageData = ctx.createImageData(canvas.width, canvas.height);
         const threshold = 30;
@@ -65,26 +68,23 @@ export function FrameDiffOverlay({
           const lastG = lastImageData.data[i + 1];
           const lastB = lastImageData.data[i + 2];
 
-          // Использование новой абстракции для сравнения цветов
-          const firstIsBg = areColorsSimilar(firstR, firstG, firstB, bgR, bgG, bgB, threshold);
-          const lastIsBg = areColorsSimilar(lastR, lastG, lastB, bgR, bgG, bgB, threshold);
+          // Используем RGB компоненты из объекта bg
+          const firstIsBg = areColorsSimilar(firstR, firstG, firstB, bg.r, bg.g, bg.b, threshold);
+          const lastIsBg = areColorsSimilar(lastR, lastG, lastB, bg.r, bg.g, bg.b, threshold);
 
           if (firstIsBg && lastIsBg) {
             resultImageData.data[i + 3] = 0;
           } else if (!firstIsBg && lastIsBg) {
-            // Исчезнувший объект (Красный)
+            // Исчезнувший (Красный)
             resultImageData.data[i] = 255;
-            resultImageData.data[i + 1] = 0;
-            resultImageData.data[i + 2] = 0;
             resultImageData.data[i + 3] = 200;
           } else if (firstIsBg && !lastIsBg) {
-            // Появившийся объект (Синий)
-            resultImageData.data[i] = 0;
-            resultImageData.data[i + 1] = 100;
+            // Появившийся (Синий)
             resultImageData.data[i + 2] = 255;
+            resultImageData.data[i + 1] = 100; // Немного зеленого для красоты
             resultImageData.data[i + 3] = 200;
           } else {
-            // Изменившийся объект (Фиолетовый)
+            // Изменившийся (Фиолетовый)
             resultImageData.data[i] = 200;
             resultImageData.data[i + 1] = 50;
             resultImageData.data[i + 2] = 255;
@@ -118,7 +118,6 @@ export function FrameDiffOverlay({
   return (
     <div className="group relative h-full w-full bg-zinc-100 dark:bg-zinc-950">
       <canvas ref={canvasRef} className="hidden" />
-
       {overlayDataUrl && (
         <Image
           src={overlayDataUrl}
@@ -128,14 +127,11 @@ export function FrameDiffOverlay({
           className="object-contain"
         />
       )}
-
       {isLoading && (
         <div className="absolute inset-0 z-10 flex items-center justify-center bg-white/60 backdrop-blur-[1px] dark:bg-black/60">
           <div className="h-5 w-5 animate-spin rounded-full border-2 border-zinc-300 border-t-blue-600"></div>
         </div>
       )}
-
-      {/* Overlay Legend */}
       {overlayDataUrl && (
         <div className="absolute right-0 bottom-0 left-0 z-20 flex gap-3 bg-gradient-to-t from-black/70 to-transparent p-2 text-[10px] font-medium text-white opacity-0 transition-opacity group-hover:opacity-100">
           <span className="flex items-center gap-1">

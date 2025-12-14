@@ -5,7 +5,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 
 import { useObjectUrl } from '@/lib/hooks/use-object-url';
 import { getColorDistance, hexToRgb, invertHex, PIXEL_STRIDE, rgbToHex } from '@/lib/utils/colors';
-import { downloadDataUrl, loadImage } from '@/lib/utils/media';
+import { downloadDataUrl, getTopLeftPixelColor, loadImage } from '@/lib/utils/media';
 
 import { Canvas, CanvasRef } from '../../primitives/Canvas';
 import { ColorInput } from '../../primitives/ColorInput';
@@ -46,7 +46,6 @@ interface Point {
 }
 
 export function MonochromeBackgroundRemover() {
-  // --- STATE ---
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const originalUrl = useObjectUrl(selectedFile);
 
@@ -304,10 +303,8 @@ export function MonochromeBackgroundRemover() {
     edgePaint,
   ]);
 
-  // Загружаем картинку в Canvas при смене URL
   useEffect(() => {
     if (originalUrl) {
-      // ИСПРАВЛЕНИЕ: Оборачиваем в requestAnimationFrame для избегания синхронного setState
       requestAnimationFrame(() => {
         loadOriginalToCanvas(originalUrl);
       });
@@ -318,7 +315,6 @@ export function MonochromeBackgroundRemover() {
     if (!originalUrl) return;
     if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
     debounceTimerRef.current = setTimeout(() => {
-      // ИСПРАВЛЕНИЕ: Вызов processImage уже содержит задержки, но для надежности
       requestAnimationFrame(() => processImage());
     }, DEBOUNCE_DELAY);
     return () => {
@@ -328,7 +324,6 @@ export function MonochromeBackgroundRemover() {
 
   useEffect(() => {
     if (manualTrigger > 0 && processingMode === 'flood-clear') {
-      // ИСПРАВЛЕНИЕ: Оборачиваем в requestAnimationFrame
       requestAnimationFrame(() => {
         processImage();
       });
@@ -345,17 +340,14 @@ export function MonochromeBackgroundRemover() {
     try {
       const tempUrl = URL.createObjectURL(file);
       const img = await loadImage(tempUrl);
-      const c = document.createElement('canvas');
-      c.width = 1;
-      c.height = 1;
-      const cx = c.getContext('2d');
-      if (cx) {
-        cx.drawImage(img, 0, 0);
-        const p = cx.getImageData(0, 0, 1, 1).data;
-        const hex = rgbToHex(p[OFFSET_R], p[OFFSET_G], p[OFFSET_B]);
-        setTargetColor(hex);
-        setContourColor(invertHex(hex));
-      }
+
+      // ИСПОЛЬЗОВАНИЕ НОВОЙ АБСТРАКЦИИ
+      const { r, g, b } = getTopLeftPixelColor(img);
+      const hex = rgbToHex(r, g, b);
+
+      setTargetColor(hex);
+      setContourColor(invertHex(hex));
+
       URL.revokeObjectURL(tempUrl);
     } catch (e) {
       console.error(e);

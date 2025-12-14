@@ -21,7 +21,12 @@ import Image from 'next/image';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { rgbToHex } from '@/lib/utils/colors';
-import { downloadDataUrl, loadImage, revokeObjectURLSafely } from '@/lib/utils/media';
+import {
+  downloadDataUrl,
+  getTopLeftPixelColor,
+  loadImage,
+  revokeObjectURLSafely,
+} from '@/lib/utils/media';
 
 import { TextureDimensionSlider } from '../../entities/hardware/TextureDimensionSlider';
 import { Canvas, CanvasRef } from '../../primitives/Canvas';
@@ -106,7 +111,7 @@ function SortableLayerItem({ img, index, onActivate, onRemove }: SortableLayerIt
       <span className="w-6 font-mono text-zinc-400">#{index + 1}</span>
       <span className="flex-1 truncate font-medium">{img.name}</span>
       <button
-        onPointerDown={(e) => e.stopPropagation()} // Prevent drag start when clicking delete
+        onPointerDown={(e) => e.stopPropagation()}
         onClick={(e) => {
           e.stopPropagation();
           onRemove(img.id);
@@ -119,7 +124,7 @@ function SortableLayerItem({ img, index, onActivate, onRemove }: SortableLayerIt
   );
 }
 
-// 2. Draggable Slot for Canvas (Manual Pointer Events for X/Y positioning)
+// 2. Draggable Slot for Canvas
 interface DraggableImageSlotProps {
   img: AlignImage;
   index: number;
@@ -198,7 +203,7 @@ const DraggableImageSlot = React.memo(
           draggable={false}
           width={img.naturalWidth}
           height={img.naturalHeight}
-          unoptimized // Важно для blob: URL
+          unoptimized
           className="absolute max-w-none origin-top-left select-none"
           style={{
             left: 0,
@@ -220,11 +225,10 @@ DraggableImageSlot.displayName = 'DraggableImageSlot';
 export function VerticalImageAligner() {
   const [images, setImages] = useState<AlignImage[]>([]);
 
-  // DND-KIT SENSORS
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: {
-        distance: 5, // Начинаем драг только после сдвига на 5px (чтобы клик работал)
+        distance: 5,
       },
     }),
     useSensor(KeyboardSensor, {
@@ -237,11 +241,9 @@ export function VerticalImageAligner() {
     imagesRef.current = images;
   }, [images]);
 
-  // Dimensions
   const [slotHeight, setSlotHeight] = useState(DEFAULT_SETTINGS.slotSize);
   const [slotWidth, setSlotWidth] = useState(DEFAULT_SETTINGS.slotSize);
 
-  // Grids & Settings
   const [showFrameGrid, setShowFrameGrid] = useState(true);
   const [frameStepX, setFrameStepX] = useState(DEFAULT_SETTINGS.frameStep);
   const [frameBorderColor] = useState(DEFAULT_SETTINGS.frameColor);
@@ -256,7 +258,6 @@ export function VerticalImageAligner() {
 
   const activeImageId = useMemo(() => images.find((img) => img.isActive)?.id ?? null, [images]);
 
-  // REFACTOR: Использование безопасной утилиты очистки
   useEffect(() => () => imagesRef.current.forEach((img) => revokeObjectURLSafely(img.url)), []);
 
   const { bounds, totalHeight } = useMemo(() => {
@@ -353,16 +354,11 @@ export function VerticalImageAligner() {
             setFrameStepX(img.height);
 
             try {
-              const tempCanvas = document.createElement('canvas');
-              tempCanvas.width = 1;
-              tempCanvas.height = 1;
-              const tempCtx = tempCanvas.getContext('2d');
-              if (tempCtx) {
-                tempCtx.drawImage(img, 0, 0, 1, 1, 0, 0, 1, 1);
-                const [r, g, b] = tempCtx.getImageData(0, 0, 1, 1).data;
-                const hex = rgbToHex(r, g, b);
-                workspaceRef.current?.setBackgroundColor(hex);
-              }
+              // ИСПОЛЬЗОВАНИЕ НОВОЙ АБСТРАКЦИИ
+              const { r, g, b } = getTopLeftPixelColor(img);
+              // Конвертируем в HEX только здесь, так как UI Canvas принимает строку
+              const hex = rgbToHex(r, g, b);
+              workspaceRef.current?.setBackgroundColor(hex);
             } catch (e) {
               console.warn('Could not extract color from image', e);
             }
