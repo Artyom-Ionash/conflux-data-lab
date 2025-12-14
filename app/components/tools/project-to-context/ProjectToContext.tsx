@@ -6,6 +6,169 @@ import { Card } from '../../primitives/Card';
 import { Switch } from '../../primitives/Switch';
 import { ToolLayout } from '../ToolLayout';
 
+// --- GODOT SCENE PARSER (FIXED) ---
+
+interface GodotNode {
+  name: string;
+  type: string;
+  parentPath: string | null;
+  properties: Record<string, string>;
+  children: GodotNode[];
+  isResource: boolean;
+  fullPath?: string;
+}
+
+class GodotSceneParser {
+  private nodes: GodotNode[] = [];
+  private rootNodes: GodotNode[] = [];
+
+  public parse(content: string): string {
+    this.reset();
+    const lines = content.split(/\r?\n/);
+
+    let currentNode: GodotNode | null = null;
+    let sectionType: 'node' | 'resource' | 'other' | null = null;
+
+    lines.forEach((line) => {
+      const trimmed = line.trim();
+      if (!trimmed) return;
+
+      if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
+        const attrs = this.parseHeaderAttributes(trimmed);
+
+        if (trimmed.startsWith('[node')) {
+          sectionType = 'node';
+          currentNode = this.createNode(attrs, false);
+          this.nodes.push(currentNode);
+        } else if (trimmed.startsWith('[sub_resource') || trimmed.startsWith('[resource')) {
+          sectionType = 'resource';
+          currentNode = this.createNode(attrs, true);
+          this.nodes.push(currentNode);
+        } else {
+          sectionType = 'other';
+          currentNode = null;
+        }
+        return;
+      }
+
+      if (sectionType && currentNode && trimmed.includes('=')) {
+        const eqIndex = trimmed.indexOf('=');
+        const key = trimmed.substring(0, eqIndex).trim();
+        const value = trimmed.substring(eqIndex + 1).trim();
+        currentNode.properties[key] = value;
+      }
+    });
+
+    this.buildTree();
+    return this.stringifyTree();
+  }
+
+  private reset(): void {
+    this.nodes = [];
+    this.rootNodes = [];
+  }
+
+  private parseHeaderAttributes(line: string): Record<string, string> {
+    const content = line.trim().slice(1, -1);
+    const props: Record<string, string> = {};
+    let token = '';
+    let inQuote = false,
+      arrayDepth = 0,
+      funcDepth = 0;
+
+    for (const char of content) {
+      if (char === '"') inQuote = !inQuote;
+      if (char === '[') arrayDepth++;
+      if (char === ']') arrayDepth--;
+      if (char === '(') funcDepth++;
+      if (char === ')') funcDepth--;
+
+      if (char === ' ' && !inQuote && arrayDepth === 0 && funcDepth === 0) {
+        if (token) this.processToken(token, props);
+        token = '';
+      } else {
+        token += char;
+      }
+    }
+    if (token) this.processToken(token, props);
+    return props;
+  }
+
+  private processToken(token: string, props: Record<string, string>): void {
+    const eqIndex = token.indexOf('=');
+    if (eqIndex > 0) {
+      props[token.substring(0, eqIndex)] = token.substring(eqIndex + 1);
+    }
+  }
+
+  private createNode(attrs: Record<string, string>, isResource: boolean): GodotNode {
+    const name = (isResource ? attrs.id : attrs.name)?.replace(/"/g, '') || 'Unnamed';
+    return {
+      name,
+      type: attrs.type?.replace(/"/g, '') || (isResource ? 'Resource' : 'Node'),
+      parentPath: attrs.parent?.replace(/"/g, '') || null,
+      properties: {},
+      children: [],
+      isResource,
+    };
+  }
+
+  private buildTree(): void {
+    const nodeMap = new Map<string, GodotNode>();
+    const sceneNodes = this.nodes.filter((n) => !n.isResource);
+
+    // 1. Identify the Scene Root (node with no parent)
+    const root = sceneNodes.find((n) => !n.parentPath);
+    if (root) {
+      root.fullPath = '.';
+      this.rootNodes.push(root);
+      nodeMap.set('.', root);
+    }
+
+    // 2. Process children
+    sceneNodes.forEach((node) => {
+      // Skip the root (already handled)
+      if (!node.parentPath) return;
+
+      const parentNode = nodeMap.get(node.parentPath);
+
+      if (parentNode) {
+        parentNode.children.push(node);
+
+        // Construct the path for THIS node so its children can find it
+        // If parent is '.', my path is just "Name"
+        // If parent is "Some/Path", my path is "Some/Path/Name"
+        const myPath = node.parentPath === '.' ? node.name : `${node.parentPath}/${node.name}`;
+
+        nodeMap.set(myPath, node);
+      } else {
+        // Fallback: orphan node (shouldn't happen in valid tscn, but safe to handle)
+        // Treat as root to ensure it appears in output
+        this.rootNodes.push(node);
+      }
+    });
+
+    // 3. Add resources at the end
+    this.nodes.filter((n) => n.isResource).forEach((res) => this.rootNodes.push(res));
+  }
+
+  private stringifyTree(): string {
+    const formatNode = (node: GodotNode, depth: number): string => {
+      const indent = '  '.repeat(depth);
+      const typeStr = node.isResource ? `[Res: ${node.type}]` : `[${node.type}]`;
+      let res = `${indent}${node.name} ${typeStr}\n`;
+
+      node.children.forEach((child) => {
+        res += formatNode(child, depth + 1);
+      });
+      return res;
+    };
+
+    // Join with empty string because formatNode already adds \n
+    return this.rootNodes.map((root) => formatNode(root, 0)).join('');
+  }
+}
+
 // --- CONFIGURATION ---
 
 const PRESETS = {
@@ -155,10 +318,12 @@ function getLanguageTag(filename: string): string {
   const parts = filename.toLowerCase().split('.');
   const ext = parts.pop() || 'text';
 
-  // Handle dotfiles like .gitignore or .eslintrc
   if (parts.length === 0 || (parts.length === 1 && parts[0] === '')) {
     return LANGUAGE_MAP[ext] || 'text';
   }
+
+  // TSCN now produces a custom tree format, but 'ini' or 'text' is fine for highlighting
+  if (ext === 'tscn') return 'text';
 
   return LANGUAGE_MAP[ext] || ext;
 }
@@ -166,7 +331,7 @@ function getLanguageTag(filename: string): string {
 function isTextFile(filename: string, extensions: string[]): boolean {
   const lowerName = filename.toLowerCase();
 
-  // 1. Explicitly Blocked (Heavy binaries or huge locks)
+  // 1. Explicitly Blocked
   if (
     lowerName === 'package-lock.json' ||
     lowerName === 'yarn.lock' ||
@@ -179,8 +344,7 @@ function isTextFile(filename: string, extensions: string[]): boolean {
     return false;
   }
 
-  // 2. Explicitly Allowed Config Files (Whitelist)
-  // These should be included regardless of the extension list settings
+  // 2. Explicitly Allowed Config Files
   const configWhitelist = [
     'project.godot',
     'package.json',
@@ -192,12 +356,11 @@ function isTextFile(filename: string, extensions: string[]): boolean {
     '.npmrc',
     '.prettierrc',
     '.eslintrc',
-    '.sworc', // Vercel/Next configs sometimes
+    '.sworc',
   ];
 
   if (configWhitelist.includes(lowerName)) return true;
 
-  // Also check for config patterns (e.g. .eslintrc.json)
   if (lowerName.startsWith('.eslintrc') || lowerName.startsWith('.prettierrc')) return true;
   if (
     lowerName.startsWith('eslint.config') ||
@@ -208,7 +371,7 @@ function isTextFile(filename: string, extensions: string[]): boolean {
   )
     return true;
 
-  // 3. Check against User Settings (Extensions)
+  // 3. Check against User Settings
   return extensions.some((ext) => lowerName.endsWith(ext));
 }
 
@@ -232,10 +395,11 @@ function shouldIgnore(path: string, ignorePatterns: string[]): boolean {
   return false;
 }
 
+// Old preprocessor for non-TSCN files
 function preprocessContent(content: string, extension: string): string {
   let cleaned = content;
 
-  if (extension === 'tscn' || extension === 'tres') {
+  if (extension === 'tres') {
     const noiseTypes = [
       'AtlasTexture',
       'StyleBoxTexture',
@@ -261,29 +425,11 @@ function preprocessContent(content: string, extension: string): string {
       'g'
     );
     cleaned = cleaned.replaceAll(noiseRegex, '');
-
     cleaned = cleaned.replaceAll(
       /^\[ext_resource.*path=".*\.(png|jpg|jpeg|webp|svg|mp3|wav|ogg|ttf|otf)".*\]$/gm,
       ''
     );
-
-    cleaned = cleaned.replaceAll(
-      /(\[sub_resource type="Animation"[^\]]*\])([\s\S]*?)(?=\[|$)/g,
-      (match, header, body) => {
-        const nameMatch = body.match(/resource_name\s*=\s*"([^"]+)"/);
-        const animName = nameMatch ? nameMatch[1] : 'unnamed';
-        return `${header}\n; Animation "${animName}" (data stripped)\n`;
-      }
-    );
-
     cleaned = cleaned.replaceAll(/^tracks\/.*$/gm, '');
-
-    const arrayRegex =
-      /\b(PackedByteArray|PackedVector2Array|PackedInt32Array|PackedFloat32Array|PackedStringArray|PackedColorArray)\s*\(([^)]*)\)/g;
-    cleaned = cleaned.replaceAll(arrayRegex, '$1(...)');
-
-    cleaned = cleaned.replaceAll(/^region_rect = .*$/gm, '');
-
     cleaned = cleaned.replaceAll(/\n{3,}/g, '\n\n');
   }
 
@@ -358,8 +504,7 @@ const calculateFileScore = (name: string) => {
   // 1. Critical Manifests
   if (lower === 'package.json' || lower === 'project.godot') return 0;
 
-  // 2. High Value Configs (Linter, TS, Git, Env)
-  // Giving them 0.5 ensures they are right after package.json but before code
+  // 2. High Value Configs
   if (
     lower.includes('tsconfig') ||
     lower.includes('eslint') ||
@@ -425,7 +570,7 @@ export function ProjectToContext() {
     } else if (
       fileNames.includes('next.config.js') ||
       fileNames.includes('next.config.ts') ||
-      fileNames.includes('next.config.mjs') || // Added mjs check
+      fileNames.includes('next.config.mjs') ||
       fileNames.includes('package.json')
     ) {
       detectedPreset = 'nextjs';
@@ -479,6 +624,8 @@ export function ProjectToContext() {
       return calculateFileScore(a.name) - calculateFileScore(b.name);
     });
 
+    const sceneParser = new GodotSceneParser();
+
     let totalOriginalBytes = 0;
     let totalCleanedBytes = 0;
     const composition: Record<string, number> = {};
@@ -498,12 +645,29 @@ export function ProjectToContext() {
         totalOriginalBytes += originalText.length;
 
         const ext = node.name.split('.').pop() || 'txt';
-        const cleanedText = preprocessContent(originalText, ext);
+        let cleanedText = '';
+        let langKey = getLanguageTag(node.name);
+
+        // --- INTELLIGENT ROUTING ---
+        if (ext === 'tscn') {
+          try {
+            const treeOutput = sceneParser.parse(originalText);
+            cleanedText = `; [Godot Scene Tree View]
+; This file has been parsed to show the hierarchy only.
+; Attributes and long sub-resources are hidden for context window efficiency.
+
+${treeOutput}`;
+            langKey = 'text';
+          } catch (e) {
+            console.warn('Parser failed for tscn, falling back to regex', e);
+            cleanedText = preprocessContent(originalText, ext);
+          }
+        } else {
+          cleanedText = preprocessContent(originalText, ext);
+        }
 
         totalCleanedBytes += cleanedText.length;
 
-        const langKey = getLanguageTag(node.name);
-        // Better Reporting for Configs
         let reportLang = LANGUAGE_MAP[ext] || ext;
         if (node.name.includes('config') || node.name.startsWith('.')) reportLang = 'config/meta';
 
@@ -553,7 +717,9 @@ The following is a flattened representation of a project codebase.
 1. Use the <directory_structure> to understand the file hierarchy.
 2. Content is in <source_files>, where each file is wrapped in a <file> tag.
 3. Code blocks utilize standard Markdown triple backticks with language tags (e.g., \`\`\`python) for expert routing.
-4. METRICS: Approximately ${estimatedTokens.toLocaleString()} tokens across ${processedFilesData.length} files.
+4. METRICS: Approximately ${estimatedTokens.toLocaleString()} tokens across ${
+      processedFilesData.length
+    } files.
 </instruction>
 
 <project_metrics>
@@ -571,7 +737,9 @@ The following is a flattened representation of a project codebase.
 `;
 
     if (includeTree) {
-      output += `<directory_structure>\n\`\`\`text\n${generateTree(sortedFiles)}\n\`\`\`\n</directory_structure>\n\n`;
+      output += `<directory_structure>\n\`\`\`text\n${generateTree(
+        sortedFiles
+      )}\n\`\`\`\n</directory_structure>\n\n`;
     }
 
     output += `<source_files>\n\n`;
