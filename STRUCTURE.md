@@ -87,6 +87,7 @@ conflux-data-lab/
 │       │   └── texture-standards.ts
 │       └── image/
 │           ├── filters.ts
+│           ├── image-processor.worker.ts
 │           └── sprite-generator.ts
 ├── public/ # Статические файлы
 │   ├── file.svg

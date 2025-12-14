@@ -3,16 +3,14 @@
 import Image from 'next/image';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 
-import {
-  applyBlur,
-  applyColorFilter,
-  applyEdgePaint,
-  applyFloodFillMask,
-  applyMorphologyChoke,
-  Point,
-} from '@/lib/domain/image/filters'; // IMPORTS
+import type { Point } from '@/lib/domain/image/filters';
+import type {
+  ProcessingMode,
+  WorkerPayload,
+  WorkerResponse,
+} from '@/lib/domain/image/image-processor.worker';
 import { useObjectUrl } from '@/lib/hooks/use-object-url';
-import { hexToRgb, invertHex, PIXEL_STRIDE, rgbToHex } from '@/lib/utils/colors';
+import { hexToRgb, invertHex, rgbToHex } from '@/lib/utils/colors';
 import { downloadDataUrl, getTopLeftPixelColor, loadImage } from '@/lib/utils/media';
 
 import { Canvas, CanvasRef } from '../../primitives/Canvas';
@@ -26,15 +24,13 @@ import { ToolLayout } from '../ToolLayout';
 // --- CONSTANTS ---
 const DEBOUNCE_DELAY = 50;
 const VIEW_RESET_DELAY = 50;
-const PROCESS_DELAY_MS = 10;
 const MOUSE_BUTTON_LEFT = 0;
 const RGB_MAX = 255;
-const OFFSET_R = 0;
-const OFFSET_G = 1;
-const OFFSET_B = 2;
-const OFFSET_A = 3;
 const MAX_RGB_DISTANCE = Math.sqrt(3 * RGB_MAX ** 2);
 const DOWNLOAD_FILENAME = 'removed_bg.png';
+const OFFSET_R = 0; // Для пипетки
+const OFFSET_G = 1;
+const OFFSET_B = 2;
 
 const DEFAULT_SETTINGS = {
   targetColor: '#ffffff',
@@ -45,8 +41,6 @@ const DEFAULT_SETTINGS = {
   edgeBlur: 0,
   edgePaint: 0,
 };
-
-type ProcessingMode = 'remove' | 'keep' | 'flood-clear';
 
 export function MonochromeBackgroundRemover() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -79,6 +73,52 @@ export function MonochromeBackgroundRemover() {
   const sourceCanvasRef = useRef<HTMLCanvasElement>(null);
   const previewCanvasRef = useRef<HTMLCanvasElement>(null);
 
+  // Ref для воркера
+  const workerRef = useRef<Worker | null>(null);
+
+  // --- WORKER SETUP ---
+  useEffect(() => {
+    // Инициализация Web Worker
+    workerRef.current = new Worker(
+      new URL('@/lib/domain/image/image-processor.worker.ts', import.meta.url)
+    );
+
+    workerRef.current.onmessage = (e: MessageEvent<WorkerResponse>) => {
+      const { processedData, error } = e.data;
+
+      if (error) {
+        console.error(error);
+        setIsProcessing(false);
+        return;
+      }
+
+      if (previewCanvasRef.current && processedData) {
+        const ctx = previewCanvasRef.current.getContext('2d');
+
+        // Создаем ImageData, явно приводя буфер к ArrayBuffer.
+        // Это устраняет ошибку несовместимости типов ArrayBufferLike vs ArrayBuffer,
+        // сохраняя эффективность (создается view, а не копия данных).
+        const imgData = new ImageData(
+          new Uint8ClampedArray(
+            processedData.buffer as ArrayBuffer,
+            processedData.byteOffset,
+            processedData.length
+          ),
+          previewCanvasRef.current.width,
+          previewCanvasRef.current.height
+        );
+
+        ctx?.putImageData(imgData, 0, 0);
+      }
+
+      setIsProcessing(false);
+    };
+
+    return () => {
+      workerRef.current?.terminate();
+    };
+  }, []);
+
   // --- LOGIC ---
 
   const loadOriginalToCanvas = useCallback(async (url: string) => {
@@ -86,6 +126,8 @@ export function MonochromeBackgroundRemover() {
       const img = await loadImage(url);
 
       setImgDimensions({ w: img.width, h: img.height });
+
+      // Настраиваем скрытый Source Canvas (хранит оригинал)
       if (sourceCanvasRef.current) {
         sourceCanvasRef.current.width = img.width;
         sourceCanvasRef.current.height = img.height;
@@ -93,6 +135,7 @@ export function MonochromeBackgroundRemover() {
         ctx?.drawImage(img, 0, 0);
       }
 
+      // Настраиваем Preview Canvas
       if (previewCanvasRef.current) {
         previewCanvasRef.current.width = img.width;
         previewCanvasRef.current.height = img.height;
@@ -107,78 +150,46 @@ export function MonochromeBackgroundRemover() {
   }, []);
 
   const processImage = useCallback(() => {
-    if (!originalUrl || !sourceCanvasRef.current || !previewCanvasRef.current) return;
+    if (!originalUrl || !sourceCanvasRef.current || !workerRef.current) return;
+
+    const sourceCtx = sourceCanvasRef.current.getContext('2d', { willReadFrequently: true });
+    if (!sourceCtx) return;
+
+    const width = sourceCanvasRef.current.width;
+    const height = sourceCanvasRef.current.height;
+
+    // Получаем свежие данные с исходного канваса
+    const imageData = sourceCtx.getImageData(0, 0, width, height);
+
+    const targetRGB = hexToRgb(targetColor);
+    const contourRGB = hexToRgb(contourColor);
+
+    if (!targetRGB || !contourRGB) return;
 
     setIsProcessing(true);
 
-    setTimeout(() => {
-      const sourceCtx = sourceCanvasRef.current!.getContext('2d', { willReadFrequently: true });
-      const previewCtx = previewCanvasRef.current!.getContext('2d');
+    // Собираем пейлоад для воркера
+    const payload: WorkerPayload = {
+      imageData: imageData.data, // Uint8ClampedArray
+      width,
+      height,
+      mode: processingMode,
+      settings: {
+        targetColor: targetRGB,
+        contourColor: contourRGB,
+        tolerance: tolerances[processingMode],
+        smoothness,
+        edgeChoke,
+        edgeBlur,
+        edgePaint,
+        maxRgbDistance: MAX_RGB_DISTANCE,
+        floodPoints: [...floodPoints], // Копия массива точек
+      },
+    };
 
-      if (!sourceCtx || !previewCtx) return;
-
-      const width = sourceCanvasRef.current!.width;
-      const height = sourceCanvasRef.current!.height;
-      const imageData = sourceCtx.getImageData(0, 0, width, height);
-      const data = imageData.data;
-
-      const targetRGB = hexToRgb(targetColor);
-      const contourRGB = hexToRgb(contourColor);
-
-      if (!targetRGB || !contourRGB) {
-        setIsProcessing(false);
-        return;
-      }
-
-      let alphaChannel: Uint8Array;
-
-      // 1. GENERATE BASE ALPHA MASK
-      if (processingMode === 'flood-clear') {
-        alphaChannel = applyFloodFillMask(
-          data,
-          width,
-          height,
-          floodPoints,
-          contourRGB,
-          tolerances['flood-clear'],
-          MAX_RGB_DISTANCE
-        );
-      } else {
-        alphaChannel = applyColorFilter(
-          data,
-          width,
-          height,
-          targetRGB,
-          tolerances[processingMode],
-          smoothness,
-          processingMode,
-          MAX_RGB_DISTANCE
-        );
-      }
-
-      // 2. APPLY MORPHOLOGY (Erode/Choke)
-      if (edgeChoke > 0) {
-        alphaChannel = applyMorphologyChoke(alphaChannel, width, height, edgeChoke);
-      }
-
-      // 3. APPLY BLUR
-      if (edgeBlur > 0) {
-        alphaChannel = applyBlur(alphaChannel, width, height, edgeBlur);
-      }
-
-      // 4. APPLY EDGE PAINT (Modifies RGB)
-      if (edgePaint > 0) {
-        applyEdgePaint(data, alphaChannel, width, height, edgePaint, contourRGB);
-      }
-
-      // 5. MERGE ALPHA
-      for (let i = 0, idx = 0; i < data.length; i += PIXEL_STRIDE, idx++) {
-        data[i + OFFSET_A] = alphaChannel[idx];
-      }
-
-      previewCtx.putImageData(imageData, 0, 0);
-      setIsProcessing(false);
-    }, PROCESS_DELAY_MS);
+    // Отправляем данные в воркер.
+    // Используем Transferable Object для буфера данных изображения (максимальная скорость)
+    workerRef.current.postMessage(payload, [imageData.data.buffer]);
   }, [
     originalUrl,
     targetColor,
@@ -192,9 +203,7 @@ export function MonochromeBackgroundRemover() {
     edgePaint,
   ]);
 
-  // ... (Effects and Handlers match previous version) ...
-  // For brevity, skipping the useEffects and handlers which are identical to previous step
-  // They just need to stay as they were (with requestAnimationFrame fixes).
+  // --- EFFECTS ---
 
   useEffect(() => {
     if (originalUrl) {
@@ -204,6 +213,7 @@ export function MonochromeBackgroundRemover() {
     }
   }, [originalUrl, loadOriginalToCanvas]);
 
+  // Debounced processing trigger
   useEffect(() => {
     if (!originalUrl) return;
     if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
@@ -215,13 +225,17 @@ export function MonochromeBackgroundRemover() {
     };
   }, [originalUrl, processImage]);
 
+  // Immediate trigger for manual actions
   useEffect(() => {
     if (manualTrigger > 0 && processingMode === 'flood-clear') {
-      requestAnimationFrame(() => {
+      const timer = setTimeout(() => {
         processImage();
-      });
+      }, 0);
+      return () => clearTimeout(timer);
     }
   }, [manualTrigger, processingMode, processImage]);
+
+  // --- EVENT HANDLERS ---
 
   const handleFilesSelected = async (files: File[]) => {
     const file = files[0];
@@ -293,9 +307,11 @@ export function MonochromeBackgroundRemover() {
 
   const handleEyedropper = (e: React.MouseEvent) => {
     if (!sourceCanvasRef.current) return;
+
     const rect = (e.target as HTMLElement).getBoundingClientRect();
     const x = ((e.clientX - rect.left) / rect.width) * sourceCanvasRef.current.width;
     const y = ((e.clientY - rect.top) / rect.height) * sourceCanvasRef.current.height;
+
     const ctx = sourceCanvasRef.current.getContext('2d', { willReadFrequently: true });
     if (ctx) {
       const p = ctx.getImageData(x, y, 1, 1).data;
@@ -307,7 +323,7 @@ export function MonochromeBackgroundRemover() {
   const clearAllPoints = () => setFloodPoints([]);
   const handleRunFloodFill = () => setManualTrigger((prev) => prev + 1);
 
-  // Sidebar code (Unchanged from last step, just structure)
+  // --- RENDER ---
   const sidebarContent = (
     <div className="flex flex-col gap-6 pb-4">
       <div className="space-y-2">
