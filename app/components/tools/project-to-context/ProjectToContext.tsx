@@ -136,14 +136,11 @@ class GodotSceneParser {
         parentNode.children.push(node);
 
         // Construct the path for THIS node so its children can find it
-        // If parent is '.', my path is just "Name"
-        // If parent is "Some/Path", my path is "Some/Path/Name"
         const myPath = node.parentPath === '.' ? node.name : `${node.parentPath}/${node.name}`;
 
         nodeMap.set(myPath, node);
       } else {
-        // Fallback: orphan node (shouldn't happen in valid tscn, but safe to handle)
-        // Treat as root to ensure it appears in output
+        // Fallback: orphan node
         this.rootNodes.push(node);
       }
     });
@@ -200,6 +197,16 @@ const PRESETS = {
       '*.uid',
       '*.import',
       '.DS_Store',
+      // Исключение файлов лицензий и документации
+      'LICENSE',
+      'LICENSE.txt',
+      'LICENCE',
+      'LICENCE.txt',
+      'COPYING',
+      'README.md', // Игнорируем общий README
+      'CHANGELOG.md', // Игнорируем журнал изменений
+      'THIRDPARTY.md', // <--- ДОБАВЛЕНО
+      'NOTICE',
     ],
   },
   nextjs: {
@@ -210,7 +217,7 @@ const PRESETS = {
       '.tsx',
       '.js',
       '.jsx',
-      '.mjs', // ESLint config often uses .mjs
+      '.mjs',
       '.cjs',
       // Styles
       '.css',
@@ -234,12 +241,22 @@ const PRESETS = {
       'dist',
       'build',
       'coverage',
-      'package-lock.json', // Still ignore lock files as they are too huge
+      'package-lock.json',
       'yarn.lock',
       'pnpm-lock.yaml',
       '.DS_Store',
       '.vercel',
       '.turbo',
+      // Исключение файлов лицензий и документации
+      'LICENSE',
+      'LICENSE.txt',
+      'LICENCE',
+      'LICENCE.txt',
+      'COPYING',
+      'README.md', // Игнорируем общий README
+      'CHANGELOG.md', // Игнорируем журнал изменений
+      'THIRDPARTY.md', // <--- ДОБАВЛЕНО
+      'NOTICE',
     ],
   },
 };
@@ -322,7 +339,6 @@ function getLanguageTag(filename: string): string {
     return LANGUAGE_MAP[ext] || 'text';
   }
 
-  // TSCN now produces a custom tree format, but 'ini' or 'text' is fine for highlighting
   if (ext === 'tscn') return 'text';
 
   return LANGUAGE_MAP[ext] || ext;
@@ -378,18 +394,28 @@ function isTextFile(filename: string, extensions: string[]): boolean {
 function shouldIgnore(path: string, ignorePatterns: string[]): boolean {
   const normalizedPath = path.replaceAll('\\', '/');
   const filename = normalizedPath.split('/').pop() || '';
+  const lowerFilename = filename.toLowerCase();
 
   for (const pattern of ignorePatterns) {
-    if (pattern.startsWith('*.')) {
-      if (filename.endsWith(pattern.slice(1))) return true;
-    } else {
-      if (
-        normalizedPath.includes(`/${pattern}/`) ||
-        normalizedPath.startsWith(`${pattern}/`) ||
-        normalizedPath === pattern
-      ) {
-        return true;
-      }
+    const lowerPattern = pattern.toLowerCase();
+
+    // 1. Обработка паттернов с подстановочными знаками (*.ext)
+    if (lowerPattern.startsWith('*.')) {
+      if (lowerFilename.endsWith(lowerPattern.slice(1))) return true;
+      continue;
+    }
+
+    // 2. Обработка точных совпадений имен файлов (например, 'LICENSE')
+    if (lowerFilename === lowerPattern) {
+      return true;
+    }
+
+    // 3. Обработка путей (например, 'node_modules')
+    if (
+      normalizedPath.includes(`/${lowerPattern}/`) ||
+      normalizedPath.startsWith(`${lowerPattern}/`)
+    ) {
+      return true;
     }
   }
   return false;
