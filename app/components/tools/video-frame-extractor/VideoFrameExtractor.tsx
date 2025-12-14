@@ -5,7 +5,7 @@ import gifshot from 'gifshot';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { TEXTURE_LIMITS } from '@/lib/domain/hardware/texture-standards';
-import { useObjectUrl } from '@/lib/hooks/use-object-url'; // NEW
+import { useObjectUrl } from '@/lib/hooks/use-object-url';
 
 // --- DOMAIN IMPORTS ---
 import { TextureLimitIndicator } from '../../entities/hardware/TextureLimitIndicator';
@@ -23,7 +23,6 @@ import { FileDropzone, FileDropzonePlaceholder } from '../../primitives/FileDrop
 import { ImageSequencePlayer } from '../../primitives/ImageSequencePlayer';
 import { Modal } from '../../primitives/Modal';
 import { NumberStepper } from '../../primitives/NumberStepper';
-import { ProcessingOverlay } from '../../primitives/ProcessingOverlay';
 import { RangeSlider } from '../../primitives/RangeSlider';
 import { Switch } from '../../primitives/Switch';
 import { ToolLayout } from '../ToolLayout';
@@ -105,7 +104,7 @@ function useSpriteSheetGenerator() {
 
 function useVideoFrameExtraction() {
   const [videoFile, setVideoFile] = useState<File | null>(null);
-  const videoSrc = useObjectUrl(videoFile); // Безопасное использование URL
+  const videoSrc = useObjectUrl(videoFile);
 
   const [videoDuration, setVideoDuration] = useState<number | null>(null);
   const [videoDimensions, setVideoDimensions] = useState<{ width: number; height: number } | null>(
@@ -233,10 +232,8 @@ function useVideoFrameExtraction() {
     setVideoDuration(null);
     setVideoDimensions(null);
 
-    // Устанавливаем файл для хука useObjectUrl
     setVideoFile(file);
 
-    // Временный URL для чтения метаданных (сразу освобождается)
     const objectUrl = URL.createObjectURL(file);
     const tempVideo = document.createElement('video');
     tempVideo.src = objectUrl;
@@ -756,12 +753,6 @@ export function VideoFrameExtractor() {
                         onDrawOverlay={handleDrawOverlay}
                       />
 
-                      <ProcessingOverlay
-                        isVisible={status.isProcessing}
-                        progress={status.progress}
-                        message="Обработка..."
-                      />
-
                       <div className="absolute inset-0 flex items-center justify-center bg-black/0 transition-colors group-hover:bg-black/10">
                         <div className="scale-95 transform rounded-full bg-black/70 px-3 py-1.5 text-xs font-bold text-white opacity-0 backdrop-blur-sm transition-opacity group-hover:scale-100 group-hover:opacity-100">
                           Открыть масштабы ⤢
@@ -834,7 +825,6 @@ export function VideoFrameExtractor() {
                     max={100}
                   />
 
-                  {/* Replaced manual picker with ColorInput */}
                   <ColorInput
                     value={spriteOptions.bg === 'transparent' ? null : spriteOptions.bg}
                     onChange={(v) => setSpriteOptions((p) => ({ ...p, bg: v }))}
@@ -857,12 +847,10 @@ export function VideoFrameExtractor() {
           </div>
         )}
 
-        {/* Hidden Processing Elements */}
         <video ref={videoRef} className="hidden" crossOrigin="anonymous" muted playsInline />
         <video ref={previewVideoRef} className="hidden" crossOrigin="anonymous" muted playsInline />
         <canvas ref={canvasRef} className="hidden" />
 
-        {/* MODAL */}
         <Modal
           isOpen={isModalOpen}
           onClose={() => setIsModalOpen(false)}
