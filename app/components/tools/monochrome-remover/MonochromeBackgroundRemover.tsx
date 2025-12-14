@@ -3,7 +3,8 @@
 import Image from 'next/image';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 
-import { hexToRgb, invertHex, rgbToHex } from '@/lib/utils/colors';
+import { useObjectUrl } from '@/lib/hooks/use-object-url';
+import { getColorDistance, hexToRgb, invertHex, PIXEL_STRIDE, rgbToHex } from '@/lib/utils/colors';
 import { downloadDataUrl, loadImage } from '@/lib/utils/media';
 
 import { Canvas, CanvasRef } from '../../primitives/Canvas';
@@ -14,22 +15,17 @@ import { Slider } from '../../primitives/Slider';
 import { ToggleGroup, ToggleGroupItem } from '../../primitives/ToggleGroup';
 import { ToolLayout } from '../ToolLayout';
 
-// --- CONSTANTS & CONFIG ---
+// --- CONSTANTS ---
 const DEBOUNCE_DELAY = 50;
 const VIEW_RESET_DELAY = 50;
 const PROCESS_DELAY_MS = 10;
 const MOUSE_BUTTON_LEFT = 0;
-
 const RGB_MAX = 255;
-// Pixel Data Constants
-const PIXEL_STRIDE = 4;
 const OFFSET_R = 0;
 const OFFSET_G = 1;
 const OFFSET_B = 2;
 const OFFSET_A = 3;
 const PERCENTAGE_MAX = 100;
-
-// Max distance in 3D RGB space: sqrt(255^2 + 255^2 + 255^2)
 const MAX_RGB_DISTANCE = Math.sqrt(3 * RGB_MAX ** 2);
 const DOWNLOAD_FILENAME = 'removed_bg.png';
 
@@ -51,9 +47,10 @@ interface Point {
 
 export function MonochromeBackgroundRemover() {
   // --- STATE ---
-  const [originalUrl, setOriginalUrl] = useState<string | null>(null);
-  const [imgDimensions, setImgDimensions] = useState({ w: 0, h: 0 });
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const originalUrl = useObjectUrl(selectedFile);
 
+  const [imgDimensions, setImgDimensions] = useState({ w: 0, h: 0 });
   const [targetColor, setTargetColor] = useState(DEFAULT_SETTINGS.targetColor);
   const [contourColor, setContourColor] = useState(DEFAULT_SETTINGS.contourColor);
 
@@ -65,17 +62,16 @@ export function MonochromeBackgroundRemover() {
   const [smoothness, setSmoothness] = useState(DEFAULT_SETTINGS.smoothness);
   const [processingMode, setProcessingMode] = useState<ProcessingMode>('remove');
 
-  // Tools
   const [edgeChoke, setEdgeChoke] = useState(DEFAULT_SETTINGS.edgeChoke);
   const [edgeBlur, setEdgeBlur] = useState(DEFAULT_SETTINGS.edgeBlur);
   const [edgePaint, setEdgePaint] = useState(DEFAULT_SETTINGS.edgePaint);
 
   const [floodPoints, setFloodPoints] = useState<Point[]>([]);
   const [manualTrigger, setManualTrigger] = useState(0);
-  // UI
+
   const [isProcessing, setIsProcessing] = useState(false);
   const [draggingPointIndex, setDraggingPointIndex] = useState<number | null>(null);
-  // --- REFS ---
+
   const workspaceRef = useRef<CanvasRef>(null);
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
   const sourceCanvasRef = useRef<HTMLCanvasElement>(null);
@@ -83,7 +79,7 @@ export function MonochromeBackgroundRemover() {
 
   // --- LOGIC ---
 
-  const loadOriginalToCanvas = async (url: string) => {
+  const loadOriginalToCanvas = useCallback(async (url: string) => {
     try {
       const img = await loadImage(url);
 
@@ -103,11 +99,10 @@ export function MonochromeBackgroundRemover() {
       }
 
       setTimeout(() => workspaceRef.current?.resetView(img.width, img.height), VIEW_RESET_DELAY);
-      processImage();
     } catch (e) {
       console.error(e);
     }
-  };
+  }, []);
 
   const processImage = useCallback(() => {
     if (!originalUrl || !sourceCanvasRef.current || !previewCanvasRef.current) return;
@@ -137,10 +132,13 @@ export function MonochromeBackgroundRemover() {
       const smoothVal = (smoothness / PERCENTAGE_MAX) * MAX_RGB_DISTANCE;
 
       const getDist = (i: number, rgb: { r: number; g: number; b: number }) =>
-        Math.hypot(
-          data[i + OFFSET_R] - rgb.r,
-          data[i + OFFSET_G] - rgb.g,
-          data[i + OFFSET_B] - rgb.b
+        getColorDistance(
+          data[i + OFFSET_R],
+          data[i + OFFSET_G],
+          data[i + OFFSET_B],
+          rgb.r,
+          rgb.g,
+          rgb.b
         );
 
       const alphaChannel = new Uint8Array(width * height);
@@ -306,11 +304,22 @@ export function MonochromeBackgroundRemover() {
     edgePaint,
   ]);
 
+  // Загружаем картинку в Canvas при смене URL
+  useEffect(() => {
+    if (originalUrl) {
+      // ИСПРАВЛЕНИЕ: Оборачиваем в requestAnimationFrame для избегания синхронного setState
+      requestAnimationFrame(() => {
+        loadOriginalToCanvas(originalUrl);
+      });
+    }
+  }, [originalUrl, loadOriginalToCanvas]);
+
   useEffect(() => {
     if (!originalUrl) return;
     if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
     debounceTimerRef.current = setTimeout(() => {
-      processImage();
+      // ИСПРАВЛЕНИЕ: Вызов processImage уже содержит задержки, но для надежности
+      requestAnimationFrame(() => processImage());
     }, DEBOUNCE_DELAY);
     return () => {
       if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
@@ -319,21 +328,23 @@ export function MonochromeBackgroundRemover() {
 
   useEffect(() => {
     if (manualTrigger > 0 && processingMode === 'flood-clear') {
-      processImage();
+      // ИСПРАВЛЕНИЕ: Оборачиваем в requestAnimationFrame
+      requestAnimationFrame(() => {
+        processImage();
+      });
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [manualTrigger]);
+  }, [manualTrigger, processingMode, processImage]);
 
   const handleFilesSelected = async (files: File[]) => {
     const file = files[0];
     if (!file) return;
-    const url = URL.createObjectURL(file);
-    setOriginalUrl(url);
+
     setFloodPoints([]);
-    loadOriginalToCanvas(url);
+    setSelectedFile(file);
 
     try {
-      const img = await loadImage(url);
+      const tempUrl = URL.createObjectURL(file);
+      const img = await loadImage(tempUrl);
       const c = document.createElement('canvas');
       c.width = 1;
       c.height = 1;
@@ -345,6 +356,7 @@ export function MonochromeBackgroundRemover() {
         setTargetColor(hex);
         setContourColor(invertHex(hex));
       }
+      URL.revokeObjectURL(tempUrl);
     } catch (e) {
       console.error(e);
     }
@@ -467,7 +479,7 @@ export function MonochromeBackgroundRemover() {
                     fill
                     className="object-cover"
                     onClick={handleEyedropper}
-                    unoptimized // Важно для blob: URL
+                    unoptimized
                   />
                 </div>
                 <div className="flex flex-1 items-center gap-2 rounded border bg-zinc-50 p-2 dark:border-zinc-700 dark:bg-zinc-800">

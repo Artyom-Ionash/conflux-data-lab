@@ -5,6 +5,7 @@ import gifshot from 'gifshot';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { TEXTURE_LIMITS } from '@/lib/domain/hardware/texture-standards';
+import { useObjectUrl } from '@/lib/hooks/use-object-url'; // NEW
 
 // --- DOMAIN IMPORTS ---
 import { TextureLimitIndicator } from '../../entities/hardware/TextureLimitIndicator';
@@ -103,7 +104,9 @@ function useSpriteSheetGenerator() {
 }
 
 function useVideoFrameExtraction() {
-  const [videoSrc, setVideoSrc] = useState<string | null>(null);
+  const [videoFile, setVideoFile] = useState<File | null>(null);
+  const videoSrc = useObjectUrl(videoFile); // Безопасное использование URL
+
   const [videoDuration, setVideoDuration] = useState<number | null>(null);
   const [videoDimensions, setVideoDimensions] = useState<{ width: number; height: number } | null>(
     null
@@ -154,12 +157,6 @@ function useVideoFrameExtraction() {
       setGifParams((prev) => ({ ...prev, fps: safeFps }));
     }
   }, [extractionParams.frameStep]);
-
-  useEffect(() => {
-    return () => {
-      if (videoSrc) URL.revokeObjectURL(videoSrc);
-    };
-  }, [videoSrc]);
 
   // Sync Hover Video Source
   useEffect(() => {
@@ -226,40 +223,42 @@ function useVideoFrameExtraction() {
     extractionParams.frameStep,
   ]);
 
-  const handleFilesSelected = useCallback(
-    async (files: File[]) => {
-      if (!files.length) return;
-      const file = files[0];
-      setRawFrames([]);
-      setPreviewFrames({ start: null, end: null });
-      setError(null);
-      setGifParams((p) => ({ ...p, dataUrl: null }));
-      setVideoDuration(null);
-      setVideoDimensions(null);
+  const handleFilesSelected = useCallback(async (files: File[]) => {
+    if (!files.length) return;
+    const file = files[0];
+    setRawFrames([]);
+    setPreviewFrames({ start: null, end: null });
+    setError(null);
+    setGifParams((p) => ({ ...p, dataUrl: null }));
+    setVideoDuration(null);
+    setVideoDimensions(null);
 
-      if (videoSrc) URL.revokeObjectURL(videoSrc);
-      const objectUrl = URL.createObjectURL(file);
-      setVideoSrc(objectUrl);
+    // Устанавливаем файл для хука useObjectUrl
+    setVideoFile(file);
 
-      const tempVideo = document.createElement('video');
-      tempVideo.src = objectUrl;
-      tempVideo.onloadedmetadata = () => {
-        const duration = tempVideo.duration || 0;
-        setVideoDuration(duration);
-        setVideoDimensions({ width: tempVideo.videoWidth, height: tempVideo.videoHeight });
+    // Временный URL для чтения метаданных (сразу освобождается)
+    const objectUrl = URL.createObjectURL(file);
+    const tempVideo = document.createElement('video');
+    tempVideo.src = objectUrl;
+    tempVideo.onloadedmetadata = () => {
+      const duration = tempVideo.duration || 0;
+      setVideoDuration(duration);
+      setVideoDimensions({ width: tempVideo.videoWidth, height: tempVideo.videoHeight });
 
-        const safeStartTime = Math.max(0, duration - DEFAULT_CLIP_DURATION);
-        setExtractionParams({
-          startTime: safeStartTime,
-          endTime: duration,
-          frameStep: DEFAULT_FRAME_STEP,
-          symmetricLoop: true,
-        });
-      };
-      tempVideo.onerror = () => setError('Ошибка загрузки');
-    },
-    [videoSrc]
-  );
+      const safeStartTime = Math.max(0, duration - DEFAULT_CLIP_DURATION);
+      setExtractionParams({
+        startTime: safeStartTime,
+        endTime: duration,
+        frameStep: DEFAULT_FRAME_STEP,
+        symmetricLoop: true,
+      });
+      URL.revokeObjectURL(objectUrl);
+    };
+    tempVideo.onerror = () => {
+      setError('Ошибка загрузки');
+      URL.revokeObjectURL(objectUrl);
+    };
+  }, []);
 
   const runExtraction = useCallback(async () => {
     if (!videoRef.current || !canvasRef.current || !videoSrc) return;

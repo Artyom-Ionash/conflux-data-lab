@@ -3,12 +3,12 @@
 import Image from 'next/image';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
+import { useDraggableList } from '@/lib/hooks/use-draggable-list'; // NEW HOOK
 import { rgbToHex } from '@/lib/utils/colors';
 import { downloadDataUrl, loadImage, revokeObjectURLSafely } from '@/lib/utils/media';
 
 import { TextureDimensionSlider } from '../../entities/hardware/TextureDimensionSlider';
 import { Canvas, CanvasRef } from '../../primitives/Canvas';
-// Импортируем ControlSection и ControlLabel из одного файла
 import { ControlLabel, ControlSection } from '../../primitives/ControlSection';
 import { FileDropzone, FileDropzonePlaceholder } from '../../primitives/FileDropzone';
 import { Slider } from '../../primitives/Slider';
@@ -152,6 +152,9 @@ DraggableImageSlot.displayName = 'DraggableImageSlot';
 // --- MAIN COMPONENT ---
 export function VerticalImageAligner() {
   const [images, setImages] = useState<AlignImage[]>([]);
+  // Использование нового хука
+  const { handleDragStart, handleDragOver, handleDrop } = useDraggableList(images, setImages);
+
   const imagesRef = useRef(images);
   useEffect(() => {
     imagesRef.current = images;
@@ -171,7 +174,6 @@ export function VerticalImageAligner() {
   const [redGridOffsetY, setRedGridOffsetY] = useState(0);
   const [redGridColor] = useState(DEFAULT_SETTINGS.redGridColor);
 
-  const [draggingListIndex, setDraggingListIndex] = useState<number | null>(null);
   const [isExporting, setIsExporting] = useState(false);
   const workspaceRef = useRef<CanvasRef>(null);
 
@@ -227,25 +229,6 @@ export function VerticalImageAligner() {
       return prev.filter((img) => img.id !== id);
     });
   }, []);
-
-  const handleDragStart = (e: React.DragEvent, index: number) => {
-    setDraggingListIndex(index);
-  };
-
-  const handleDrop = (e: React.DragEvent, targetIndex: number) => {
-    e.preventDefault();
-    if (draggingListIndex === null || draggingListIndex === targetIndex) {
-      setDraggingListIndex(null);
-      return;
-    }
-    setImages((prev) => {
-      const copy = [...prev];
-      const [item] = copy.splice(draggingListIndex, 1);
-      copy.splice(targetIndex, 0, item);
-      return copy;
-    });
-    setDraggingListIndex(null);
-  };
 
   const processFiles = useCallback(
     (files: File[]) => {
@@ -468,7 +451,7 @@ export function VerticalImageAligner() {
                 key={img.id}
                 draggable
                 onDragStart={(e) => handleDragStart(e, i)}
-                onDragOver={(e) => e.preventDefault()}
+                onDragOver={handleDragOver}
                 onDrop={(e) => handleDrop(e, i)}
                 className={`flex cursor-pointer items-center gap-3 rounded-md border p-2.5 text-sm transition-colors select-none ${img.isActive ? 'border-blue-200 bg-blue-50 text-blue-800 shadow-sm dark:border-blue-800 dark:bg-blue-900/30 dark:text-blue-100' : 'border-zinc-200 bg-white hover:border-zinc-300 dark:border-zinc-700 dark:bg-zinc-800'}`}
                 onClick={() => handleActivate(img.id)}

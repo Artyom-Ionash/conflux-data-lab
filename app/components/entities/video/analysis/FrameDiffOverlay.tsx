@@ -3,7 +3,8 @@
 import Image from 'next/image';
 import { useEffect, useRef, useState } from 'react';
 
-import { loadImage } from '@/lib/utils/media'; // <-- New Import
+import { areColorsSimilar } from '@/lib/utils/colors'; // UPDATE
+import { loadImage } from '@/lib/utils/media';
 
 interface FrameDiffOverlayProps {
   image1: string | null;
@@ -36,7 +37,6 @@ export function FrameDiffOverlay({
         const ctx = canvas?.getContext('2d');
         if (!ctx || !canvas) return;
 
-        // REFACTOR: Использование утилиты loadImage вместо ручных Promise
         const [firstImg, lastImg] = await Promise.all([loadImage(image1), loadImage(image2)]);
 
         canvas.width = firstImg.width;
@@ -65,15 +65,9 @@ export function FrameDiffOverlay({
           const lastG = lastImageData.data[i + 1];
           const lastB = lastImageData.data[i + 2];
 
-          const firstIsBg =
-            Math.abs(firstR - bgR) < threshold &&
-            Math.abs(firstG - bgG) < threshold &&
-            Math.abs(firstB - bgB) < threshold;
-
-          const lastIsBg =
-            Math.abs(lastR - bgR) < threshold &&
-            Math.abs(lastG - bgG) < threshold &&
-            Math.abs(lastB - bgB) < threshold;
+          // Использование новой абстракции для сравнения цветов
+          const firstIsBg = areColorsSimilar(firstR, firstG, firstB, bgR, bgG, bgB, threshold);
+          const lastIsBg = areColorsSimilar(lastR, lastG, lastB, bgR, bgG, bgB, threshold);
 
           if (firstIsBg && lastIsBg) {
             resultImageData.data[i + 3] = 0;
