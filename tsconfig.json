@@ -1,18 +1,14 @@
 // conflux-data-lab/tsconfig.json
-
 {
   "compilerOptions": {
     // Безопасный и современный стандарт для Node 18+
     "target": "ES2022",
     "lib": ["dom", "dom.iterable", "esnext"],
-
     "allowJs": true,
     // Включаем проверку типов даже в JS файлах (максимальная строгость для смешанных проектов)
     "checkJs": true,
-
     "skipLibCheck": true,
     "strict": true,
-
     // --- MAXIMUM STRICTNESS ---
     // Гарантирует, что доступ по индексу (arr[0]) всегда возвращает Type | undefined
     "noUncheckedIndexedAccess": true,
@@ -22,7 +18,6 @@
     "noImplicitOverride": true,
     // Различает опциональные поля (?) и поля, которые могут быть undefined
     "exactOptionalPropertyTypes": true,
-
     // --- CODE QUALITY ---
     // Ошибка, если функция не возвращает значение во всех ветках кода
     "noImplicitReturns": true,
@@ -32,7 +27,6 @@
     "allowUnreachableCode": false,
     // Ошибка при неиспользуемых лейблах
     "allowUnusedLabels": false,
-
     "noEmit": true,
     "esModuleInterop": true,
     "module": "esnext",
@@ -57,7 +51,8 @@
     "**/*.tsx",
     ".next/types/**/*.ts",
     "**/*.mts",
-    "lib/types/**/*.d.ts"
+    "lib/types/**/*.d.ts",
+    ".next/dev/types/**/*.ts"
   ],
   "exclude": ["node_modules", ".next/dev"]
 }

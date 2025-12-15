@@ -33,6 +33,7 @@
     "@radix-ui/react-tooltip": "^1.2.8",
     "colord": "^2.9.3",
     "gifshot": "^0.4.5",
+    "ignore": "^7.0.5",
     "next": "^16.0.7",
     "react": "^19.2.1",
     "react-dom": "^19.2.1"

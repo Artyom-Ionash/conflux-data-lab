@@ -1,112 +1,31 @@
 'use client';
 
+import ignore from 'ignore';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 
+// --- SHARED LOGIC IMPORTS ---
+import { CONTEXT_PRESETS, type PresetKey } from '@/lib/modules/context-generator/config';
+import {
+  generateContextOutput,
+  type ProcessedContextFile,
+} from '@/lib/modules/context-generator/core';
+// --- UTILS ---
 import {
   calculateFileScore,
   getLanguageTag,
   isTextFile,
   LANGUAGE_MAP,
   preprocessContent,
-  shouldIgnore,
 } from '@/lib/modules/file-system/file-utils';
 import { GodotSceneParser } from '@/lib/modules/file-system/godot-scene';
 import { formatBytes, generateAsciiTree } from '@/lib/modules/file-system/tree-view';
 
+// --- UI COMPONENTS ---
 import { Card } from '../../primitives/Card';
 import { Switch } from '../../primitives/Switch';
 import { ToolLayout } from '../ToolLayout';
 
-// --- CONFIGURATION ---
-
-const PRESETS = {
-  godot: {
-    name: 'Godot 4 (Logic Only)',
-    textExtensions: [
-      '.gd',
-      '.tscn',
-      '.godot',
-      '.tres',
-      '.cfg',
-      '.gdshader',
-      '.json',
-      '.txt',
-      '.md',
-      '.py',
-      '.gitignore',
-    ],
-    hardIgnore: [
-      '.git',
-      '.godot',
-      '.import',
-      'builds',
-      '__pycache__',
-      'node_modules',
-      '.next',
-      '.vscode',
-      '.idea',
-      '*.uid',
-      '*.import',
-      '.DS_Store',
-      'LICENSE',
-      'LICENSE.txt',
-      'LICENCE',
-      'LICENCE.txt',
-      'COPYING',
-      'README.md',
-      'CHANGELOG.md',
-      'THIRDPARTY.md',
-      'NOTICE',
-    ],
-  },
-  nextjs: {
-    name: 'Next.js / React',
-    textExtensions: [
-      '.ts',
-      '.tsx',
-      '.js',
-      '.jsx',
-      '.mjs',
-      '.cjs',
-      '.css',
-      '.scss',
-      '.sass',
-      '.json',
-      '.md',
-      '.yaml',
-      '.yml',
-      '.toml',
-      '.env.example',
-      '.conf',
-      '.xml',
-    ],
-    hardIgnore: [
-      '.git',
-      'node_modules',
-      '.next',
-      'dist',
-      'build',
-      'coverage',
-      'package-lock.json',
-      'yarn.lock',
-      'pnpm-lock.yaml',
-      '.DS_Store',
-      '.vercel',
-      '.turbo',
-      'LICENSE',
-      'LICENSE.txt',
-      'LICENCE',
-      'LICENCE.txt',
-      'COPYING',
-      'README.md',
-      'CHANGELOG.md',
-      'THIRDPARTY.md',
-      'NOTICE',
-    ],
-  },
-};
-
-type PresetKey = keyof typeof PRESETS;
+// --- TYPES ---
 
 interface FileNode {
   path: string;
@@ -142,9 +61,9 @@ const readFileAsText = (file: File): Promise<string> => {
 export function ProjectToContext() {
   const [selectedPreset, setSelectedPreset] = useState<PresetKey>('godot');
   const [customExtensions, setCustomExtensions] = useState<string>(
-    PRESETS.godot.textExtensions.join(', ')
+    CONTEXT_PRESETS.godot.textExtensions.join(', ')
   );
-  const [customIgnore, setCustomIgnore] = useState<string>(PRESETS.godot.hardIgnore.join(', '));
+  const [customIgnore, setCustomIgnore] = useState<string>('');
   const [includeTree, setIncludeTree] = useState(true);
 
   const [files, setFiles] = useState<FileNode[]>([]);
@@ -152,24 +71,36 @@ export function ProjectToContext() {
   const [progress, setProgress] = useState(0);
   const [result, setResult] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
-
-  // Добавлено: Состояние для времени последней генерации
   const [lastGeneratedAt, setLastGeneratedAt] = useState<Date | null>(null);
-
   const [stats, setStats] = useState<ProjectStats | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // --- HANDLERS ---
+
   const handlePresetChange = (key: PresetKey) => {
     setSelectedPreset(key);
-    setCustomExtensions(PRESETS[key].textExtensions.join(', '));
-    setCustomIgnore(PRESETS[key].hardIgnore.join(', '));
+    setCustomExtensions(CONTEXT_PRESETS[key].textExtensions.join(', '));
+    setCustomIgnore('');
   };
 
-  const handleDirectorySelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleDirectorySelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files) return;
     const fileList = [...e.target.files];
 
+    // 1. Поиск .gitignore
+    const gitIgnoreFile = fileList.find((f) => f.name === '.gitignore');
+    let gitIgnoreContent = '';
+
+    if (gitIgnoreFile) {
+      try {
+        gitIgnoreContent = await readFileAsText(gitIgnoreFile);
+      } catch (err) {
+        console.warn('Failed to read .gitignore', err);
+      }
+    }
+
+    // 2. Определение пресета
     let detectedPreset: PresetKey | null = null;
     const fileNames = fileList.map((f) => f.name);
 
@@ -178,37 +109,61 @@ export function ProjectToContext() {
     } else if (
       fileNames.includes('next.config.js') ||
       fileNames.includes('next.config.ts') ||
-      fileNames.includes('next.config.mjs') ||
       fileNames.includes('package.json')
     ) {
       detectedPreset = 'nextjs';
     }
 
-    let activeIgnoreStr = customIgnore;
-    let activeExtStr = customExtensions;
+    const activePresetKey = detectedPreset || selectedPreset;
+    const activePreset = CONTEXT_PRESETS[activePresetKey];
 
     if (detectedPreset && detectedPreset !== selectedPreset) {
-      const preset = PRESETS[detectedPreset];
       setSelectedPreset(detectedPreset);
-      setCustomExtensions(preset.textExtensions.join(', '));
-      setCustomIgnore(preset.hardIgnore.join(', '));
-      activeExtStr = preset.textExtensions.join(', ');
-      activeIgnoreStr = preset.hardIgnore.join(', ');
+      setCustomExtensions(activePreset.textExtensions.join(', '));
+      setCustomIgnore('');
     }
 
-    const ignoreList = activeIgnoreStr
-      .split(',')
-      .map((s) => s.trim())
-      .filter((s) => s.length > 0);
-    const extList = activeExtStr
-      .split(',')
-      .map((s) => s.trim())
-      .filter((s) => s.length > 0);
+    // 3. Настройка Ignore Manager
+    const ig = ignore();
 
+    // А) Добавляем Hard Ignore из пресета
+    ig.add(activePreset.hardIgnore);
+
+    // Б) Добавляем правила из .gitignore (если есть)
+    if (gitIgnoreContent) {
+      ig.add(gitIgnoreContent);
+    }
+
+    // В) Добавляем пользовательские правила из UI инпута
+    if (customIgnore.trim()) {
+      ig.add(
+        customIgnore
+          .split(',')
+          .map((s) => s.trim())
+          .filter((s) => s.length > 0)
+      );
+    }
+
+    // Расширения
+    const extList = activePreset.textExtensions;
+
+    // 4. Фильтрация
     const nodes: FileNode[] = [];
+
     fileList.forEach((f) => {
-      const path = f.webkitRelativePath || f.name;
-      if (shouldIgnore(path, ignoreList)) return;
+      // Нормализация пути: убираем имя корневой папки, которую дает браузер
+      let path = f.webkitRelativePath || f.name;
+      if (f.webkitRelativePath) {
+        const parts = path.split('/');
+        // Если путь содержит папку проекта (что почти всегда так при выборе папки), убираем её
+        if (parts.length > 1) {
+          path = parts.slice(1).join('/');
+        }
+      }
+
+      // ПРОВЕРКА ЧЕРЕЗ ПАКЕТ IGNORE
+      if (ig.ignores(path)) return;
+
       nodes.push({
         path: path,
         name: f.name,
@@ -219,7 +174,7 @@ export function ProjectToContext() {
     });
 
     setFiles(nodes);
-    setResult(null); // Сброс результата для триггера авто-генерации
+    setResult(null);
     setStats(null);
   };
 
@@ -238,7 +193,8 @@ export function ProjectToContext() {
     let totalCleanedBytes = 0;
     const composition: Record<string, number> = {};
     const processedFileStats: { path: string; size: number; tokens: number }[] = [];
-    const processedFilesData: { node: FileNode; content: string; langTag: string }[] = [];
+
+    const filesForGenerator: ProcessedContextFile[] = [];
 
     let processedCount = 0;
 
@@ -261,7 +217,6 @@ export function ProjectToContext() {
             const treeOutput = sceneParser.parse(originalText);
             cleanedText = `; [Godot Scene Tree View]
 ; This file has been parsed to show the hierarchy only.
-; Attributes and long sub-resources are hidden for context window efficiency.
 
 ${treeOutput}`;
             langKey = 'text';
@@ -277,13 +232,13 @@ ${treeOutput}`;
 
         let reportLang = LANGUAGE_MAP[ext] || ext;
         if (node.name.includes('config') || node.name.startsWith('.')) reportLang = 'config/meta';
-
         composition[reportLang] = (composition[reportLang] || 0) + 1;
 
-        processedFilesData.push({
-          node,
+        filesForGenerator.push({
+          path: node.path,
           content: cleanedText,
           langTag: langKey,
+          size: cleanedText.length,
         });
 
         processedFileStats.push({
@@ -296,21 +251,23 @@ ${treeOutput}`;
       }
 
       processedCount++;
-      setProgress(Math.round((processedCount / sortedFiles.length) * 50));
-      if (processedCount % 10 === 0) await new Promise((r) => setTimeout(r, 0));
+      setProgress(Math.round((processedCount / sortedFiles.length) * 80));
+      if (processedCount % 5 === 0) await new Promise((r) => setTimeout(r, 0));
     }
 
-    const estimatedTokens = Math.ceil(totalCleanedBytes / 4);
+    const treeString = includeTree ? generateAsciiTree(sortedFiles) : '';
+
+    const { output, stats: coreStats } = generateContextOutput(filesForGenerator, treeString);
+
     const savingsBytes = totalOriginalBytes - totalCleanedBytes;
     const savingsPercent = totalOriginalBytes > 0 ? (savingsBytes / totalOriginalBytes) * 100 : 0;
-
     const topFiles = processedFileStats.sort((a, b) => b.size - a.size).slice(0, 5);
 
     setStats({
       totalFiles: sortedFiles.length,
-      processedFiles: processedFilesData.length,
+      processedFiles: filesForGenerator.length,
       totalChars: totalCleanedBytes,
-      estimatedTokens,
+      estimatedTokens: coreStats.totalTokens,
       originalSize: totalOriginalBytes,
       cleanedSize: totalCleanedBytes,
       savings: { bytes: savingsBytes, percentage: savingsPercent },
@@ -318,57 +275,12 @@ ${treeOutput}`;
       topFiles,
     });
 
-    let output = `<codebase_context>
-<instruction>
-The following is a flattened representation of a project codebase.
-1. Use the <directory_structure> to understand the file hierarchy.
-2. Content is in <source_files>, where each file is wrapped in a <file> tag.
-3. Code blocks utilize standard Markdown triple backticks with language tags (e.g., \`\`\`python) for expert routing.
-4. METRICS: Approximately ${estimatedTokens.toLocaleString()} tokens across ${
-      processedFilesData.length
-    } files.
-</instruction>
-
-<project_metrics>
-  <token_count_estimate>${estimatedTokens}</token_count_estimate>
-  <file_count>${processedFilesData.length}</file_count>
-  <top_languages>
-    ${Object.entries(composition)
-      .sort(([, a], [, b]) => b - a)
-      .slice(0, 3)
-      .map(([lang, count]) => `${lang} (${count})`)
-      .join(', ')}
-  </top_languages>
-</project_metrics>
-
-`;
-
-    if (includeTree) {
-      output += `<directory_structure>\n\`\`\`text\n${generateAsciiTree(
-        sortedFiles
-      )}\n\`\`\`\n</directory_structure>\n\n`;
-    }
-
-    output += `<source_files>\n\n`;
-
-    processedFilesData.forEach((item, idx) => {
-      output += `<file path="${item.node.path}">\n`;
-      output += '```' + item.langTag + '\n';
-      output += item.content;
-      output += '\n```\n';
-      output += `</file>\n\n`;
-
-      if (idx % 10 === 0) setProgress(50 + Math.round((idx / processedFilesData.length) * 50));
-    });
-
-    output += `</source_files>\n</codebase_context>`;
-
     setResult(output);
-    setLastGeneratedAt(new Date()); // Установка времени генерации
+    setLastGeneratedAt(new Date());
+    setProgress(100);
     setProcessing(false);
-  }, [files, includeTree]); // processFiles зависит от файлов и настроек
+  }, [files, includeTree]);
 
-  // --- AUTO-GEN EFFECT ---
   useEffect(() => {
     if (files.length > 0 && result === null && !processing) {
       void processFiles();
@@ -388,46 +300,33 @@ The following is a flattened representation of a project codebase.
 
   const copyToClipboard = async () => {
     if (!result) return;
-
     try {
-      // 1. Попытка использовать современный API (HTTPS / Localhost)
       if (navigator.clipboard && navigator.clipboard.writeText) {
         await navigator.clipboard.writeText(result);
       } else {
         throw new Error('Clipboard API unavailable');
       }
     } catch {
-      // FIX: Убрали неиспользуемую переменную (err)
-      // 2. Фоллбэк для HTTP (старый метод через скрытый textarea)
       try {
         const textArea = document.createElement('textarea');
         textArea.value = result;
-
-        // Делаем элемент невидимым, но доступным для фокуса
         textArea.style.position = 'fixed';
         textArea.style.left = '-9999px';
-        textArea.style.top = '0';
         document.body.appendChild(textArea);
-
         textArea.focus();
         textArea.select();
-
-        const successful = document.execCommand('copy');
+        document.execCommand('copy');
         document.body.removeChild(textArea);
-
-        if (!successful) throw new Error('execCommand failed');
       } catch (fallbackErr) {
         console.error('Copy failed', fallbackErr);
-        alert('Не удалось скопировать. Браузер заблокировал доступ к буферу обмена.');
+        alert('Не удалось скопировать.');
         return;
       }
     }
-
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
 
-  // Форматирование времени в HH:mm:ss
   const formatTime = (date: Date) => {
     return date.toLocaleTimeString('ru-RU', {
       hour: '2-digit',
@@ -451,7 +350,7 @@ The following is a flattened representation of a project codebase.
             ref={fileInputRef}
             type="file"
             className="hidden"
-            // @ts-expect-error webkitdirectory is non-standard but supported
+            // @ts-expect-error webkitdirectory is non-standard
             webkitdirectory=""
             directory=""
             multiple
@@ -459,14 +358,14 @@ The following is a flattened representation of a project codebase.
           />
         </div>
         <p className="px-1 text-[10px] leading-tight text-zinc-400">
-          Браузер не отслеживает изменения на диске. Чтобы обновить файлы, выберите папку снова.
+          Выберите папку корневого проекта.
         </p>
       </div>
 
       <div className="flex flex-col gap-4">
         <label className="text-sm font-bold text-zinc-700 dark:text-zinc-300">2. Настройки</label>
         <div className="flex flex-wrap gap-2">
-          {(Object.keys(PRESETS) as PresetKey[]).map((key) => (
+          {(Object.keys(CONTEXT_PRESETS) as PresetKey[]).map((key) => (
             <button
               key={key}
               onClick={() => handlePresetChange(key)}
@@ -476,7 +375,7 @@ The following is a flattened representation of a project codebase.
                   : 'border-zinc-200 bg-white text-zinc-600 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-400'
               }`}
             >
-              {PRESETS[key].name}
+              {CONTEXT_PRESETS[key].name}
             </button>
           ))}
         </div>
@@ -492,11 +391,14 @@ The following is a flattened representation of a project codebase.
             />
           </div>
           <div>
-            <span className="mb-1 block text-xs text-zinc-500">Игнорировать</span>
+            <span className="mb-1 block text-xs text-zinc-500">
+              Дополнительно игнорировать (поверх .gitignore)
+            </span>
             <input
               type="text"
               value={customIgnore}
               onChange={(e) => setCustomIgnore(e.target.value)}
+              placeholder="*.log, temp/"
               className="w-full rounded border border-zinc-200 bg-white px-3 py-2 font-mono text-xs dark:border-zinc-700 dark:bg-zinc-900"
             />
           </div>
@@ -517,7 +419,6 @@ The following is a flattened representation of a project codebase.
       {/* --- STATS BLOCK --- */}
       {stats && (
         <div className="animate-in fade-in slide-in-from-bottom-2 space-y-4 border-t border-zinc-200 pt-4 dark:border-zinc-800">
-          {/* Main Token Count */}
           <div className="rounded-lg border border-blue-100 bg-blue-50 p-3 dark:border-blue-800 dark:bg-blue-900/20">
             <div className="mb-1 text-xs font-bold tracking-wide text-blue-600 uppercase dark:text-blue-300">
               Токены (Est.)
@@ -530,7 +431,6 @@ The following is a flattened representation of a project codebase.
             </div>
           </div>
 
-          {/* Efficiency Stats */}
           <div className="grid grid-cols-2 gap-2">
             <div className="rounded border border-zinc-200 bg-zinc-50 p-2 dark:border-zinc-700 dark:bg-zinc-800">
               <div className="text-[10px] font-bold text-zinc-500">Файлы</div>
@@ -546,7 +446,6 @@ The following is a flattened representation of a project codebase.
             </div>
           </div>
 
-          {/* Top Heaviest Files */}
           <div className="space-y-1">
             <div className="text-[10px] font-bold text-zinc-500 uppercase">Самые тяжелые файлы</div>
             <div className="space-y-1">
@@ -621,7 +520,7 @@ The following is a flattened representation of a project codebase.
             <p>
               {processing
                 ? 'Обработка и генерация контекста...'
-                : 'Генератор контекста для LLM (Ultra Optimized for Gemini)'}
+                : 'Генератор контекста для LLM (Ultra Optimized)'}
             </p>
           </div>
         )}
