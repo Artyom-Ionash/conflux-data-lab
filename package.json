@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "run-p dev:next type-check:watch",
+    "dev": "run-p dev:next type-check:watch context:watch",
     "dev:next": "next dev",
     "build": "next build",
     "start": "next start",
@@ -11,12 +11,15 @@
     "type-check:watch": "tsc --noEmit --watch --preserveWatchOutput",
     "lint": "eslint",
     "lint:fix": "eslint --fix",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "context": "tsx scripts/generate-context.ts",
+    "context:watch": "tsx watch --include ./app --include ./lib scripts/generate-context.ts",
     "stylelint": "stylelint \"**/*.css\"",
     "stylelint:fix": "stylelint \"**/*.css\" --fix",
     "format:prettier": "prettier --write .",
     "format": "run-s format:prettier lint:fix stylelint:fix",
-    "prepare": "husky install",
-    "update-structure": "node scripts/structure/update.mjs"
+    "prepare": "husky install"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
@@ -39,11 +42,13 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@vitejs/plugin-react": "^5.1.2",
     "eslint": "^9",
     "eslint-config-next": "16.0.5",
     "eslint-plugin-boundaries": "^5.3.1",
     "eslint-plugin-simple-import-sort": "^12.1.1",
     "eslint-plugin-unicorn": "^62.0.0",
+    "happy-dom": "^20.0.11",
     "husky": "^9.1.7",
     "lint-staged": "^16.2.7",
     "npm-run-all": "^4.1.5",
@@ -52,12 +57,16 @@
     "stylelint": "^16.26.1",
     "stylelint-config-standard": "^39.0.1",
     "tailwindcss": "^4",
-    "typescript": "^5"
+    "tsx": "^4.21.0",
+    "typescript": "^5",
+    "vite-tsconfig-paths": "^6.0.1",
+    "vitest": "^4.0.15"
   },
   "lint-staged": {
     "*.{js,jsx,ts,tsx}": [
       "prettier --write",
-      "eslint --fix"
+      "eslint --fix",
+      "vitest related --run"
     ],
     "*.css": [
       "prettier --write",
