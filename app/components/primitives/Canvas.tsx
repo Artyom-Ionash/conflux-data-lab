@@ -11,6 +11,8 @@ import React, {
   useState,
 } from 'react';
 
+import { useElementSize } from '@/lib/core/hooks/use-element-size';
+
 import { ColorInput } from './ColorInput';
 import { ProcessingOverlay } from './ProcessingOverlay';
 
@@ -90,9 +92,22 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(
     },
     ref
   ) => {
+    // 1. Инициализация хука размеров
+    const [resizeRef, containerSize] = useElementSize<HTMLDivElement>();
+
+    // Нам все еще нужен useRef для императивных вызовов (pointerCapture, getBoundingClientRect в событиях мыши)
     const containerRef = useRef<HTMLDivElement>(null);
     const contentRef = useRef<HTMLDivElement>(null);
     const zoomLabelRef = useRef<HTMLSpanElement>(null);
+
+    // 2. Объединение рефов
+    const setRefs = useCallback(
+      (node: HTMLDivElement | null) => {
+        containerRef.current = node;
+        resizeRef(node);
+      },
+      [resizeRef]
+    );
 
     const transform = useRef<CanvasTransform>({ scale: initialScale, x: 0, y: 0 });
     const interactionTimer = useRef<NodeJS.Timeout | null>(null);
@@ -161,7 +176,13 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(
     const performResetView = useCallback(
       (w?: number, h?: number) => {
         if (!containerRef.current) return;
-        const { clientWidth, clientHeight } = containerRef.current;
+
+        // 3. Используем реактивные размеры из хука
+        const { width: clientWidth, height: clientHeight } = containerSize;
+
+        // Если размеры еще не вычислены (0), выходим
+        if (clientWidth === 0 || clientHeight === 0) return;
+
         const targetW = w || contentWidth || 0;
         const targetH = h || contentHeight || 0;
         let newScale = 1;
@@ -184,8 +205,15 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(
         transform.current = { scale: newScale, x: newX, y: newY };
         scheduleUpdate(false);
       },
-      [contentWidth, contentHeight, scheduleUpdate]
+      [contentWidth, contentHeight, scheduleUpdate, containerSize]
     );
+
+    // 4. Автоматический сброс вида при изменении размеров контейнера
+    useEffect(() => {
+      if (containerSize.width > 0 && containerSize.height > 0) {
+        performResetView();
+      }
+    }, [containerSize.width, containerSize.height, performResetView]);
 
     useImperativeHandle(ref, () => ({
       resetView: (w, h) => performResetView(w, h),
@@ -273,7 +301,7 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(
 
     return (
       <div
-        ref={containerRef}
+        ref={setRefs} // 5. Передаем объединенный ref
         className={`relative h-full w-full touch-none overflow-hidden transition-colors ease-in-out select-none ${bgClass} ${className}`}
         onWheel={handleWheel}
         onPointerDown={handlePointerDown}

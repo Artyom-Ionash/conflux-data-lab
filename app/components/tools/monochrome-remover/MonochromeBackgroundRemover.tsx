@@ -3,6 +3,7 @@
 import Image from 'next/image';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 
+import { useDebounceEffect } from '@/lib/core/hooks/use-debounce-effect';
 import { useObjectUrl } from '@/lib/core/hooks/use-object-url';
 import { hexToRgb, invertHex, rgbToHex } from '@/lib/core/utils/colors';
 import { downloadDataUrl, getTopLeftPixelColor, loadImage } from '@/lib/core/utils/media';
@@ -70,7 +71,6 @@ export function MonochromeBackgroundRemover() {
   const [draggingPointIndex, setDraggingPointIndex] = useState<number | null>(null);
 
   const workspaceRef = useRef<CanvasRef>(null);
-  const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
   const sourceCanvasRef = useRef<HTMLCanvasElement>(null);
   const previewCanvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -211,16 +211,16 @@ export function MonochromeBackgroundRemover() {
   }, [originalUrl, loadOriginalToCanvas]);
 
   // Debounced processing trigger
-  useEffect(() => {
-    if (!originalUrl) return;
-    if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
-    debounceTimerRef.current = setTimeout(() => {
-      requestAnimationFrame(() => processImage());
-    }, DEBOUNCE_DELAY);
-    return () => {
-      if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
-    };
-  }, [originalUrl, processImage]);
+  // Заменяем сложный useEffect с таймерами на декларативный хук
+  useDebounceEffect(
+    () => {
+      if (originalUrl) {
+        requestAnimationFrame(() => processImage());
+      }
+    },
+    [originalUrl, processImage], // Зависимости, при изменении которых нужно запустить таймер
+    DEBOUNCE_DELAY
+  );
 
   // Immediate trigger for manual actions
   useEffect(() => {
