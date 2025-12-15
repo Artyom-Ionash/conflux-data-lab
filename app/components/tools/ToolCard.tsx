@@ -1,4 +1,4 @@
-import { ToolConfig } from '@/lib/types/tools'; // <-- 1. Импортируем правильное имя
+import { ToolConfig } from '@/lib/modules/tool-registry/types'; // <-- 1. Импортируем правильное имя
 
 import { Badge } from '../primitives/Badge';
 import { Card } from '../primitives/Card';

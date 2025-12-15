@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 
-import { categoryLabels, toolsByCategory } from '@/lib/config/tools';
+import { categoryLabels, toolsByCategory } from '@/lib/modules/tool-registry/config';
 
 import { ToolGrid } from '../../components/tools/ToolGrid';
 

@@ -1,5 +1,5 @@
-import { TEXTURE_LIMITS } from '@/lib/domain/hardware/texture-standards';
-import { loadImage } from '@/lib/utils/media';
+import { loadImage } from '@/lib/core/utils/media';
+import { TEXTURE_LIMITS } from '@/lib/modules/graphics/standards';
 
 interface SpriteGeneratorOptions {
   maxHeight: number;

@@ -69,26 +69,26 @@ conflux-data-lab/
 │   ├── layout.tsx
 │   └── page.tsx
 ├── lib/ # Библиотека и утилиты
-│   ├── types/
-│   │   └── tools.ts
-│   ├── utils/
-│   │   ├── parsers/
-│   │   │   └── godot-scene.ts
-│   │   ├── colors.ts
-│   │   ├── file-tree.ts
-│   │   ├── media.ts
-│   │   └── tool-loader.tsx
-│   ├── hooks/
-│   │   └── use-object-url.ts
-│   ├── config/
-│   │   └── tools.ts
-│   └── domain/
-│       ├── hardware/
-│       │   └── texture-standards.ts
-│       └── image/
-│           ├── filters.ts
-│           ├── image-processor.worker.ts
-│           └── sprite-generator.ts
+│   ├── core/
+│   │   ├── utils/
+│   │   │   ├── colors.ts
+│   │   │   └── media.ts
+│   │   └── hooks/
+│   │       └── use-object-url.ts
+│   └── modules/
+│       ├── file-system/
+│       │   ├── godot-scene.ts
+│       │   └── tree-view.ts
+│       ├── graphics/
+│       │   ├── processing/
+│       │   │   ├── filters.ts
+│       │   │   ├── processor.worker.ts
+│       │   │   └── sprite-generator.ts
+│       │   └── standards.ts
+│       └── tool-registry/
+│           ├── config.ts
+│           ├── loader.tsx
+│           └── types.ts
 ├── public/ # Статические файлы
 │   ├── file.svg
 │   ├── globe.svg

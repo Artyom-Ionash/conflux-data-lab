@@ -20,13 +20,13 @@ import { CSS } from '@dnd-kit/utilities';
 import Image from 'next/image';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
-import { rgbToHex } from '@/lib/utils/colors';
+import { rgbToHex } from '@/lib/core/utils/colors';
 import {
   downloadDataUrl,
   getTopLeftPixelColor,
   loadImage,
   revokeObjectURLSafely,
-} from '@/lib/utils/media';
+} from '@/lib/core/utils/media';
 
 import { TextureDimensionSlider } from '../../entities/hardware/TextureDimensionSlider';
 import { Canvas, CanvasRef } from '../../primitives/Canvas';

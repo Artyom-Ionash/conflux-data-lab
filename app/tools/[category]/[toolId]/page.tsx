@@ -2,8 +2,8 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 
-import { categoryLabels, getToolById } from '@/lib/config/tools';
-import { getToolComponent } from '@/lib/utils/tool-loader';
+import { categoryLabels, getToolById } from '@/lib/modules/tool-registry/config';
+import { getToolComponent } from '@/lib/modules/tool-registry/loader';
 
 import { Badge } from '../../../components/primitives/Badge';
 

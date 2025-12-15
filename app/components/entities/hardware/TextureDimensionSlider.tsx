@@ -7,7 +7,7 @@ import {
   isPowerOfTwo,
   TEXTURE_LIMITS,
   TEXTURE_ZONES,
-} from '@/lib/domain/hardware/texture-standards';
+} from '@/lib/modules/graphics/standards';
 
 interface TextureDimensionSliderProps {
   label: string;

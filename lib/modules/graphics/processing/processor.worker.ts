@@ -1,4 +1,4 @@
-import { PIXEL_STRIDE, RGB } from '@/lib/utils/colors';
+import { PIXEL_STRIDE, RGB } from '@/lib/core/utils/colors';
 
 import {
   applyBlur,

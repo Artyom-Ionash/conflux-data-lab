@@ -6,7 +6,7 @@ import {
   HARDWARE_STANDARD_YEAR,
   TEXTURE_LIMITS,
   TEXTURE_ZONES,
-} from '@/lib/domain/hardware/texture-standards';
+} from '@/lib/modules/graphics/standards';
 
 interface TextureLimitIndicatorProps {
   value: number;

@@ -3,15 +3,15 @@
 import Image from 'next/image';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 
-import type { Point } from '@/lib/domain/image/filters';
+import { useObjectUrl } from '@/lib/core/hooks/use-object-url';
+import { hexToRgb, invertHex, rgbToHex } from '@/lib/core/utils/colors';
+import { downloadDataUrl, getTopLeftPixelColor, loadImage } from '@/lib/core/utils/media';
+import type { Point } from '@/lib/modules/graphics/processing/filters';
 import type {
   ProcessingMode,
   WorkerPayload,
   WorkerResponse,
-} from '@/lib/domain/image/image-processor.worker';
-import { useObjectUrl } from '@/lib/hooks/use-object-url';
-import { hexToRgb, invertHex, rgbToHex } from '@/lib/utils/colors';
-import { downloadDataUrl, getTopLeftPixelColor, loadImage } from '@/lib/utils/media';
+} from '@/lib/modules/graphics/processing/processor.worker';
 
 import { Canvas, CanvasRef } from '../../primitives/Canvas';
 import { ColorInput } from '../../primitives/ColorInput';
@@ -80,7 +80,7 @@ export function MonochromeBackgroundRemover() {
   useEffect(() => {
     // Инициализация Web Worker
     workerRef.current = new Worker(
-      new URL('@/lib/domain/image/image-processor.worker.ts', import.meta.url)
+      new URL('@/lib/modules/graphics/processing/processor.worker.ts', import.meta.url)
     );
 
     workerRef.current.onmessage = (e: MessageEvent<WorkerResponse>) => {

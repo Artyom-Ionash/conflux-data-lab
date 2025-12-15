@@ -1,4 +1,4 @@
-import { getColorDistance, PIXEL_STRIDE, RGB } from '@/lib/utils/colors';
+import { getColorDistance, PIXEL_STRIDE, RGB } from '@/lib/core/utils/colors';
 
 // --- Constants ---
 const RGB_MAX = 255;

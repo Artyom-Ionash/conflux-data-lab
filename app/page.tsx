@@ -1,4 +1,4 @@
-import { categoryLabels, tools, toolsByCategory } from '@/lib/config/tools';
+import { categoryLabels, tools, toolsByCategory } from '@/lib/modules/tool-registry/config';
 
 import { Badge } from './components/primitives/Badge';
 import { ToolGrid } from './components/tools/ToolGrid';

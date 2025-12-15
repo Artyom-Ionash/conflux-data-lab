@@ -4,9 +4,9 @@ import type { CreateGIFResult } from 'gifshot';
 import gifshot from 'gifshot';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
-import { TEXTURE_LIMITS } from '@/lib/domain/hardware/texture-standards';
-import { generateSpriteSheet } from '@/lib/domain/image/sprite-generator'; // IMPORT NEW ABSTRACTION
-import { useObjectUrl } from '@/lib/hooks/use-object-url';
+import { useObjectUrl } from '@/lib/core/hooks/use-object-url';
+import { generateSpriteSheet } from '@/lib/modules/graphics/processing/sprite-generator'; // IMPORT NEW ABSTRACTION
+import { TEXTURE_LIMITS } from '@/lib/modules/graphics/standards';
 
 // --- DOMAIN IMPORTS ---
 import { TextureLimitIndicator } from '../../entities/hardware/TextureLimitIndicator';

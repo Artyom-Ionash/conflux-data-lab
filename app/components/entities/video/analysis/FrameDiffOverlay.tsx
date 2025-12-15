@@ -4,8 +4,8 @@ import Image from 'next/image';
 import { useEffect, useRef, useState } from 'react';
 
 import { getCanvasFromImage } from '@/app/components/primitives/Canvas';
-import { areColorsSimilar } from '@/lib/utils/colors';
-import { getTopLeftPixelColor, loadImage } from '@/lib/utils/media';
+import { areColorsSimilar } from '@/lib/core/utils/colors';
+import { getTopLeftPixelColor, loadImage } from '@/lib/core/utils/media';
 
 interface FrameDiffOverlayProps {
   image1: string | null;

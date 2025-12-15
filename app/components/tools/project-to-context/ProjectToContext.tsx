@@ -2,8 +2,8 @@
 
 import React, { useRef, useState } from 'react';
 
-import { formatBytes, generateAsciiTree } from '@/lib/utils/file-tree'; // IMPORT NEW ABSTRACTIONS
-import { GodotSceneParser } from '@/lib/utils/parsers/godot-scene';
+import { GodotSceneParser } from '@/lib/modules/file-system/godot-scene';
+import { formatBytes, generateAsciiTree } from '@/lib/modules/file-system/tree-view'; // IMPORT NEW ABSTRACTIONS
 
 import { Card } from '../../primitives/Card';
 import { Switch } from '../../primitives/Switch';
