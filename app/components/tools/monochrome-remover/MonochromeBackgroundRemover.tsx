@@ -5,6 +5,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 
 import { useDebounceEffect } from '@/lib/core/hooks/use-debounce-effect';
 import { useObjectUrl } from '@/lib/core/hooks/use-object-url';
+import { useWorker } from '@/lib/core/hooks/use-worker';
 import { hexToRgb, invertHex, rgbToHex } from '@/lib/core/utils/colors';
 import { downloadDataUrl, getTopLeftPixelColor, loadImage } from '@/lib/core/utils/media';
 import type { Point } from '@/lib/modules/graphics/processing/filters';
@@ -74,48 +75,45 @@ export function MonochromeBackgroundRemover() {
   const sourceCanvasRef = useRef<HTMLCanvasElement>(null);
   const previewCanvasRef = useRef<HTMLCanvasElement>(null);
 
-  // Ref для воркера
-  const workerRef = useRef<Worker | null>(null);
+  // --- WORKER INTEGRATION ---
+  // Фабрика воркера (должна быть стабильной или useCallback, но здесь просто функция вне рендера или useCallback)
+  const createWorker = useCallback(
+    () =>
+      new Worker(new URL('@/lib/modules/graphics/processing/processor.worker.ts', import.meta.url)),
+    []
+  );
 
-  // --- WORKER SETUP ---
-  useEffect(() => {
-    // Инициализация Web Worker
-    workerRef.current = new Worker(
-      new URL('@/lib/modules/graphics/processing/processor.worker.ts', import.meta.url)
-    );
+  const handleWorkerMessage = useCallback((data: WorkerResponse) => {
+    const { processedData, error } = data;
 
-    workerRef.current.onmessage = (e: MessageEvent<WorkerResponse>) => {
-      const { processedData, error } = e.data;
-
-      if (error) {
-        console.error(error);
-        setIsProcessing(false);
-        return;
-      }
-
-      if (previewCanvasRef.current && processedData) {
-        const ctx = previewCanvasRef.current.getContext('2d');
-
-        const imgData = new ImageData(
-          new Uint8ClampedArray(
-            processedData.buffer as ArrayBuffer,
-            processedData.byteOffset,
-            processedData.length
-          ),
-          previewCanvasRef.current.width,
-          previewCanvasRef.current.height
-        );
-
-        ctx?.putImageData(imgData, 0, 0);
-      }
-
+    if (error) {
+      console.error(error);
       setIsProcessing(false);
-    };
+      return;
+    }
 
-    return () => {
-      workerRef.current?.terminate();
-    };
+    if (previewCanvasRef.current && processedData) {
+      const ctx = previewCanvasRef.current.getContext('2d');
+      // Создаем ImageData из буфера (zero-copy view)
+      const imgData = new ImageData(
+        new Uint8ClampedArray(
+          processedData.buffer as ArrayBuffer,
+          processedData.byteOffset,
+          processedData.length
+        ),
+        previewCanvasRef.current.width,
+        previewCanvasRef.current.height
+      );
+      ctx?.putImageData(imgData, 0, 0);
+    }
+    setIsProcessing(false);
   }, []);
+
+  // Инициализация хука
+  const { postMessage } = useWorker<WorkerPayload, WorkerResponse>({
+    workerFactory: createWorker,
+    onMessage: handleWorkerMessage,
+  });
 
   // --- LOGIC ---
 
@@ -148,7 +146,7 @@ export function MonochromeBackgroundRemover() {
   }, []);
 
   const processImage = useCallback(() => {
-    if (!originalUrl || !sourceCanvasRef.current || !workerRef.current) return;
+    if (!originalUrl || !sourceCanvasRef.current) return;
 
     const sourceCtx = sourceCanvasRef.current.getContext('2d', { willReadFrequently: true });
     if (!sourceCtx) return;
@@ -166,7 +164,6 @@ export function MonochromeBackgroundRemover() {
 
     setIsProcessing(true);
 
-    // Собираем пейлоад для воркера
     const payload: WorkerPayload = {
       imageData: imageData.data, // Uint8ClampedArray
       width,
@@ -175,18 +172,18 @@ export function MonochromeBackgroundRemover() {
       settings: {
         targetColor: targetRGB,
         contourColor: contourRGB,
-        tolerance: tolerances[processingMode] ?? 0, // Fallback for strictness
+        tolerance: tolerances[processingMode] ?? 0,
         smoothness,
         edgeChoke,
         edgeBlur,
         edgePaint,
         maxRgbDistance: MAX_RGB_DISTANCE,
-        floodPoints: [...floodPoints], // Копия массива точек
+        floodPoints: [...floodPoints],
       },
     };
 
-    // Отправляем данные в воркер.
-    workerRef.current.postMessage(payload, [imageData.data.buffer]);
+    // Отправляем данные через хук
+    postMessage(payload, [imageData.data.buffer]);
   }, [
     originalUrl,
     targetColor,
@@ -198,6 +195,7 @@ export function MonochromeBackgroundRemover() {
     edgeChoke,
     edgeBlur,
     edgePaint,
+    postMessage,
   ]);
 
   // --- EFFECTS ---
@@ -261,7 +259,6 @@ export function MonochromeBackgroundRemover() {
     }
   };
 
-  // Унифицированная функция получения координат относительно изображения
   const getRelativeImageCoords = (clientX: number, clientY: number): Point | null => {
     if (!workspaceRef.current || !imgDimensions.w) return null;
     const world = workspaceRef.current.screenToWorld(clientX, clientY);
@@ -293,7 +290,7 @@ export function MonochromeBackgroundRemover() {
       if (newCoords) {
         setFloodPoints((prev) => {
           const next = [...prev];
-          next[draggingPointIndex] = newCoords; // Index checked by usage context
+          next[draggingPointIndex] = newCoords;
           return next;
         });
       }
@@ -304,7 +301,6 @@ export function MonochromeBackgroundRemover() {
     if (draggingPointIndex !== null) setDraggingPointIndex(null);
   };
 
-  // Updated Eyedropper to use unified coordinate system
   const handleEyedropper = (e: React.MouseEvent) => {
     if (!sourceCanvasRef.current) return;
 
@@ -407,7 +403,7 @@ export function MonochromeBackgroundRemover() {
           <ControlSection>
             <Slider
               label="Допуск (%)"
-              value={tolerances[processingMode] ?? 0} // Fallback
+              value={tolerances[processingMode] ?? 0}
               onChange={(val) => setTolerances((p) => ({ ...p, [processingMode]: val }))}
               min={0}
               max={100}
