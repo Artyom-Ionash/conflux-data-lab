@@ -4,6 +4,7 @@ import type { CreateGIFResult } from 'gifshot';
 import gifshot from 'gifshot';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
+import { useDebounceEffect } from '@/lib/core/hooks/use-debounce-effect';
 import { useObjectUrl } from '@/lib/core/hooks/use-object-url';
 import { generateSpriteSheet } from '@/lib/modules/graphics/processing/sprite-generator'; // IMPORT NEW ABSTRACTION
 import { TEXTURE_LIMITS } from '@/lib/modules/graphics/standards';
@@ -276,11 +277,15 @@ function useVideoFrameExtraction() {
     }
   }, [videoSrc, extractionParams.startTime, extractionParams.frameStep, effectiveEnd]);
 
-  useEffect(() => {
-    if (!videoSrc) return;
-    const timer = setTimeout(() => runExtraction(), 600);
-    return () => clearTimeout(timer);
-  }, [runExtraction, videoSrc]);
+  useDebounceEffect(
+    () => {
+      if (videoSrc) {
+        void runExtraction();
+      }
+    },
+    [runExtraction, videoSrc],
+    600
+  );
 
   const generateAndDownloadGif = useCallback(() => {
     const validFrames = frames.filter((f) => f.dataUrl !== null);
