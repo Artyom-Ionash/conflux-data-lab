@@ -1,5 +1,3 @@
-// conflux-data-lab/app/components/tools/monochrome-remover/MonochromeBackgroundRemover.tsx
-
 'use client';
 
 import Image from 'next/image';
@@ -23,7 +21,7 @@ import { Slider } from '../../primitives/Slider';
 import { ToggleGroup, ToggleGroupItem } from '../../primitives/ToggleGroup';
 import { ToolLayout } from '../ToolLayout';
 
-// ... (CONSTANTS без изменений)
+// --- CONSTANTS ---
 const DEBOUNCE_DELAY = 50;
 const VIEW_RESET_DELAY = 50;
 const MOUSE_BUTTON_LEFT = 0;
@@ -45,7 +43,6 @@ const DEFAULT_SETTINGS = {
 };
 
 export function MonochromeBackgroundRemover() {
-  // ... (State без изменений)
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const originalUrl = useObjectUrl(selectedFile);
 
@@ -76,9 +73,12 @@ export function MonochromeBackgroundRemover() {
   const sourceCanvasRef = useRef<HTMLCanvasElement>(null);
   const previewCanvasRef = useRef<HTMLCanvasElement>(null);
 
+  // Ref для воркера
   const workerRef = useRef<Worker | null>(null);
 
+  // --- WORKER SETUP ---
   useEffect(() => {
+    // Инициализация Web Worker
     workerRef.current = new Worker(
       new URL('@/lib/modules/graphics/processing/processor.worker.ts', import.meta.url)
     );
@@ -94,6 +94,7 @@ export function MonochromeBackgroundRemover() {
 
       if (previewCanvasRef.current && processedData) {
         const ctx = previewCanvasRef.current.getContext('2d');
+
         const imgData = new ImageData(
           new Uint8ClampedArray(
             processedData.buffer as ArrayBuffer,
@@ -103,8 +104,10 @@ export function MonochromeBackgroundRemover() {
           previewCanvasRef.current.width,
           previewCanvasRef.current.height
         );
+
         ctx?.putImageData(imgData, 0, 0);
       }
+
       setIsProcessing(false);
     };
 
@@ -113,12 +116,15 @@ export function MonochromeBackgroundRemover() {
     };
   }, []);
 
+  // --- LOGIC ---
+
   const loadOriginalToCanvas = useCallback(async (url: string) => {
     try {
       const img = await loadImage(url);
 
       setImgDimensions({ w: img.width, h: img.height });
 
+      // Настраиваем скрытый Source Canvas (хранит оригинал)
       if (sourceCanvasRef.current) {
         sourceCanvasRef.current.width = img.width;
         sourceCanvasRef.current.height = img.height;
@@ -126,6 +132,7 @@ export function MonochromeBackgroundRemover() {
         ctx?.drawImage(img, 0, 0);
       }
 
+      // Настраиваем Preview Canvas
       if (previewCanvasRef.current) {
         previewCanvasRef.current.width = img.width;
         previewCanvasRef.current.height = img.height;
@@ -147,7 +154,10 @@ export function MonochromeBackgroundRemover() {
 
     const width = sourceCanvasRef.current.width;
     const height = sourceCanvasRef.current.height;
+
+    // Получаем свежие данные с исходного канваса
     const imageData = sourceCtx.getImageData(0, 0, width, height);
+
     const targetRGB = hexToRgb(targetColor);
     const contourRGB = hexToRgb(contourColor);
 
@@ -155,24 +165,26 @@ export function MonochromeBackgroundRemover() {
 
     setIsProcessing(true);
 
+    // Собираем пейлоад для воркера
     const payload: WorkerPayload = {
-      imageData: imageData.data,
+      imageData: imageData.data, // Uint8ClampedArray
       width,
       height,
       mode: processingMode,
       settings: {
         targetColor: targetRGB,
         contourColor: contourRGB,
-        tolerance: tolerances[processingMode],
+        tolerance: tolerances[processingMode] ?? 0, // Fallback for strictness
         smoothness,
         edgeChoke,
         edgeBlur,
         edgePaint,
         maxRgbDistance: MAX_RGB_DISTANCE,
-        floodPoints: [...floodPoints],
+        floodPoints: [...floodPoints], // Копия массива точек
       },
     };
 
+    // Отправляем данные в воркер.
     workerRef.current.postMessage(payload, [imageData.data.buffer]);
   }, [
     originalUrl,
@@ -187,6 +199,8 @@ export function MonochromeBackgroundRemover() {
     edgePaint,
   ]);
 
+  // --- EFFECTS ---
+
   useEffect(() => {
     if (originalUrl) {
       requestAnimationFrame(() => {
@@ -195,6 +209,7 @@ export function MonochromeBackgroundRemover() {
     }
   }, [originalUrl, loadOriginalToCanvas]);
 
+  // Debounced processing trigger
   useEffect(() => {
     if (!originalUrl) return;
     if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
@@ -206,6 +221,7 @@ export function MonochromeBackgroundRemover() {
     };
   }, [originalUrl, processImage]);
 
+  // Immediate trigger for manual actions
   useEffect(() => {
     if (manualTrigger > 0 && processingMode === 'flood-clear') {
       const timer = setTimeout(() => {
@@ -213,9 +229,10 @@ export function MonochromeBackgroundRemover() {
       }, 0);
       return () => clearTimeout(timer);
     }
-    // FIX: Явный return undefined, чтобы TS не ругался на отсутствие возвращаемого значения во всех путях
     return undefined;
   }, [manualTrigger, processingMode, processImage]);
+
+  // --- EVENT HANDLERS ---
 
   const handleFilesSelected = async (files: File[]) => {
     const file = files[0];
@@ -243,6 +260,7 @@ export function MonochromeBackgroundRemover() {
     }
   };
 
+  // Унифицированная функция получения координат относительно изображения
   const getRelativeImageCoords = (clientX: number, clientY: number): Point | null => {
     if (!workspaceRef.current || !imgDimensions.w) return null;
     const world = workspaceRef.current.screenToWorld(clientX, clientY);
@@ -274,7 +292,7 @@ export function MonochromeBackgroundRemover() {
       if (newCoords) {
         setFloodPoints((prev) => {
           const next = [...prev];
-          next[draggingPointIndex] = newCoords;
+          next[draggingPointIndex] = newCoords; // Index checked by usage context
           return next;
         });
       }
@@ -285,17 +303,19 @@ export function MonochromeBackgroundRemover() {
     if (draggingPointIndex !== null) setDraggingPointIndex(null);
   };
 
+  // Updated Eyedropper to use unified coordinate system
   const handleEyedropper = (e: React.MouseEvent) => {
     if (!sourceCanvasRef.current) return;
 
-    const rect = (e.target as HTMLElement).getBoundingClientRect();
-    const x = ((e.clientX - rect.left) / rect.width) * sourceCanvasRef.current.width;
-    const y = ((e.clientY - rect.top) / rect.height) * sourceCanvasRef.current.height;
+    // 1. Получаем координаты через единый механизм Canvas
+    const coords = getRelativeImageCoords(e.clientX, e.clientY);
+    if (!coords) return;
 
     const ctx = sourceCanvasRef.current.getContext('2d', { willReadFrequently: true });
     if (ctx) {
-      const p = ctx.getImageData(x, y, 1, 1).data;
-      // FIX: Используем ?? 0, так как массив может вернуть undefined
+      // 2. Используем полученные координаты
+      const p = ctx.getImageData(coords.x, coords.y, 1, 1).data;
+      // Используем nullish coalescing для строгой типизации доступа к массиву
       setTargetColor(rgbToHex(p[OFFSET_R] ?? 0, p[OFFSET_G] ?? 0, p[OFFSET_B] ?? 0));
     }
   };
@@ -304,13 +324,50 @@ export function MonochromeBackgroundRemover() {
   const clearAllPoints = () => setFloodPoints([]);
   const handleRunFloodFill = () => setManualTrigger((prev) => prev + 1);
 
-  // ... (JSX render без изменений)
+  // --- RENDER ---
   const sidebarContent = (
     <div className="flex flex-col gap-6 pb-4">
-      {/* ... */}
+      <div className="space-y-2">
+        <ControlLabel>Исходник</ControlLabel>
+        <FileDropzone
+          onFilesSelected={handleFilesSelected}
+          multiple={false}
+          label="Загрузить изображение"
+        />
+      </div>
+
       {originalUrl && (
         <div className="animate-fade-in space-y-6">
-          {/* ... */}
+          <ControlSection title="Режим">
+            <ToggleGroup
+              type="single"
+              value={processingMode}
+              gridCols={2}
+              onValueChange={(val) => {
+                if (val) setProcessingMode(val as ProcessingMode);
+              }}
+            >
+              <ToggleGroupItem value="remove">Убрать цвет</ToggleGroupItem>
+              <ToggleGroupItem value="keep">Оставить цвет</ToggleGroupItem>
+              <ToggleGroupItem
+                value="flood-clear"
+                fullWidth
+                className="flex items-center justify-center gap-2"
+              >
+                Заливка невидимостью
+              </ToggleGroupItem>
+            </ToggleGroup>
+
+            {processingMode === 'flood-clear' && (
+              <div className="rounded border border-blue-100 bg-blue-50 p-2 text-[10px] leading-tight text-blue-600 dark:border-blue-800 dark:bg-blue-900/20 dark:text-blue-400">
+                1. Кликните на холст, чтобы поставить точки.
+                <br />
+                2. Точки можно <b>перетаскивать</b>.<br />
+                3. Заливка обновляется <b>автоматически</b>.
+              </div>
+            )}
+          </ControlSection>
+
           <ControlSection>
             <div className="flex flex-col gap-2">
               <div className="flex items-center gap-3">
@@ -324,12 +381,114 @@ export function MonochromeBackgroundRemover() {
                     unoptimized
                   />
                 </div>
-                {/* ... */}
+                <div className="flex flex-1 items-center gap-2 rounded border bg-zinc-50 p-2 dark:border-zinc-700 dark:bg-zinc-800">
+                  <ColorInput value={targetColor} onChange={setTargetColor} size="sm" />
+                  <div className="flex flex-col">
+                    <ControlLabel className="text-[10px]! opacity-70">Цель (Фон)</ControlLabel>
+                    <span className="font-mono text-xs font-bold uppercase">{targetColor}</span>
+                  </div>
+                </div>
               </div>
-              {/* ... */}
+
+              <div className="flex items-center gap-3">
+                <div className="h-8 w-8 flex-shrink-0" />
+                <div className="flex flex-1 items-center gap-2 rounded border bg-zinc-50 p-2 dark:border-zinc-700 dark:bg-zinc-800">
+                  <ColorInput value={contourColor} onChange={setContourColor} size="sm" />
+                  <div className="flex flex-col">
+                    <ControlLabel className="text-[10px]! opacity-70">Контур / Окрас</ControlLabel>
+                    <span className="font-mono text-xs font-bold uppercase">{contourColor}</span>
+                  </div>
+                </div>
+              </div>
             </div>
           </ControlSection>
-          {/* ... */}
+
+          <ControlSection>
+            <Slider
+              label="Допуск (%)"
+              value={tolerances[processingMode] ?? 0} // Fallback
+              onChange={(val) => setTolerances((p) => ({ ...p, [processingMode]: val }))}
+              min={0}
+              max={100}
+            />
+            {processingMode !== 'flood-clear' && (
+              <Slider
+                label="Сглаживание"
+                value={smoothness}
+                onChange={setSmoothness}
+                min={0}
+                max={50}
+              />
+            )}
+            <div className="border-t border-zinc-200 pt-2 dark:border-zinc-700/50">
+              <div className="mb-3 flex justify-between text-xs">
+                <ControlLabel>Удаление ореолов</ControlLabel>
+              </div>
+              <Slider
+                label="Сжатие (Choke)"
+                value={edgeChoke}
+                onChange={setEdgeChoke}
+                min={0}
+                max={5}
+                step={1}
+              />
+              <Slider
+                label="Смягчение (Blur)"
+                value={edgeBlur}
+                onChange={setEdgeBlur}
+                min={0}
+                max={5}
+                step={1}
+              />
+              <Slider
+                label="Окрашивание (Paint)"
+                value={edgePaint}
+                onChange={setEdgePaint}
+                min={0}
+                max={5}
+                step={1}
+              />
+            </div>
+          </ControlSection>
+
+          {processingMode === 'flood-clear' && (
+            <div className="space-y-3 rounded-lg border border-blue-100 bg-blue-50 p-3 dark:border-blue-900/30 dark:bg-blue-900/10">
+              <div className="flex items-center justify-between text-xs font-bold text-blue-800 dark:text-blue-200">
+                <span>Точки: {floodPoints.length}</span>
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={removeLastPoint}
+                  disabled={floodPoints.length === 0}
+                  className="flex-1 rounded border border-zinc-200 bg-white py-2 text-xs hover:bg-zinc-50 disabled:opacity-50 dark:border-zinc-700 dark:bg-zinc-800"
+                >
+                  Отменить
+                </button>
+                <button
+                  onClick={clearAllPoints}
+                  disabled={floodPoints.length === 0}
+                  className="flex-1 rounded border border-zinc-200 bg-white py-2 text-xs hover:bg-red-50 hover:text-red-500 disabled:opacity-50 dark:border-zinc-700 dark:bg-zinc-800"
+                >
+                  Сбросить
+                </button>
+              </div>
+              <button
+                onClick={handleRunFloodFill}
+                disabled={floodPoints.length === 0 || isProcessing}
+                className="w-full rounded bg-blue-600 py-2.5 text-xs font-bold tracking-wide text-white uppercase shadow-sm hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {isProcessing ? 'Обработка...' : 'Принудительно обновить'}
+              </button>
+            </div>
+          )}
+
+          <button
+            onClick={handleDownload}
+            disabled={!originalUrl}
+            className="w-full rounded bg-zinc-900 py-3 text-sm font-bold text-white shadow transition hover:opacity-90 disabled:opacity-50 dark:bg-white dark:text-black"
+          >
+            Скачать
+          </button>
         </div>
       )}
     </div>
