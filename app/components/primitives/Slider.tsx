@@ -93,8 +93,8 @@ export const Slider = ({
         max={max}
         min={min}
         step={step}
-        disabled={disabled} // <-- Блокировка Radix
-        onValueChange={(val) => onChange(val[0])}
+        disabled={disabled}
+        onValueChange={(val) => onChange(val[0] ?? value)}
       >
         <SliderPrimitive.Track className="relative h-[4px] grow rounded-full bg-zinc-200 dark:bg-zinc-700">
           <SliderPrimitive.Range

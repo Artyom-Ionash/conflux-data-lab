@@ -47,12 +47,13 @@ export function TextureLimitIndicator({ value, label, className }: TextureLimitI
     <ZoneIndicator
       value={value}
       displayValue={displayValue}
-      max={TEXTURE_LIMITS.MAX_SLIDER} // Исправлено: MAX_VISUALIZER -> MAX_SLIDER
+      max={TEXTURE_LIMITS.MAX_SLIDER}
       zones={uiZones}
       markerColorClass={styles.marker}
-      label={label}
+      // FIX: exactOptionalPropertyTypes не разрешает undefined для optional string
+      label={label ?? ''}
       tooltip={tooltipContent}
-      className={className}
+      className={className ?? ''}
     />
   );
 }

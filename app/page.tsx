@@ -31,17 +31,23 @@ export default function Home() {
       )}
 
       {/* Tools by Category */}
-      {categories.map((category) => (
-        <section key={category} className="mb-12">
-          <div className="mb-6 flex items-center gap-3">
-            <h2 className="text-2xl font-semibold text-zinc-900 dark:text-zinc-100">
-              {categoryLabels[category] || category}
-            </h2>
-            <Badge variant="secondary">{toolsByCategory[category].length}</Badge>
-          </div>
-          <ToolGrid tools={toolsByCategory[category]} />
-        </section>
-      ))}
+      {categories.map((category) => {
+        // FIX: Явно получаем массив или пустой список
+        const categoryTools = toolsByCategory[category] ?? [];
+
+        return (
+          <section key={category} className="mb-12">
+            <div className="mb-6 flex items-center gap-3">
+              <h2 className="text-2xl font-semibold text-zinc-900 dark:text-zinc-100">
+                {categoryLabels[category] || category}
+              </h2>
+              {/* FIX: categoryTools гарантированно массив */}
+              <Badge variant="secondary">{categoryTools.length}</Badge>
+            </div>
+            <ToolGrid tools={categoryTools} />
+          </section>
+        );
+      })}
 
       {/* All Tools Count */}
       <section className="mt-12 rounded-lg border border-zinc-200 bg-zinc-50 p-6 text-center dark:border-zinc-800 dark:bg-zinc-900">

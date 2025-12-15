@@ -1,3 +1,5 @@
+// conflux-data-lab/tsconfig.json
+
 {
   "compilerOptions": {
     // Безопасный и современный стандарт для Node 18+
@@ -5,8 +7,32 @@
     "lib": ["dom", "dom.iterable", "esnext"],
 
     "allowJs": true,
+    // Включаем проверку типов даже в JS файлах (максимальная строгость для смешанных проектов)
+    "checkJs": true,
+
     "skipLibCheck": true,
     "strict": true,
+
+    // --- MAXIMUM STRICTNESS ---
+    // Гарантирует, что доступ по индексу (arr[0]) всегда возвращает Type | undefined
+    "noUncheckedIndexedAccess": true,
+    // Запрещает доступ к свойствам через точку, если они определены только через index signature
+    "noPropertyAccessFromIndexSignature": true,
+    // Требует ключевое слово 'override' при переопределении методов классов
+    "noImplicitOverride": true,
+    // Различает опциональные поля (?) и поля, которые могут быть undefined
+    "exactOptionalPropertyTypes": true,
+
+    // --- CODE QUALITY ---
+    // Ошибка, если функция не возвращает значение во всех ветках кода
+    "noImplicitReturns": true,
+    // Ошибка при проваливании в switch-case без break/return
+    "noFallthroughCasesInSwitch": true,
+    // Ошибка при наличии недостижимого кода
+    "allowUnreachableCode": false,
+    // Ошибка при неиспользуемых лейблах
+    "allowUnusedLabels": false,
+
     "noEmit": true,
     "esModuleInterop": true,
     "module": "esnext",
@@ -23,7 +49,6 @@
     "paths": {
       "@/*": ["./*"]
     },
-    // Добавьте это, если VS Code не видит типов из node_modules
     "typeRoots": ["./lib/types", "./node_modules/@types"]
   },
   "include": [

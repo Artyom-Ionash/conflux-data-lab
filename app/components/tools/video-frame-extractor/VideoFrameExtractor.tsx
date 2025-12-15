@@ -173,6 +173,7 @@ function useVideoFrameExtraction() {
   const handleFilesSelected = useCallback(async (files: File[]) => {
     if (!files.length) return;
     const file = files[0];
+    if (!file) return;
     setRawFrames([]);
     setPreviewFrames({ start: null, end: null });
     setError(null);
@@ -466,9 +467,13 @@ export function VideoFrameExtractor() {
   };
 
   const handleValueChange = (newValues: number[], thumbIndex?: 0 | 1) => {
-    setExtractionParams((p) => ({ ...p, startTime: newValues[0], endTime: newValues[1] }));
+    const start = newValues[0] ?? 0;
+    const end = newValues[1] ?? 0;
+
+    setExtractionParams((p) => ({ ...p, startTime: start, endTime: end }));
+
     if (isDragging && typeof thumbIndex === 'number') {
-      const changedTime = newValues[thumbIndex];
+      const changedTime = newValues[thumbIndex] ?? 0;
       setHoverPreview({ activeThumb: thumbIndex, time: changedTime });
       if (hoverVideoRef.current) hoverVideoRef.current.currentTime = changedTime;
     }

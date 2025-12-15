@@ -62,6 +62,12 @@ export function getTopLeftPixelColor(source: CanvasImageSource): RGB {
   // Рисуем кусочек 1x1 из координат 0,0 источника в координаты 0,0 канваса
   ctx.drawImage(source, 0, 0, 1, 1, 0, 0, 1, 1);
 
-  const [r, g, b] = ctx.getImageData(0, 0, 1, 1).data;
+  const data = ctx.getImageData(0, 0, 1, 1).data;
+
+  // FIX: Используем nullish coalescing (?? 0), так как TS не гарантирует наличие индекса
+  const r = data[0] ?? 255;
+  const g = data[1] ?? 255;
+  const b = data[2] ?? 255;
+
   return { r, g, b };
 }

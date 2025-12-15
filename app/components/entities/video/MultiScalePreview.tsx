@@ -49,7 +49,7 @@ export function MultiScalePreview({ frames, fps }: MultiScalePreviewProps) {
           >
             <div style={{ width: size, height: size }}>
               <Image
-                src={currentSrc}
+                src={currentSrc ?? ''}
                 alt={`${size}px preview`}
                 width={size}
                 height={size}

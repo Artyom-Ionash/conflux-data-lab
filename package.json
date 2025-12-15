@@ -3,9 +3,12 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "run-p dev:next type-check:watch",
+    "dev:next": "next dev",
     "build": "next build",
     "start": "next start",
+    "type-check": "tsc --noEmit",
+    "type-check:watch": "tsc --noEmit --watch --preserveWatchOutput",
     "lint": "eslint",
     "lint:fix": "eslint --fix",
     "stylelint": "stylelint \"**/*.css\"",

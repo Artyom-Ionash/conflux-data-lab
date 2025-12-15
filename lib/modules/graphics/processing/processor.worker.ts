@@ -97,7 +97,7 @@ self.onmessage = (e: MessageEvent<WorkerPayload>) => {
     // alphaChannel - это Uint8Array (0-255), imageData - это RGBA буфер
     const OFFSET_A = 3;
     for (let i = 0, idx = 0; i < imageData.length; i += PIXEL_STRIDE, idx++) {
-      imageData[i + OFFSET_A] = alphaChannel[idx];
+      imageData[i + OFFSET_A] = alphaChannel[idx]!;
     }
 
     // Отправляем результат обратно.

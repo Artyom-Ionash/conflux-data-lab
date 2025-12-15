@@ -32,14 +32,12 @@ export function applyColorFilter(
   const smoothVal = (smoothness / 100) * maxRgbDistance;
 
   for (let i = 0, idx = 0; i < data.length; i += PIXEL_STRIDE, idx++) {
-    const dist = getColorDistance(
-      data[i + OFFSET_R],
-      data[i + OFFSET_G],
-      data[i + OFFSET_B],
-      targetColor.r,
-      targetColor.g,
-      targetColor.b
-    );
+    // FIX: Используем !, так как шаг цикла гарантирует существование элементов
+    const r = data[i + OFFSET_R]!;
+    const g = data[i + OFFSET_G]!;
+    const b = data[i + OFFSET_B]!;
+
+    const dist = getColorDistance(r, g, b, targetColor.r, targetColor.g, targetColor.b);
 
     let alpha = RGB_MAX;
 
@@ -95,14 +93,13 @@ export function applyFloodFillMask(
 
       // Проверка границы (контура)
       const pxIdx = idx * PIXEL_STRIDE;
-      const dist = getColorDistance(
-        data[pxIdx + OFFSET_R],
-        data[pxIdx + OFFSET_G],
-        data[pxIdx + OFFSET_B],
-        contourColor.r,
-        contourColor.g,
-        contourColor.b
-      );
+
+      // FIX: Используем !
+      const r = data[pxIdx + OFFSET_R]!;
+      const g = data[pxIdx + OFFSET_G]!;
+      const b = data[pxIdx + OFFSET_B]!;
+
+      const dist = getColorDistance(r, g, b, contourColor.r, contourColor.g, contourColor.b);
 
       if (dist <= tolVal) continue; // Попали в контур, останавливаемся
 
@@ -184,7 +181,7 @@ export function applyBlur(
           const ny = y + ky;
           const nx = x + kx;
           if (nx >= 0 && nx < width && ny >= 0 && ny < height) {
-            sum += alphaChannel[ny * width + nx];
+            sum += alphaChannel[ny * width + nx]!;
             count++;
           }
         }

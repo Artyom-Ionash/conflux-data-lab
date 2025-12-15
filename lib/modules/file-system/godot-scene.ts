@@ -92,11 +92,19 @@ export class GodotSceneParser {
   }
 
   private createNode(attrs: Record<string, string>, isResource: boolean): GodotNode {
-    const name = (isResource ? attrs.id : attrs.name)?.replace(/"/g, '') || 'Unnamed';
+    const rawName = isResource ? attrs['id'] : attrs['name'];
+    const name = rawName?.replace(/"/g, '') || 'Unnamed';
+
+    const rawType = attrs['type'];
+    const type = rawType?.replace(/"/g, '') || (isResource ? 'Resource' : 'Node');
+
+    const rawParent = attrs['parent'];
+    const parentPath = rawParent?.replace(/"/g, '') || null;
+
     return {
       name,
-      type: attrs.type?.replace(/"/g, '') || (isResource ? 'Resource' : 'Node'),
-      parentPath: attrs.parent?.replace(/"/g, '') || null,
+      type,
+      parentPath,
       properties: {},
       children: [],
       isResource,

@@ -22,7 +22,7 @@ export async function generateSpriteSheet(
   if (validFrames.length === 0) throw new Error('No frames to generate sprite');
 
   // 1. Load first image to determine scaling ratio
-  const firstImage = await loadImage(validFrames[0].dataUrl!);
+  const firstImage = await loadImage(validFrames[0]!.dataUrl!);
 
   const scale = options.maxHeight / firstImage.height;
   const scaledWidth = Math.floor(firstImage.width * scale);
@@ -53,7 +53,8 @@ export async function generateSpriteSheet(
 
   // 5. Draw Frames
   for (let i = 0; i < validFrames.length; i++) {
-    const img = await loadImage(validFrames[i].dataUrl!);
+    // FIX: Используем !, так как i внутри границ массива
+    const img = await loadImage(validFrames[i]!.dataUrl!);
     const x = i * (scaledWidth + options.spacing);
     ctx.drawImage(img, x, 0, scaledWidth, scaledHeight);
   }

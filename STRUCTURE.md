@@ -113,7 +113,8 @@ conflux-data-lab/
 ├── package-lock.json
 ├── postcss.config.mjs # Конфигурация PostCSS
 ├── stylelint.config.mjs
-└── TECH_DEBT.md
+├── TECH_DEBT.md
+└── tsconfig.tsbuildinfo
 ```
 
 ## Ключевые особенности структуры
