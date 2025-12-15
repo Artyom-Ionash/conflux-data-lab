@@ -1,5 +1,6 @@
 import Image from 'next/image';
-import React, { RefObject } from 'react';
+import type { RefObject } from 'react';
+import React from 'react';
 
 interface DualHoverPreviewProps {
   activeThumb: 0 | 1;

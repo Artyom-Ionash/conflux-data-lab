@@ -1,9 +1,9 @@
 'use client';
 
+import type { DragEndEvent } from '@dnd-kit/core';
 import {
   closestCenter,
   DndContext,
-  DragEndEvent,
   KeyboardSensor,
   PointerSensor,
   useSensor,
@@ -29,7 +29,8 @@ import {
 } from '@/lib/core/utils/media';
 
 import { TextureDimensionSlider } from '../../entities/hardware/TextureDimensionSlider';
-import { Canvas, CanvasRef } from '../../primitives/Canvas';
+import type { CanvasRef } from '../../primitives/Canvas';
+import { Canvas } from '../../primitives/Canvas';
 import { ControlLabel, ControlSection } from '../../primitives/ControlSection';
 import { FileDropzone, FileDropzonePlaceholder } from '../../primitives/FileDropzone';
 import { Slider } from '../../primitives/Slider';

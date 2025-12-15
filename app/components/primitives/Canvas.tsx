@@ -1,8 +1,8 @@
 'use client';
 
+import type { ReactNode } from 'react';
 import React, {
   forwardRef,
-  ReactNode,
   useCallback,
   useEffect,
   useImperativeHandle,

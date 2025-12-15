@@ -1,12 +1,13 @@
-import { PIXEL_STRIDE, RGB } from '@/lib/core/utils/colors';
+import type { RGB } from '@/lib/core/utils/colors';
+import { PIXEL_STRIDE } from '@/lib/core/utils/colors';
 
+import type { Point } from './filters';
 import {
   applyBlur,
   applyColorFilter,
   applyEdgePaint,
   applyFloodFillMask,
   applyMorphologyChoke,
-  Point,
 } from './filters';
 
 // --- Types ---

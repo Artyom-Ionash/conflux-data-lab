@@ -1,5 +1,5 @@
 // 1. Импортируем ToolConfig вместо Tool
-import { ToolConfig } from '@/lib/modules/tool-registry/types';
+import type { ToolConfig } from '@/lib/modules/tool-registry/types';
 
 import { ToolCard } from './ToolCard';
 

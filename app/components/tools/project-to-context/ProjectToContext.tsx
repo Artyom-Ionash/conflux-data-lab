@@ -553,7 +553,7 @@ The following is a flattened representation of a project codebase.
   // --- AUTO-GEN EFFECT ---
   useEffect(() => {
     if (files.length > 0 && result === null && !processing) {
-      processFiles();
+      void processFiles();
     }
   }, [files, result, processing, processFiles]);
 

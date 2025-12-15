@@ -2,7 +2,7 @@
  * Утилиты для работы с медиа-контентом (Изображения, Файлы).
  */
 
-import { RGB } from './colors';
+import type { RGB } from './colors';
 
 /**
  * Асинхронно загружает изображение и возвращает HTMLImageElement.

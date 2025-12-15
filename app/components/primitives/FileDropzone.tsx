@@ -1,6 +1,7 @@
 'use client';
 
-import React, { ReactNode, useCallback, useEffect, useRef, useState } from 'react';
+import type { ReactNode } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 
 // --- Helper: Validate File Type ---
 const isFileAccepted = (file: File, accept: string): boolean => {

@@ -1,7 +1,8 @@
 'use client';
 
 import * as SliderPrimitive from '@radix-ui/react-slider';
-import React, { ReactNode } from 'react';
+import type { ReactNode } from 'react';
+import React from 'react';
 
 export type SliderStatusColor = 'blue' | 'green' | 'yellow' | 'orange' | 'red';
 

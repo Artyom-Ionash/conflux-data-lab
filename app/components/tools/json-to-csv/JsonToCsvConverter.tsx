@@ -65,7 +65,7 @@ export function JsonToCsvConverter() {
   };
 
   const handleCopy = () => {
-    navigator.clipboard.writeText(csvOutput);
+    void navigator.clipboard.writeText(csvOutput);
   };
 
   const handleClear = () => {

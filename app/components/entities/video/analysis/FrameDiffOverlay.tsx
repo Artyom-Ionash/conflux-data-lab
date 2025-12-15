@@ -99,7 +99,7 @@ export function FrameDiffOverlay({
         setProcessingDiff(false);
       }
     };
-    processFrames();
+    void processFrames();
   }, [image1, image2, onDataGenerated]);
 
   const isLoading = processingDiff || isProcessing;

@@ -13,7 +13,8 @@ import type {
   WorkerResponse,
 } from '@/lib/modules/graphics/processing/processor.worker';
 
-import { Canvas, CanvasRef } from '../../primitives/Canvas';
+import type { CanvasRef } from '../../primitives/Canvas';
+import { Canvas } from '../../primitives/Canvas';
 import { ColorInput } from '../../primitives/ColorInput';
 import { ControlLabel, ControlSection } from '../../primitives/ControlSection';
 import { FileDropzone, FileDropzonePlaceholder } from '../../primitives/FileDropzone';
@@ -204,7 +205,7 @@ export function MonochromeBackgroundRemover() {
   useEffect(() => {
     if (originalUrl) {
       requestAnimationFrame(() => {
-        loadOriginalToCanvas(originalUrl);
+        void loadOriginalToCanvas(originalUrl);
       });
     }
   }, [originalUrl, loadOriginalToCanvas]);
