@@ -1,3 +1,5 @@
+// conflux-data-lab/app/components/primitives/Canvas.tsx
+
 'use client';
 
 import type { ReactNode } from 'react';
@@ -16,27 +18,59 @@ import { useElementSize } from '@/lib/core/hooks/use-element-size';
 import { ColorInput } from './ColorInput';
 import { ProcessingOverlay } from './ProcessingOverlay';
 
-// --- CONSTANTS ---
-const DEFAULT_SCALE_MIN = 0.05;
-const DEFAULT_SCALE_MAX = 50;
-const DEFAULT_INITIAL_SCALE = 1;
-const ZOOM_INTENSITY = 0.002;
-const PAN_BUTTON_CODE = 1; // Middle mouse button
-const STABILIZATION_DELAY = 150; // ms
-const AUTO_CONTRAST_PERIOD_DEFAULT = 5; // seconds
-const OVERLAY_SPREAD_SIZE = 50_000;
+// --- CONFIGURATION CONSTANTS ---
 
-const THEME_DARK_BG = 'bg-[#111]';
-const THEME_LIGHT_BG = 'bg-[#e5e5e5]';
-const GRID_OPACITY_DARK = 'opacity-10';
-const GRID_OPACITY_LIGHT = 'opacity-30';
-const GRID_PATTERN =
-  'linear-gradient(45deg, #888 25%, transparent 25%), linear-gradient(-45deg, #888 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #888 75%), linear-gradient(-45deg, transparent 75%, #888 75%)';
+// Zoom & Pan limits
+const ZOOM_CONFIG = {
+  MIN: 0.05,
+  MAX: 50,
+  INITIAL: 1,
+  INTENSITY: 0.002, // Коэффициент чувствительности колеса мыши
+  PIXELATED_THRESHOLD: 4, // Масштаб, после которого включается image-rendering: pixelated
+  WHEEL_DELTA_LIMIT: 100, // Ограничение дельты колеса мыши для плавности
+};
 
-const CHECKER_COLOR_DARK = '#333';
-const CHECKER_COLOR_LIGHT = '#ccc';
-const CHECKER_BG_DARK = '#111';
-const CHECKER_BG_LIGHT = '#fff';
+// Viewport settings
+const VIEWPORT_PADDING = 40; // Отступ при автоматическом сбросе вида (fit to screen)
+
+// Animation settings
+const ANIMATION_CONFIG = {
+  STABILIZATION_DELAY: 150, // ms, задержка перед финальной стабилизацией после зума
+  DEFAULT_DURATION: 300, // ms, стандартная анимация переходов
+  AUTO_CONTRAST_PERIOD_DEFAULT: 5, // секунд
+  AUTO_CONTRAST_TRANSITION_FACTOR: 0.9, // Доля времени анимации от периода смены темы
+};
+
+// Mouse interaction
+const PAN_BUTTON_CODE = 1; // Middle mouse button (Колесико)
+
+// --- STYLING CONSTANTS ---
+
+const OVERLAY_SPREAD_SIZE = 50_000; // Размер тени для затемнения области вокруг контента
+const GRID_SIZE = 20; // Размер клетки фона в пикселях
+
+const THEME_COLORS = {
+  DARK: {
+    BG: 'bg-[#111]',
+    CHECKER: '#333',
+    CHECKER_BG: '#111',
+    GRID_OPACITY: 'opacity-10',
+  },
+  LIGHT: {
+    BG: 'bg-[#e5e5e5]',
+    CHECKER: '#ccc',
+    CHECKER_BG: '#fff',
+    GRID_OPACITY: 'opacity-30',
+  },
+} as const;
+
+// CSS Patterns (теперь используют GRID_SIZE)
+const GRID_CSS_PATTERN = `linear-gradient(45deg, #888 25%, transparent 25%), linear-gradient(-45deg, #888 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #888 75%), linear-gradient(-45deg, transparent 75%, #888 75%)`;
+
+const CHECKER_CSS_TEMPLATE = (color: string) =>
+  `linear-gradient(45deg, ${color} 25%, transparent 25%), linear-gradient(-45deg, ${color} 25%, transparent 25%), linear-gradient(45deg, transparent 75%, ${color} 75%), linear-gradient(-45deg, transparent 75%, ${color} 75%)`;
+
+// --- TYPES ---
 
 interface Point {
   x: number;
@@ -73,15 +107,17 @@ interface CanvasProps {
   placeholder?: ReactNode;
 }
 
+// --- COMPONENT ---
+
 export const Canvas = forwardRef<CanvasRef, CanvasProps>(
   (
     {
       children,
       isLoading = false,
       className = '',
-      minScale = DEFAULT_SCALE_MIN,
-      maxScale = DEFAULT_SCALE_MAX,
-      initialScale = DEFAULT_INITIAL_SCALE,
+      minScale = ZOOM_CONFIG.MIN,
+      maxScale = ZOOM_CONFIG.MAX,
+      initialScale = ZOOM_CONFIG.INITIAL,
       contentWidth,
       contentHeight,
       theme: propTheme,
@@ -95,7 +131,7 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(
     // 1. Инициализация хука размеров
     const [resizeRef, containerSize] = useElementSize<HTMLDivElement>();
 
-    // Нам все еще нужен useRef для императивных вызовов (pointerCapture, getBoundingClientRect в событиях мыши)
+    // Нам все еще нужен useRef для императивных вызовов (pointerCapture, getBoundingClientRect)
     const containerRef = useRef<HTMLDivElement>(null);
     const contentRef = useRef<HTMLDivElement>(null);
     const zoomLabelRef = useRef<HTMLSpanElement>(null);
@@ -116,7 +152,9 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(
     const [isPanning, setIsPanning] = useState(false);
     const [internalTheme, setInternalTheme] = useState<'light' | 'dark'>('dark');
     const [isAutoContrast, setIsAutoContrast] = useState(false);
-    const [autoContrastPeriod, setAutoContrastPeriod] = useState(AUTO_CONTRAST_PERIOD_DEFAULT);
+    const [autoContrastPeriod, setAutoContrastPeriod] = useState(
+      ANIMATION_CONFIG.AUTO_CONTRAST_PERIOD_DEFAULT
+    );
 
     const [canvasBgColor, setCanvasBgColor] = useState<string | null>(defaultBackgroundColor);
 
@@ -134,7 +172,8 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(
         contentRef.current.style.willChange = 'transform';
       } else {
         contentRef.current.style.willChange = 'auto';
-        const renderingMode = scale > 4 ? 'pixelated' : 'auto';
+        // Включаем пикселизацию только при большом увеличении
+        const renderingMode = scale > ZOOM_CONFIG.PIXELATED_THRESHOLD ? 'pixelated' : 'auto';
         if (contentRef.current.style.imageRendering !== renderingMode) {
           contentRef.current.style.imageRendering = renderingMode;
         }
@@ -163,7 +202,7 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(
           interactionTimer.current = setTimeout(() => {
             stabilizeView();
             rafId.current = null;
-          }, STABILIZATION_DELAY);
+          }, ANIMATION_CONFIG.STABILIZATION_DELAY);
         }
       },
       [updateDOM, stabilizeView]
@@ -190,9 +229,9 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(
         let newY = 0;
 
         if (targetW && targetH) {
-          const padding = 40;
-          const scaleX = (clientWidth - padding) / targetW;
-          const scaleY = (clientHeight - padding) / targetH;
+          // Вычисляем масштаб, чтобы контент влез с отступом
+          const scaleX = (clientWidth - VIEWPORT_PADDING) / targetW;
+          const scaleY = (clientHeight - VIEWPORT_PADDING) / targetH;
           newScale = Math.min(1, Math.min(scaleX, scaleY));
           if (newScale <= 0) newScale = 1;
           newX = (clientWidth - targetW * newScale) / 2;
@@ -249,14 +288,22 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(
       const rect = containerRef.current.getBoundingClientRect();
       const mouseX = e.clientX - rect.left;
       const mouseY = e.clientY - rect.top;
-      const delta = Math.max(-100, Math.min(100, e.deltaY));
-      const factor = Math.exp(-delta * ZOOM_INTENSITY);
+
+      // Ограничиваем дельту для плавности на разных мышках/тачпадах
+      const delta = Math.max(
+        -ZOOM_CONFIG.WHEEL_DELTA_LIMIT,
+        Math.min(ZOOM_CONFIG.WHEEL_DELTA_LIMIT, e.deltaY)
+      );
+
+      const factor = Math.exp(-delta * ZOOM_CONFIG.INTENSITY);
       const current = transform.current;
       let newScale = current.scale * factor;
       newScale = Math.max(minScale, Math.min(newScale, maxScale));
+
       const scaleRatio = newScale / current.scale;
       const newX = mouseX - (mouseX - current.x) * scaleRatio;
       const newY = mouseY - (mouseY - current.y) * scaleRatio;
+
       transform.current = { scale: newScale, x: newX, y: newY };
       scheduleUpdate(true);
     };
@@ -292,17 +339,18 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(
     };
 
     const isDark = activeTheme === 'dark';
-    const bgClass = isDark ? THEME_DARK_BG : THEME_LIGHT_BG;
-    const gridOpacity = isDark ? GRID_OPACITY_DARK : GRID_OPACITY_LIGHT;
-    const transitionDuration = isAutoContrast ? autoContrastPeriod * 1000 * 0.9 : 300;
-    const checkerColor = isDark ? CHECKER_COLOR_DARK : CHECKER_COLOR_LIGHT;
-    const checkerBg = isDark ? CHECKER_BG_DARK : CHECKER_BG_LIGHT;
+    const currentTheme = isDark ? THEME_COLORS.DARK : THEME_COLORS.LIGHT;
+
+    const transitionDuration = isAutoContrast
+      ? autoContrastPeriod * 1000 * ANIMATION_CONFIG.AUTO_CONTRAST_TRANSITION_FACTOR
+      : ANIMATION_CONFIG.DEFAULT_DURATION;
+
     const hasDimensions = !!contentWidth && !!contentHeight;
 
     return (
       <div
-        ref={setRefs} // 5. Передаем объединенный ref
-        className={`relative h-full w-full touch-none overflow-hidden transition-colors ease-in-out select-none ${bgClass} ${className}`}
+        ref={setRefs}
+        className={`relative h-full w-full touch-none overflow-hidden transition-colors ease-in-out select-none ${currentTheme.BG} ${className}`}
         onWheel={handleWheel}
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
@@ -379,11 +427,11 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(
         </div>
 
         <div
-          className={`pointer-events-none absolute inset-0 transition-opacity ease-in-out ${gridOpacity}`}
+          className={`pointer-events-none absolute inset-0 transition-opacity ease-in-out ${currentTheme.GRID_OPACITY}`}
           style={{
             transitionDuration: `${transitionDuration}ms`,
-            backgroundImage: GRID_PATTERN,
-            backgroundSize: '20px 20px',
+            backgroundImage: GRID_CSS_PATTERN,
+            backgroundSize: `${GRID_SIZE}px ${GRID_SIZE}px`,
             zIndex: 0,
           }}
         />
@@ -421,10 +469,10 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(
               <div
                 className="pointer-events-none absolute inset-0 z-0 transition-colors duration-300"
                 style={{
-                  backgroundImage: `linear-gradient(45deg, ${checkerColor} 25%, transparent 25%), linear-gradient(-45deg, ${checkerColor} 25%, transparent 25%), linear-gradient(45deg, transparent 75%, ${checkerColor} 75%), linear-gradient(-45deg, transparent 75%, ${checkerColor} 75%)`,
-                  backgroundSize: '20px 20px',
-                  backgroundPosition: '0 0, 0 10px, 10px -10px, -10px 0px',
-                  backgroundColor: checkerBg,
+                  backgroundImage: CHECKER_CSS_TEMPLATE(currentTheme.CHECKER),
+                  backgroundSize: `${GRID_SIZE}px ${GRID_SIZE}px`,
+                  backgroundPosition: `0 0, 0 ${GRID_SIZE / 2}px, ${GRID_SIZE / 2}px -${GRID_SIZE / 2}px, -${GRID_SIZE / 2}px 0px`,
+                  backgroundColor: currentTheme.CHECKER_BG,
                 }}
               />
             )}
