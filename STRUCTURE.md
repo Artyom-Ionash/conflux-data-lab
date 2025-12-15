@@ -69,6 +69,8 @@ conflux-data-lab/
 │   ├── layout.tsx
 │   └── page.tsx
 ├── lib/ # Библиотека и утилиты
+│   ├── types/
+│   │   └── gifshot.d.ts
 │   ├── core/
 │   │   ├── utils/
 │   │   │   ├── colors.ts
@@ -95,8 +97,6 @@ conflux-data-lab/
 │   ├── next.svg
 │   ├── vercel.svg
 │   └── window.svg
-├── types/ # TypeScript типы
-│   └── gifshot.d.ts
 ├── README.md # Основная документация
 ├── ARCHITECTURE.md # Описание архитектуры
 ├── STRUCTURE.md # Структура файлов (автогенерируется)

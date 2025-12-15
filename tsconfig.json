@@ -24,7 +24,7 @@
       "@/*": ["./*"]
     },
     // Добавьте это, если VS Code не видит типов из node_modules
-    "typeRoots": ["./types", "./node_modules/@types"]
+    "typeRoots": ["./lib/types", "./node_modules/@types"]
   },
   "include": [
     "next-env.d.ts",
@@ -33,7 +33,7 @@
     ".next/types/**/*.ts",
     ".next/dev/types/**/*.ts",
     "**/*.mts",
-    "types/**/*.d.ts"
+    "lib/types/**/*.d.ts"
   ],
   "exclude": ["node_modules"]
 }
