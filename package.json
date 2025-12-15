@@ -1,6 +1,8 @@
 {
   "name": "conflux-data-lab",
   "version": "0.1.0",
+  "license": "MIT",
+  "author": "Артемий Николаевич Ионаш",
   "private": true,
   "scripts": {
     "dev": "run-p dev:next type-check:watch context:watch",
