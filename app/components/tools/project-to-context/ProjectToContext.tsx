@@ -1,9 +1,11 @@
+// conflux-data-lab/app/components/tools/project-to-context/ProjectToContext.tsx
+
 'use client';
 
-import React, { useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 
 import { GodotSceneParser } from '@/lib/modules/file-system/godot-scene';
-import { formatBytes, generateAsciiTree } from '@/lib/modules/file-system/tree-view'; // IMPORT NEW ABSTRACTIONS
+import { formatBytes, generateAsciiTree } from '@/lib/modules/file-system/tree-view';
 
 import { Card } from '../../primitives/Card';
 import { Switch } from '../../primitives/Switch';
@@ -331,6 +333,10 @@ export function ProjectToContext() {
   const [processing, setProcessing] = useState(false);
   const [progress, setProgress] = useState(0);
   const [result, setResult] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
+
+  // Добавлено: Состояние для времени последней генерации
+  const [lastGeneratedAt, setLastGeneratedAt] = useState<Date | null>(null);
 
   const [stats, setStats] = useState<ProjectStats | null>(null);
 
@@ -395,11 +401,11 @@ export function ProjectToContext() {
     });
 
     setFiles(nodes);
-    setResult(null);
+    setResult(null); // Сброс результата для триггера авто-генерации
     setStats(null);
   };
 
-  const processFiles = async () => {
+  const processFiles = useCallback(async () => {
     setProcessing(true);
     setProgress(0);
     setResult(null);
@@ -520,7 +526,6 @@ The following is a flattened representation of a project codebase.
 `;
 
     if (includeTree) {
-      // USE NEW ABSTRACTION
       output += `<directory_structure>\n\`\`\`text\n${generateAsciiTree(
         sortedFiles
       )}\n\`\`\`\n</directory_structure>\n\n`;
@@ -541,8 +546,16 @@ The following is a flattened representation of a project codebase.
     output += `</source_files>\n</codebase_context>`;
 
     setResult(output);
+    setLastGeneratedAt(new Date()); // Установка времени генерации
     setProcessing(false);
-  };
+  }, [files, includeTree]); // processFiles зависит от файлов и настроек
+
+  // --- AUTO-GEN EFFECT ---
+  useEffect(() => {
+    if (files.length > 0 && result === null && !processing) {
+      processFiles();
+    }
+  }, [files, result, processing, processFiles]);
 
   const downloadResult = () => {
     if (!result) return;
@@ -555,10 +568,53 @@ The following is a flattened representation of a project codebase.
     URL.revokeObjectURL(url);
   };
 
-  const copyToClipboard = () => {
+  const copyToClipboard = async () => {
     if (!result) return;
-    navigator.clipboard.writeText(result);
-    alert('Copied to clipboard!');
+
+    try {
+      // 1. Попытка использовать современный API (HTTPS / Localhost)
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(result);
+      } else {
+        throw new Error('Clipboard API unavailable');
+      }
+    } catch (err) {
+      // 2. Фоллбэк для HTTP (старый метод через скрытый textarea)
+      try {
+        const textArea = document.createElement('textarea');
+        textArea.value = result;
+
+        // Делаем элемент невидимым, но доступным для фокуса
+        textArea.style.position = 'fixed';
+        textArea.style.left = '-9999px';
+        textArea.style.top = '0';
+        document.body.appendChild(textArea);
+
+        textArea.focus();
+        textArea.select();
+
+        const successful = document.execCommand('copy');
+        document.body.removeChild(textArea);
+
+        if (!successful) throw new Error('execCommand failed');
+      } catch (fallbackErr) {
+        console.error('Copy failed', fallbackErr);
+        alert('Не удалось скопировать. Браузер заблокировал доступ к буферу обмена.');
+        return;
+      }
+    }
+
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  // Форматирование времени в HH:mm:ss
+  const formatTime = (date: Date) => {
+    return date.toLocaleTimeString('ru-RU', {
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+    });
   };
 
   const sidebar = (
@@ -583,6 +639,9 @@ The following is a flattened representation of a project codebase.
             onChange={handleDirectorySelect}
           />
         </div>
+        <p className="px-1 text-[10px] leading-tight text-zinc-400">
+          Браузер не отслеживает изменения на диске. Чтобы обновить файлы, выберите папку снова.
+        </p>
       </div>
 
       <div className="flex flex-col gap-4">
@@ -699,15 +758,28 @@ The following is a flattened representation of a project codebase.
         {result ? (
           <Card
             className="flex h-full flex-1 flex-col shadow-sm"
-            title="Результат"
+            title={
+              <div className="flex items-center gap-3">
+                <span>Результат</span>
+                {lastGeneratedAt && (
+                  <span className="rounded bg-zinc-100 px-2 py-0.5 text-[10px] font-normal text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400">
+                    Обновлено: {formatTime(lastGeneratedAt)}
+                  </span>
+                )}
+              </div>
+            }
             contentClassName="p-0 flex-1 overflow-hidden flex flex-col"
             headerActions={
               <div className="flex gap-2">
                 <button
                   onClick={copyToClipboard}
-                  className="rounded bg-zinc-100 px-3 py-1.5 text-xs transition-colors hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700"
+                  className={`rounded px-3 py-1.5 text-xs transition-all duration-200 ${
+                    copied
+                      ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300'
+                      : 'bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700'
+                  }`}
                 >
-                  Копировать
+                  {copied ? 'Скопировано!' : 'Копировать'}
                 </button>
                 <button
                   onClick={downloadResult}
@@ -727,7 +799,11 @@ The following is a flattened representation of a project codebase.
             <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-zinc-100 dark:bg-zinc-800">
               <span className="text-2xl">🤖</span>
             </div>
-            <p>Генератор контекста для LLM (Ultra Optimized for Gemini)</p>
+            <p>
+              {processing
+                ? 'Обработка и генерация контекста...'
+                : 'Генератор контекста для LLM (Ultra Optimized for Gemini)'}
+            </p>
           </div>
         )}
       </div>
