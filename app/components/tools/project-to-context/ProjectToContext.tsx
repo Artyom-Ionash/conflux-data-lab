@@ -578,7 +578,8 @@ The following is a flattened representation of a project codebase.
       } else {
         throw new Error('Clipboard API unavailable');
       }
-    } catch (err) {
+    } catch {
+      // FIX: Убрали неиспользуемую переменную (err)
       // 2. Фоллбэк для HTTP (старый метод через скрытый textarea)
       try {
         const textArea = document.createElement('textarea');

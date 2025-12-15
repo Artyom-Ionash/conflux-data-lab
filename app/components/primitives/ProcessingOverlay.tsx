@@ -1,8 +1,10 @@
-import React from 'react';
+'use client';
+
+import React, { useEffect, useState } from 'react';
 
 interface ProcessingOverlayProps {
   isVisible: boolean;
-  progress?: number; // 0-100. Если не передан — показывается спиннер
+  progress?: number;
   message?: string;
   className?: string;
 }
@@ -13,15 +15,43 @@ export function ProcessingOverlay({
   message,
   className = '',
 }: ProcessingOverlayProps) {
-  if (!isVisible) return null;
+  const [shouldRender, setShouldRender] = useState(isVisible);
+
+  // ПАТТЕРН: Обновление состояния во время рендера (Derived State).
+  // Если проп isVisible стал true, а мы еще не рендеримся — включаем немедленно.
+  // React прервет текущий рендер и запустит новый с обновленным стейтом ДО отрисовки в браузере.
+  // Это устраняет мигание и удовлетворяет линтер, так как мы не используем useEffect для этого.
+  if (isVisible && !shouldRender) {
+    setShouldRender(true);
+  }
+
+  useEffect(() => {
+    let timer: NodeJS.Timeout;
+
+    // Логика задержки нужна только при скрытии (isVisible = false)
+    if (!isVisible) {
+      timer = setTimeout(() => setShouldRender(false), 300);
+    }
+
+    // Очистка таймера обязательна
+    return () => {
+      if (timer) clearTimeout(timer);
+    };
+  }, [isVisible]);
+
+  if (!shouldRender) return null;
 
   return (
     <div
-      className={`absolute inset-0 z-50 flex flex-col items-center justify-center gap-3 bg-white/60 backdrop-blur-[2px] dark:bg-black/60 ${className}`}
+      className={`absolute inset-0 z-50 flex flex-col items-center justify-center gap-3 transition-all duration-300 ease-in-out ${
+        isVisible
+          ? 'pointer-events-auto opacity-100 backdrop-blur-[1px]'
+          : 'pointer-events-none opacity-0 backdrop-blur-none'
+      } bg-white/40 dark:bg-black/40 ${className}`}
     >
       {progress !== undefined ? (
         // Progress Bar Variant
-        <div className="w-64 max-w-[80%] rounded-lg bg-white p-4 shadow-xl dark:bg-zinc-900">
+        <div className="w-64 max-w-[80%] rounded-lg border border-zinc-200 bg-white/90 p-4 shadow-xl backdrop-blur-sm dark:border-zinc-700 dark:bg-zinc-900/90">
           <div className="mb-2 flex justify-between text-xs font-semibold text-zinc-700 dark:text-zinc-200">
             <span>{message || 'Обработка...'}</span>
             <span className="font-mono">{Math.round(progress)}%</span>
@@ -35,7 +65,7 @@ export function ProcessingOverlay({
         </div>
       ) : (
         // Spinner Variant
-        <div className="flex flex-col items-center gap-3 rounded-lg bg-white p-4 shadow-xl dark:bg-zinc-900">
+        <div className="flex flex-col items-center gap-3 rounded-lg border border-zinc-200 bg-white/90 p-4 shadow-xl backdrop-blur-sm dark:border-zinc-700 dark:bg-zinc-900/90">
           <svg
             className="h-8 w-8 animate-spin text-blue-600"
             xmlns="http://www.w3.org/2000/svg"
