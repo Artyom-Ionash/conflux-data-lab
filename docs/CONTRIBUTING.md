@@ -6,7 +6,6 @@
 
     ```bash
     npm install
-    npm run prepare # Установка git-хуков
     ```
 
 2.  **Запуск в режиме разработки:**
