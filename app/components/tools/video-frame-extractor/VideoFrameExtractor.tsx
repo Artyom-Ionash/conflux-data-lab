@@ -18,15 +18,15 @@ import { MultiScalePreview } from '../../entities/video/MultiScalePreview';
 import { RangeVideoPlayer } from '../../entities/video/player/RangeVideoPlayer';
 import { SpriteFrameList } from '../../entities/video/SpriteFrameList';
 // --- UI IMPORTS ---
-import { Card } from '../../primitives/Card';
-import { ColorInput } from '../../primitives/ColorInput';
-import { ControlLabel, ControlSection } from '../../primitives/ControlSection';
-import { FileDropzone, FileDropzonePlaceholder } from '../../primitives/FileDropzone';
-import { ImageSequencePlayer } from '../../primitives/ImageSequencePlayer';
-import { Modal } from '../../primitives/Modal';
-import { NumberStepper } from '../../primitives/NumberStepper';
-import { RangeSlider } from '../../primitives/RangeSlider';
-import { Switch } from '../../primitives/Switch';
+import { Card } from '../../ui/Card';
+import { ColorInput } from '../../ui/ColorInput';
+import { ControlLabel, ControlSection } from '../../ui/ControlSection';
+import { FileDropzone, FileDropzonePlaceholder } from '../../ui/FileDropzone';
+import { ImageSequencePlayer } from '../../ui/ImageSequencePlayer';
+import { Modal } from '../../ui/Modal';
+import { NumberStepper } from '../../ui/NumberStepper';
+import { RangeSlider } from '../../ui/RangeSlider';
+import { Switch } from '../../ui/Switch';
 import { ToolLayout } from '../ToolLayout';
 
 // --- CONSTANTS ---

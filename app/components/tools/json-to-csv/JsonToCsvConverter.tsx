@@ -4,7 +4,7 @@ import { useState } from 'react';
 
 import { convertJsonToCsv } from '@/lib/modules/converters/json-to-csv';
 
-import { Card } from '../../primitives/Card';
+import { Card } from '../../ui/Card';
 
 export function JsonToCsvConverter() {
   const [jsonInput, setJsonInput] = useState('');

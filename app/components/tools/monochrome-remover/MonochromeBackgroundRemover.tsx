@@ -15,13 +15,13 @@ import type {
   WorkerResponse,
 } from '@/lib/modules/graphics/processing/processor.worker';
 
-import type { CanvasRef } from '../../primitives/Canvas';
-import { Canvas } from '../../primitives/Canvas';
-import { ColorInput } from '../../primitives/ColorInput';
-import { ControlLabel, ControlSection } from '../../primitives/ControlSection';
-import { FileDropzone, FileDropzonePlaceholder } from '../../primitives/FileDropzone';
-import { Slider } from '../../primitives/Slider';
-import { ToggleGroup, ToggleGroupItem } from '../../primitives/ToggleGroup';
+import type { CanvasRef } from '../../ui/Canvas';
+import { Canvas } from '../../ui/Canvas';
+import { ColorInput } from '../../ui/ColorInput';
+import { ControlLabel, ControlSection } from '../../ui/ControlSection';
+import { FileDropzone, FileDropzonePlaceholder } from '../../ui/FileDropzone';
+import { Slider } from '../../ui/Slider';
+import { ToggleGroup, ToggleGroupItem } from '../../ui/ToggleGroup';
 import { ToolLayout } from '../ToolLayout';
 
 // --- CONSTANTS ---

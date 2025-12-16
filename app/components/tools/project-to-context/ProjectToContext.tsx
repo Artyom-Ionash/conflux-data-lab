@@ -19,8 +19,8 @@ import { isTextFile, LANGUAGE_MAP } from '@/lib/modules/file-system/file-utils';
 import { formatBytes, generateAsciiTree } from '@/lib/modules/file-system/tree-view';
 
 // --- UI COMPONENTS ---
-import { Card } from '../../primitives/Card';
-import { Switch } from '../../primitives/Switch';
+import { Card } from '../../ui/Card';
+import { Switch } from '../../ui/Switch';
 import { ToolLayout } from '../ToolLayout';
 
 // --- TYPES ---

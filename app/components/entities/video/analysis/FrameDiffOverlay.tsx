@@ -1,7 +1,7 @@
 import Image from 'next/image';
 import { useEffect, useRef, useState } from 'react';
 
-import { getCanvasFromImage } from '@/app/components/primitives/Canvas';
+import { getCanvasFromImage } from '@/app/components/ui/Canvas';
 import { areColorsSimilar } from '@/lib/core/utils/colors';
 import { getTopLeftPixelColor, loadImage } from '@/lib/core/utils/media';
 

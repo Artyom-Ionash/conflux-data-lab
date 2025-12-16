@@ -1,4 +1,4 @@
-// conflux-data-lab/eslint.config.mjs
+
 
 import { defineConfig, globalIgnores } from 'eslint/config';
 import nextVitals from 'eslint-config-next/core-web-vitals';
@@ -22,7 +22,6 @@ const eslintConfig = defineConfig([
       unicorn: eslintPluginUnicorn,
     },
     settings: {
-      // ... настройки boundaries ...
       'boundaries/include': ['app/**/*', 'lib/**/*'],
       'boundaries/elements': [
         {
@@ -32,7 +31,8 @@ const eslintConfig = defineConfig([
         },
         { type: 'tool', pattern: 'app/components/tools/*', capture: ['toolName'] },
         { type: 'entity', pattern: 'app/components/entities/*', capture: ['entityName'] },
-        { type: 'primitives', pattern: 'app/components/primitives/*', mode: 'folder' },
+       
+        { type: 'ui', pattern: 'app/components/ui/*', mode: 'folder' },
         { type: 'module', pattern: 'lib/modules/*', mode: 'folder', capture: ['moduleName'] },
         { type: 'core', pattern: ['lib/core/*', 'lib/types/*'], mode: 'folder' },
       ],
@@ -52,18 +52,18 @@ const eslintConfig = defineConfig([
           rules: [
             {
               from: 'core',
-              disallow: ['module', 'primitives', 'entity', 'tool', 'app-layer'],
+              disallow: ['module', 'ui', 'entity', 'tool', 'app-layer'],
               message: '❌ Core (lib/core, lib/types) must not depend on upper layers',
             },
             {
               from: 'module',
-              disallow: ['primitives', 'entity', 'tool', 'app-layer'],
+              disallow: ['ui', 'entity', 'tool', 'app-layer'],
               message: '❌ Modules (lib/modules) must not depend on UI components',
             },
             {
-              from: 'primitives',
+              from: 'ui',
               disallow: ['module', 'entity', 'tool', 'app-layer'],
-              message: '❌ Primitives (UI) must not depend on Business Logic or Entities',
+              message: '❌ UI Library must not depend on Business Logic or Entities',
             },
             {
               from: 'entity',
@@ -102,7 +102,7 @@ const eslintConfig = defineConfig([
     },
   },
 
-  // 3. ИСКЛЮЧЕНИЯ ДЛЯ ГРАФИКИ (Разрешаем ! там, где это критично для производительности)
+   // 3. Разрешаем ! там, где это критично для производительности
   {
     files: [
       'lib/modules/graphics/**/*.ts',
@@ -114,7 +114,7 @@ const eslintConfig = defineConfig([
     },
   },
 
-  // 4. PRETTIER (ОТКЛЮЧЕНИЕ КОНФЛИКТУЮЩИХ ПРАВИЛ)
+  // 4. ОТКЛЮЧЕНИЕ КОНФЛИКТУЮЩИХ ПРАВИЛ
   eslintConfigPrettier,
 ]);
 

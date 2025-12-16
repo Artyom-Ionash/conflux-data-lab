@@ -2,8 +2,8 @@ import Link from 'next/link';
 
 import type { ToolConfig } from '@/lib/modules/tool-registry/types';
 
-import { Badge } from '../primitives/Badge';
-import { Card } from '../primitives/Card';
+import { Badge } from '../ui/Badge';
+import { Card } from '../ui/Card';
 
 interface ToolCardProps {
   tool: ToolConfig;

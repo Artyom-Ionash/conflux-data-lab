@@ -30,12 +30,12 @@ import {
 } from '@/lib/core/utils/media';
 
 import { TextureDimensionSlider } from '../../entities/hardware/TextureDimensionSlider';
-import type { CanvasRef } from '../../primitives/Canvas';
-import { Canvas } from '../../primitives/Canvas';
-import { ControlLabel, ControlSection } from '../../primitives/ControlSection';
-import { FileDropzone, FileDropzonePlaceholder } from '../../primitives/FileDropzone';
-import { Slider } from '../../primitives/Slider';
-import { Switch } from '../../primitives/Switch';
+import type { CanvasRef } from '../../ui/Canvas';
+import { Canvas } from '../../ui/Canvas';
+import { ControlLabel, ControlSection } from '../../ui/ControlSection';
+import { FileDropzone, FileDropzonePlaceholder } from '../../ui/FileDropzone';
+import { Slider } from '../../ui/Slider';
+import { Switch } from '../../ui/Switch';
 import { ToolLayout } from '../ToolLayout';
 
 // --- CONSTANTS ---
