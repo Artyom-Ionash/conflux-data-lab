@@ -1,4 +1,4 @@
-import { calculateFileScore } from '../file-system/file-utils';
+import { calculateFileScore } from './pipeline'; // Обновленный импорт
 
 export interface ProcessedContextFile {
   path: string; // Относительный путь (app/page.tsx)
@@ -26,9 +26,11 @@ export function generateContextOutput(
 ): ContextGenerationResult {
   // 1. Сортировка (Конфиги выше, код ниже)
   const sortedFiles = [...files].sort((a, b) => {
+    const nameA = a.path.split('/').pop() || '';
+    const nameB = b.path.split('/').pop() || '';
     // Сначала по Score (чем меньше score, тем выше файл)
-    const scoreA = calculateFileScore(a.path.split('/').pop() || '');
-    const scoreB = calculateFileScore(b.path.split('/').pop() || '');
+    const scoreA = calculateFileScore(nameA);
+    const scoreB = calculateFileScore(nameB);
     if (scoreA !== scoreB) return scoreA - scoreB;
     // Потом по алфавиту
     return a.path.localeCompare(b.path);

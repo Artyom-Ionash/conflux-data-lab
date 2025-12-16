@@ -9,15 +9,13 @@ import {
   generateContextOutput,
   type ProcessedContextFile,
 } from '@/lib/modules/context-generator/core';
-// --- UTILS ---
 import {
   calculateFileScore,
-  getLanguageTag,
-  isTextFile,
-  LANGUAGE_MAP,
-  preprocessContent,
-} from '@/lib/modules/file-system/file-utils';
-import { GodotSceneParser } from '@/lib/modules/file-system/godot-scene';
+  processFileToContext,
+  type RawFile,
+} from '@/lib/modules/context-generator/pipeline';
+// --- UTILS ---
+import { isTextFile, LANGUAGE_MAP } from '@/lib/modules/file-system/file-utils';
 import { formatBytes, generateAsciiTree } from '@/lib/modules/file-system/tree-view';
 
 // --- UI COMPONENTS ---
@@ -183,17 +181,15 @@ export function ProjectToContext() {
     setProgress(0);
     setResult(null);
 
+    // Сортировка для последовательной обработки (опционально, т.к. pipeline чистый)
     const sortedFiles = [...files].sort((a, b) => {
       return calculateFileScore(a.name) - calculateFileScore(b.name);
     });
-
-    const sceneParser = new GodotSceneParser();
 
     let totalOriginalBytes = 0;
     let totalCleanedBytes = 0;
     const composition: Record<string, number> = {};
     const processedFileStats: { path: string; size: number; tokens: number }[] = [];
-
     const filesForGenerator: ProcessedContextFile[] = [];
 
     let processedCount = 0;
@@ -206,45 +202,37 @@ export function ProjectToContext() {
 
       try {
         const originalText = await readFileAsText(node.file);
-        totalOriginalBytes += originalText.length;
-
         const ext = node.name.split('.').pop() || 'txt';
-        let cleanedText = '';
-        let langKey = getLanguageTag(node.name);
 
-        if (ext === 'tscn') {
-          try {
-            const treeOutput = sceneParser.parse(originalText);
-            cleanedText = `; [Godot Scene Tree View]
-; This file has been parsed to show the hierarchy only.
+        // --- ПРИМЕНЕНИЕ ПАЙПЛАЙНА ---
+        const rawFile: RawFile = {
+          name: node.name,
+          path: node.path,
+          content: originalText,
+          extension: ext,
+        };
 
-${treeOutput}`;
-            langKey = 'text';
-          } catch (e) {
-            console.warn('Parser failed for tscn, falling back to regex', e);
-            cleanedText = preprocessContent(originalText, ext);
-          }
-        } else {
-          cleanedText = preprocessContent(originalText, ext);
-        }
+        const contextNode = processFileToContext(rawFile);
+        // -----------------------------
 
-        totalCleanedBytes += cleanedText.length;
+        totalOriginalBytes += contextNode.originalSize;
+        totalCleanedBytes += contextNode.cleanedSize;
 
-        let reportLang = LANGUAGE_MAP[ext] || ext;
+        let reportLang = LANGUAGE_MAP[contextNode.langTag] || contextNode.langTag;
         if (node.name.includes('config') || node.name.startsWith('.')) reportLang = 'config/meta';
         composition[reportLang] = (composition[reportLang] || 0) + 1;
 
         filesForGenerator.push({
-          path: node.path,
-          content: cleanedText,
-          langTag: langKey,
-          size: cleanedText.length,
+          path: contextNode.path,
+          content: contextNode.content,
+          langTag: contextNode.langTag,
+          size: contextNode.cleanedSize,
         });
 
         processedFileStats.push({
-          path: node.path,
-          size: cleanedText.length,
-          tokens: Math.ceil(cleanedText.length / 4),
+          path: contextNode.path,
+          size: contextNode.cleanedSize,
+          tokens: Math.ceil(contextNode.cleanedSize / 4),
         });
       } catch (e) {
         console.error(`Error processing ${node.path}`, e);
@@ -256,7 +244,6 @@ ${treeOutput}`;
     }
 
     const treeString = includeTree ? generateAsciiTree(sortedFiles) : '';
-
     const { output, stats: coreStats } = generateContextOutput(filesForGenerator, treeString);
 
     const savingsBytes = totalOriginalBytes - totalCleanedBytes;

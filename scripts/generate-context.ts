@@ -1,37 +1,26 @@
 import { writeFileSync, readFileSync, readdirSync, statSync, existsSync, mkdirSync } from 'node:fs';
 import { join, relative } from 'node:path';
-import ignore from 'ignore'; // <--- НОВЫЙ ИМПОРТ
+import ignore from 'ignore';
 
 // SHARED IMPORTS
-import {
-  isTextFile,
-  getLanguageTag,
-  preprocessContent,
-} from '../lib/modules/file-system/file-utils';
-import { GodotSceneParser } from '../lib/modules/file-system/godot-scene';
+import { isTextFile } from '../lib/modules/file-system/file-utils';
 import { generateAsciiTree } from '../lib/modules/file-system/tree-view';
 import { CONTEXT_PRESETS } from '../lib/modules/context-generator/config';
 import { generateContextOutput, ProcessedContextFile } from '../lib/modules/context-generator/core';
+import { processFileToContext, type RawFile } from '../lib/modules/context-generator/pipeline';
 
 // --- CONFIG ---
 const PRESET = CONTEXT_PRESETS.nextjs;
 const OUTPUT_DIR = '.context';
 const OUTPUT_FILENAME = 'project.txt';
 const MAX_FILE_SIZE_KB = 500;
-
-// Папки с точкой, которые мы разрешаем (игнор-менеджер их отфильтрует сам, если они в .gitignore)
-// Но мы должны разрешить их "вход" в рекурсию.
 const ALLOWED_DOT_DIRS = ['.husky', '.github', '.storybook'];
 
 // --- UTILS ---
 
 function getIgManager(rootDir: string) {
   const ig = ignore();
-
-  // 1. Добавляем жесткие правила пресета
   ig.add(PRESET.hardIgnore);
-
-  // 2. Читаем .gitignore, если есть
   const gitIgnorePath = join(rootDir, '.gitignore');
   if (existsSync(gitIgnorePath)) {
     try {
@@ -41,7 +30,6 @@ function getIgManager(rootDir: string) {
       console.warn('⚠️ Could not read .gitignore:', e);
     }
   }
-
   return ig;
 }
 
@@ -52,7 +40,6 @@ try {
 
   if (!existsSync(outputDirPath)) mkdirSync(outputDirPath);
 
-  // Инициализируем менеджер игнорирования
   const ig = getIgManager(rootDir);
 
   function walkDirectory(
@@ -65,25 +52,16 @@ try {
 
     for (const entry of entries) {
       const fullPath = join(dir, entry.name);
-      // Относительный путь от корня проекта (важно для ignore)
       const relPath = relative(rootDir, fullPath);
 
-      // 1. ПРОВЕРКА ЧЕРЕЗ ПАКЕТ IGNORE (Правильная!)
-      // ig.ignores() принимает относительный путь (например 'src/utils/file.ts')
-      // Для папок лучше добавлять слеш, но пакет умный, поймет и так.
       if (ig.ignores(relPath)) continue;
 
       if (entry.isDirectory()) {
-        // 2. Логика скрытых папок (оптимизация обхода)
-        // Если папка скрытая (начинается с точки) И она не в белом списке системных папок
-        // мы в неё даже не заходим, чтобы не тратить время (например .git весит много)
         if (entry.name.startsWith('.') && !ALLOWED_DOT_DIRS.includes(entry.name)) {
           continue;
         }
-
         walkDirectory(fullPath, fileList, forTree, treeNodes);
       } else {
-        // Логика сбора файлов
         if (forTree) {
           const size = statSync(fullPath).size;
           const isText = isTextFile(entry.name, PRESET.textExtensions);
@@ -97,14 +75,11 @@ try {
     }
   }
 
-  // Сбор данных
   const allFilePaths: string[] = [];
   walkDirectory(rootDir, allFilePaths, false);
 
-  const sceneParser = new GodotSceneParser();
   const processedFiles: ProcessedContextFile[] = [];
 
-  // Обработка контента
   for (const filePath of allFilePaths) {
     try {
       if (statSync(filePath).size > MAX_FILE_SIZE_KB * 1024) continue;
@@ -114,38 +89,33 @@ try {
       const relPath = relative(rootDir, filePath).replaceAll('\\', '/');
       const ext = filename.split('.').pop() || 'txt';
 
-      let cleanedText = '';
-      let langTag = getLanguageTag(filename);
+      // --- ИСПОЛЬЗУЕМ НОВЫЙ PIPELINE ---
+      const rawFile: RawFile = {
+        name: filename,
+        path: relPath,
+        content: originalText,
+        extension: ext,
+      };
 
-      if (ext === 'tscn') {
-        try {
-          cleanedText = `; [Godot Scene Tree]...\n${sceneParser.parse(originalText)}`;
-          langTag = 'text';
-        } catch {
-          cleanedText = preprocessContent(originalText, ext);
-        }
-      } else {
-        cleanedText = preprocessContent(originalText, ext);
-      }
+      const contextNode = processFileToContext(rawFile);
+      // ---------------------------------
 
       processedFiles.push({
-        path: relPath,
-        content: cleanedText,
-        langTag,
-        size: cleanedText.length,
+        path: contextNode.path,
+        content: contextNode.content,
+        langTag: contextNode.langTag,
+        size: contextNode.cleanedSize,
       });
     } catch (e) {
       console.warn('Skip:', filePath);
     }
   }
 
-  // Генерация дерева
   const treeNodes: any[] = [];
   walkDirectory(rootDir, [], true, treeNodes);
   treeNodes.sort((a: any, b: any) => a.path.localeCompare(b.path));
   const treeString = generateAsciiTree(treeNodes);
 
-  // Генерация XML
   const { output, stats } = generateContextOutput(processedFiles, treeString);
   writeFileSync(join(outputDirPath, OUTPUT_FILENAME), output);
 
