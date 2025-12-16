@@ -5,6 +5,7 @@
   "author": "Артемий Николаевич Ионаш",
   "private": true,
   "scripts": {
+    "amend": "git commit --amend --no-edit",
     "dev": "run-p dev:next type-check:watch context:watch",
     "dev:next": "next dev",
     "build": "next build",
