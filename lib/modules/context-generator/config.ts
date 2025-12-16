@@ -11,7 +11,6 @@ export const IGNORE_COMMON = [
   'bun.lockb',
   'LICENSE',
   'LICENSE.txt',
-  'README.md',
   'CHANGELOG.md',
 ];
 
