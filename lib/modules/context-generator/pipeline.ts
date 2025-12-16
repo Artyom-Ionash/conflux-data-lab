@@ -102,7 +102,7 @@ const transformContent = (file: RawFile): RawFile => {
     try {
       const treeOutput = sceneParser.parse(file.content);
       cleaned = `; [Godot Scene Tree View]\n; Hierarchy only.\n\n${treeOutput}`;
-    } catch (e) {
+    } catch {
       cleaned = preprocessGodotText(file.content);
     }
   }
