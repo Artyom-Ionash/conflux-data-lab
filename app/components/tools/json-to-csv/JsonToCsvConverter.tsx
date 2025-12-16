@@ -2,6 +2,8 @@
 
 import { useState } from 'react';
 
+import { convertJsonToCsv } from '@/lib/modules/converters/json-to-csv';
+
 import { Card } from '../../primitives/Card';
 
 export function JsonToCsvConverter() {
@@ -9,55 +11,12 @@ export function JsonToCsvConverter() {
   const [csvOutput, setCsvOutput] = useState('');
   const [error, setError] = useState('');
 
-  const convert = () => {
+  const handleConvert = () => {
     try {
       setError('');
-
-      if (!jsonInput.trim()) {
-        setCsvOutput('');
-        return;
-      }
-
-      const data = JSON.parse(jsonInput);
-
-      if (!Array.isArray(data)) {
-        throw new Error('JSON должен быть массивом объектов');
-      }
-
-      if (data.length === 0) {
-        setCsvOutput('');
-        return;
-      }
-
-      // Получаем заголовки из первого объекта
-      const headers = Object.keys(data[0]);
-
-      // Создаем CSV строки
-      const csvRows = [
-        headers.join(','), // заголовки
-        ...data.map((row) =>
-          headers
-            .map((header) => {
-              const value = row[header];
-              // Экранируем кавычки и запятые
-              if (value === null || value === undefined) {
-                return '';
-              }
-              const stringValue = String(value);
-              if (
-                stringValue.includes(',') ||
-                stringValue.includes('"') ||
-                stringValue.includes('\n')
-              ) {
-                return `"${stringValue.replaceAll('"', '""')}"`;
-              }
-              return stringValue;
-            })
-            .join(',')
-        ),
-      ];
-
-      setCsvOutput(csvRows.join('\n'));
+      // Вся сложность ушла в pipeline
+      const result = convertJsonToCsv(jsonInput);
+      setCsvOutput(result);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Ошибка конвертации');
       setCsvOutput('');
@@ -94,7 +53,7 @@ export function JsonToCsvConverter() {
             <textarea
               value={jsonInput}
               onChange={(e) => setJsonInput(e.target.value)}
-              onBlur={convert}
+              onBlur={handleConvert}
               placeholder='[{"name": "John", "age": 30}, {"name": "Jane", "age": 25}]'
               className="h-64 w-full rounded-md border border-zinc-300 bg-white px-3 py-2 font-mono text-sm dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
             />
@@ -104,7 +63,7 @@ export function JsonToCsvConverter() {
               </div>
             )}
             <button
-              onClick={convert}
+              onClick={handleConvert}
               className="w-full rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700"
             >
               Конвертировать

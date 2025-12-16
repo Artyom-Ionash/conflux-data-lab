@@ -19,6 +19,7 @@ import {
 import { CSS } from '@dnd-kit/utilities';
 import Image from 'next/image';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { filter, map, pipe } from 'remeda';
 
 import { rgbToHex } from '@/lib/core/utils/colors';
 import {
@@ -324,25 +325,31 @@ export function VerticalImageAligner() {
   const processFiles = useCallback(
     (files: File[]) => {
       if (!files || files.length === 0) return;
-      const newImages: AlignImage[] = [];
       const isListEmpty = images.length === 0;
 
-      [...files].forEach((file, index) => {
-        if (!file.type.startsWith('image/')) return;
-        const url = URL.createObjectURL(file);
-        const id = `${Date.now()}-${index}-${Math.random().toString(36).substr(2, 9)}`;
-        newImages.push({
-          id,
-          file,
-          url,
-          name: file.name,
-          offsetX: 0,
-          offsetY: 0,
-          isActive: isListEmpty && index === 0,
-          naturalWidth: 0,
-          naturalHeight: 0,
-        });
-      });
+      // --- ПАЙПЛАЙН: TRANSFORM FILES TO IMAGES ---
+      const newImages = pipe(
+        files,
+        filter((f) => f.type.startsWith('image/')),
+        map((file, index) => {
+          const url = URL.createObjectURL(file);
+          const id = `${Date.now()}-${index}-${Math.random().toString(36).substr(2, 9)}`;
+          return {
+            id,
+            file,
+            url,
+            name: file.name,
+            offsetX: 0,
+            offsetY: 0,
+            isActive: isListEmpty && index === 0, // Первый активен, если список пуст
+            naturalWidth: 0,
+            naturalHeight: 0,
+          };
+        })
+      );
+      // -------------------------------------------
+
+      if (newImages.length === 0) return;
 
       setImages((prev) => [...prev, ...newImages]);
 
