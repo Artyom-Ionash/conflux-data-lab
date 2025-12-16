@@ -6,7 +6,7 @@ import nextTs from 'eslint-config-next/typescript';
 import boundaries from 'eslint-plugin-boundaries';
 import simpleImportSort from 'eslint-plugin-simple-import-sort';
 import eslintPluginUnicorn from 'eslint-plugin-unicorn';
-// УДАЛЕНО: import tseslint ...
+import eslintConfigPrettier from 'eslint-config-prettier'; 
 
 const eslintConfig = defineConfig([
   ...nextVitals,
@@ -14,7 +14,7 @@ const eslintConfig = defineConfig([
 
   globalIgnores(['.next/**', 'out/**', 'build/**', 'next-env.d.ts', 'scripts/**']),
 
-  // 1. БАЗОВЫЕ ПРАВИЛА (работают везде)
+  // 1. БАЗОВЫЕ ПРАВИЛА
   {
     plugins: {
       'simple-import-sort': simpleImportSort,
@@ -22,14 +22,15 @@ const eslintConfig = defineConfig([
       unicorn: eslintPluginUnicorn,
     },
     settings: {
+      // ... настройки boundaries ...
       'boundaries/include': ['app/**/*', 'lib/**/*'],
       'boundaries/elements': [
-        { type: 'app-layer', pattern: 'app/(page|layout|loading|error|not-found|tools/**/page).tsx', mode: 'file' },
-        { type: 'tool', pattern: 'app/components/tools/*', capture: ['toolName'] },
-        { type: 'entity', pattern: 'app/components/entities/*', capture: ['entityName'] },
-        { type: 'primitives', pattern: 'app/components/primitives/*', mode: 'folder' },
-        { type: 'module', pattern: 'lib/modules/*', mode: 'folder', capture: ['moduleName'] },
-        { type: 'core', pattern: ['lib/core/*', 'lib/types/*'], mode: 'folder' },
+         { type: 'app-layer', pattern: 'app/(page|layout|loading|error|not-found|tools/**/page).tsx', mode: 'file' },
+         { type: 'tool', pattern: 'app/components/tools/*', capture: ['toolName'] },
+         { type: 'entity', pattern: 'app/components/entities/*', capture: ['entityName'] },
+         { type: 'primitives', pattern: 'app/components/primitives/*', mode: 'folder' },
+         { type: 'module', pattern: 'lib/modules/*', mode: 'folder', capture: ['moduleName'] },
+         { type: 'core', pattern: ['lib/core/*', 'lib/types/*'], mode: 'folder' },
       ],
     },
     rules: {
@@ -56,7 +57,7 @@ const eslintConfig = defineConfig([
     },
   },
 
-  // 2. СТРОГИЕ ПРАВИЛА TS (Применяем ТОЛЬКО к TS файлам)
+  // 2. СТРОГИЕ ПРАВИЛА TS
   {
     files: ['**/*.ts', '**/*.tsx'],
     languageOptions: {
@@ -71,7 +72,7 @@ const eslintConfig = defineConfig([
         { prefer: 'type-imports', fixStyle: 'separate-type-imports' },
       ],
       '@typescript-eslint/no-explicit-any': 'error',
-      '@typescript-eslint/no-non-null-assertion': 'warn', // По умолчанию предупреждаем
+      '@typescript-eslint/no-non-null-assertion': 'warn',
       '@typescript-eslint/no-floating-promises': 'error',
       '@typescript-eslint/await-thenable': 'error',
     },
@@ -88,6 +89,9 @@ const eslintConfig = defineConfig([
       '@typescript-eslint/no-non-null-assertion': 'off',
     },
   },
+
+  // 4. PRETTIER (ОТКЛЮЧЕНИЕ КОНФЛИКТУЮЩИХ ПРАВИЛ)
+  eslintConfigPrettier,
 ]);
 
 export default eslintConfig;
