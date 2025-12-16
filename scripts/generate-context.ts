@@ -1,5 +1,6 @@
 import { writeFileSync, readFileSync, readdirSync, statSync, existsSync, mkdirSync } from 'node:fs';
 import { join, relative } from 'node:path';
+import { execSync } from 'node:child_process';
 import ignore from 'ignore';
 
 // SHARED IMPORTS
@@ -15,6 +16,77 @@ const OUTPUT_DIR = '.context';
 const OUTPUT_FILENAME = 'project.txt';
 const MAX_FILE_SIZE_KB = 500;
 const ALLOWED_DOT_DIRS = ['.husky', '.github', '.storybook'];
+
+// --- GIT DELTA UTILS (NEW) ---
+function getGitBlobSize(filePath: string): number {
+  try {
+    // git ls-tree выводит: <mode> <type> <hash> <size> <path>
+    // Флаг -l показывает размер блоба в байтах
+    // Используем относительный путь для git
+    const output = execSync(`git ls-tree -l HEAD "${filePath.replaceAll('\\', '/')}"`, {
+      encoding: 'utf-8',
+      stdio: ['ignore', 'pipe', 'ignore'], // Подавляем ошибки stderr
+    });
+
+    // Парсим 4-ю колонку (size)
+    const match = output.trim().split(/\s+/);
+    // FIX: Явно сохраняем в переменную для проверки типов (noUncheckedIndexedAccess)
+    const sizeColumn = match[3];
+
+    if (match.length >= 4 && sizeColumn && sizeColumn !== '-') {
+      return parseInt(sizeColumn, 10);
+    }
+  } catch (e) {
+    // Если ошибка (например, файл не в гите), возвращаем 0
+    return 0;
+  }
+  return 0;
+}
+
+function calculateGitDelta(rootDir: string): string {
+  try {
+    // Получаем список измененных файлов
+    const statusOutput = execSync('git status --porcelain', { encoding: 'utf-8' });
+    const lines = statusOutput.split('\n').filter((l) => l.trim());
+
+    let totalDelta = 0;
+    let changedFilesCount = 0;
+
+    for (const line of lines) {
+      const status = line.substring(0, 2);
+      const filePath = line.substring(3).trim();
+      const fullPath = join(rootDir, filePath);
+
+      // Пропускаем удаленные файлы для простоты
+      if (status.includes('D')) {
+        const oldSize = getGitBlobSize(filePath);
+        totalDelta -= oldSize;
+        changedFilesCount++;
+        continue;
+      }
+
+      if (existsSync(fullPath)) {
+        const currentSize = statSync(fullPath).size;
+        const oldSize = getGitBlobSize(filePath);
+
+        // Если файл новый (?? или A), oldSize будет 0
+        totalDelta += currentSize - oldSize;
+        changedFilesCount++;
+      }
+    }
+
+    if (changedFilesCount === 0) return '';
+
+    const sign = totalDelta > 0 ? '+' : '';
+    // Красим вывод: Красный если выросло, Зеленый если уменьшилось
+    const color = totalDelta > 0 ? '\x1b[31m' : '\x1b[32m';
+    const reset = '\x1b[0m';
+
+    return ` | Pending Commit: ${color}${sign}${totalDelta} B${reset}`;
+  } catch (e) {
+    return ''; // Если нет гита или ошибка
+  }
+}
 
 // --- UTILS ---
 
@@ -89,7 +161,6 @@ try {
       const relPath = relative(rootDir, filePath).replaceAll('\\', '/');
       const ext = filename.split('.').pop() || 'txt';
 
-      // --- ИСПОЛЬЗУЕМ НОВЫЙ PIPELINE ---
       const rawFile: RawFile = {
         name: filename,
         path: relPath,
@@ -98,7 +169,6 @@ try {
       };
 
       const contextNode = processFileToContext(rawFile);
-      // ---------------------------------
 
       processedFiles.push({
         path: contextNode.path,
@@ -119,8 +189,11 @@ try {
   const { output, stats } = generateContextOutput(processedFiles, treeString);
   writeFileSync(join(outputDirPath, OUTPUT_FILENAME), output);
 
+  // --- ВЫЧИСЛЕНИЕ DELTA ---
+  const gitDeltaStr = calculateGitDelta(rootDir);
+
   console.log(
-    `✅ Updated context: ${stats.fileCount} files, ~${stats.totalTokens.toLocaleString()} tokens`
+    `✅ Context: ${stats.fileCount} files, ~${stats.totalTokens.toLocaleString()} tokens${gitDeltaStr}`
   );
 } catch (err) {
   console.error('❌ Failed:', err);
