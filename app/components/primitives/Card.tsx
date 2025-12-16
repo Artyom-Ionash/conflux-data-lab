@@ -1,9 +1,9 @@
-import Link from 'next/link';
+import { Slot } from '@radix-ui/react-slot';
 import type { ReactNode } from 'react';
 
 interface CardProps {
   children: ReactNode;
-  href?: string;
+  asChild?: boolean;
   className?: string;
   title?: ReactNode;
   headerActions?: ReactNode;
@@ -34,28 +34,38 @@ function CardHeader({ title, headerActions }: Pick<CardProps, 'title' | 'headerA
 
 export function Card({
   children,
-  href,
+  asChild = false,
   className = '',
   title,
   headerActions,
   contentClassName,
 }: CardProps) {
+  const Comp = asChild ? Slot : 'div';
   const hasHeader = Boolean(title || headerActions);
   const contentClasses = contentClassName ?? (hasHeader ? 'px-5 py-4' : 'p-6');
-  const content = (
-    <>
-      {hasHeader && <CardHeader title={title} headerActions={headerActions} />}
-      <div className={contentClasses}>{children}</div>
-    </>
-  );
 
-  if (href) {
+  // Если asChild=true, мы рендерим Slot, который передает пропсы единственному ребенку.
+  // Но нам нужно также отрендерить Header и внутренний padding.
+  // Slot предполагает, что мы передаем *только* ребенка.
+  // ПАТТЕРН: Если мы хотим обернуть Link в Card, Link должен быть корневым элементом.
+  // Значит, Header должен быть *внутри* Link или Link должен быть *внутри* Card?
+  // Обычно Card как ссылка означает, что ВСЯ карточка кликабельна.
+
+  if (asChild) {
     return (
-      <Link href={href} className={`${baseClasses} ${className}`}>
-        {content}
-      </Link>
+      <Comp className={`${baseClasses} ${className}`}>
+        {/* Slot мерджит пропсы (включая className) с ребенком */}
+        {/* Мы ожидаем, что ребенок примет children (контент карточки) */}
+        {children}
+      </Comp>
     );
   }
 
-  return <div className={`${baseClasses} ${className}`}>{content}</div>;
+  // Стандартный режим
+  return (
+    <div className={`${baseClasses} ${className}`}>
+      {hasHeader && <CardHeader title={title} headerActions={headerActions} />}
+      <div className={contentClasses}>{children}</div>
+    </div>
+  );
 }
