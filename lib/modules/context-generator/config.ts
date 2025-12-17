@@ -14,6 +14,10 @@ export const IGNORE_COMMON = [
   'CHANGELOG.md',
 ];
 
+// Файлы, которые должны быть в контексте, даже если они в .gitignore
+// (используются как правила исключения "!" для менеджера игнорирования)
+export const FORCE_INCLUDE_FILES = ['docs/ENGINEER_PROFILE.md'];
+
 export const CONTEXT_PRESETS = {
   godot: {
     name: 'Godot 4 (Logic Only)',

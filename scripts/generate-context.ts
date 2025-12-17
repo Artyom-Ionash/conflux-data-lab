@@ -6,7 +6,7 @@ import ignore from 'ignore';
 // SHARED IMPORTS
 import { isTextFile } from '../lib/modules/file-system/file-utils';
 import { generateAsciiTree } from '../lib/modules/file-system/tree-view';
-import { CONTEXT_PRESETS } from '../lib/modules/context-generator/config';
+import { CONTEXT_PRESETS, FORCE_INCLUDE_FILES } from '../lib/modules/context-generator/config';
 import { generateContextOutput, ProcessedContextFile } from '../lib/modules/context-generator/core';
 import { processFileToContext, type RawFile } from '../lib/modules/context-generator/pipeline';
 
@@ -17,7 +17,7 @@ const OUTPUT_FILENAME = 'project.txt';
 const MAX_FILE_SIZE_KB = 500;
 const ALLOWED_DOT_DIRS = ['.husky', '.github', '.storybook'];
 
-// --- GIT DELTA UTILS (NEW) ---
+// --- GIT DELTA UTILS ---
 function getGitBlobSize(filePath: string): number {
   try {
     // git ls-tree выводит: <mode> <type> <hash> <size> <path>
@@ -30,14 +30,13 @@ function getGitBlobSize(filePath: string): number {
 
     // Парсим 4-ю колонку (size)
     const match = output.trim().split(/\s+/);
-    // FIX: Явно сохраняем в переменную для проверки типов (noUncheckedIndexedAccess)
+    // Для проверки типов (noUncheckedIndexedAccess)
     const sizeColumn = match[3];
 
     if (match.length >= 4 && sizeColumn && sizeColumn !== '-') {
       return parseInt(sizeColumn, 10);
     }
   } catch (e) {
-    // Если ошибка (например, файл не в гите), возвращаем 0
     return 0;
   }
   return 0;
@@ -45,7 +44,6 @@ function getGitBlobSize(filePath: string): number {
 
 function calculateGitDelta(rootDir: string): string {
   try {
-    // Получаем список измененных файлов
     const statusOutput = execSync('git status --porcelain', { encoding: 'utf-8' });
     const lines = statusOutput.split('\n').filter((l) => l.trim());
 
@@ -56,7 +54,6 @@ function calculateGitDelta(rootDir: string): string {
       const status = line.substring(0, 2);
       const filePath = line.substring(3).trim();
       const fullPath = join(rootDir, filePath);
-
       // Пропускаем удаленные файлы для простоты
       if (status.includes('D')) {
         const oldSize = getGitBlobSize(filePath);
@@ -78,6 +75,7 @@ function calculateGitDelta(rootDir: string): string {
     if (changedFilesCount === 0) return '';
 
     const sign = totalDelta > 0 ? '+' : '';
+
     // Красим вывод: Красный если выросло, Зеленый если уменьшилось
     const color = totalDelta > 0 ? '\x1b[31m' : '\x1b[32m';
     const reset = '\x1b[0m';
@@ -92,7 +90,11 @@ function calculateGitDelta(rootDir: string): string {
 
 function getIgManager(rootDir: string) {
   const ig = ignore();
+
+  // 1. Базовые правила игнорирования
   ig.add(PRESET.hardIgnore);
+
+  // 2. Правила из .gitignore
   const gitIgnorePath = join(rootDir, '.gitignore');
   if (existsSync(gitIgnorePath)) {
     try {
@@ -102,6 +104,14 @@ function getIgManager(rootDir: string) {
       console.warn('⚠️ Could not read .gitignore:', e);
     }
   }
+
+  // 3. ПРИНУДИТЕЛЬНОЕ ВКЛЮЧЕНИЕ (Un-ignore)
+  // Добавляем правила с "!", чтобы перебить настройки .gitignore
+  // Пример: "!docs/ENGINEER_PROFILE.md"
+  if (FORCE_INCLUDE_FILES.length > 0) {
+    ig.add(FORCE_INCLUDE_FILES.map((f) => `!${f}`));
+  }
+
   return ig;
 }
 
@@ -124,8 +134,9 @@ try {
 
     for (const entry of entries) {
       const fullPath = join(dir, entry.name);
-      const relPath = relative(rootDir, fullPath);
+      const relPath = relative(rootDir, fullPath).replaceAll('\\', '/');
 
+      // Теперь проверка стандартная, так как ig уже знает про исключения
       if (ig.ignores(relPath)) continue;
 
       if (entry.isDirectory()) {
@@ -137,7 +148,7 @@ try {
         if (forTree) {
           const size = statSync(fullPath).size;
           const isText = isTextFile(entry.name, PRESET.textExtensions);
-          treeNodes.push({ path: relPath.replaceAll('\\', '/'), name: entry.name, size, isText });
+          treeNodes.push({ path: relPath, name: entry.name, size, isText });
         }
 
         if (!forTree && isTextFile(entry.name, PRESET.textExtensions)) {

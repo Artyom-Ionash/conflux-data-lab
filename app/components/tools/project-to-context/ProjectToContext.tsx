@@ -4,7 +4,11 @@ import ignore from 'ignore';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 
 // --- SHARED LOGIC IMPORTS ---
-import { CONTEXT_PRESETS, type PresetKey } from '@/lib/modules/context-generator/config';
+import {
+  CONTEXT_PRESETS,
+  FORCE_INCLUDE_FILES,
+  type PresetKey,
+} from '@/lib/modules/context-generator/config';
 import {
   generateContextOutput,
   type ProcessedContextFile,
@@ -142,6 +146,12 @@ export function ProjectToContext() {
       );
     }
 
+    // Г) Принудительное включение (Un-ignore)
+    // Важно добавить это В КОНЦЕ, чтобы перебить предыдущие правила
+    if (FORCE_INCLUDE_FILES.length > 0) {
+      ig.add(FORCE_INCLUDE_FILES.map((f) => `!${f}`));
+    }
+
     // Расширения
     const extList = activePreset.textExtensions;
 
@@ -160,14 +170,18 @@ export function ProjectToContext() {
       }
 
       // ПРОВЕРКА ЧЕРЕЗ ПАКЕТ IGNORE
+      // Теперь библиотека ignore сама знает, что профиль игнорировать нельзя
       if (ig.ignores(path)) return;
+
+      // Проверяем, является ли файл текстовым ИЛИ принудительно включенным
+      const isText = isTextFile(f.name, extList) || FORCE_INCLUDE_FILES.includes(path);
 
       nodes.push({
         path: path,
         name: f.name,
         size: f.size,
         file: f,
-        isText: isTextFile(f.name, extList),
+        isText,
       });
     });
 
