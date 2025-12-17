@@ -3,6 +3,8 @@
 import * as SliderPrimitive from '@radix-ui/react-slider';
 import React, { useRef } from 'react';
 
+import { cn } from '@/lib/core/utils/styles';
+
 interface RangeSliderProps {
   min: number;
   max: number;
@@ -45,15 +47,15 @@ export function RangeSlider({
 
   const renderThumb = (val: number, index: 0 | 1) => {
     const isMin = index === 0;
-    const colorClass = isMin
-      ? 'border-blue-500 focus:ring-blue-500'
-      : 'border-purple-500 focus:ring-purple-500';
     const label = isMin ? 'Start' : 'End';
 
     return (
       <SliderPrimitive.Thumb
         key={index}
-        className={`group/thumb relative block h-4 w-4 rounded-full border-2 bg-white shadow-md transition-transform duration-75 hover:scale-110 focus:ring-2 focus:outline-none ${colorClass}`}
+        className={cn(
+          'group/thumb relative block h-4 w-4 rounded-full border-2 bg-white shadow-md transition-transform duration-75 hover:scale-110 focus:ring-2 focus:outline-none',
+          isMin ? 'border-blue-500 focus:ring-blue-500' : 'border-purple-500 focus:ring-purple-500'
+        )}
         aria-label={label}
       >
         {/* Tooltip (появляется при наведении или фокусе/драге) */}
@@ -61,7 +63,10 @@ export function RangeSlider({
           <div className="flex items-center gap-1.5 rounded border border-zinc-700 bg-zinc-900 px-2 py-1 font-mono text-[10px] whitespace-nowrap text-white shadow-lg">
             <span className="font-bold">{formatTooltip ? formatTooltip(val) : val.toFixed(2)}</span>
             <span
-              className={`text-[9px] font-bold tracking-wide uppercase ${isMin ? 'text-blue-400' : 'text-purple-400'}`}
+              className={cn(
+                'text-[9px] font-bold tracking-wide uppercase',
+                isMin ? 'text-blue-400' : 'text-purple-400'
+              )}
             >
               {isMin ? '← Start' : 'End →'}
             </span>
@@ -75,7 +80,7 @@ export function RangeSlider({
 
   return (
     <SliderPrimitive.Root
-      className={`relative flex h-6 w-full touch-none items-center select-none ${className}`}
+      className={cn('relative flex h-6 w-full touch-none items-center select-none', className)}
       value={value}
       min={min}
       max={max}

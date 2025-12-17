@@ -3,6 +3,8 @@
 import type { ReactNode } from 'react';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 
+import { cn } from '@/lib/core/utils/styles';
+
 // --- Helper: Validate File Type ---
 const isFileAccepted = (file: File, accept: string): boolean => {
   if (!accept || accept === '*' || accept === '') return true;
@@ -148,17 +150,27 @@ export const FileDropzone = ({
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
-        className={`group relative flex cursor-pointer flex-col items-center justify-center transition-all duration-200 ${
+        className={cn(
+          'group relative flex cursor-pointer flex-col items-center justify-center transition-all duration-200',
+          !className.includes('border') && 'rounded-lg border-2 border-dashed',
+          !className.includes('h-') && 'h-24',
+          !className.includes('w-') && 'w-full',
           isDragActive
             ? 'scale-[1.01] border-blue-500 bg-blue-50 shadow-lg ring-2 ring-blue-500/20 dark:border-blue-400 dark:bg-blue-900/20'
-            : 'border-zinc-300 bg-zinc-50 hover:bg-zinc-100 dark:border-zinc-700 dark:bg-zinc-800/50 dark:hover:bg-zinc-800'
-        } ${className.includes('border') ? '' : 'rounded-lg border-2 border-dashed'} ${className.includes('h-') ? '' : 'h-24'} ${className.includes('w-') ? '' : 'w-full'} ${className} `}
+            : 'border-zinc-300 bg-zinc-50 hover:bg-zinc-100 dark:border-zinc-700 dark:bg-zinc-800/50 dark:hover:bg-zinc-800',
+          className
+        )}
       >
         {/* FIX: unicorn/prefer-logical-operator-over-ternary */}
         {children || (
           <div className="pointer-events-none flex flex-col items-center justify-center pt-5 pb-6">
             <svg
-              className={`mb-2 h-8 w-8 transition-colors ${isDragActive ? 'text-blue-500' : 'text-zinc-400 group-hover:text-zinc-500 dark:text-zinc-500 dark:group-hover:text-zinc-400'}`}
+              className={cn(
+                'mb-2 h-8 w-8 transition-colors',
+                isDragActive
+                  ? 'text-blue-500'
+                  : 'text-zinc-400 group-hover:text-zinc-500 dark:text-zinc-500 dark:group-hover:text-zinc-400'
+              )}
               aria-hidden="true"
               xmlns="http://www.w3.org/2000/svg"
               fill="none"
@@ -173,7 +185,12 @@ export const FileDropzone = ({
               />
             </svg>
             <p
-              className={`text-xs font-medium transition-colors ${isDragActive ? 'text-blue-600 dark:text-blue-300' : 'text-zinc-500 dark:text-zinc-400'}`}
+              className={cn(
+                'text-xs font-medium transition-colors',
+                isDragActive
+                  ? 'text-blue-600 dark:text-blue-300'
+                  : 'text-zinc-500 dark:text-zinc-400'
+              )}
             >
               {isDragActive ? (multiple ? 'Бросайте файлы сюда' : 'Бросайте файл сюда') : label}
             </p>
@@ -224,7 +241,10 @@ export const FileDropzonePlaceholder = ({
       multiple={multiple}
       enableWindowDrop={enableWindowDrop}
       accept={accept}
-      className={`h-full w-full border-none bg-transparent transition-colors hover:bg-zinc-50/50 dark:hover:bg-zinc-900/50 ${className}`}
+      className={cn(
+        'h-full w-full border-none bg-transparent transition-colors hover:bg-zinc-50/50 dark:hover:bg-zinc-900/50',
+        className
+      )}
     >
       <div className="animate-in fade-in zoom-in-95 flex flex-col items-center justify-center text-zinc-400 duration-300">
         <div className="mb-4 rounded-full bg-zinc-100 p-4 transition-transform duration-200 group-hover:scale-110 dark:bg-zinc-800">

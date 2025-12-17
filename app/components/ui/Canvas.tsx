@@ -1,5 +1,3 @@
-// conflux-data-lab/app/components/primitives/Canvas.tsx
-
 'use client';
 
 import type { ReactNode } from 'react';
@@ -14,6 +12,7 @@ import React, {
 } from 'react';
 
 import { useElementSize } from '@/lib/core/hooks/use-element-size';
+import { cn } from '@/lib/core/utils/styles';
 
 import { ColorInput } from './ColorInput';
 import { ProcessingOverlay } from './ProcessingOverlay';
@@ -350,7 +349,11 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(
     return (
       <div
         ref={setRefs}
-        className={`relative h-full w-full touch-none overflow-hidden transition-colors ease-in-out select-none ${currentTheme.BG} ${className}`}
+        className={cn(
+          'relative h-full w-full touch-none overflow-hidden transition-colors ease-in-out select-none',
+          currentTheme.BG,
+          className
+        )}
         onWheel={handleWheel}
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
@@ -384,7 +387,12 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(
           </button>
           <button
             onClick={() => setIsAutoContrast(!isAutoContrast)}
-            className={`rounded-full p-2 transition-colors ${isAutoContrast ? 'bg-blue-100 text-blue-600 dark:bg-blue-900 dark:text-blue-300' : 'text-zinc-500 hover:bg-zinc-100'}`}
+            className={cn(
+              'rounded-full p-2 transition-colors',
+              isAutoContrast
+                ? 'bg-blue-100 text-blue-600 dark:bg-blue-900 dark:text-blue-300'
+                : 'text-zinc-500 hover:bg-zinc-100'
+            )}
           >
             <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path
@@ -427,7 +435,10 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(
         </div>
 
         <div
-          className={`pointer-events-none absolute inset-0 transition-opacity ease-in-out ${currentTheme.GRID_OPACITY}`}
+          className={cn(
+            'pointer-events-none absolute inset-0 transition-opacity ease-in-out',
+            currentTheme.GRID_OPACITY
+          )}
           style={{
             transitionDuration: `${transitionDuration}ms`,
             backgroundImage: GRID_CSS_PATTERN,

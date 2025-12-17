@@ -1,5 +1,7 @@
 import React from 'react';
 
+import { cn } from '@/lib/core/utils/styles';
+
 interface NumberStepperProps {
   value: number;
   onChange: (val: number) => void;
@@ -22,26 +24,26 @@ export function NumberStepper({
   disabled = false,
 }: NumberStepperProps) {
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    // FIX: unicorn/prefer-number-properties (parseFloat -> Number.parseFloat - опционально, но лучше isNaN -> Number.isNaN)
     const val = Number.parseFloat(e.target.value);
-    // FIX: unicorn/prefer-number-properties
+
     if (!Number.isNaN(val)) {
       onChange(val);
     }
   };
 
   return (
-    <div className={`flex items-center gap-2 ${className}`}>
+    <div className={cn('flex items-center gap-2', className)}>
       {label && (
         <span className="text-xs font-bold tracking-wide text-zinc-500 uppercase">{label}:</span>
       )}
 
       <div
-        className={`flex h-8 items-center rounded-lg border shadow-sm transition-colors ${
+        className={cn(
+          'flex h-8 items-center rounded-lg border shadow-sm transition-colors',
           disabled
             ? 'cursor-default border-zinc-200 bg-zinc-100 opacity-80 dark:border-zinc-700 dark:bg-zinc-800'
             : 'border-zinc-200 bg-white hover:border-zinc-300 dark:border-zinc-700 dark:bg-zinc-900 dark:hover:border-zinc-600'
-        }`}
+        )}
       >
         <input
           type="number"
@@ -51,7 +53,10 @@ export function NumberStepper({
           step={step}
           onChange={handleChange}
           disabled={disabled}
-          className={`h-full w-16 appearance-none rounded-lg bg-transparent px-1 text-center font-mono text-sm font-bold outline-none ${disabled ? 'pointer-events-none text-zinc-500' : 'text-zinc-700 dark:text-zinc-200'}`}
+          className={cn(
+            'h-full w-16 appearance-none rounded-lg bg-transparent px-1 text-center font-mono text-sm font-bold outline-none',
+            disabled ? 'pointer-events-none text-zinc-500' : 'text-zinc-700 dark:text-zinc-200'
+          )}
         />
       </div>
     </div>

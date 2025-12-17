@@ -3,6 +3,8 @@
 import * as Dialog from '@radix-ui/react-dialog';
 import React from 'react';
 
+import { cn } from '@/lib/core/utils/styles';
+
 interface ModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -29,7 +31,10 @@ export function Modal({
         {/* Content Wrapper: центрирование */}
         <div className="fixed inset-0 z-[210] flex items-center justify-center p-4">
           <Dialog.Content
-            className={`data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-top-[48%] flex max-h-[95vh] w-full flex-col overflow-hidden rounded-2xl border border-zinc-700 bg-zinc-900 shadow-2xl outline-none ${className}`}
+            className={cn(
+              'data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-top-[48%] flex max-h-[95vh] w-full flex-col overflow-hidden rounded-2xl border border-zinc-700 bg-zinc-900 shadow-2xl outline-none',
+              className
+            )}
           >
             {/* Header */}
             <div className="flex shrink-0 items-center justify-between border-b border-zinc-800 bg-zinc-900 px-6 py-4">

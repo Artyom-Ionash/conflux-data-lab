@@ -3,6 +3,8 @@
 import * as SwitchPrimitives from '@radix-ui/react-switch';
 import React from 'react';
 
+import { cn } from '@/lib/core/utils/styles';
+
 interface SwitchProps {
   checked: boolean;
   onCheckedChange: (checked: boolean) => void;
@@ -11,7 +13,7 @@ interface SwitchProps {
 }
 
 export const Switch = ({ checked, onCheckedChange, label, className = '' }: SwitchProps) => (
-  <div className={`flex items-center justify-between py-2 ${className}`}>
+  <div className={cn('flex items-center justify-between py-2', className)}>
     <label
       className="cursor-pointer text-sm font-medium text-zinc-700 select-none dark:text-zinc-300"
       onClick={() => onCheckedChange(!checked)}
