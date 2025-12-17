@@ -36,13 +36,16 @@
     "@radix-ui/react-switch": "^1.2.6",
     "@radix-ui/react-toggle-group": "^1.1.11",
     "@radix-ui/react-tooltip": "^1.2.8",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
     "colord": "^2.9.3",
     "gifshot": "^0.4.5",
     "ignore": "^7.0.5",
     "next": "^16.0.7",
     "react": "^19.2.1",
     "react-dom": "^19.2.1",
-    "remeda": "^2.32.0"
+    "remeda": "^2.32.0",
+    "tailwind-merge": "^3.4.0"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
