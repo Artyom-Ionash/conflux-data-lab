@@ -57,14 +57,15 @@ export function FrameDiffOverlay({
         const threshold = 30;
 
         for (let i = 0; i < firstImageData.data.length; i += 4) {
-          // FIX: Используем ! для утверждения, что пиксели существуют
-          const firstR = firstImageData.data[i]!;
-          const firstG = firstImageData.data[i + 1]!;
-          const firstB = firstImageData.data[i + 2]!;
+          // ИСПОЛЬЗУЕМ БЕЗОПАСНЫЙ ДОСТУП ВМЕСТО !
+          // TypeScript в строгом режиме считает array[i] возможным undefined
+          const firstR = firstImageData.data[i] ?? 0;
+          const firstG = firstImageData.data[i + 1] ?? 0;
+          const firstB = firstImageData.data[i + 2] ?? 0;
 
-          const lastR = lastImageData.data[i]!;
-          const lastG = lastImageData.data[i + 1]!;
-          const lastB = lastImageData.data[i + 2]!;
+          const lastR = lastImageData.data[i] ?? 0;
+          const lastG = lastImageData.data[i + 1] ?? 0;
+          const lastB = lastImageData.data[i + 2] ?? 0;
 
           const firstIsBg = areColorsSimilar(firstR, firstG, firstB, bg.r, bg.g, bg.b, threshold);
           const lastIsBg = areColorsSimilar(lastR, lastG, lastB, bg.r, bg.g, bg.b, threshold);

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 
+import { cn } from '@/lib/core/utils/styles'; // NEW
 import {
   analyzeTextureSize,
   getNearestPoT,
@@ -50,7 +51,7 @@ export function TextureDimensionSlider({
 
   return (
     <div
-      className={`relative flex flex-col gap-2 ${disabled ? 'pointer-events-none opacity-50' : ''}`}
+      className={cn('relative flex flex-col gap-2', disabled && 'pointer-events-none opacity-50')}
     >
       {/* Header Label */}
       <div className="flex items-end justify-between">
@@ -60,7 +61,12 @@ export function TextureDimensionSlider({
 
         {/* Status Badge */}
         <div
-          className={`flex cursor-help items-center gap-1 rounded border px-1.5 py-0.5 text-[10px] font-bold tracking-wider uppercase transition-colors ${styles.bg} ${styles.border} ${styles.text}`}
+          className={cn(
+            'flex cursor-help items-center gap-1 rounded border px-1.5 py-0.5 text-[10px] font-bold tracking-wider uppercase transition-colors',
+            styles.bg,
+            styles.border,
+            styles.text
+          )}
           onMouseEnter={() => setShowTooltip(true)}
           onMouseLeave={() => setShowTooltip(false)}
         >
@@ -79,7 +85,10 @@ export function TextureDimensionSlider({
             max={max}
             value={value}
             onChange={handleSliderChange}
-            className={`h-1.5 w-full cursor-pointer appearance-none rounded-lg bg-zinc-200 focus:ring-2 focus:ring-blue-500/30 focus:outline-none dark:bg-zinc-700 ${styles.slider}`}
+            className={cn(
+              'h-1.5 w-full cursor-pointer appearance-none rounded-lg bg-zinc-200 focus:ring-2 focus:ring-blue-500/30 focus:outline-none dark:bg-zinc-700',
+              styles.slider
+            )}
           />
         </div>
 
@@ -89,11 +98,12 @@ export function TextureDimensionSlider({
           <button
             onClick={handlePoTClick}
             disabled={disabled}
-            className={`flex flex-1 items-center justify-center border text-[9px] font-bold tracking-wide uppercase transition-all ${
+            className={cn(
+              'flex flex-1 items-center justify-center rounded-t-lg border border-b-0 text-[9px] font-bold tracking-wide uppercase transition-all',
               isPoT
                 ? 'cursor-default border-green-600 bg-green-600/90 text-white'
                 : 'border-zinc-200 bg-zinc-100 text-zinc-500 hover:border-blue-600 hover:bg-blue-600 hover:text-white dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-400'
-            } rounded-t-lg border-b-0`}
+            )}
             title={
               isPoT ? 'Размер кратен степени двойки (Оптимально)' : `Округлить до ${nearestPoT}px`
             }
@@ -120,7 +130,7 @@ export function TextureDimensionSlider({
           {TEXTURE_ZONES.map((zone, i) => (
             <div
               key={i}
-              className={`bg-gradient-to-r ${zone.color} h-full`}
+              className={cn('h-full bg-gradient-to-r', zone.color)}
               style={{ width: `${zone.percent}%` }}
             />
           ))}
@@ -128,7 +138,10 @@ export function TextureDimensionSlider({
 
         {/* Cursor */}
         <div
-          className={`absolute top-0 bottom-0 -ml-1 w-2 rounded-full shadow-[0_0_4px_rgba(0,0,0,0.5)] ring-1 ring-white/80 transition-all duration-75 ease-out ${styles.marker}`}
+          className={cn(
+            'absolute top-0 bottom-0 -ml-1 w-2 rounded-full shadow-[0_0_4px_rgba(0,0,0,0.5)] ring-1 ring-white/80 transition-all duration-75 ease-out',
+            styles.marker
+          )}
           style={{ left: `${percentage}%` }}
         />
       </div>

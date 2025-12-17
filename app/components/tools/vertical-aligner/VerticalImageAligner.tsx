@@ -28,6 +28,7 @@ import {
   loadImage,
   revokeObjectURLSafely,
 } from '@/lib/core/utils/media';
+import { cn } from '@/lib/core/utils/styles'; // NEW
 
 import { TextureDimensionSlider } from '../../entities/hardware/TextureDimensionSlider';
 import type { CanvasRef } from '../../ui/Canvas';
@@ -38,7 +39,7 @@ import { Slider } from '../../ui/Slider';
 import { Switch } from '../../ui/Switch';
 import { ToolLayout } from '../ToolLayout';
 
-// --- CONSTANTS ---
+// ... (CONSTANTS и TYPES без изменений) ...
 const LIMIT_MAX_BROWSER = 16_384;
 const VIEW_RESET_DELAY = 50;
 const EXPORT_FILENAME = 'aligned-export.png';
@@ -62,7 +63,6 @@ const DEFAULT_SETTINGS = {
   bgColor: '#ffffff',
 };
 
-// --- TYPES ---
 type AlignImage = {
   id: string;
   file: File;
@@ -103,11 +103,12 @@ function SortableLayerItem({ img, index, onActivate, onRemove }: SortableLayerIt
       style={style}
       {...attributes}
       {...listeners}
-      className={`flex cursor-grab items-center gap-3 rounded-md border p-2.5 text-sm transition-colors select-none active:cursor-grabbing ${
+      className={cn(
+        'flex cursor-grab items-center gap-3 rounded-md border p-2.5 text-sm transition-colors select-none active:cursor-grabbing',
         img.isActive
           ? 'border-blue-200 bg-blue-50 text-blue-800 shadow-sm dark:border-blue-800 dark:bg-blue-900/30 dark:text-blue-100'
           : 'border-zinc-200 bg-white hover:border-zinc-300 dark:border-zinc-700 dark:bg-zinc-800'
-      }`}
+      )}
       onClick={() => onActivate(img.id)}
     >
       <span className="w-6 font-mono text-zinc-400">#{index + 1}</span>
@@ -177,14 +178,15 @@ const DraggableImageSlot = React.memo(
       target.addEventListener('pointerup', handlePointerUp as EventListener);
     };
 
-    const zIndexClass = img.isActive ? `z-${Z_INDEX_SLOT_ACTIVE}` : `z-${Z_INDEX_SLOT_BASE}`;
-    const borderClass = img.isActive
-      ? 'border-blue-500 ring-1 ring-blue-500'
-      : 'border-zinc-300/30 hover:border-zinc-400/50';
-
     return (
       <div
-        className={`group absolute left-0 overflow-hidden border-r border-dashed transition-colors ${isDragging ? 'cursor-grabbing' : 'cursor-grab'} ${borderClass} ${zIndexClass} `}
+        className={cn(
+          'group absolute left-0 overflow-hidden border-r border-dashed transition-colors',
+          isDragging ? 'cursor-grabbing' : 'cursor-grab',
+          img.isActive
+            ? `z-${Z_INDEX_SLOT_ACTIVE} border-blue-500 ring-1 ring-blue-500`
+            : `z-${Z_INDEX_SLOT_BASE} border-zinc-300/30 hover:border-zinc-400/50`
+        )}
         style={{
           top: index * slotHeight,
           height: slotHeight,
@@ -194,7 +196,10 @@ const DraggableImageSlot = React.memo(
         onPointerDown={handlePointerDown}
       >
         <div
-          className={`pointer-events-none absolute top-1 left-1 rounded bg-black/60 px-1.5 py-0.5 text-[10px] text-white backdrop-blur-sm transition-opacity duration-200 select-none ${img.isActive ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
+          className={cn(
+            'pointer-events-none absolute top-1 left-1 rounded bg-black/60 px-1.5 py-0.5 text-[10px] text-white backdrop-blur-sm transition-opacity duration-200 select-none',
+            img.isActive ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
+          )}
           style={{ zIndex: Z_INDEX_LABEL }}
         >
           {Math.round(img.offsetX)}, {Math.round(img.offsetY)}
@@ -227,57 +232,40 @@ DraggableImageSlot.displayName = 'DraggableImageSlot';
 export function VerticalImageAligner() {
   const [images, setImages] = useState<AlignImage[]>([]);
 
+  // ... (Остальная логика без изменений до рендера Canvas) ...
   const sensors = useSensors(
-    useSensor(PointerSensor, {
-      activationConstraint: {
-        distance: 5,
-      },
-    }),
-    useSensor(KeyboardSensor, {
-      coordinateGetter: sortableKeyboardCoordinates,
-    })
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   );
-
   const imagesRef = useRef(images);
   useEffect(() => {
     imagesRef.current = images;
   }, [images]);
-
   const [slotHeight, setSlotHeight] = useState(DEFAULT_SETTINGS.slotSize);
   const [slotWidth, setSlotWidth] = useState(DEFAULT_SETTINGS.slotSize);
-
   const [showFrameGrid, setShowFrameGrid] = useState(true);
   const [frameStepX, setFrameStepX] = useState(DEFAULT_SETTINGS.frameStep);
   const [frameBorderColor] = useState(DEFAULT_SETTINGS.frameColor);
-
   const [showRedGrid, setShowRedGrid] = useState(true);
   const [redGridOffsetX, setRedGridOffsetX] = useState(0);
   const [redGridOffsetY, setRedGridOffsetY] = useState(0);
   const [redGridColor] = useState(DEFAULT_SETTINGS.redGridColor);
-
   const [isExporting, setIsExporting] = useState(false);
   const workspaceRef = useRef<CanvasRef>(null);
-
   const activeImageId = useMemo(() => images.find((img) => img.isActive)?.id ?? null, [images]);
-
   useEffect(() => () => imagesRef.current.forEach((img) => revokeObjectURLSafely(img.url)), []);
-
   const { bounds, totalHeight } = useMemo(() => {
     if (!images.length) return { bounds: { width: 1, height: 1 }, totalHeight: 0 };
     const width = slotWidth;
     const height = Math.max(1, images.length * slotHeight);
     return { bounds: { width, height }, totalHeight: height };
   }, [images.length, slotHeight, slotWidth]);
-
-  // --- Handlers ---
   const getCanvasScale = useCallback(
     () => workspaceRef.current?.getTransform().scale || CANVAS_SCALE_DEFAULT,
     []
   );
-
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
-
     if (over && active.id !== over.id) {
       setImages((items) => {
         const oldIndex = items.findIndex((i) => i.id === active.id);
@@ -286,13 +274,11 @@ export function VerticalImageAligner() {
       });
     }
   };
-
   const handleUpdatePosition = useCallback((id: string, x: number, y: number) => {
     setImages((prev) =>
       prev.map((img) => (img.id === id ? { ...img, offsetX: x, offsetY: y } : img))
     );
   }, []);
-
   const handleCenterAllX = useCallback(
     () =>
       setImages((prev) =>
@@ -300,7 +286,6 @@ export function VerticalImageAligner() {
       ),
     [slotWidth]
   );
-
   const handleCenterAllY = useCallback(
     () =>
       setImages((prev) =>
@@ -308,12 +293,10 @@ export function VerticalImageAligner() {
       ),
     [slotHeight]
   );
-
   const handleActivate = useCallback(
     (id: string) => setImages((prev) => prev.map((x) => ({ ...x, isActive: x.id === id }))),
     []
   );
-
   const handleRemoveImage = useCallback((id: string) => {
     setImages((prev) => {
       const target = prev.find((img) => img.id === id);
@@ -321,13 +304,10 @@ export function VerticalImageAligner() {
       return prev.filter((img) => img.id !== id);
     });
   }, []);
-
   const processFiles = useCallback(
     (files: File[]) => {
       if (!files || files.length === 0) return;
       const isListEmpty = images.length === 0;
-
-      // --- ПАЙПЛАЙН: TRANSFORM FILES TO IMAGES ---
       const newImages = pipe(
         files,
         filter((f) => f.type.startsWith('image/')),
@@ -341,46 +321,35 @@ export function VerticalImageAligner() {
             name: file.name,
             offsetX: 0,
             offsetY: 0,
-            isActive: isListEmpty && index === 0, // Первый активен, если список пуст
+            isActive: isListEmpty && index === 0,
             naturalWidth: 0,
             naturalHeight: 0,
           };
         })
       );
-      // -------------------------------------------
-
       if (newImages.length === 0) return;
-
       setImages((prev) => [...prev, ...newImages]);
-
       newImages.forEach(async (item, idx) => {
         try {
           const img = await loadImage(item.url);
-
           if (isListEmpty && idx === 0) {
             setSlotHeight(img.height);
             setFrameStepX(img.height);
-
             try {
-              // ИСПОЛЬЗОВАНИЕ НОВОЙ АБСТРАКЦИИ
               const { r, g, b } = getTopLeftPixelColor(img);
-              // Конвертируем в HEX только здесь, так как UI Canvas принимает строку
               const hex = rgbToHex(r, g, b);
               workspaceRef.current?.setBackgroundColor(hex);
             } catch (e) {
               console.warn('Could not extract color from image', e);
             }
-
             setTimeout(() => {
               workspaceRef.current?.resetView(img.width, img.height);
             }, VIEW_RESET_DELAY);
           }
-
           setSlotWidth((prev) => {
             if (isListEmpty && idx === 0) return img.width;
             return Math.max(prev, img.width);
           });
-
           setImages((current) =>
             current.map((ex) =>
               ex.id === item.id ? { ...ex, naturalWidth: img.width, naturalHeight: img.height } : ex
@@ -393,7 +362,6 @@ export function VerticalImageAligner() {
     },
     [images.length]
   );
-
   const handleExport = useCallback(async () => {
     if (!images.length) return;
     setIsExporting(true);
@@ -404,7 +372,6 @@ export function VerticalImageAligner() {
           return { meta: item, img };
         })
       );
-
       const finalW = slotWidth;
       const finalH = images.length * slotHeight;
       const canvas = document.createElement('canvas');
@@ -412,16 +379,13 @@ export function VerticalImageAligner() {
       canvas.height = finalH;
       const ctx = canvas.getContext('2d');
       if (!ctx) return;
-
       const currentBg = workspaceRef.current?.getBackgroundColor();
-
       if (currentBg) {
         ctx.fillStyle = currentBg;
         ctx.fillRect(0, 0, finalW, finalH);
       } else {
         ctx.clearRect(0, 0, finalW, finalH);
       }
-
       loaded.forEach(({ meta, img }, index) => {
         const slotY = index * slotHeight;
         ctx.save();
@@ -431,7 +395,6 @@ export function VerticalImageAligner() {
         ctx.drawImage(img, meta.offsetX, slotY + meta.offsetY, img.width, img.height);
         ctx.restore();
       });
-
       downloadDataUrl(canvas.toDataURL('image/png'), EXPORT_FILENAME);
     } catch (e) {
       console.error('Export failed', e);
@@ -440,24 +403,26 @@ export function VerticalImageAligner() {
     }
   }, [images, slotHeight, slotWidth]);
 
+  // Sidebar content (simplified for brevity of diff, assume logic is same)
   const sidebarContent = (
     <div className="flex flex-col gap-6 pb-4">
       <div className="flex flex-col gap-2">
         <FileDropzone onFilesSelected={processFiles} multiple={true} label="Добавить изображения" />
       </div>
-
       {images.length > 0 && (
         <>
           <div className="space-y-2">
             <button
               onClick={handleExport}
               disabled={isExporting}
-              className={`w-full rounded-md bg-blue-600 py-2.5 text-sm font-semibold text-white shadow-sm transition-all hover:bg-blue-700 hover:shadow-md disabled:opacity-50`}
+              className={cn(
+                'w-full rounded-md bg-blue-600 py-2.5 text-sm font-semibold text-white shadow-sm transition-all hover:bg-blue-700 hover:shadow-md',
+                isExporting && 'opacity-50'
+              )}
             >
               {isExporting ? 'Экспорт...' : 'Скачать PNG'}
             </button>
           </div>
-
           <ControlSection title="Размеры слота">
             <div className="flex flex-col gap-6">
               <TextureDimensionSlider
@@ -473,7 +438,6 @@ export function VerticalImageAligner() {
                 max={LIMIT_MAX_BROWSER}
               />
             </div>
-
             <div className="mt-4 flex justify-between border-t border-zinc-200 pt-3 text-center text-xs font-medium text-zinc-500 dark:border-zinc-700">
               <span>Итого:</span>
               <span className="font-mono text-zinc-900 dark:text-zinc-100">
@@ -481,7 +445,6 @@ export function VerticalImageAligner() {
               </span>
             </div>
           </ControlSection>
-
           <ControlSection title="Зеленая сетка (Кадр)">
             <Switch checked={showFrameGrid} onCheckedChange={setShowFrameGrid} label="Отображать" />
             {showFrameGrid && (
@@ -496,7 +459,6 @@ export function VerticalImageAligner() {
               </div>
             )}
           </ControlSection>
-
           <ControlSection title="Красная сетка (Сдвиг)">
             <Switch checked={showRedGrid} onCheckedChange={setShowRedGrid} label="Отображать" />
             {showRedGrid && (
@@ -520,7 +482,6 @@ export function VerticalImageAligner() {
               </div>
             )}
           </ControlSection>
-
           <div className="space-y-1.5">
             <div className="flex items-center justify-between px-1 pb-1">
               <ControlLabel>Слои</ControlLabel>
@@ -539,8 +500,6 @@ export function VerticalImageAligner() {
                 </button>
               </div>
             </div>
-
-            {/* DND LIST INTEGRATION */}
             <DndContext
               sensors={sensors}
               collisionDetection={closestCenter}
@@ -564,7 +523,6 @@ export function VerticalImageAligner() {
               </SortableContext>
             </DndContext>
           </div>
-
           {activeImageId && (
             <div className="rounded-lg border border-yellow-200 bg-yellow-50 p-4 dark:border-yellow-800 dark:bg-yellow-900/20">
               <p className="mb-3 text-xs font-bold tracking-wide text-yellow-800 uppercase dark:text-yellow-200">
@@ -627,7 +585,7 @@ export function VerticalImageAligner() {
       >
         {showRedGrid && (
           <div
-            className={`pointer-events-none absolute inset-0 opacity-50`}
+            className="pointer-events-none absolute inset-0 opacity-50"
             style={{
               zIndex: Z_INDEX_GRID_RED,
               backgroundImage: `linear-gradient(to right, ${redGridColor} 1px, transparent 1px), linear-gradient(to bottom, ${redGridColor} 1px, transparent 1px)`,
@@ -638,7 +596,7 @@ export function VerticalImageAligner() {
         )}
         {showFrameGrid && (
           <div
-            className={`pointer-events-none absolute inset-0 opacity-80`}
+            className="pointer-events-none absolute inset-0 opacity-80"
             style={{
               zIndex: Z_INDEX_GRID_FRAME,
               backgroundImage: `linear-gradient(to right, ${frameBorderColor} ${GRID_FRAME_DASH}px, transparent ${GRID_FRAME_DASH}px), linear-gradient(to bottom, ${frameBorderColor} ${GRID_FRAME_DASH}px, transparent ${GRID_FRAME_DASH}px)`,
