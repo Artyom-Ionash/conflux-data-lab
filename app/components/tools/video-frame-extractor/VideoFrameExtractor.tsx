@@ -6,7 +6,9 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import { useDebounceEffect } from '@/lib/core/hooks/use-debounce-effect';
 import { useObjectUrl } from '@/lib/core/hooks/use-object-url';
-import { generateSpriteSheet } from '@/lib/modules/graphics/processing/sprite-generator'; // IMPORT NEW ABSTRACTION
+import { waitForVideoFrame } from '@/lib/core/utils/media';
+import { cn } from '@/lib/core/utils/styles';
+import { generateSpriteSheet } from '@/lib/modules/graphics/processing/sprite-generator';
 import { TEXTURE_LIMITS } from '@/lib/modules/graphics/standards';
 
 // --- DOMAIN IMPORTS ---
@@ -252,16 +254,37 @@ function useVideoFrameExtraction() {
       for (let i = 0; i <= numberOfSteps; i++) {
         if (signal.aborted) throw new Error('Aborted');
         const current = safeStart + i * interval;
-        await new Promise<void>((resolve) => {
-          const onSeeked = () => {
-            ctx.drawImage(videoEl, 0, 0, canvasEl.width, canvasEl.height);
-            const url = canvasEl.toDataURL('image/png');
-            setRawFrames((prev) => prev.map((f, idx) => (idx === i ? { ...f, dataUrl: url } : f)));
-            resolve();
+
+        // ВАЖНО: Асинхронное ожидание кадра
+        await new Promise<void>((resolve, reject) => {
+          const onSeeked = async () => {
+            try {
+              // 1. Ждем реальной готовности текстуры в GPU (фикс прозрачного кадра)
+              await waitForVideoFrame(videoEl);
+
+              // 2. Проверяем, не отменили ли задачу во время ожидания
+              if (signal.aborted) {
+                reject(new Error('Aborted'));
+                return;
+              }
+
+              // 3. Рисуем
+              ctx.drawImage(videoEl, 0, 0, canvasEl.width, canvasEl.height);
+              const url = canvasEl.toDataURL('image/png');
+              setRawFrames((prev) =>
+                prev.map((f, idx) => (idx === i ? { ...f, dataUrl: url } : f))
+              );
+              resolve();
+            } catch (e) {
+              reject(e);
+            }
           };
+
+          // Подписываемся разово на событие seeked
+          videoEl.addEventListener('seeked', onSeeked, { once: true });
           videoEl.currentTime = current;
-          videoEl.onseeked = onSeeked;
         });
+
         setStatus((s) => ({ ...s, progress: Math.min(100, ((i + 1) / totalSteps) * 100) }));
         await new Promise((r) => requestAnimationFrame(r));
       }
@@ -288,7 +311,11 @@ function useVideoFrameExtraction() {
   );
 
   const generateAndDownloadGif = useCallback(() => {
-    const validFrames = frames.filter((f) => f.dataUrl !== null);
+    // Type Guard: фильтруем и гарантируем, что dataUrl не null
+    const validFrames = frames.filter(
+      (f): f is ExtractedFrame & { dataUrl: string } => f.dataUrl !== null
+    );
+
     if (validFrames.length === 0) return;
 
     setStatus({ isProcessing: true, currentStep: 'generating', progress: 0 });
@@ -298,7 +325,7 @@ function useVideoFrameExtraction() {
       if (gifshot !== undefined) {
         gifshot.createGIF(
           {
-            images: validFrames.map((f) => f.dataUrl!),
+            images: validFrames.map((f) => f.dataUrl),
             interval: 1 / gifParams.fps,
             gifWidth: videoDimensions?.width || 300,
             gifHeight: videoDimensions?.height || 200,
@@ -686,7 +713,10 @@ export function VideoFrameExtractor() {
                     <button
                       onClick={generateAndDownloadGif}
                       disabled={status.isProcessing}
-                      className="text-xs font-medium text-blue-600 hover:underline disabled:opacity-50"
+                      className={cn(
+                        'text-xs font-medium text-blue-600 hover:underline disabled:opacity-50',
+                        status.isProcessing && 'cursor-not-allowed opacity-50'
+                      )}
                     >
                       {status.currentStep === 'generating' ? 'Кодирование...' : 'Скачать GIF'}
                     </button>
@@ -743,7 +773,12 @@ export function VideoFrameExtractor() {
                     </div>
                     <button
                       onClick={handleDownloadSpriteSheet}
-                      className={`text-xs font-bold transition-colors ${totalSpriteWidth > MAX_BROWSER_TEXTURE ? 'cursor-not-allowed text-zinc-400' : 'text-blue-600 hover:underline'}`}
+                      className={cn(
+                        'text-xs font-bold transition-colors',
+                        totalSpriteWidth > MAX_BROWSER_TEXTURE
+                          ? 'cursor-not-allowed text-zinc-400'
+                          : 'text-blue-600 hover:underline'
+                      )}
                       disabled={totalSpriteWidth > MAX_BROWSER_TEXTURE}
                     >
                       Скачать PNG
@@ -805,11 +840,25 @@ export function VideoFrameExtractor() {
           </div>
         )}
 
-        {/* Hidden Processing Elements */}
-        <video ref={videoRef} className="hidden" crossOrigin="anonymous" muted playsInline />
-        <video ref={previewVideoRef} className="hidden" crossOrigin="anonymous" muted playsInline />
+        {/* Hidden Processing Elements:
+            FIX: Используем "Visual Hiding" вместо display:none.
+            requestVideoFrameCallback требует, чтобы элемент был частью render tree.
+        */}
+        <video
+          ref={videoRef}
+          className="pointer-events-none absolute top-0 left-0 -z-50 h-1 w-1 opacity-0"
+          crossOrigin="anonymous"
+          muted
+          playsInline
+        />
+        <video
+          ref={previewVideoRef}
+          className="pointer-events-none absolute top-0 left-0 -z-50 h-1 w-1 opacity-0"
+          crossOrigin="anonymous"
+          muted
+          playsInline
+        />
         <canvas ref={canvasRef} className="hidden" />
-
         {/* MODAL */}
         <Modal
           isOpen={isModalOpen}

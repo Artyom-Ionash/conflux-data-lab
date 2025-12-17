@@ -71,3 +71,42 @@ export function getTopLeftPixelColor(source: CanvasImageSource): RGB {
 
   return { r, g, b };
 }
+
+/**
+ * Ожидает, пока видеокадр будет действительно готов к отрисовке.
+ * Использует `requestVideoFrameCallback` для точной синхронизации с композитором браузера.
+ * Включает Safety Timeout для предотвращения зависания.
+ */
+export function waitForVideoFrame(video: HTMLVideoElement): Promise<void> {
+  return new Promise((resolve) => {
+    let resolved = false;
+    const safeResolve = () => {
+      if (!resolved) {
+        resolved = true;
+        resolve();
+      }
+    };
+
+    // 1. Safety Timeout: Если API зависнет (например, вкладка в фоне),
+    // принудительно продолжаем через 200мс, чтобы не сломать UX.
+    const timeoutId = setTimeout(safeResolve, 200);
+
+    const onFrame = () => {
+      clearTimeout(timeoutId);
+      safeResolve();
+    };
+
+    // 2. Modern API
+    if (
+      'requestVideoFrameCallback' in video &&
+      typeof video.requestVideoFrameCallback === 'function'
+    ) {
+      video.requestVideoFrameCallback(onFrame);
+    } else {
+      // 3. Fallback: Double RAF
+      requestAnimationFrame(() => {
+        requestAnimationFrame(onFrame);
+      });
+    }
+  });
+}
