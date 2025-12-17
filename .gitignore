@@ -43,5 +43,5 @@ next-env.d.ts
 # LLM context
 .context/
 
-# Personal Engineer Profile (Local Context)
-docs/ENGINEER_PROFILE.md
+# Local AI Context
+.ai/

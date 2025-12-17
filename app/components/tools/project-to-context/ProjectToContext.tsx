@@ -6,7 +6,8 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 // --- SHARED LOGIC IMPORTS ---
 import {
   CONTEXT_PRESETS,
-  FORCE_INCLUDE_FILES,
+  LOCAL_CONTEXT_FOLDER,
+  MANDATORY_REPO_FILES,
   type PresetKey,
 } from '@/lib/modules/context-generator/config';
 import {
@@ -128,15 +129,12 @@ export function ProjectToContext() {
     // 3. Настройка Ignore Manager
     const ig = ignore();
 
-    // А) Добавляем Hard Ignore из пресета
     ig.add(activePreset.hardIgnore);
 
-    // Б) Добавляем правила из .gitignore (если есть)
     if (gitIgnoreContent) {
       ig.add(gitIgnoreContent);
     }
 
-    // В) Добавляем пользовательские правила из UI инпута
     if (customIgnore.trim()) {
       ig.add(
         customIgnore
@@ -147,41 +145,40 @@ export function ProjectToContext() {
     }
 
     // Г) Принудительное включение (Un-ignore)
-    // Важно добавить это В КОНЦЕ, чтобы перебить предыдущие правила
-    if (FORCE_INCLUDE_FILES.length > 0) {
-      ig.add(FORCE_INCLUDE_FILES.map((f) => `!${f}`));
+    // 1. Обязательные файлы репо
+    if (MANDATORY_REPO_FILES.length > 0) {
+      ig.add(MANDATORY_REPO_FILES.map((f) => `!${f}`));
     }
+    // 2. Локальный контекст
+    ig.add(`!${LOCAL_CONTEXT_FOLDER}`);
+    ig.add(`!${LOCAL_CONTEXT_FOLDER}/**`);
 
-    // Расширения
     const extList = activePreset.textExtensions;
 
     // 4. Фильтрация
     const nodes: FileNode[] = [];
 
     fileList.forEach((f) => {
-      // Нормализация пути: убираем имя корневой папки, которую дает браузер
       let path = f.webkitRelativePath || f.name;
       if (f.webkitRelativePath) {
         const parts = path.split('/');
-        // Если путь содержит папку проекта (что почти всегда так при выборе папки), убираем её
         if (parts.length > 1) {
           path = parts.slice(1).join('/');
         }
       }
 
       // ПРОВЕРКА ЧЕРЕЗ ПАКЕТ IGNORE
-      // Теперь библиотека ignore сама знает, что профиль игнорировать нельзя
       if (ig.ignores(path)) return;
 
-      // Проверяем, является ли файл текстовым ИЛИ принудительно включенным
-      const isText = isTextFile(f.name, extList) || FORCE_INCLUDE_FILES.includes(path);
+      // Является ли файл частью локального контекста?
+      const isLocalContext = path.startsWith(LOCAL_CONTEXT_FOLDER + '/');
 
       nodes.push({
         path: path,
         name: f.name,
         size: f.size,
         file: f,
-        isText,
+        isText: isTextFile(f.name, extList) || isLocalContext, // Локальный контекст всегда текст
       });
     });
 
@@ -195,9 +192,12 @@ export function ProjectToContext() {
     setProgress(0);
     setResult(null);
 
-    // Сортировка для последовательной обработки (опционально, т.к. pipeline чистый)
+    // Сортировка с учетом новых приоритетов в calculateFileScore
     const sortedFiles = [...files].sort((a, b) => {
-      return calculateFileScore(a.name) - calculateFileScore(b.name);
+      return (
+        calculateFileScore(a.name, undefined, a.path) -
+        calculateFileScore(b.name, undefined, b.path)
+      );
     });
 
     let totalOriginalBytes = 0;
@@ -218,7 +218,6 @@ export function ProjectToContext() {
         const originalText = await readFileAsText(node.file);
         const ext = node.name.split('.').pop() || 'txt';
 
-        // --- ПРИМЕНЕНИЕ ПАЙПЛАЙНА ---
         const rawFile: RawFile = {
           name: node.name,
           path: node.path,
@@ -227,7 +226,6 @@ export function ProjectToContext() {
         };
 
         const contextNode = processFileToContext(rawFile);
-        // -----------------------------
 
         totalOriginalBytes += contextNode.originalSize;
         totalCleanedBytes += contextNode.cleanedSize;

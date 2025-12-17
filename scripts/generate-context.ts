@@ -6,7 +6,11 @@ import ignore from 'ignore';
 // SHARED IMPORTS
 import { isTextFile } from '../lib/modules/file-system/file-utils';
 import { generateAsciiTree } from '../lib/modules/file-system/tree-view';
-import { CONTEXT_PRESETS, FORCE_INCLUDE_FILES } from '../lib/modules/context-generator/config';
+import {
+  CONTEXT_PRESETS,
+  MANDATORY_REPO_FILES,
+  LOCAL_CONTEXT_FOLDER,
+} from '../lib/modules/context-generator/config';
 import { generateContextOutput, ProcessedContextFile } from '../lib/modules/context-generator/core';
 import { processFileToContext, type RawFile } from '../lib/modules/context-generator/pipeline';
 
@@ -15,22 +19,18 @@ const PRESET = CONTEXT_PRESETS.nextjs;
 const OUTPUT_DIR = '.context';
 const OUTPUT_FILENAME = 'project.txt';
 const MAX_FILE_SIZE_KB = 500;
-const ALLOWED_DOT_DIRS = ['.husky', '.github', '.storybook'];
+// Разрешаем вход в служебные папки и локальный контекст
+const ALLOWED_DOT_DIRS = ['.husky', '.github', '.storybook', LOCAL_CONTEXT_FOLDER];
 
 // --- GIT DELTA UTILS ---
 function getGitBlobSize(filePath: string): number {
   try {
-    // git ls-tree выводит: <mode> <type> <hash> <size> <path>
-    // Флаг -l показывает размер блоба в байтах
-    // Используем относительный путь для git
     const output = execSync(`git ls-tree -l HEAD "${filePath.replaceAll('\\', '/')}"`, {
       encoding: 'utf-8',
-      stdio: ['ignore', 'pipe', 'ignore'], // Подавляем ошибки stderr
+      stdio: ['ignore', 'pipe', 'ignore'],
     });
 
-    // Парсим 4-ю колонку (size)
     const match = output.trim().split(/\s+/);
-    // Для проверки типов (noUncheckedIndexedAccess)
     const sizeColumn = match[3];
 
     if (match.length >= 4 && sizeColumn && sizeColumn !== '-') {
@@ -54,7 +54,7 @@ function calculateGitDelta(rootDir: string): string {
       const status = line.substring(0, 2);
       const filePath = line.substring(3).trim();
       const fullPath = join(rootDir, filePath);
-      // Пропускаем удаленные файлы для простоты
+
       if (status.includes('D')) {
         const oldSize = getGitBlobSize(filePath);
         totalDelta -= oldSize;
@@ -65,8 +65,6 @@ function calculateGitDelta(rootDir: string): string {
       if (existsSync(fullPath)) {
         const currentSize = statSync(fullPath).size;
         const oldSize = getGitBlobSize(filePath);
-
-        // Если файл новый (?? или A), oldSize будет 0
         totalDelta += currentSize - oldSize;
         changedFilesCount++;
       }
@@ -75,14 +73,12 @@ function calculateGitDelta(rootDir: string): string {
     if (changedFilesCount === 0) return '';
 
     const sign = totalDelta > 0 ? '+' : '';
-
-    // Красим вывод: Красный если выросло, Зеленый если уменьшилось
     const color = totalDelta > 0 ? '\x1b[31m' : '\x1b[32m';
     const reset = '\x1b[0m';
 
     return ` | Pending Commit: ${color}${sign}${totalDelta} B${reset}`;
   } catch (e) {
-    return ''; // Если нет гита или ошибка
+    return '';
   }
 }
 
@@ -91,10 +87,10 @@ function calculateGitDelta(rootDir: string): string {
 function getIgManager(rootDir: string) {
   const ig = ignore();
 
-  // 1. Базовые правила игнорирования
+  // 1. Базовые правила
   ig.add(PRESET.hardIgnore);
 
-  // 2. Правила из .gitignore
+  // 2. .gitignore
   const gitIgnorePath = join(rootDir, '.gitignore');
   if (existsSync(gitIgnorePath)) {
     try {
@@ -106,11 +102,14 @@ function getIgManager(rootDir: string) {
   }
 
   // 3. ПРИНУДИТЕЛЬНОЕ ВКЛЮЧЕНИЕ (Un-ignore)
-  // Добавляем правила с "!", чтобы перебить настройки .gitignore
-  // Пример: "!docs/ENGINEER_PROFILE.md"
-  if (FORCE_INCLUDE_FILES.length > 0) {
-    ig.add(FORCE_INCLUDE_FILES.map((f) => `!${f}`));
+  // Снимаем игнор с обязательных файлов документации
+  if (MANDATORY_REPO_FILES.length > 0) {
+    ig.add(MANDATORY_REPO_FILES.map((f) => `!${f}`));
   }
+
+  // Снимаем игнор с папки локального контекста и её содержимого
+  ig.add(`!${LOCAL_CONTEXT_FOLDER}`);
+  ig.add(`!${LOCAL_CONTEXT_FOLDER}/**`);
 
   return ig;
 }
@@ -136,7 +135,8 @@ try {
       const fullPath = join(dir, entry.name);
       const relPath = relative(rootDir, fullPath).replaceAll('\\', '/');
 
-      // Теперь проверка стандартная, так как ig уже знает про исключения
+      // Проверка игнорирования.
+      // Благодаря правилам '!', папка .ai вернет false (не игнорировать)
       if (ig.ignores(relPath)) continue;
 
       if (entry.isDirectory()) {
@@ -151,8 +151,14 @@ try {
           treeNodes.push({ path: relPath, name: entry.name, size, isText });
         }
 
-        if (!forTree && isTextFile(entry.name, PRESET.textExtensions)) {
-          fileList.push(fullPath);
+        if (!forTree) {
+          const isText = isTextFile(entry.name, PRESET.textExtensions);
+          // Дополнительно разрешаем любые файлы внутри .ai/
+          const isLocalContext = relPath.startsWith(LOCAL_CONTEXT_FOLDER + '/');
+
+          if (isText || isLocalContext) {
+            fileList.push(fullPath);
+          }
         }
       }
     }
@@ -200,7 +206,6 @@ try {
   const { output, stats } = generateContextOutput(processedFiles, treeString);
   writeFileSync(join(outputDirPath, OUTPUT_FILENAME), output);
 
-  // --- ВЫЧИСЛЕНИЕ DELTA ---
   const gitDeltaStr = calculateGitDelta(rootDir);
 
   console.log(
