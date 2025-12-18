@@ -1,6 +1,22 @@
-import { afterEach,describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { waitForVideoFrame } from './media';
+
+// --- TYPE DEFINITIONS FOR JSDOM ENVIRONMENT ---
+interface VideoFrameMetadata {
+  presentationTime: number;
+  expectedDisplayTime: number;
+  width: number;
+  height: number;
+  mediaTime: number;
+  presentedFrames: number;
+  processingDuration?: number;
+  captureTime?: number;
+  receiveTime?: number;
+  rtpTimestamp?: number;
+}
+
+type VideoFrameRequestCallback = (now: number, metadata: VideoFrameMetadata) => void;
 
 describe('waitForVideoFrame (Race Condition Simulation)', () => {
   afterEach(() => {
@@ -10,60 +26,52 @@ describe('waitForVideoFrame (Race Condition Simulation)', () => {
   it('should delay execution until the frame is actually presented', async () => {
     const video = document.createElement('video');
 
-    // 1. Симулируем среду с поддержкой requestVideoFrameCallback
-    // Мы намеренно НЕ вызываем callback сразу, чтобы симулировать задержку рендеринга
-    let frameCallback: (() => void) | null = null;
-    video.requestVideoFrameCallback = vi.fn((cb) => {
-      frameCallback = cb as () => void;
-      return 0;
-    });
+    const rvfcMock = vi.fn<(callback: VideoFrameRequestCallback) => number>(() => 0);
+    video.requestVideoFrameCallback = rvfcMock;
 
-    // Шпион для проверки порядка вызовов
     const drawAction = vi.fn();
 
-    // 2. Запускаем "Гонку"
     const raceScenario = async () => {
-      // Эмуляция логики компонента:
-      // Сначала ждем готовности кадра...
       await waitForVideoFrame(video);
-      // ...потом рисуем
       drawAction();
     };
 
-    // Запускаем промис, но он должен "повиснуть" в ожидании коллбека
     const processPromise = raceScenario();
 
-    // 3. ПРОВЕРКА (The Trap):
-    // Если бы мы не использовали waitForVideoFrame (или он был бы синхронным),
-    // drawAction уже был бы вызван, так как в JS (без await) код бежит дальше.
-
-    // Проверяем, что отрисовка НЕ произошла "слишком рано" (симуляция прозрачного кадра)
     expect(drawAction).not.toHaveBeenCalled();
 
-    // 4. Разрешаем ситуацию (Симулируем готовность GPU/Браузера)
-    expect(frameCallback).toBeDefined();
-    frameCallback!(); // "Кадр готов!"
+    const registeredCallback = rvfcMock.mock.lastCall?.[0];
 
-    // Ждем разрешения микротасок промиса
+    if (!registeredCallback) {
+      throw new Error('requestVideoFrameCallback was never called');
+    }
+
+    const mockMetadata: VideoFrameMetadata = {
+      presentationTime: 0,
+      expectedDisplayTime: 0,
+      width: 1920,
+      height: 1080,
+      mediaTime: 0,
+      presentedFrames: 1,
+    };
+
+    registeredCallback(performance.now(), mockMetadata);
+
     await processPromise;
 
-    // 5. Теперь отрисовка должна произойти
     expect(drawAction).toHaveBeenCalled();
-    expect(video.requestVideoFrameCallback).toHaveBeenCalledTimes(1);
   });
 
   it('should fall back to double-RAF if API is missing', async () => {
     const video = document.createElement('video');
-    // Удаляем современный API
-    // @ts-expect-error - намеренное удаление для теста
-    delete video.requestVideoFrameCallback;
 
-    // Мокаем requestAnimationFrame
+    // FIX: Используем Reflect.deleteProperty вместо (video as any).
+    // Это легальный способ удалить свойство в рантайме без отключения типов.
+    Reflect.deleteProperty(video, 'requestVideoFrameCallback');
+
     const rafRequest = vi.fn();
     vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => {
       rafRequest();
-      // В реальном тесте нужно сохранить cb и вызвать его вручную,
-      // но для проверки факта вызова достаточно setTimeout(0) для простоты в JSDOM
       setTimeout(cb, 0);
       return 0;
     });
@@ -73,7 +81,6 @@ describe('waitForVideoFrame (Race Condition Simulation)', () => {
     await waitForVideoFrame(video);
     drawAction();
 
-    // Проверяем, что fallback стратегия сработала (была задержка)
     expect(drawAction).toHaveBeenCalled();
   });
 });

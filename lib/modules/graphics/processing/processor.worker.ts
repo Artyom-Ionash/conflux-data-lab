@@ -110,8 +110,8 @@ self.onmessage = (e: MessageEvent<WorkerPayload>) => {
     // Merge Alpha into Output
     const OFFSET_A = 3;
     for (let i = 0, idx = 0; i < imageData.length; i += PIXEL_STRIDE, idx++) {
-      // Используем non-null assertion, так как размеры массивов гарантированно совпадают
-      imageData[i + OFFSET_A] = alphaChannel[idx]!;
+      // FIX: Замена ! на безопасный фоллбэк (255 - полная непрозрачность)
+      imageData[i + OFFSET_A] = alphaChannel[idx] ?? 255;
     }
 
     // --- 4. Transfer ---

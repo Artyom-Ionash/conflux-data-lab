@@ -164,18 +164,24 @@ const DraggableImageSlot = React.memo(
       const initialOffsetY = img.offsetY;
       const scale = getCanvasScale();
 
-      const handlePointerMove = (moveEvent: globalThis.PointerEvent) => {
+      // FIX: Используем общий тип Event, чтобы избежать приведения (as EventListener).
+      // Внутри сужаем тип до PointerEvent.
+      const handlePointerMove = (moveEvent: Event) => {
+        if (!(moveEvent instanceof PointerEvent)) return;
+
         const dx = (moveEvent.clientX - startX) / scale;
         const dy = (moveEvent.clientY - startY) / scale;
         onUpdatePosition(img.id, initialOffsetX + dx, initialOffsetY + dy);
       };
+
       const handlePointerUp = () => {
         setIsDragging(false);
-        target.removeEventListener('pointermove', handlePointerMove as EventListener);
-        target.removeEventListener('pointerup', handlePointerUp as EventListener);
+        target.removeEventListener('pointermove', handlePointerMove);
+        target.removeEventListener('pointerup', handlePointerUp);
       };
-      target.addEventListener('pointermove', handlePointerMove as EventListener);
-      target.addEventListener('pointerup', handlePointerUp as EventListener);
+
+      target.addEventListener('pointermove', handlePointerMove);
+      target.addEventListener('pointerup', handlePointerUp);
     };
 
     return (
@@ -403,7 +409,7 @@ export function VerticalImageAligner() {
     }
   }, [images, slotHeight, slotWidth]);
 
-  // Sidebar content (simplified for brevity of diff, assume logic is same)
+  // Sidebar content
   const sidebarContent = (
     <div className="flex flex-col gap-6 pb-4">
       <div className="flex flex-col gap-2">

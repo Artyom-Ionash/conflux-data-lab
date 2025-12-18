@@ -33,10 +33,10 @@ export function applyColorFilter(
   const smoothVal = (smoothness / 100) * maxRgbDistance;
 
   for (let i = 0, idx = 0; i < data.length; i += PIXEL_STRIDE, idx++) {
-    // FIX: Используем !, так как шаг цикла гарантирует существование элементов
-    const r = data[i + OFFSET_R]!;
-    const g = data[i + OFFSET_G]!;
-    const b = data[i + OFFSET_B]!;
+    // FIX: Замена ! на ?? 0. Если индекс вне границ (маловероятно в цикле, но для типизации важно), берем 0.
+    const r = data[i + OFFSET_R] ?? 0;
+    const g = data[i + OFFSET_G] ?? 0;
+    const b = data[i + OFFSET_B] ?? 0;
 
     const dist = getColorDistance(r, g, b, targetColor.r, targetColor.g, targetColor.b);
 
@@ -85,8 +85,15 @@ export function applyFloodFillMask(
 
     const stack = [startX, startY];
     while (stack.length) {
-      const y = stack.pop()!;
-      const x = stack.pop()!;
+      // Использование non-null assertion здесь безопасно, так как мы проверяем length,
+      // но для чистоты стиля можно использовать pop() ?? 0, хотя это изменит логику если стек пуст (чего не будет).
+      // В данном случае, так как это управление стеком алгоритма, а не доступ к внешним данным,
+      // использование ! допустимо как "инвариант алгоритма", но заменим на проверку для строгости.
+      const y = stack.pop();
+      const x = stack.pop();
+
+      if (x === undefined || y === undefined) continue;
+
       const idx = y * width + x;
 
       if (visited[idx]) continue;
@@ -95,10 +102,10 @@ export function applyFloodFillMask(
       // Проверка границы (контура)
       const pxIdx = idx * PIXEL_STRIDE;
 
-      // FIX: Используем !
-      const r = data[pxIdx + OFFSET_R]!;
-      const g = data[pxIdx + OFFSET_G]!;
-      const b = data[pxIdx + OFFSET_B]!;
+      // FIX: Замена ! на ?? 0
+      const r = data[pxIdx + OFFSET_R] ?? 0;
+      const g = data[pxIdx + OFFSET_G] ?? 0;
+      const b = data[pxIdx + OFFSET_B] ?? 0;
 
       const dist = getColorDistance(r, g, b, contourColor.r, contourColor.g, contourColor.b);
 
@@ -182,7 +189,7 @@ export function applyBlur(
           const ny = y + ky;
           const nx = x + kx;
           if (nx >= 0 && nx < width && ny >= 0 && ny < height) {
-            sum += alphaChannel[ny * width + nx]!;
+            sum += alphaChannel[ny * width + nx] ?? 0;
             count++;
           }
         }

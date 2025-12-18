@@ -42,6 +42,7 @@ const eslintConfig = defineConfig([
       'no-console': ['warn', { allow: ['warn', 'error'] }],
       'unicorn/no-null': 'off',
       'unicorn/filename-case': 'off',
+      
       'react-hooks/exhaustive-deps': 'error',
 
       'boundaries/element-types': [
@@ -95,25 +96,17 @@ const eslintConfig = defineConfig([
         { prefer: 'type-imports', fixStyle: 'separate-type-imports' },
       ],
       '@typescript-eslint/no-explicit-any': 'error',
-      '@typescript-eslint/no-non-null-assertion': 'warn',
+      
+      // SAFETY NET: Запрещаем non-null assertion (!) глобально.
+      // Код должен быть безопасным по построению.
+      '@typescript-eslint/no-non-null-assertion': 'error',
+      
       '@typescript-eslint/no-floating-promises': 'error',
       '@typescript-eslint/await-thenable': 'error',
     },
   },
 
-   // 3. Разрешаем ! там, где это критично для производительности
-  {
-    files: [
-      'lib/modules/graphics/**/*.ts',
-      'app/components/entities/video/**/*.tsx',
-      'app/components/tools/video-frame-extractor/**/*.tsx',
-    ],
-    rules: {
-      '@typescript-eslint/no-non-null-assertion': 'off',
-    },
-  },
-
-  // 4. ОТКЛЮЧЕНИЕ КОНФЛИКТУЮЩИХ ПРАВИЛ
+  // 3. ОТКЛЮЧЕНИЕ КОНФЛИКТУЮЩИХ ПРАВИЛ
   eslintConfigPrettier,
 ]);
 

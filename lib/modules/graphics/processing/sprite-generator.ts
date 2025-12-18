@@ -12,17 +12,27 @@ export interface ExtractedFrame {
   dataUrl: string | null;
 }
 
+// Вспомогательный тип для кадра с гарантированным URL
+type ValidFrame = ExtractedFrame & { dataUrl: string };
+
 const MAX_BROWSER_TEXTURE = TEXTURE_LIMITS.MAX_BROWSER;
 
 export async function generateSpriteSheet(
   frames: ExtractedFrame[],
   options: SpriteGeneratorOptions
 ): Promise<string> {
-  const validFrames = frames.filter((f) => f.dataUrl !== null);
-  if (validFrames.length === 0) throw new Error('No frames to generate sprite');
+  // FIX: Используем Type Predicate (f is ValidFrame), чтобы TS понял, что null ушел
+  const validFrames = frames.filter((f): f is ValidFrame => f.dataUrl !== null);
 
-  // 1. Load first image to determine scaling ratio
-  const firstImage = await loadImage(validFrames[0]!.dataUrl!);
+  // FIX: Извлекаем первый элемент и проверяем его явно.
+  // Это удовлетворяет 'noUncheckedIndexedAccess', так как TS видит Guard (!firstFrame).
+  const firstFrame = validFrames[0];
+  if (!firstFrame) {
+    throw new Error('No frames to generate sprite');
+  }
+
+  // TS теперь знает, что firstFrame определен и dataUrl — string
+  const firstImage = await loadImage(firstFrame.dataUrl);
 
   const scale = options.maxHeight / firstImage.height;
   const scaledWidth = Math.floor(firstImage.width * scale);
@@ -53,8 +63,11 @@ export async function generateSpriteSheet(
 
   // 5. Draw Frames
   for (let i = 0; i < validFrames.length; i++) {
-    // FIX: Используем !, так как i внутри границ массива
-    const img = await loadImage(validFrames[i]!.dataUrl!);
+    const frame = validFrames[i];
+    // Лишняя проверка не помешает (защита от undefined индекса)
+    if (!frame) continue;
+
+    const img = await loadImage(frame.dataUrl);
     const x = i * (scaledWidth + options.spacing);
     ctx.drawImage(img, x, 0, scaledWidth, scaledHeight);
   }

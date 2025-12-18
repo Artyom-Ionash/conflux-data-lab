@@ -76,7 +76,6 @@ export function MonochromeBackgroundRemover() {
   const previewCanvasRef = useRef<HTMLCanvasElement>(null);
 
   // --- WORKER INTEGRATION ---
-  // Фабрика воркера (должна быть стабильной или useCallback, но здесь просто функция вне рендера или useCallback)
   const createWorker = useCallback(
     () =>
       new Worker(new URL('@/lib/modules/graphics/processing/processor.worker.ts', import.meta.url)),
@@ -94,7 +93,6 @@ export function MonochromeBackgroundRemover() {
 
     if (previewCanvasRef.current && processedData) {
       const ctx = previewCanvasRef.current.getContext('2d');
-      // Создаем ImageData из буфера (zero-copy view)
       const imgData = new ImageData(
         new Uint8ClampedArray(
           processedData.buffer as ArrayBuffer,
@@ -109,7 +107,6 @@ export function MonochromeBackgroundRemover() {
     setIsProcessing(false);
   }, []);
 
-  // Инициализация хука
   const { postMessage } = useWorker<WorkerPayload, WorkerResponse>({
     workerFactory: createWorker,
     onMessage: handleWorkerMessage,
@@ -123,7 +120,6 @@ export function MonochromeBackgroundRemover() {
 
       setImgDimensions({ w: img.width, h: img.height });
 
-      // Настраиваем скрытый Source Canvas (хранит оригинал)
       if (sourceCanvasRef.current) {
         sourceCanvasRef.current.width = img.width;
         sourceCanvasRef.current.height = img.height;
@@ -131,7 +127,6 @@ export function MonochromeBackgroundRemover() {
         ctx?.drawImage(img, 0, 0);
       }
 
-      // Настраиваем Preview Canvas
       if (previewCanvasRef.current) {
         previewCanvasRef.current.width = img.width;
         previewCanvasRef.current.height = img.height;
@@ -154,7 +149,6 @@ export function MonochromeBackgroundRemover() {
     const width = sourceCanvasRef.current.width;
     const height = sourceCanvasRef.current.height;
 
-    // Получаем свежие данные с исходного канваса
     const imageData = sourceCtx.getImageData(0, 0, width, height);
 
     const targetRGB = hexToRgb(targetColor);
@@ -165,7 +159,7 @@ export function MonochromeBackgroundRemover() {
     setIsProcessing(true);
 
     const payload: WorkerPayload = {
-      imageData: imageData.data, // Uint8ClampedArray
+      imageData: imageData.data,
       width,
       height,
       mode: processingMode,
@@ -182,7 +176,6 @@ export function MonochromeBackgroundRemover() {
       },
     };
 
-    // Отправляем данные через хук
     postMessage(payload, [imageData.data.buffer]);
   }, [
     originalUrl,
@@ -208,19 +201,16 @@ export function MonochromeBackgroundRemover() {
     }
   }, [originalUrl, loadOriginalToCanvas]);
 
-  // Debounced processing trigger
-  // Заменяем сложный useEffect с таймерами на декларативный хук
   useDebounceEffect(
     () => {
       if (originalUrl) {
         requestAnimationFrame(() => processImage());
       }
     },
-    [originalUrl, processImage], // Зависимости, при изменении которых нужно запустить таймер
+    [originalUrl, processImage],
     DEBOUNCE_DELAY
   );
 
-  // Immediate trigger for manual actions
   useEffect(() => {
     if (manualTrigger > 0 && processingMode === 'flood-clear') {
       const timer = setTimeout(() => {
@@ -272,8 +262,13 @@ export function MonochromeBackgroundRemover() {
     e.stopPropagation();
     e.preventDefault();
     if (e.button !== MOUSE_BUTTON_LEFT) return;
+
     setDraggingPointIndex(index);
-    (e.target as HTMLElement).setPointerCapture(e.pointerId);
+
+    // FIX: Используем instanceof для Type Guard вместо `as HTMLElement`
+    if (e.target instanceof HTMLElement) {
+      e.target.setPointerCapture(e.pointerId);
+    }
   };
 
   const handleImagePointerDown = (e: React.PointerEvent) => {
@@ -304,15 +299,12 @@ export function MonochromeBackgroundRemover() {
   const handleEyedropper = (e: React.MouseEvent) => {
     if (!sourceCanvasRef.current) return;
 
-    // 1. Получаем координаты через единый механизм Canvas
     const coords = getRelativeImageCoords(e.clientX, e.clientY);
     if (!coords) return;
 
     const ctx = sourceCanvasRef.current.getContext('2d', { willReadFrequently: true });
     if (ctx) {
-      // 2. Используем полученные координаты
       const p = ctx.getImageData(coords.x, coords.y, 1, 1).data;
-      // Используем nullish coalescing для строгой типизации доступа к массиву
       setTargetColor(rgbToHex(p[OFFSET_R] ?? 0, p[OFFSET_G] ?? 0, p[OFFSET_B] ?? 0));
     }
   };
