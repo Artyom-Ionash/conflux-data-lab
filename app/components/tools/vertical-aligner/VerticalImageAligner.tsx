@@ -29,14 +29,14 @@ import {
   revokeObjectURLSafely,
 } from '@/lib/core/utils/media';
 import { cn } from '@/lib/core/utils/styles'; // NEW
+import type { CanvasRef } from '@/ui/Canvas';
+import { Canvas } from '@/ui/Canvas';
+import { ControlLabel, ControlSection } from '@/ui/ControlSection';
+import { FileDropzone, FileDropzonePlaceholder } from '@/ui/FileDropzone';
+import { Slider } from '@/ui/Slider';
+import { Switch } from '@/ui/Switch';
 
 import { TextureDimensionSlider } from '../../entities/hardware/TextureDimensionSlider';
-import type { CanvasRef } from '../../ui/Canvas';
-import { Canvas } from '../../ui/Canvas';
-import { ControlLabel, ControlSection } from '../../ui/ControlSection';
-import { FileDropzone, FileDropzonePlaceholder } from '../../ui/FileDropzone';
-import { Slider } from '../../ui/Slider';
-import { Switch } from '../../ui/Switch';
 import { ToolLayout } from '../ToolLayout';
 
 // ... (CONSTANTS и TYPES без изменений) ...

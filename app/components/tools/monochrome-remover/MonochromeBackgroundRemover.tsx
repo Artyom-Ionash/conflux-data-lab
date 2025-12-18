@@ -14,14 +14,14 @@ import type {
   WorkerPayload,
   WorkerResponse,
 } from '@/lib/modules/graphics/processing/processor.worker';
+import type { CanvasRef } from '@/ui/Canvas';
+import { Canvas } from '@/ui/Canvas';
+import { ColorInput } from '@/ui/ColorInput';
+import { ControlLabel, ControlSection } from '@/ui/ControlSection';
+import { FileDropzone, FileDropzonePlaceholder } from '@/ui/FileDropzone';
+import { Slider } from '@/ui/Slider';
+import { ToggleGroup, ToggleGroupItem } from '@/ui/ToggleGroup';
 
-import type { CanvasRef } from '../../ui/Canvas';
-import { Canvas } from '../../ui/Canvas';
-import { ColorInput } from '../../ui/ColorInput';
-import { ControlLabel, ControlSection } from '../../ui/ControlSection';
-import { FileDropzone, FileDropzonePlaceholder } from '../../ui/FileDropzone';
-import { Slider } from '../../ui/Slider';
-import { ToggleGroup, ToggleGroupItem } from '../../ui/ToggleGroup';
 import { ToolLayout } from '../ToolLayout';
 
 // --- CONSTANTS ---

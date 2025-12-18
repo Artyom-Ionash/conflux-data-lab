@@ -1,7 +1,7 @@
 import { categoryLabels, tools, toolsByCategory } from '@/lib/modules/tool-registry/config';
+import { Badge } from '@/ui/Badge';
 
 import { ToolGrid } from './components/tools/ToolGrid';
-import { Badge } from './components/ui/Badge';
 
 export default function Home() {
   const featuredTools = tools.filter((tool) => tool.featured);

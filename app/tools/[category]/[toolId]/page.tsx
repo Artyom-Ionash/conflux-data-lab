@@ -4,8 +4,7 @@ import { notFound } from 'next/navigation';
 
 import { categoryLabels, getToolById } from '@/lib/modules/tool-registry/config';
 import { getToolComponent } from '@/lib/modules/tool-registry/loader';
-
-import { Badge } from '../../../components/ui/Badge';
+import { Badge } from '@/ui/Badge';
 
 interface ToolPageProps {
   params: Promise<{

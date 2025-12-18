@@ -10,6 +10,16 @@ import { waitForVideoFrame } from '@/lib/core/utils/media';
 import { cn } from '@/lib/core/utils/styles';
 import { generateSpriteSheet } from '@/lib/modules/graphics/processing/sprite-generator';
 import { TEXTURE_LIMITS } from '@/lib/modules/graphics/standards';
+// --- UI IMPORTS ---
+import { Card } from '@/ui/Card';
+import { ColorInput } from '@/ui/ColorInput';
+import { ControlLabel, ControlSection } from '@/ui/ControlSection';
+import { FileDropzone, FileDropzonePlaceholder } from '@/ui/FileDropzone';
+import { ImageSequencePlayer } from '@/ui/ImageSequencePlayer';
+import { Modal } from '@/ui/Modal';
+import { NumberStepper } from '@/ui/NumberStepper';
+import { RangeSlider } from '@/ui/RangeSlider';
+import { Switch } from '@/ui/Switch';
 
 // --- DOMAIN IMPORTS ---
 import { TextureLimitIndicator } from '../../entities/hardware/TextureLimitIndicator';
@@ -19,16 +29,6 @@ import { DualHoverPreview } from '../../entities/video/DualHoverPreview';
 import { MultiScalePreview } from '../../entities/video/MultiScalePreview';
 import { RangeVideoPlayer } from '../../entities/video/player/RangeVideoPlayer';
 import { SpriteFrameList } from '../../entities/video/SpriteFrameList';
-// --- UI IMPORTS ---
-import { Card } from '../../ui/Card';
-import { ColorInput } from '../../ui/ColorInput';
-import { ControlLabel, ControlSection } from '../../ui/ControlSection';
-import { FileDropzone, FileDropzonePlaceholder } from '../../ui/FileDropzone';
-import { ImageSequencePlayer } from '../../ui/ImageSequencePlayer';
-import { Modal } from '../../ui/Modal';
-import { NumberStepper } from '../../ui/NumberStepper';
-import { RangeSlider } from '../../ui/RangeSlider';
-import { Switch } from '../../ui/Switch';
 import { ToolLayout } from '../ToolLayout';
 
 // --- CONSTANTS ---

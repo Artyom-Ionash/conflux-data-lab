@@ -22,10 +22,10 @@ import {
 // --- UTILS ---
 import { isTextFile, LANGUAGE_MAP } from '@/lib/modules/file-system/file-utils';
 import { formatBytes, generateAsciiTree } from '@/lib/modules/file-system/tree-view';
-
 // --- UI COMPONENTS ---
-import { Card } from '../../ui/Card';
-import { Switch } from '../../ui/Switch';
+import { Card } from '@/ui/Card';
+import { Switch } from '@/ui/Switch';
+
 import { ToolLayout } from '../ToolLayout';
 
 // --- TYPES ---

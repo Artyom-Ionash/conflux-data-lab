@@ -1,7 +1,7 @@
 import Image from 'next/image';
 import React, { useEffect, useMemo, useState } from 'react';
 
-import { Checkerboard } from '@/app/components/ui/Checkerboard';
+import { Checkerboard } from '@/ui/Checkerboard';
 
 interface MultiScalePreviewProps {
   frames: (string | null)[];
