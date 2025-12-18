@@ -1,5 +1,3 @@
-
-
 import { defineConfig, globalIgnores } from 'eslint/config';
 import nextVitals from 'eslint-config-next/core-web-vitals';
 import nextTs from 'eslint-config-next/typescript';
@@ -44,6 +42,7 @@ const eslintConfig = defineConfig([
       'no-console': ['warn', { allow: ['warn', 'error'] }],
       'unicorn/no-null': 'off',
       'unicorn/filename-case': 'off',
+      'react-hooks/exhaustive-deps': 'error',
 
       'boundaries/element-types': [
         'error',
