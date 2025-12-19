@@ -110,3 +110,64 @@ export function waitForVideoFrame(video: HTMLVideoElement): Promise<void> {
     }
   });
 }
+
+/**
+ * Creates an offscreen canvas containing the provided image/video.
+ * Useful for extracting pixel data or resizing.
+ * Moved from UI components to Core Utils for better separation.
+ */
+export function getCanvasFromImage(
+  source: CanvasImageSource,
+  width?: number,
+  height?: number
+): { canvas: HTMLCanvasElement; ctx: CanvasRenderingContext2D } {
+  const canvas = document.createElement('canvas');
+
+  // Determine dimensions safely based on source type
+  let w = width;
+  let h = height;
+
+  if (!w || !h) {
+    if (source instanceof HTMLVideoElement) {
+      w = source.videoWidth;
+      h = source.videoHeight;
+    } else if (source instanceof HTMLImageElement) {
+      w = source.naturalWidth;
+      h = source.naturalHeight;
+    } else if (source instanceof HTMLCanvasElement) {
+      w = source.width;
+      h = source.height;
+    } else {
+      // Fallback for other sources (SVGImageElement, ImageBitmap, OffscreenCanvas, VideoFrame)
+      if ('displayWidth' in source) {
+        // VideoFrame uses displayWidth/displayHeight
+        w = source.displayWidth;
+        h = source.displayHeight;
+      } else if ('width' in source) {
+        if (typeof source.width === 'number') {
+          // ImageBitmap, OffscreenCanvas
+          w = source.width;
+          h = source.height as number;
+        } else if (typeof SVGImageElement !== 'undefined' && source instanceof SVGImageElement) {
+          // SVGImageElement uses SVGAnimatedLength
+          w = source.width.baseVal.value;
+          h = source.height.baseVal.value;
+        }
+      }
+    }
+  }
+
+  canvas.width = w || 0;
+  canvas.height = h || 0;
+
+  const ctx = canvas.getContext('2d', { willReadFrequently: true });
+  if (!ctx) {
+    throw new Error('Failed to create canvas context');
+  }
+
+  if (w && h) {
+    ctx.drawImage(source, 0, 0, w, h);
+  }
+
+  return { canvas, ctx };
+}

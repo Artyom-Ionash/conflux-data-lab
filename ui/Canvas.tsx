@@ -282,7 +282,10 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(
     }, [isAutoContrast, autoContrastPeriod]);
 
     const handleWheel = (e: React.WheelEvent) => {
+      // Блокируем скролл страницы даже если контент вылез за пределы (чего быть не должно, но на всякий случай)
       e.preventDefault();
+      e.stopPropagation();
+
       if (!containerRef.current) return;
       const rect = containerRef.current.getBoundingClientRect();
       const mouseX = e.clientX - rect.left;
@@ -350,7 +353,7 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(
       <div
         ref={setRefs}
         className={cn(
-          'relative h-full w-full touch-none overflow-hidden transition-colors ease-in-out select-none',
+          'relative h-full w-full touch-none overflow-hidden overscroll-none transition-colors ease-in-out select-none',
           currentTheme.BG,
           className
         )}
@@ -365,6 +368,7 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(
           transitionDuration: `${transitionDuration}ms`,
         }}
       >
+        {/* Controls Overlay */}
         <div className="absolute top-4 left-1/2 z-30 flex -translate-x-1/2 items-center gap-2 rounded-full border border-zinc-200 bg-white/90 px-3 py-2 shadow-lg backdrop-blur dark:border-zinc-700 dark:bg-zinc-900/90">
           <div className="mr-2 border-r border-zinc-200 pr-2 dark:border-zinc-700">
             <ColorInput
@@ -434,6 +438,7 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(
           </button>
         </div>
 
+        {/* Grid Background */}
         <div
           className={cn(
             'pointer-events-none absolute inset-0 transition-opacity ease-in-out',
@@ -447,6 +452,7 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(
           }}
         />
 
+        {/* Content Transform Container */}
         <div
           ref={contentRef}
           className="absolute top-0 left-0 z-10 origin-top-left"
@@ -513,65 +519,3 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(
 );
 
 Canvas.displayName = 'Canvas';
-
-// --- STATIC UTILITIES ---
-
-/**
- * Creates an offscreen canvas containing the provided image/video.
- * Useful for extracting pixel data or resizing.
- */
-export function getCanvasFromImage(
-  source: CanvasImageSource,
-  width?: number,
-  height?: number
-): { canvas: HTMLCanvasElement; ctx: CanvasRenderingContext2D } {
-  const canvas = document.createElement('canvas');
-
-  // Determine dimensions safely based on source type
-  let w = width;
-  let h = height;
-
-  if (!w || !h) {
-    if (source instanceof HTMLVideoElement) {
-      w = source.videoWidth;
-      h = source.videoHeight;
-    } else if (source instanceof HTMLImageElement) {
-      w = source.naturalWidth;
-      h = source.naturalHeight;
-    } else if (source instanceof HTMLCanvasElement) {
-      w = source.width;
-      h = source.height;
-    } else {
-      // Fallback for other sources (SVGImageElement, ImageBitmap, OffscreenCanvas, VideoFrame)
-      if ('displayWidth' in source) {
-        // VideoFrame uses displayWidth/displayHeight
-        w = source.displayWidth;
-        h = source.displayHeight;
-      } else if ('width' in source) {
-        if (typeof source.width === 'number') {
-          // ImageBitmap, OffscreenCanvas
-          w = source.width;
-          h = source.height as number;
-        } else if (typeof SVGImageElement !== 'undefined' && source instanceof SVGImageElement) {
-          // SVGImageElement uses SVGAnimatedLength
-          w = source.width.baseVal.value;
-          h = source.height.baseVal.value;
-        }
-      }
-    }
-  }
-
-  canvas.width = w || 0;
-  canvas.height = h || 0;
-
-  const ctx = canvas.getContext('2d', { willReadFrequently: true });
-  if (!ctx) {
-    throw new Error('Failed to create canvas context');
-  }
-
-  if (w && h) {
-    ctx.drawImage(source, 0, 0, w, h);
-  }
-
-  return { canvas, ctx };
-}
