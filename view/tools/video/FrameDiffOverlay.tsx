@@ -2,7 +2,7 @@ import Image from 'next/image';
 import { useEffect, useRef, useState } from 'react';
 
 import { areColorsSimilar } from '@/lib/core/utils/colors';
-import { getCanvasFromImage, getTopLeftPixelColor, loadImage } from '@/lib/core/utils/media';
+import { captureToCanvas, getTopLeftPixelColor, loadImage } from '@/lib/core/utils/media';
 // import { getCanvasFromImage } from '@/ui/Canvas'; // УДАЛЕНО
 
 interface FrameDiffOverlayProps {
@@ -48,8 +48,8 @@ export function FrameDiffOverlay({
 
         // 3. Получение полных данных
         // Используем утилиту из media.ts
-        const { ctx: ctx1 } = getCanvasFromImage(firstImg);
-        const { ctx: ctx2 } = getCanvasFromImage(lastImg);
+        const { ctx: ctx1 } = captureToCanvas(firstImg);
+        const { ctx: ctx2 } = captureToCanvas(lastImg);
 
         const firstImageData = ctx1.getImageData(0, 0, canvas.width, canvas.height);
         const lastImageData = ctx2.getImageData(0, 0, canvas.width, canvas.height);

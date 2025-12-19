@@ -10,7 +10,7 @@ export const categoryLabels: Record<string, string> = {
   validation: 'Валидация',
 };
 
-export const tools: ToolConfig[] = [
+export const TOOLS_MANIFEST: ToolConfig[] = [
   // --- SPRITES TOOLS ---
   {
     id: 'video-frame-extractor',
@@ -54,7 +54,7 @@ export const tools: ToolConfig[] = [
   },
 ];
 
-export const toolsByCategory = tools.reduce(
+export const toolsByCategory = TOOLS_MANIFEST.reduce(
   (acc, tool) => {
     const category = tool.category;
     if (!acc[category]) {
@@ -67,5 +67,5 @@ export const toolsByCategory = tools.reduce(
 );
 
 export function getToolById(id: string): ToolConfig | undefined {
-  return tools.find((tool) => tool.id === id);
+  return TOOLS_MANIFEST.find((tool) => tool.id === id);
 }

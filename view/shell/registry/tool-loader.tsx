@@ -19,30 +19,30 @@ const ToolLoading = () => (
 // --- Dynamic Imports ---
 
 const JsonToCsvConverter = dynamic(
-  () => import('@/view/instruments/JsonToCsvConverter').then((mod) => mod.JsonToCsvConverter),
+  () => import('@/view/tools/JsonToCsvConverter').then((mod) => mod.JsonToCsvConverter),
   { loading: ToolLoading }
 );
 
 const VideoFrameExtractor = dynamic(
-  () => import('@/view/instruments/VideoFrameExtractor').then((mod) => mod.VideoFrameExtractor),
+  () => import('@/view/tools/VideoFrameExtractor').then((mod) => mod.VideoFrameExtractor),
   { loading: ToolLoading }
 );
 
 const VerticalImageAligner = dynamic(
-  () => import('@/view/instruments/VerticalImageAligner').then((mod) => mod.VerticalImageAligner),
+  () => import('@/view/tools/VerticalImageAligner').then((mod) => mod.VerticalImageAligner),
   { loading: ToolLoading }
 );
 
 const MonochromeBackgroundRemover = dynamic(
   () =>
-    import('@/view/instruments/MonochromeBackgroundRemover').then(
+    import('@/view/tools/MonochromeBackgroundRemover').then(
       (mod) => mod.MonochromeBackgroundRemover
     ),
   { loading: ToolLoading }
 );
 
 const ProjectToContext = dynamic(
-  () => import('@/view/instruments/ProjectToContext').then((mod) => mod.ProjectToContext),
+  () => import('@/view/tools/ProjectToContext').then((mod) => mod.ProjectToContext),
   { loading: ToolLoading }
 );
 

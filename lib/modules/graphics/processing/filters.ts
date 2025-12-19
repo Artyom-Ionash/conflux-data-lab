@@ -29,8 +29,8 @@ export function applyColorFilter(
   maxRgbDistance: number
 ): Uint8Array {
   const alphaChannel = new Uint8Array(width * height);
-  const tolVal = (tolerance / 100) * maxRgbDistance;
-  const smoothVal = (smoothness / 100) * maxRgbDistance;
+  const toleranceValue = (tolerance / 100) * maxRgbDistance;
+  const smoothnessValue = (smoothness / 100) * maxRgbDistance;
 
   for (let i = 0, idx = 0; i < data.length; i += PIXEL_STRIDE, idx++) {
     // FIX: Замена ! на ?? 0. Если индекс вне границ (маловероятно в цикле, но для типизации важно), берем 0.
@@ -43,14 +43,14 @@ export function applyColorFilter(
     let alpha = RGB_MAX;
 
     if (mode === 'remove') {
-      if (dist <= tolVal) alpha = 0;
-      else if (dist <= tolVal + smoothVal && smoothVal > 0) {
-        alpha = Math.floor(RGB_MAX * ((dist - tolVal) / smoothVal));
+      if (dist <= toleranceValue) alpha = 0;
+      else if (dist <= toleranceValue + smoothnessValue && smoothnessValue > 0) {
+        alpha = Math.floor(RGB_MAX * ((dist - toleranceValue) / smoothnessValue));
       }
     } else if (mode === 'keep') {
-      if (dist > tolVal + smoothVal) alpha = 0;
-      else if (dist > tolVal && smoothVal > 0) {
-        alpha = Math.floor(RGB_MAX * (1 - (dist - tolVal) / smoothVal));
+      if (dist > toleranceValue + smoothnessValue) alpha = 0;
+      else if (dist > toleranceValue && smoothnessValue > 0) {
+        alpha = Math.floor(RGB_MAX * (1 - (dist - toleranceValue) / smoothnessValue));
       }
     }
     alphaChannel[idx] = alpha;
@@ -76,7 +76,7 @@ export function applyFloodFillMask(
   if (startPoints.length === 0) return alphaChannel;
 
   const visited = new Uint8Array(width * height);
-  const tolVal = (tolerance / 100) * maxRgbDistance;
+  const toleranceValue = (tolerance / 100) * maxRgbDistance;
 
   startPoints.forEach((pt) => {
     const startX = Math.floor(pt.x);
@@ -100,16 +100,16 @@ export function applyFloodFillMask(
       visited[idx] = 1;
 
       // Проверка границы (контура)
-      const pxIdx = idx * PIXEL_STRIDE;
+      const pixelIndex = idx * PIXEL_STRIDE;
 
       // FIX: Замена ! на ?? 0
-      const r = data[pxIdx + OFFSET_R] ?? 0;
-      const g = data[pxIdx + OFFSET_G] ?? 0;
-      const b = data[pxIdx + OFFSET_B] ?? 0;
+      const r = data[pixelIndex + OFFSET_R] ?? 0;
+      const g = data[pixelIndex + OFFSET_G] ?? 0;
+      const b = data[pixelIndex + OFFSET_B] ?? 0;
 
       const dist = getColorDistance(r, g, b, contourColor.r, contourColor.g, contourColor.b);
 
-      if (dist <= tolVal) continue; // Попали в контур, останавливаемся
+      if (dist <= toleranceValue) continue; // Попали в контур, останавливаемся
 
       alphaChannel[idx] = 0; // Делаем прозрачным
 

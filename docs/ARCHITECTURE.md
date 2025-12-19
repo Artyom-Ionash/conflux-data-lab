@@ -16,13 +16,13 @@
   - Компоненты **агностичны к бизнесу**: `Canvas` умеет зумить и панорамировать, но не знает, _что_ именно он отображает (видео или картинку).
   - Зависимости: Только `Radix UI`, `Tailwind` и утилиты из `lib/core`.
 
-### 2. Entity Layer (`view/instruments/*/`)
+### 2. Entity Layer (`view/tools/*/`)
 
 - **Назначение:** UI-компоненты, привязанные к конкретным бизнес-сущностям (`TextureLimitIndicator`, `FrameDiffOverlay`).
 - **Состав:** Группируются по доменам в подпапках (`hardware/`, `video/`).
 - **Правила:** Может использовать `view/ui` и `lib/modules`.
 
-### 3. Feature / Tool Layer (`view/instruments/`)
+### 3. Feature / Tool Layer (`view/tools/`)
 
 - **Назначение:** Полноценные виджеты инструментов. Сборка компонентов и логики в готовое решение.
 - **Правила:** Инструменты должны быть изолированы друг от друга.
@@ -32,7 +32,7 @@
 - **Назначение:** Компоненты, специфичные для структуры приложения.
   - `view/catalog/`: Компоненты каталога инструментов (`ToolGrid`, `ToolCard`).
   - `view/shell/`: Компоненты оболочки приложения (`Header`, `Footer`, `registry/tool-loader`).
-- **Правила:** Может использовать `view/ui`, `view/instruments/*/` (entities) и `lib/modules`.
+- **Правила:** Может использовать `view/ui`, `view/tools/*/` (entities) и `lib/modules`.
 
 ### 5. Domain Logic & Core (`lib/`)
 
@@ -92,7 +92,7 @@
 
 1.  **Конфигурация:** Метаданные в `lib/core/registry/config.ts`.
 2.  **Типы:** Определения типов в `lib/core/registry/types.ts`.
-3.  **Реализация:** Компонент в `view/instruments/[ToolName].tsx` (например, `view/instruments/VideoFrameExtractor.tsx`).
+3.  **Реализация:** Компонент в `view/tools/[ToolName].tsx` (например, `view/tools/VideoFrameExtractor.tsx`).
 4.  **Регистрация:** Lazy-loading через `dynamic import` в `view/shell/registry/tool-loader.tsx`.
 
 ---

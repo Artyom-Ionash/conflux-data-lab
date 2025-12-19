@@ -1,9 +1,9 @@
-import { categoryLabels, tools, toolsByCategory } from '@/lib/core/registry/config';
+import { categoryLabels, TOOLS_MANIFEST, toolsByCategory } from '@/lib/core/registry/config';
 import { ToolGrid } from '@/view/catalog/ToolGrid';
 import { Badge } from '@/view/ui/Badge';
 
 export default function Home() {
-  const featuredTools = tools.filter((tool) => tool.featured);
+  const featuredTools = TOOLS_MANIFEST.filter((tool) => tool.featured);
   const categories = Object.keys(toolsByCategory);
 
   return (
@@ -52,7 +52,9 @@ export default function Home() {
       <section className="mt-12 rounded-lg border border-zinc-200 bg-zinc-50 p-6 text-center dark:border-zinc-800 dark:bg-zinc-900">
         <p className="text-zinc-600 dark:text-zinc-400">
           Всего инструментов:{' '}
-          <span className="font-semibold text-zinc-900 dark:text-zinc-100">{tools.length}</span>
+          <span className="font-semibold text-zinc-900 dark:text-zinc-100">
+            {TOOLS_MANIFEST.length}
+          </span>
         </p>
       </section>
     </div>

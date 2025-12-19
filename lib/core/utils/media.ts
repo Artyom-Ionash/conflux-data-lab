@@ -11,10 +11,8 @@ import type { RGB } from './colors';
 export function loadImage(src: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
     const img = new Image();
-    // Важно для манипуляций с canvas (избегание Tainted Canvas)
     img.crossOrigin = 'Anonymous';
     img.onload = () => resolve(img);
-    // Игнорируем параметр ошибки, используя только 'reject'
     img.onerror = () => reject(new Error(`Failed to load image: ${src}`));
     img.src = src;
   });
@@ -22,7 +20,6 @@ export function loadImage(src: string): Promise<HTMLImageElement> {
 
 /**
  * Создает невидимую ссылку и инициирует скачивание файла.
- * Работает как с Blob URL, так и с Data URL.
  */
 export function downloadDataUrl(dataUrl: string, filename: string): void {
   const a = document.createElement('a');
@@ -35,47 +32,33 @@ export function downloadDataUrl(dataUrl: string, filename: string): void {
 }
 
 /**
- * Безопасно освобождает URL объекта, подавляя ошибки.
+ * Безопасно освобождает URL объекта.
  */
 export function revokeObjectURLSafely(url: string | null | undefined) {
   if (!url) return;
   try {
     URL.revokeObjectURL(url);
   } catch {
-    // Игнорируем ошибки, если URL уже был удален
+    // Игнорируем ошибки
   }
 }
 
 /**
- * Извлекает RGB-цвет верхнего левого пикселя (0,0) изображения.
- * Использует микро-канвас 1x1 для производительности.
- * Возвращает {r, g, b} для удобства вычислений.
+ * Извлекает RGB-цвет верхнего левого пикселя (0,0) источника.
  */
 export function getTopLeftPixelColor(source: CanvasImageSource): RGB {
-  const canvas = document.createElement('canvas');
-  canvas.width = 1;
-  canvas.height = 1;
-  const ctx = canvas.getContext('2d', { willReadFrequently: true });
-
-  if (!ctx) return { r: 255, g: 255, b: 255 }; // Fallback (White)
-
-  // Рисуем кусочек 1x1 из координат 0,0 источника в координаты 0,0 канваса
-  ctx.drawImage(source, 0, 0, 1, 1, 0, 0, 1, 1);
-
+  const { canvas, ctx } = captureToCanvas(source, 1, 1);
   const data = ctx.getImageData(0, 0, 1, 1).data;
 
-  // FIX: Используем nullish coalescing (?? 0), так как TS не гарантирует наличие индекса
-  const r = data[0] ?? 255;
-  const g = data[1] ?? 255;
-  const b = data[2] ?? 255;
-
-  return { r, g, b };
+  return {
+    r: data[0] ?? 255,
+    g: data[1] ?? 255,
+    b: data[2] ?? 255,
+  };
 }
 
 /**
- * Ожидает, пока видеокадр будет действительно готов к отрисовке.
- * Использует `requestVideoFrameCallback` для точной синхронизации с композитором браузера.
- * Включает Safety Timeout для предотвращения зависания.
+ * Ожидает, пока видеокадр будет готов к отрисовке.
  */
 export function waitForVideoFrame(video: HTMLVideoElement): Promise<void> {
   return new Promise((resolve) => {
@@ -87,8 +70,6 @@ export function waitForVideoFrame(video: HTMLVideoElement): Promise<void> {
       }
     };
 
-    // 1. Safety Timeout: Если API зависнет (например, вкладка в фоне),
-    // принудительно продолжаем через 200мс, чтобы не сломать UX.
     const timeoutId = setTimeout(safeResolve, 200);
 
     const onFrame = () => {
@@ -96,14 +77,12 @@ export function waitForVideoFrame(video: HTMLVideoElement): Promise<void> {
       safeResolve();
     };
 
-    // 2. Modern API
     if (
       'requestVideoFrameCallback' in video &&
       typeof video.requestVideoFrameCallback === 'function'
     ) {
       video.requestVideoFrameCallback(onFrame);
     } else {
-      // 3. Fallback: Double RAF
       requestAnimationFrame(() => {
         requestAnimationFrame(onFrame);
       });
@@ -112,61 +91,45 @@ export function waitForVideoFrame(video: HTMLVideoElement): Promise<void> {
 }
 
 /**
- * Creates an offscreen canvas containing the provided image/video.
- * Useful for extracting pixel data or resizing.
- * Moved from UI components to Core Utils for better separation.
+ * Создает закадровый холст (Offscreen Canvas) и "запекает" в него текущее состояние источника.
+ * Название отражает универсальность: работает с Image, Video, Canvas и VideoFrame.
  */
-export function getCanvasFromImage(
+export function captureToCanvas(
   source: CanvasImageSource,
   width?: number,
   height?: number
 ): { canvas: HTMLCanvasElement; ctx: CanvasRenderingContext2D } {
   const canvas = document.createElement('canvas');
 
-  // Determine dimensions safely based on source type
-  let w = width;
-  let h = height;
+  let targetWidth = width;
+  let targetHeight = height;
 
-  if (!w || !h) {
+  if (!targetWidth || !targetHeight) {
     if (source instanceof HTMLVideoElement) {
-      w = source.videoWidth;
-      h = source.videoHeight;
+      targetWidth = source.videoWidth;
+      targetHeight = source.videoHeight;
     } else if (source instanceof HTMLImageElement) {
-      w = source.naturalWidth;
-      h = source.naturalHeight;
+      targetWidth = source.naturalWidth;
+      targetHeight = source.naturalHeight;
     } else if (source instanceof HTMLCanvasElement) {
-      w = source.width;
-      h = source.height;
-    } else {
-      // Fallback for other sources (SVGImageElement, ImageBitmap, OffscreenCanvas, VideoFrame)
-      if ('displayWidth' in source) {
-        // VideoFrame uses displayWidth/displayHeight
-        w = source.displayWidth;
-        h = source.displayHeight;
-      } else if ('width' in source) {
-        if (typeof source.width === 'number') {
-          // ImageBitmap, OffscreenCanvas
-          w = source.width;
-          h = source.height as number;
-        } else if (typeof SVGImageElement !== 'undefined' && source instanceof SVGImageElement) {
-          // SVGImageElement uses SVGAnimatedLength
-          w = source.width.baseVal.value;
-          h = source.height.baseVal.value;
-        }
-      }
+      targetWidth = source.width;
+      targetHeight = source.height;
+    } else if ('width' in source && typeof source.width === 'number') {
+      targetWidth = source.width;
+      targetHeight = source.height as number;
     }
   }
 
-  canvas.width = w || 0;
-  canvas.height = h || 0;
+  canvas.width = targetWidth || 0;
+  canvas.height = targetHeight || 0;
 
   const ctx = canvas.getContext('2d', { willReadFrequently: true });
   if (!ctx) {
     throw new Error('Failed to create canvas context');
   }
 
-  if (w && h) {
-    ctx.drawImage(source, 0, 0, w, h);
+  if (targetWidth && targetHeight) {
+    ctx.drawImage(source, 0, 0, targetWidth, targetHeight);
   }
 
   return { canvas, ctx };
