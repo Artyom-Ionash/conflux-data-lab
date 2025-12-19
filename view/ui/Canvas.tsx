@@ -1,6 +1,6 @@
 'use client';
 
-import type { ReactNode } from 'react';
+import type { ReactNode, RefObject } from 'react';
 import React, {
   forwardRef,
   useCallback,
@@ -13,11 +13,6 @@ import React, {
 
 import { cn } from '@/view/ui/infrastructure/standards';
 import { useElementSize } from '@/view/ui/infrastructure/use-element-size';
-
-// eslint-disable-next-line boundaries/element-types
-import { ColorInput } from './ColorInput';
-// eslint-disable-next-line boundaries/element-types
-import { ProcessingOverlay } from './ProcessingOverlay';
 
 // --- CONFIGURATION CONSTANTS ---
 
@@ -38,8 +33,6 @@ const VIEWPORT_PADDING = 40; // Отступ при автоматическом
 const ANIMATION_CONFIG = {
   STABILIZATION_DELAY: 150, // ms, задержка перед финальной стабилизацией после зума
   DEFAULT_DURATION: 300, // ms, стандартная анимация переходов
-  AUTO_CONTRAST_PERIOD_DEFAULT: 5, // секунд
-  AUTO_CONTRAST_TRANSITION_FACTOR: 0.9, // Доля времени анимации от периода смены темы
 };
 
 // Mouse interaction
@@ -65,7 +58,7 @@ const THEME_COLORS = {
   },
 } as const;
 
-// CSS Patterns (теперь используют GRID_SIZE)
+// CSS Patterns
 const GRID_CSS_PATTERN = `linear-gradient(45deg, #888 25%, transparent 25%), linear-gradient(-45deg, #888 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #888 75%), linear-gradient(-45deg, transparent 75%, #888 75%)`;
 
 const CHECKER_CSS_TEMPLATE = (color: string) =>
@@ -88,43 +81,57 @@ export interface CanvasRef {
   resetView: (width?: number, height?: number) => void;
   getTransform: () => CanvasTransform;
   screenToWorld: (clientX: number, clientY: number) => Point;
+  // Backward compatibility signatures, though now controlled via props
   getBackgroundColor: () => string | null;
   setBackgroundColor: (color: string | null) => void;
 }
 
 interface CanvasProps {
   children: ReactNode;
-  isLoading?: boolean;
-  className?: string;
-  minScale?: number;
-  maxScale?: number;
-  initialScale?: number;
-  contentWidth?: number;
-  contentHeight?: number;
-  theme?: 'light' | 'dark';
-  shadowOverlayOpacity?: number;
-  showTransparencyGrid?: boolean;
-  defaultBackgroundColor?: string;
-  placeholder?: ReactNode;
+  /**
+   * Ref для обновления текстовой метки масштаба (например, "100%").
+   * Используется для обновления UI без ре-рендеринга родителя.
+   */
+  zoomLabelRef?: RefObject<HTMLSpanElement | null> | undefined;
+  theme?: 'light' | 'dark' | undefined;
+  backgroundColor?: string | null | undefined;
+  className?: string | undefined;
+  minScale?: number | undefined;
+  maxScale?: number | undefined;
+  initialScale?: number | undefined;
+  contentWidth?: number | undefined;
+  contentHeight?: number | undefined;
+  shadowOverlayOpacity?: number | undefined;
+  showTransparencyGrid?: boolean | undefined;
+  placeholder?: ReactNode | undefined;
 }
 
 // --- COMPONENT ---
 
+/**
+ * [PRIMITIVE] Canvas
+ * Низкоуровневый компонент холста. Отвечает ТОЛЬКО за:
+ * 1. Pan/Zoom трансформации (математика и DOM).
+ * 2. Рендеринг сетки/фона.
+ * 3. Контейнеризацию контента.
+ *
+ * Не содержит: тулбаров, кнопок, оверлеев загрузки, бизнес-логики.
+ */
 export const Canvas = forwardRef<CanvasRef, CanvasProps>(
   (
     {
       children,
-      isLoading = false,
+      zoomLabelRef,
+      theme = 'dark',
+      backgroundColor = null,
       className = '',
       minScale = ZOOM_CONFIG.MIN,
       maxScale = ZOOM_CONFIG.MAX,
       initialScale = ZOOM_CONFIG.INITIAL,
       contentWidth,
       contentHeight,
-      theme: propTheme,
       shadowOverlayOpacity = 0,
       showTransparencyGrid = false,
-      defaultBackgroundColor = null,
       placeholder,
     },
     ref
@@ -132,10 +139,8 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(
     // 1. Инициализация хука размеров
     const [resizeRef, containerSize] = useElementSize<HTMLDivElement>();
 
-    // Нам все еще нужен useRef для императивных вызовов (pointerCapture, getBoundingClientRect)
     const containerRef = useRef<HTMLDivElement>(null);
     const contentRef = useRef<HTMLDivElement>(null);
-    const zoomLabelRef = useRef<HTMLSpanElement>(null);
 
     // 2. Объединение рефов
     const setRefs = useCallback(
@@ -146,48 +151,50 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(
       [resizeRef]
     );
 
-    const transform = useRef<CanvasTransform>({ scale: initialScale, x: 0, y: 0 });
+    const transform = useRef<CanvasTransform>({ scale: initialScale || 1, x: 0, y: 0 });
     const interactionTimer = useRef<NodeJS.Timeout | null>(null);
     const rafId = useRef<number | null>(null);
 
     const [isPanning, setIsPanning] = useState(false);
-    const [internalTheme, setInternalTheme] = useState<'light' | 'dark'>('dark');
-    const [isAutoContrast, setIsAutoContrast] = useState(false);
-    const [autoContrastPeriod, setAutoContrastPeriod] = useState(
-      ANIMATION_CONFIG.AUTO_CONTRAST_PERIOD_DEFAULT
-    );
 
-    const [canvasBgColor, setCanvasBgColor] = useState<string | null>(defaultBackgroundColor);
+    // Для совместимости с imperative handle, храним цвет, если он не передан через props
+    // Но оставим локальный стейт только для поддержки метода setBackgroundColor, если он будет вызван императивно.
+    // Однако, лучше полагаться на props.
+    // const [canvasBgColor, setCanvasBgColor] = useState<string | null>(defaultBackgroundColor);
 
-    const activeTheme = propTheme || internalTheme;
     const panStartRef = useRef<Point | null>(null);
     const transformStartRef = useRef<CanvasTransform | null>(null);
 
-    const updateDOM = useCallback((isInteracting: boolean) => {
-      if (!contentRef.current) return;
-      const { x, y, scale } = transform.current;
+    const updateDOM = useCallback(
+      (isInteracting: boolean) => {
+        if (!contentRef.current) return;
+        const { x, y, scale } = transform.current;
 
-      contentRef.current.style.transform = `translate3d(${x}px, ${y}px, 0) scale(${scale})`;
+        contentRef.current.style.transform = `translate3d(${x}px, ${y}px, 0) scale(${scale})`;
 
-      if (isInteracting) {
-        contentRef.current.style.willChange = 'transform';
-      } else {
-        contentRef.current.style.willChange = 'auto';
-        // Включаем пикселизацию только при большом увеличении
-        const renderingMode = scale > ZOOM_CONFIG.PIXELATED_THRESHOLD ? 'pixelated' : 'auto';
-        if (contentRef.current.style.imageRendering !== renderingMode) {
-          contentRef.current.style.imageRendering = renderingMode;
+        if (isInteracting) {
+          contentRef.current.style.willChange = 'transform';
+        } else {
+          contentRef.current.style.willChange = 'auto';
+          const renderingMode =
+            scale > (ZOOM_CONFIG.PIXELATED_THRESHOLD ?? 4) ? 'pixelated' : 'auto';
+          if (contentRef.current.style.imageRendering !== renderingMode) {
+            contentRef.current.style.imageRendering = renderingMode;
+          }
         }
-      }
 
-      if (zoomLabelRef.current) {
-        zoomLabelRef.current.innerText = `${Math.round(scale * 100)}%`;
-      }
-    }, []);
+        // Direct DOM update for performance
+        if (zoomLabelRef?.current) {
+          zoomLabelRef.current.innerText = `${Math.round(scale * 100)}%`;
+        }
+      },
+      [zoomLabelRef]
+    );
 
     const stabilizeView = useCallback(() => {
       if (!contentRef.current) return;
       updateDOM(false);
+      // Trigger reflow to apply rendering changes
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
       const _force = contentRef.current.offsetHeight;
     }, [updateDOM]);
@@ -216,11 +223,7 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(
     const performResetView = useCallback(
       (w?: number, h?: number) => {
         if (!containerRef.current) return;
-
-        // 3. Используем реактивные размеры из хука
         const { width: clientWidth, height: clientHeight } = containerSize;
-
-        // Если размеры еще не вычислены (0), выходим
         if (clientWidth === 0 || clientHeight === 0) return;
 
         const targetW = w || contentWidth || 0;
@@ -230,7 +233,6 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(
         let newY = 0;
 
         if (targetW && targetH) {
-          // Вычисляем масштаб, чтобы контент влез с отступом
           const scaleX = (clientWidth - VIEWPORT_PADDING) / targetW;
           const scaleY = (clientHeight - VIEWPORT_PADDING) / targetH;
           newScale = Math.min(1, Math.min(scaleX, scaleY));
@@ -248,7 +250,6 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(
       [contentWidth, contentHeight, scheduleUpdate, containerSize]
     );
 
-    // 4. Автоматический сброс вида при изменении размеров контейнера
     useEffect(() => {
       if (containerSize.width > 0 && containerSize.height > 0) {
         performResetView();
@@ -266,25 +267,13 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(
         const worldY = (clientY - rect.top - y) / scale;
         return { x: worldX, y: worldY };
       },
-      getBackgroundColor: () => canvasBgColor,
-      setBackgroundColor: (color: string | null) => {
-        setCanvasBgColor(color);
+      getBackgroundColor: () => backgroundColor,
+      setBackgroundColor: () => {
+        console.warn('Canvas: setBackgroundColor is deprecated. Use props instead.');
       },
     }));
 
-    useEffect(() => {
-      let interval: NodeJS.Timeout;
-      if (isAutoContrast) {
-        const ms = autoContrastPeriod * 1000;
-        interval = setInterval(() => {
-          setInternalTheme((prev) => (prev === 'light' ? 'dark' : 'light'));
-        }, ms);
-      }
-      return () => clearInterval(interval);
-    }, [isAutoContrast, autoContrastPeriod]);
-
     const handleWheel = (e: React.WheelEvent) => {
-      // Блокируем скролл страницы даже если контент вылез за пределы (чего быть не должно, но на всякий случай)
       e.preventDefault();
       e.stopPropagation();
 
@@ -293,7 +282,6 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(
       const mouseX = e.clientX - rect.left;
       const mouseY = e.clientY - rect.top;
 
-      // Ограничиваем дельту для плавности на разных мышках/тачпадах
       const delta = Math.max(
         -ZOOM_CONFIG.WHEEL_DELTA_LIMIT,
         Math.min(ZOOM_CONFIG.WHEEL_DELTA_LIMIT, e.deltaY)
@@ -302,7 +290,12 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(
       const factor = Math.exp(-delta * ZOOM_CONFIG.INTENSITY);
       const current = transform.current;
       let newScale = current.scale * factor;
-      newScale = Math.max(minScale, Math.min(newScale, maxScale));
+
+      // Fallbacks for optional props
+      const mnScale = minScale ?? ZOOM_CONFIG.MIN;
+      const mxScale = maxScale ?? ZOOM_CONFIG.MAX;
+
+      newScale = Math.max(mnScale, Math.min(newScale, mxScale));
 
       const scaleRatio = newScale / current.scale;
       const newX = mouseX - (mouseX - current.x) * scaleRatio;
@@ -342,13 +335,7 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(
       }
     };
 
-    const isDark = activeTheme === 'dark';
-    const currentTheme = isDark ? THEME_COLORS.DARK : THEME_COLORS.LIGHT;
-
-    const transitionDuration = isAutoContrast
-      ? autoContrastPeriod * 1000 * ANIMATION_CONFIG.AUTO_CONTRAST_TRANSITION_FACTOR
-      : ANIMATION_CONFIG.DEFAULT_DURATION;
-
+    const currentTheme = theme === 'dark' ? THEME_COLORS.DARK : THEME_COLORS.LIGHT;
     const hasDimensions = !!contentWidth && !!contentHeight;
 
     return (
@@ -367,79 +354,9 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(
         onContextMenu={(e) => e.preventDefault()}
         style={{
           cursor: isPanning ? 'grabbing' : 'default',
-          transitionDuration: `${transitionDuration}ms`,
+          transitionDuration: `${ANIMATION_CONFIG.DEFAULT_DURATION}ms`,
         }}
       >
-        {/* Controls Overlay */}
-        <div className="absolute top-4 left-1/2 z-30 flex -translate-x-1/2 items-center gap-2 rounded-full border border-zinc-200 bg-white/90 px-3 py-2 shadow-lg backdrop-blur dark:border-zinc-700 dark:bg-zinc-900/90">
-          <div className="mr-2 border-r border-zinc-200 pr-2 dark:border-zinc-700">
-            <ColorInput
-              value={canvasBgColor}
-              onChange={(v) => setCanvasBgColor(v)}
-              allowTransparent
-              onClear={() => setCanvasBgColor(null)}
-              size="sm"
-            />
-          </div>
-
-          <button
-            onClick={() => {
-              setIsAutoContrast(false);
-              setInternalTheme((prev) => (prev === 'dark' ? 'light' : 'dark'));
-            }}
-            className="rounded-full p-2 text-zinc-500 transition-colors hover:bg-zinc-100 dark:hover:bg-zinc-800"
-          >
-            {isDark ? '🌙' : '☀️'}
-          </button>
-          <button
-            onClick={() => setIsAutoContrast(!isAutoContrast)}
-            className={cn(
-              'rounded-full p-2 transition-colors',
-              isAutoContrast
-                ? 'bg-blue-100 text-blue-600 dark:bg-blue-900 dark:text-blue-300'
-                : 'text-zinc-500 hover:bg-zinc-100'
-            )}
-          >
-            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth="2"
-                d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
-              />
-            </svg>
-          </button>
-          {isAutoContrast && (
-            <div className="animate-fade-in mx-1 flex items-center gap-2">
-              <input
-                type="range"
-                min="1"
-                max="10"
-                step="1"
-                value={autoContrastPeriod}
-                onChange={(e) => setAutoContrastPeriod(Number(e.target.value))}
-                className="h-1 w-16 cursor-pointer appearance-none rounded-lg bg-zinc-200 accent-blue-600 dark:bg-zinc-700"
-              />
-              <span className="w-5 font-mono text-xs font-bold text-zinc-600 dark:text-zinc-300">
-                {autoContrastPeriod}s
-              </span>
-            </div>
-          )}
-          <div className="mx-1 h-4 w-px bg-zinc-300 dark:bg-zinc-700" />
-          <span
-            ref={zoomLabelRef}
-            className="min-w-[3ch] px-1 text-right font-mono text-xs text-zinc-500 select-none dark:text-zinc-400"
-          >
-            {(initialScale * 100).toFixed(0)}%
-          </span>
-          <button
-            onClick={() => performResetView()}
-            className="rounded px-2 py-1 text-xs font-medium text-zinc-600 transition-colors hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
-          >
-            Сброс
-          </button>
-        </div>
-
         {/* Grid Background */}
         <div
           className={cn(
@@ -447,7 +364,7 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(
             currentTheme.GRID_OPACITY
           )}
           style={{
-            transitionDuration: `${transitionDuration}ms`,
+            transitionDuration: `${ANIMATION_CONFIG.DEFAULT_DURATION}ms`,
             backgroundImage: GRID_CSS_PATTERN,
             backgroundSize: `${GRID_SIZE}px ${GRID_SIZE}px`,
             zIndex: 0,
@@ -459,11 +376,11 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(
           ref={contentRef}
           className="absolute top-0 left-0 z-10 origin-top-left"
           style={{
-            transform: `translate3d(${initialScale}px, 0px, 0) scale(${initialScale})`,
+            transform: `translate3d(${initialScale || 1}px, 0px, 0) scale(${initialScale || 1})`,
             backfaceVisibility: 'hidden',
           }}
         >
-          {hasDimensions && shadowOverlayOpacity > 0 && (
+          {hasDimensions && (shadowOverlayOpacity ?? 0) > 0 && (
             <div
               className="pointer-events-none absolute top-0 left-0"
               style={{
@@ -496,8 +413,8 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(
               />
             )}
 
-            {hasDimensions && canvasBgColor && (
-              <div className="absolute inset-0 z-0" style={{ backgroundColor: canvasBgColor }} />
+            {hasDimensions && backgroundColor && (
+              <div className="absolute inset-0 z-0" style={{ backgroundColor }} />
             )}
 
             <div className="relative z-10 h-full w-full">{children}</div>
@@ -509,12 +426,6 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(
             <div className="pointer-events-auto h-full w-full">{placeholder}</div>
           </div>
         )}
-
-        <ProcessingOverlay isVisible={isLoading} />
-
-        <div className="pointer-events-none absolute bottom-4 left-1/2 z-50 -translate-x-1/2 rounded bg-white/50 px-2 py-1 text-[10px] text-zinc-500 opacity-50 backdrop-blur-sm dark:bg-black/50">
-          Средняя кнопка мыши для перемещения
-        </div>
       </div>
     );
   }

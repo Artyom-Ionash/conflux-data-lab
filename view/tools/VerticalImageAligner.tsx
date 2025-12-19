@@ -29,8 +29,8 @@ import {
   loadImage,
   revokeObjectURLSafely,
 } from '@/lib/core/utils/media';
+import { WorkbenchCanvas } from '@/view/tools/graphics/WorkbenchCanvas';
 import type { CanvasRef } from '@/view/ui/Canvas';
-import { Canvas } from '@/view/ui/Canvas';
 import { ControlLabel, ControlSection } from '@/view/ui/ControlSection';
 import { FileDropzone, FileDropzonePlaceholder } from '@/view/ui/FileDropzone';
 import { cn } from '@/view/ui/infrastructure/standards';
@@ -40,7 +40,6 @@ import { Workbench } from '@/view/ui/Workbench';
 
 import { TextureDimensionSlider } from './hardware/TextureDimensionSlider';
 
-// ... (CONSTANTS и TYPES без изменений) ...
 const LIMIT_MAX_BROWSER = 16_384;
 const VIEW_RESET_DELAY = 50;
 const EXPORT_FILENAME = 'aligned-export.png';
@@ -71,9 +70,6 @@ type AlignImage = {
   naturalWidth: number;
   naturalHeight: number;
 };
-
-// ... (Components SortableLayerItem и DraggableImageSlot без изменений) ...
-// (Они были в прошлом ответе корректны, если нужно, я могу повторить)
 
 // 1. Sortable Item for Sidebar (DND-KIT)
 interface SortableLayerItemProps {
@@ -587,7 +583,7 @@ export function VerticalImageAligner() {
     <Workbench.Root>
       <Workbench.Sidebar>{sidebarContent}</Workbench.Sidebar>
       <Workbench.Stage>
-        <Canvas
+        <WorkbenchCanvas
           ref={workspaceRef}
           isLoading={isExporting}
           contentWidth={bounds.width}
@@ -639,7 +635,7 @@ export function VerticalImageAligner() {
               onUpdatePosition={handleUpdatePosition}
             />
           ))}
-        </Canvas>
+        </WorkbenchCanvas>
       </Workbench.Stage>
     </Workbench.Root>
   );

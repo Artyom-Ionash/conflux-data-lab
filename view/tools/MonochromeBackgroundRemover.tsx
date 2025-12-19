@@ -1,7 +1,7 @@
 'use client';
 
 import Image from 'next/image';
-import Link from 'next/link'; // Добавлен для хедера
+import Link from 'next/link';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 
 import { useDebounceEffect } from '@/lib/core/hooks/use-debounce-effect';
@@ -15,22 +15,21 @@ import type {
   WorkerResponse,
 } from '@/lib/modules/graphics/processing/background-engine.worker';
 import type { Point } from '@/lib/modules/graphics/processing/imaging';
+import { WorkbenchCanvas } from '@/view/tools/graphics/WorkbenchCanvas';
 import type { CanvasRef } from '@/view/ui/Canvas';
-import { Canvas } from '@/view/ui/Canvas';
 import { ColorInput } from '@/view/ui/ColorInput';
 import { ControlLabel, ControlSection } from '@/view/ui/ControlSection';
 import { FileDropzone, FileDropzonePlaceholder } from '@/view/ui/FileDropzone';
 import { Slider } from '@/view/ui/Slider';
 import { ToggleGroup, ToggleGroupItem } from '@/view/ui/ToggleGroup';
-import { Workbench } from '@/view/ui/Workbench'; // Обновленный импорт
+import { Workbench } from '@/view/ui/Workbench';
 
 // --- CONSTANTS ---
-// ... (Константы остаются без изменений)
 const DEBOUNCE_DELAY = 50;
 const VIEW_RESET_DELAY = 50;
 const MOUSE_BUTTON_LEFT = 0;
-const RGB_MAX = 255;
-const MAX_RGB_DISTANCE = Math.sqrt(3 * RGB_MAX ** 2);
+// const RGB_MAX = 255;
+const MAX_RGB_DISTANCE = Math.sqrt(3 * 255 ** 2);
 const DOWNLOAD_FILENAME = 'removed_bg.png';
 const OFFSET_R = 0;
 const OFFSET_G = 1;
@@ -47,7 +46,6 @@ const DEFAULT_SETTINGS = {
 };
 
 export function MonochromeBackgroundRemover() {
-  // ... (Вся логика хуков и стейта остается без изменений) ...
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const originalUrl = useObjectUrl(selectedFile);
 
@@ -494,7 +492,7 @@ export function MonochromeBackgroundRemover() {
           onPointerMove={handleGlobalPointerMove}
           onPointerUp={handleGlobalPointerUp}
         >
-          <Canvas
+          <WorkbenchCanvas
             ref={workspaceRef}
             isLoading={isProcessing}
             contentWidth={imgDimensions.w}
@@ -537,7 +535,7 @@ export function MonochromeBackgroundRemover() {
                   <div className="h-full w-full rounded-full border border-white bg-red-500 shadow-[0_0_2px_rgba(0,0,0,0.8)]" />
                 </div>
               ))}
-          </Canvas>
+          </WorkbenchCanvas>
         </div>
       </Workbench.Stage>
     </Workbench.Root>
