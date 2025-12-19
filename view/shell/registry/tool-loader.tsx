@@ -17,7 +17,6 @@ const ToolLoading = () => (
 );
 
 // --- Dynamic Imports ---
-// Важно: так как компоненты используют named exports, мы используем .then(mod => mod.Component)
 
 const JsonToCsvConverter = dynamic(
   () => import('@/view/instruments/JsonToCsvConverter').then((mod) => mod.JsonToCsvConverter),
@@ -55,9 +54,31 @@ const toolComponents: Record<string, React.ComponentType> = {
   'vertical-image-aligner': VerticalImageAligner,
   'monochrome-background-remover': MonochromeBackgroundRemover,
   'project-to-context': ProjectToContext,
-  // Новые инструменты регистрируйте здесь аналогичным образом через dynamic()
 };
 
+/**
+ * Рендерит компонент инструмента по его ID.
+ * Решает проблему линтера react-hooks/static-components, так как объявлен на верхнем уровне.
+ */
+export function ToolRegistry({ toolId }: { toolId: string }) {
+  const Component = toolComponents[toolId];
+
+  if (!Component) {
+    return (
+      <div className="rounded-lg border border-red-200 bg-red-50 p-6 dark:border-red-900/50 dark:bg-red-900/20">
+        <p className="text-red-600 dark:text-red-400">
+          Ошибка: Инструмент &quot;{toolId}&quot; не зарегистрирован в системе.
+        </p>
+      </div>
+    );
+  }
+
+  return <Component />;
+}
+
+/**
+ * Возвращает ссылку на компонент (для специфических нужд)
+ */
 export function getToolComponent(toolId: string): React.ComponentType | null {
   return toolComponents[toolId] || null;
 }

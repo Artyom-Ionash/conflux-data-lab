@@ -66,8 +66,9 @@ export function useWorker<Req, Res>({
 
   const postMessage = useCallback((message: Req, transfer?: Transferable[]) => {
     if (workerRef.current) {
-      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-      workerRef.current.postMessage(message, transfer!);
+      // Безопасно передаем пустой массив, если transfer не определен.
+      // Это убирает необходимость в non-null assertion (!)
+      workerRef.current.postMessage(message, transfer ?? []);
     } else {
       console.warn('Worker is not ready yet');
     }
