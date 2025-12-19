@@ -21,6 +21,7 @@ import Image from 'next/image';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { filter, map, pipe } from 'remeda';
 
+import { ToolLayout } from '@/app/_components/ToolLayout';
 import { rgbToHex } from '@/lib/core/utils/colors';
 import {
   downloadDataUrl,
@@ -37,7 +38,6 @@ import { Slider } from '@/ui/Slider';
 import { Switch } from '@/ui/Switch';
 
 import { TextureDimensionSlider } from './entities/hardware/TextureDimensionSlider';
-import { ToolLayout } from './tools/ToolLayout';
 
 // ... (CONSTANTS и TYPES без изменений) ...
 const LIMIT_MAX_BROWSER = 16_384;

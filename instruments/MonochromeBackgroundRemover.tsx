@@ -3,6 +3,7 @@
 import Image from 'next/image';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 
+import { ToolLayout } from '@/app/_components/ToolLayout';
 import { useDebounceEffect } from '@/lib/core/hooks/use-debounce-effect';
 import { useObjectUrl } from '@/lib/core/hooks/use-object-url';
 import { useWorker } from '@/lib/core/hooks/use-worker';
@@ -21,8 +22,6 @@ import { ControlLabel, ControlSection } from '@/ui/ControlSection';
 import { FileDropzone, FileDropzonePlaceholder } from '@/ui/FileDropzone';
 import { Slider } from '@/ui/Slider';
 import { ToggleGroup, ToggleGroupItem } from '@/ui/ToggleGroup';
-
-import { ToolLayout } from './tools/ToolLayout';
 
 // --- CONSTANTS ---
 const DEBOUNCE_DELAY = 50;

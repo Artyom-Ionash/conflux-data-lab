@@ -3,6 +3,7 @@
 import ignore from 'ignore';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 
+import { ToolLayout } from '@/app/_components/ToolLayout';
 // --- SHARED LOGIC IMPORTS ---
 import {
   CONTEXT_PRESETS,
@@ -25,8 +26,6 @@ import { formatBytes, generateAsciiTree } from '@/lib/modules/file-system/tree-v
 // --- UI COMPONENTS ---
 import { Card } from '@/ui/Card';
 import { Switch } from '@/ui/Switch';
-
-import { ToolLayout } from './tools/ToolLayout';
 
 // --- TYPES ---
 

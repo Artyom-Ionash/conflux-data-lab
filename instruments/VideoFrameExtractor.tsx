@@ -4,6 +4,7 @@ import type { CreateGIFResult } from 'gifshot';
 import gifshot from 'gifshot';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
+import { ToolLayout } from '@/app/_components/ToolLayout';
 import { useDebounceEffect } from '@/lib/core/hooks/use-debounce-effect';
 import { useObjectUrl } from '@/lib/core/hooks/use-object-url';
 import { waitForVideoFrame } from '@/lib/core/utils/media';
@@ -29,7 +30,6 @@ import { Switch } from '@/ui/Switch';
 // --- DOMAIN IMPORTS ---
 import { TextureLimitIndicator } from './entities/hardware/TextureLimitIndicator';
 import { FrameDiffOverlay } from './entities/video/FrameDiffOverlay';
-import { ToolLayout } from './tools/ToolLayout';
 
 // --- CONSTANTS ---
 const DEFAULT_CLIP_DURATION = 0.5; // seconds
