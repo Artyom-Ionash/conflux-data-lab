@@ -27,10 +27,10 @@ const eslintConfig = defineConfig([
           pattern: 'app/(page|layout|loading|error|not-found|tools/**/page).tsx',
           mode: 'file',
         },
-        { type: 'tool', pattern: 'app/components/tools/*', capture: ['toolName'] },
-        { type: 'entity', pattern: 'app/components/entities/*', capture: ['entityName'] },
+        { type: 'tool', pattern: 'components/tools/*', capture: ['toolName'] },
+        { type: 'entity', pattern: 'components/entities/*', capture: ['entityName'] },
        
-        { type: 'ui', pattern: 'app/components/ui/*', mode: 'folder' },
+        { type: 'ui', pattern: 'ui/*', mode: 'folder' },
         { type: 'module', pattern: 'lib/modules/*', mode: 'folder', capture: ['moduleName'] },
         { type: 'core', pattern: ['lib/core/*', 'lib/types/*'], mode: 'folder' },
       ],

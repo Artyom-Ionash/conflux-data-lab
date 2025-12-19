@@ -20,42 +20,30 @@ const ToolLoading = () => (
 // Важно: так как компоненты используют named exports, мы используем .then(mod => mod.Component)
 
 const JsonToCsvConverter = dynamic(
-  () =>
-    import('@/app/components/tools/json-to-csv/JsonToCsvConverter').then(
-      (mod) => mod.JsonToCsvConverter
-    ),
+  () => import('@/components/JsonToCsvConverter').then((mod) => mod.JsonToCsvConverter),
   { loading: ToolLoading }
 );
 
 const VideoFrameExtractor = dynamic(
-  () =>
-    import('@/app/components/tools/video-frame-extractor/VideoFrameExtractor').then(
-      (mod) => mod.VideoFrameExtractor
-    ),
+  () => import('@/components/VideoFrameExtractor').then((mod) => mod.VideoFrameExtractor),
   { loading: ToolLoading }
 );
 
 const VerticalImageAligner = dynamic(
-  () =>
-    import('@/app/components/tools/vertical-aligner/VerticalImageAligner').then(
-      (mod) => mod.VerticalImageAligner
-    ),
+  () => import('@/components/VerticalImageAligner').then((mod) => mod.VerticalImageAligner),
   { loading: ToolLoading }
 );
 
 const MonochromeBackgroundRemover = dynamic(
   () =>
-    import('@/app/components/tools/monochrome-remover/MonochromeBackgroundRemover').then(
+    import('@/components/MonochromeBackgroundRemover').then(
       (mod) => mod.MonochromeBackgroundRemover
     ),
   { loading: ToolLoading }
 );
 
 const ProjectToContext = dynamic(
-  () =>
-    import('@/app/components/tools/project-to-context/ProjectToContext').then(
-      (mod) => mod.ProjectToContext
-    ),
+  () => import('@/components/ProjectToContext').then((mod) => mod.ProjectToContext),
   { loading: ToolLoading }
 );
 

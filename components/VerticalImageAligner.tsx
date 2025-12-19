@@ -36,8 +36,8 @@ import { FileDropzone, FileDropzonePlaceholder } from '@/ui/FileDropzone';
 import { Slider } from '@/ui/Slider';
 import { Switch } from '@/ui/Switch';
 
-import { TextureDimensionSlider } from '../../entities/hardware/TextureDimensionSlider';
-import { ToolLayout } from '../ToolLayout';
+import { TextureDimensionSlider } from './entities/hardware/TextureDimensionSlider';
+import { ToolLayout } from './tools/ToolLayout';
 
 // ... (CONSTANTS и TYPES без изменений) ...
 const LIMIT_MAX_BROWSER = 16_384;

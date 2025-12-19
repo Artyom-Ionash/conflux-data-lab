@@ -12,24 +12,24 @@ import { generateSpriteSheet } from '@/lib/modules/graphics/processing/sprite-ge
 import { TEXTURE_LIMITS } from '@/lib/modules/graphics/standards';
 // --- UI IMPORTS ---
 import { Card } from '@/ui/Card';
+import { MultiScalePreview } from '@/ui/collections/MultiScalePreview';
+import { SpriteFrameList } from '@/ui/collections/SpriteFrameList';
 import { ColorInput } from '@/ui/ColorInput';
 import { ControlLabel, ControlSection } from '@/ui/ControlSection';
 import { FileDropzone, FileDropzonePlaceholder } from '@/ui/FileDropzone';
 import { ImageSequencePlayer } from '@/ui/ImageSequencePlayer';
 import { Modal } from '@/ui/Modal';
 import { NumberStepper } from '@/ui/NumberStepper';
+// --- EXTRACTED COMPONENTS ---
+import { DualHoverPreview } from '@/ui/players/DualHoverPreview';
+import { RangeVideoPlayer } from '@/ui/players/RangeVideoPlayer';
 import { RangeSlider } from '@/ui/RangeSlider';
 import { Switch } from '@/ui/Switch';
 
 // --- DOMAIN IMPORTS ---
-import { TextureLimitIndicator } from '../../entities/hardware/TextureLimitIndicator';
-import { FrameDiffOverlay } from '../../entities/video/analysis/FrameDiffOverlay';
-// --- EXTRACTED COMPONENTS ---
-import { DualHoverPreview } from '../../entities/video/DualHoverPreview';
-import { MultiScalePreview } from '../../entities/video/MultiScalePreview';
-import { RangeVideoPlayer } from '../../entities/video/player/RangeVideoPlayer';
-import { SpriteFrameList } from '../../entities/video/SpriteFrameList';
-import { ToolLayout } from '../ToolLayout';
+import { TextureLimitIndicator } from './entities/hardware/TextureLimitIndicator';
+import { FrameDiffOverlay } from './entities/video/FrameDiffOverlay';
+import { ToolLayout } from './tools/ToolLayout';
 
 // --- CONSTANTS ---
 const DEFAULT_CLIP_DURATION = 0.5; // seconds

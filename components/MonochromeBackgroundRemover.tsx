@@ -22,7 +22,7 @@ import { FileDropzone, FileDropzonePlaceholder } from '@/ui/FileDropzone';
 import { Slider } from '@/ui/Slider';
 import { ToggleGroup, ToggleGroupItem } from '@/ui/ToggleGroup';
 
-import { ToolLayout } from '../ToolLayout';
+import { ToolLayout } from './tools/ToolLayout';
 
 // --- CONSTANTS ---
 const DEBOUNCE_DELAY = 50;

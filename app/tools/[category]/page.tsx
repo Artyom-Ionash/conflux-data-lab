@@ -1,9 +1,8 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 
+import { ToolGrid } from '@/components/tools/ToolGrid';
 import { categoryLabels, toolsByCategory } from '@/lib/modules/tool-registry/config';
-
-import { ToolGrid } from '../../components/tools/ToolGrid';
 
 interface CategoryPageProps {
   params: Promise<{

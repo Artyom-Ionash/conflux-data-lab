@@ -26,7 +26,7 @@ import { formatBytes, generateAsciiTree } from '@/lib/modules/file-system/tree-v
 import { Card } from '@/ui/Card';
 import { Switch } from '@/ui/Switch';
 
-import { ToolLayout } from '../ToolLayout';
+import { ToolLayout } from './tools/ToolLayout';
 
 // --- TYPES ---
 

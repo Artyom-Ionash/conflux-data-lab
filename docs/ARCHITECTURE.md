@@ -6,7 +6,7 @@
 
 Мы используем жесткие правила линтера (`eslint-plugin-boundaries`) для предотвращения запутывания зависимостей.
 
-### 1. UI Library (`app/components/ui`)
+### 1. UI Library (`ui/`)
 
 > _Ранее: primitives_
 
@@ -16,12 +16,12 @@
   - Компоненты **агностичны к бизнесу**: `Canvas` умеет зумить и панорамировать, но не знает, _что_ именно он отображает (видео или картинку).
   - Зависимости: Только `Radix UI`, `Tailwind` и утилиты из `lib/core`.
 
-### 2. Entity Layer (`app/components/entities`)
+### 2. Entity Layer (`components/entities/`)
 
 - **Назначение:** UI-компоненты, привязанные к конкретным бизнес-сущностям (`TextureLimitIndicator`, `RangeVideoPlayer`).
 - **Правила:** Может использовать `ui` и `lib/modules`.
 
-### 3. Feature / Tool Layer (`app/components/tools`)
+### 3. Feature / Tool Layer (`components/tools/`)
 
 - **Назначение:** Полноценные виджеты инструментов. Сборка компонентов и логики в готовое решение.
 - **Правила:** Инструменты должны быть изолированы друг от друга.
@@ -83,7 +83,7 @@
 Добавление инструмента стандартизировано:
 
 1.  **Конфигурация:** Метаданные в `lib/modules/tool-registry/config.ts`.
-2.  **Реализация:** Компонент в `app/components/tools/[tool-id]/`.
+2.  **Реализация:** Компонент в `components/tools/[tool-id]/`.
 3.  **Регистрация:** Lazy-loading через `dynamic import` в `lib/modules/tool-registry/loader.tsx`.
 
 ---
