@@ -6,8 +6,6 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import { useDebounceEffect } from '@/lib/core/hooks/use-debounce-effect';
 import { useObjectUrl } from '@/lib/core/hooks/use-object-url';
-import { waitForVideoFrame } from '@/lib/core/utils/media';
-import { cn } from '@/lib/core/utils/styles';
 import { generateSpriteSheet } from '@/lib/modules/graphics/processing/sprite-generator';
 import { TEXTURE_LIMITS } from '@/lib/modules/graphics/standards';
 import {
@@ -24,6 +22,7 @@ import { ColorInput } from '@/view/ui/ColorInput';
 import { ControlLabel, ControlSection } from '@/view/ui/ControlSection';
 import { FileDropzone, FileDropzonePlaceholder } from '@/view/ui/FileDropzone';
 import { ImageSequencePlayer } from '@/view/ui/ImageSequencePlayer';
+import { cn } from '@/view/ui/infrastructure/standards';
 import { Modal } from '@/view/ui/Modal';
 import { NumberStepper } from '@/view/ui/NumberStepper';
 // --- EXTRACTED COMPONENTS ---

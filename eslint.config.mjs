@@ -12,7 +12,7 @@ const eslintConfig = defineConfig([
 
   globalIgnores(['.next/**', 'out/**', 'build/**', 'next-env.d.ts', 'scripts/**']),
 
-  // 1. БАЗОВЫЕ ПРАВИЛА
+  // 1. БАЗОВЫЕ ПРАВИЛА И ГРАНИЦЫ
   {
     plugins: {
       'simple-import-sort': simpleImportSort,
@@ -30,7 +30,21 @@ const eslintConfig = defineConfig([
         { type: 'tool', pattern: 'view/tools/*.tsx', mode: 'file', capture: ['toolName'] },
         { type: 'entity', pattern: 'view/tools/*/*.tsx', mode: 'file', capture: ['entityName'] },
         { type: 'app-component', pattern: 'view/(catalog|shell)/*', mode: 'folder' },
-        { type: 'ui', pattern: 'view/ui/*', mode: 'folder' },
+        
+        // --- ПЕРИМЕТР UI ---
+        { 
+          type: 'ui-infrastructure', 
+          pattern: 'view/ui/infrastructure/*', 
+          mode: 'folder' 
+        },
+        { 
+          type: 'ui-component', 
+          pattern: 'view/ui/*.tsx', 
+          mode: 'file', 
+          capture: ['componentName'] 
+        },
+        // --- --- --- --- ---
+
         { type: 'module', pattern: 'lib/modules/*', mode: 'folder', capture: ['moduleName'] },
         { type: 'core', pattern: ['lib/core/*', 'lib/types/*'], mode: 'folder' },
       ],
@@ -42,7 +56,6 @@ const eslintConfig = defineConfig([
       'no-console': ['warn', { allow: ['warn', 'error'] }],
       'unicorn/no-null': 'off',
       'unicorn/filename-case': 'off',
-      
       'react-hooks/exhaustive-deps': 'error',
 
       'boundaries/element-types': [
@@ -52,19 +65,37 @@ const eslintConfig = defineConfig([
           rules: [
             {
               from: 'core',
-              disallow: ['module', 'ui', 'entity', 'tool', 'app-layer'],
-              message: '❌ Core (lib/core, lib/types) must not depend on upper layers',
+              disallow: ['module', 'ui-component', 'ui-infrastructure', 'entity', 'tool', 'app-layer'],
+              message: '❌ Core must not depend on upper layers',
             },
             {
               from: 'module',
-              disallow: ['ui', 'entity', 'tool', 'app-layer'],
-              message: '❌ Modules (lib/modules) must not depend on UI components',
+              disallow: ['ui-component', 'ui-infrastructure', 'entity', 'tool', 'app-layer'],
+              message: '❌ Modules must not depend on UI or App layers',
+            },
+
+            // --- ПРАВИЛА ИЗОЛЯЦИИ UI ---
+            {
+              from: 'ui-component',
+              disallow: ['core', 'module', 'entity', 'tool', 'app-layer'],
+              message: '❌ UI Component must be a stand-alone crystal. Imports from /lib or /app are forbidden.',
             },
             {
-              from: 'ui',
-              disallow: ['module', 'entity', 'tool', 'app-layer'],
-              message: '❌ UI Library must not depend on Business Logic or Entities',
+              from: 'ui-component',
+              // Запрещаем импорт других компонентов UI (каждый файл сам по себе)
+              disallow: [['ui-component', { componentName: '!${from.componentName}' }]],
+              // Но разрешаем импорт своей внутренней инфраструктуры
+              allow: ['ui-infrastructure'],
+              message: '❌ UI Components cannot depend on each other. Use slots or infrastructure.',
             },
+            {
+              from: 'ui-infrastructure',
+              // Инфраструктура UI не может зависеть от логики проекта
+              disallow: ['ui-component', 'core', 'module', 'entity', 'tool', 'app-layer'],
+              message: '❌ UI Infrastructure must be pure and depend only on third-party packages.',
+            },
+            // --- --- --- --- --- ---
+
             {
               from: 'entity',
               disallow: ['tool', 'app-layer'],
@@ -96,11 +127,7 @@ const eslintConfig = defineConfig([
         { prefer: 'type-imports', fixStyle: 'separate-type-imports' },
       ],
       '@typescript-eslint/no-explicit-any': 'error',
-      
-      // SAFETY NET: Запрещаем non-null assertion (!) глобально.
-      // Код должен быть безопасным по построению.
       '@typescript-eslint/no-non-null-assertion': 'error',
-      
       '@typescript-eslint/no-floating-promises': 'error',
       '@typescript-eslint/await-thenable': 'error',
     },

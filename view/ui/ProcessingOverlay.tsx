@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 
-import { cn } from '@/lib/core/utils/styles';
+import { cn } from './infrastructure/standards';
 
 interface ProcessingOverlayProps {
   isVisible: boolean;

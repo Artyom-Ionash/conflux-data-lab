@@ -3,7 +3,7 @@
 import type { ReactNode } from 'react';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 
-import { cn } from '@/lib/core/utils/styles';
+import { cn } from './infrastructure/standards';
 
 // --- Helper: Validate File Type ---
 const isFileAccepted = (file: File, accept: string): boolean => {

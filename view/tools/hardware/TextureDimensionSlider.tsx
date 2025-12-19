@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 
-import { cn } from '@/lib/core/utils/styles'; // NEW
 import {
   analyzeTextureSize,
   getNearestPoT,
@@ -9,6 +8,7 @@ import {
   TEXTURE_LIMITS,
   TEXTURE_ZONES,
 } from '@/lib/modules/graphics/standards';
+import { cn } from '@/view/ui/infrastructure/standards';
 
 interface TextureDimensionSliderProps {
   label: string;

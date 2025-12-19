@@ -5,7 +5,7 @@ import { cva, type VariantProps } from 'class-variance-authority';
 import type { ReactNode } from 'react';
 import React from 'react';
 
-import { cn } from '@/lib/core/utils/styles';
+import { cn } from './infrastructure/standards';
 
 // --- ОПРЕДЕЛЕНИЕ СТИЛЕЙ ---
 

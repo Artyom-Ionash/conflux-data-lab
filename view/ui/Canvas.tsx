@@ -11,10 +11,12 @@ import React, {
   useState,
 } from 'react';
 
-import { useElementSize } from '@/lib/core/hooks/use-element-size';
-import { cn } from '@/lib/core/utils/styles';
+import { cn } from '@/view/ui/infrastructure/standards';
+import { useElementSize } from '@/view/ui/infrastructure/use-element-size';
 
+// eslint-disable-next-line boundaries/element-types
 import { ColorInput } from './ColorInput';
+// eslint-disable-next-line boundaries/element-types
 import { ProcessingOverlay } from './ProcessingOverlay';
 
 // --- CONFIGURATION CONSTANTS ---

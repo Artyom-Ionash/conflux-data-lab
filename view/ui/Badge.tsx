@@ -1,7 +1,7 @@
 import { cva, type VariantProps } from 'class-variance-authority';
 import React from 'react';
 
-import { cn } from '@/lib/core/utils/styles';
+import { cn } from './infrastructure/standards';
 
 // 1. Описываем стили декларативно.
 // CVA автоматически генерирует типы для вариантов.

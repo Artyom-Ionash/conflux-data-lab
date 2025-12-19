@@ -23,6 +23,12 @@
 
 Выделение `lib/modules/viewport` и `lib/modules/playback`.
 
+### 3. **UI Isolation Violation (Canvas.tsx):**
+
+    - **Issue:** `Canvas.tsx` нарушает правило изоляции кристаллов, импортируя `ColorInput` и `ProcessingOverlay`.
+    - **Current Workaround:** Использованы заглушки `eslint-disable`.
+    - **Goal:** Вынести "умную" логику (тулбар, тему, оверлей) из `Canvas` в доменный слой (`view/tools/shared/WorkbenchCanvas.tsx`) или передать через `slots`.
+
 ## 🟡 Средний приоритет (DX & Stability)
 
 - **Web Worker optimization:** Вынос генерации GIF в воркер.

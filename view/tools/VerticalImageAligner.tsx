@@ -29,11 +29,11 @@ import {
   loadImage,
   revokeObjectURLSafely,
 } from '@/lib/core/utils/media';
-import { cn } from '@/lib/core/utils/styles';
 import type { CanvasRef } from '@/view/ui/Canvas';
 import { Canvas } from '@/view/ui/Canvas';
 import { ControlLabel, ControlSection } from '@/view/ui/ControlSection';
 import { FileDropzone, FileDropzonePlaceholder } from '@/view/ui/FileDropzone';
+import { cn } from '@/view/ui/infrastructure/standards';
 import { Slider } from '@/view/ui/Slider';
 import { Switch } from '@/view/ui/Switch';
 import { Workbench } from '@/view/ui/Workbench';
