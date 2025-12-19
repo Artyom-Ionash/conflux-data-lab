@@ -24,9 +24,9 @@ import {
 import { isTextFile, LANGUAGE_MAP } from '@/lib/modules/file-system/file-utils';
 import { formatBytes, generateAsciiTree } from '@/lib/modules/file-system/tree-view';
 // --- UI COMPONENTS ---
-import { Card } from '@/ui/Card';
-import { Switch } from '@/ui/Switch';
-import { Workbench } from '@/ui/Workbench'; // NEW
+import { Card } from '@/view/ui/Card';
+import { Switch } from '@/view/ui/Switch';
+import { Workbench } from '@/view/ui/Workbench'; // NEW
 
 // ... (TYPES и HELPERS без изменений)
 interface FileNode {

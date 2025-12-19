@@ -15,14 +15,14 @@ import type {
   WorkerPayload,
   WorkerResponse,
 } from '@/lib/modules/graphics/processing/processor.worker';
-import type { CanvasRef } from '@/ui/Canvas';
-import { Canvas } from '@/ui/Canvas';
-import { ColorInput } from '@/ui/ColorInput';
-import { ControlLabel, ControlSection } from '@/ui/ControlSection';
-import { FileDropzone, FileDropzonePlaceholder } from '@/ui/FileDropzone';
-import { Slider } from '@/ui/Slider';
-import { ToggleGroup, ToggleGroupItem } from '@/ui/ToggleGroup';
-import { Workbench } from '@/ui/Workbench'; // Обновленный импорт
+import type { CanvasRef } from '@/view/ui/Canvas';
+import { Canvas } from '@/view/ui/Canvas';
+import { ColorInput } from '@/view/ui/ColorInput';
+import { ControlLabel, ControlSection } from '@/view/ui/ControlSection';
+import { FileDropzone, FileDropzonePlaceholder } from '@/view/ui/FileDropzone';
+import { Slider } from '@/view/ui/Slider';
+import { ToggleGroup, ToggleGroupItem } from '@/view/ui/ToggleGroup';
+import { Workbench } from '@/view/ui/Workbench'; // Обновленный импорт
 
 // --- CONSTANTS ---
 // ... (Константы остаются без изменений)

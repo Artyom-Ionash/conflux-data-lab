@@ -30,15 +30,15 @@ import {
   revokeObjectURLSafely,
 } from '@/lib/core/utils/media';
 import { cn } from '@/lib/core/utils/styles';
-import type { CanvasRef } from '@/ui/Canvas';
-import { Canvas } from '@/ui/Canvas';
-import { ControlLabel, ControlSection } from '@/ui/ControlSection';
-import { FileDropzone, FileDropzonePlaceholder } from '@/ui/FileDropzone';
-import { Slider } from '@/ui/Slider';
-import { Switch } from '@/ui/Switch';
-import { Workbench } from '@/ui/Workbench';
+import type { CanvasRef } from '@/view/ui/Canvas';
+import { Canvas } from '@/view/ui/Canvas';
+import { ControlLabel, ControlSection } from '@/view/ui/ControlSection';
+import { FileDropzone, FileDropzonePlaceholder } from '@/view/ui/FileDropzone';
+import { Slider } from '@/view/ui/Slider';
+import { Switch } from '@/view/ui/Switch';
+import { Workbench } from '@/view/ui/Workbench';
 
-import { TextureDimensionSlider } from './entities/hardware/TextureDimensionSlider';
+import { TextureDimensionSlider } from './hardware/TextureDimensionSlider';
 
 // ... (CONSTANTS и TYPES без изменений) ...
 const LIMIT_MAX_BROWSER = 16_384;

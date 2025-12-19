@@ -6,7 +6,7 @@ import {
   TEXTURE_LIMITS,
   TEXTURE_ZONES,
 } from '@/lib/modules/graphics/standards';
-import { ZoneIndicator } from '@/ui/ZoneIndicator';
+import { ZoneIndicator } from '@/view/ui/ZoneIndicator';
 
 interface TextureLimitIndicatorProps {
   value: number;

@@ -11,25 +11,25 @@ import { cn } from '@/lib/core/utils/styles';
 import { generateSpriteSheet } from '@/lib/modules/graphics/processing/sprite-generator';
 import { TEXTURE_LIMITS } from '@/lib/modules/graphics/standards';
 // --- UI IMPORTS ---
-import { Card } from '@/ui/Card';
-import { MultiScalePreview } from '@/ui/collections/MultiScalePreview';
-import { SpriteFrameList } from '@/ui/collections/SpriteFrameList';
-import { ColorInput } from '@/ui/ColorInput';
-import { ControlLabel, ControlSection } from '@/ui/ControlSection';
-import { FileDropzone, FileDropzonePlaceholder } from '@/ui/FileDropzone';
-import { ImageSequencePlayer } from '@/ui/ImageSequencePlayer';
-import { Modal } from '@/ui/Modal';
-import { NumberStepper } from '@/ui/NumberStepper';
+import { Card } from '@/view/ui/Card';
+import { MultiScalePreview } from '@/view/ui/collections/MultiScalePreview';
+import { SpriteFrameList } from '@/view/ui/collections/SpriteFrameList';
+import { ColorInput } from '@/view/ui/ColorInput';
+import { ControlLabel, ControlSection } from '@/view/ui/ControlSection';
+import { FileDropzone, FileDropzonePlaceholder } from '@/view/ui/FileDropzone';
+import { ImageSequencePlayer } from '@/view/ui/ImageSequencePlayer';
+import { Modal } from '@/view/ui/Modal';
+import { NumberStepper } from '@/view/ui/NumberStepper';
 // --- EXTRACTED COMPONENTS ---
-import { DualHoverPreview } from '@/ui/players/DualHoverPreview';
-import { RangeVideoPlayer } from '@/ui/players/RangeVideoPlayer';
-import { RangeSlider } from '@/ui/RangeSlider';
-import { Switch } from '@/ui/Switch';
-import { Workbench } from '@/ui/Workbench';
+import { DualHoverPreview } from '@/view/ui/players/DualHoverPreview';
+import { RangeVideoPlayer } from '@/view/ui/players/RangeVideoPlayer';
+import { RangeSlider } from '@/view/ui/RangeSlider';
+import { Switch } from '@/view/ui/Switch';
+import { Workbench } from '@/view/ui/Workbench';
 
 // --- DOMAIN IMPORTS ---
-import { TextureLimitIndicator } from './entities/hardware/TextureLimitIndicator';
-import { FrameDiffOverlay } from './entities/video/FrameDiffOverlay';
+import { TextureLimitIndicator } from './hardware/TextureLimitIndicator';
+import { FrameDiffOverlay } from './video/FrameDiffOverlay';
 
 // --- CONSTANTS ---
 const DEFAULT_CLIP_DURATION = 0.5; // seconds

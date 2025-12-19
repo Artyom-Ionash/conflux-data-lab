@@ -2,9 +2,9 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 
-import { getToolComponent } from '@/app/_components/registry/tool-loader';
 import { categoryLabels, getToolById } from '@/lib/core/registry/config';
-import { Badge } from '@/ui/Badge';
+import { getToolComponent } from '@/view/shell/registry/tool-loader';
+import { Badge } from '@/view/ui/Badge';
 
 interface ToolPageProps {
   params: Promise<{
