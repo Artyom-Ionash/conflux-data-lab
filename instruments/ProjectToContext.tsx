@@ -1,9 +1,9 @@
 'use client';
 
 import ignore from 'ignore';
+import Link from 'next/link';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 
-import { ToolLayout } from '@/app/_components/ToolLayout';
 // --- SHARED LOGIC IMPORTS ---
 import {
   CONTEXT_PRESETS,
@@ -26,9 +26,9 @@ import { formatBytes, generateAsciiTree } from '@/lib/modules/file-system/tree-v
 // --- UI COMPONENTS ---
 import { Card } from '@/ui/Card';
 import { Switch } from '@/ui/Switch';
+import { Workbench } from '@/ui/Workbench'; // NEW
 
-// --- TYPES ---
-
+// ... (TYPES и HELPERS без изменений)
 interface FileNode {
   path: string;
   name: string;
@@ -52,8 +52,6 @@ interface ProjectStats {
   topFiles: { path: string; size: number; tokens: number }[];
 }
 
-// --- HELPERS ---
-
 const readFileAsText = (file: File): Promise<string> => {
   return file.text();
 };
@@ -61,6 +59,7 @@ const readFileAsText = (file: File): Promise<string> => {
 // --- COMPONENT ---
 
 export function ProjectToContext() {
+  // ... (Логика и хуки без изменений) ...
   const [selectedPreset, setSelectedPreset] = useState<PresetKey>('godot');
   const [customExtensions, setCustomExtensions] = useState<string>(
     CONTEXT_PRESETS.godot.textExtensions.join(', ')
@@ -78,8 +77,6 @@ export function ProjectToContext() {
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // --- HANDLERS ---
-
   const handlePresetChange = (key: PresetKey) => {
     setSelectedPreset(key);
     setCustomExtensions(CONTEXT_PRESETS[key].textExtensions.join(', '));
@@ -89,8 +86,6 @@ export function ProjectToContext() {
   const handleDirectorySelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files) return;
     const fileList = [...e.target.files];
-
-    // 1. Поиск .gitignore
     const gitIgnoreFile = fileList.find((f) => f.name === '.gitignore');
     let gitIgnoreContent = '';
 
@@ -102,7 +97,6 @@ export function ProjectToContext() {
       }
     }
 
-    // 2. Определение пресета
     let detectedPreset: PresetKey | null = null;
     const fileNames = fileList.map((f) => f.name);
 
@@ -125,15 +119,9 @@ export function ProjectToContext() {
       setCustomIgnore('');
     }
 
-    // 3. Настройка Ignore Manager
     const ig = ignore();
-
     ig.add(activePreset.hardIgnore);
-
-    if (gitIgnoreContent) {
-      ig.add(gitIgnoreContent);
-    }
-
+    if (gitIgnoreContent) ig.add(gitIgnoreContent);
     if (customIgnore.trim()) {
       ig.add(
         customIgnore
@@ -142,19 +130,13 @@ export function ProjectToContext() {
           .filter((s) => s.length > 0)
       );
     }
-
-    // Г) Принудительное включение (Un-ignore)
-    // 1. Обязательные файлы репо
     if (MANDATORY_REPO_FILES.length > 0) {
       ig.add(MANDATORY_REPO_FILES.map((f) => `!${f}`));
     }
-    // 2. Локальный контекст
     ig.add(`!${LOCAL_CONTEXT_FOLDER}`);
     ig.add(`!${LOCAL_CONTEXT_FOLDER}/**`);
 
     const extList = activePreset.textExtensions;
-
-    // 4. Фильтрация
     const nodes: FileNode[] = [];
 
     fileList.forEach((f) => {
@@ -165,19 +147,14 @@ export function ProjectToContext() {
           path = parts.slice(1).join('/');
         }
       }
-
-      // ПРОВЕРКА ЧЕРЕЗ ПАКЕТ IGNORE
       if (ig.ignores(path)) return;
-
-      // Является ли файл частью локального контекста?
       const isLocalContext = path.startsWith(LOCAL_CONTEXT_FOLDER + '/');
-
       nodes.push({
         path: path,
         name: f.name,
         size: f.size,
         file: f,
-        isText: isTextFile(f.name, extList) || isLocalContext, // Локальный контекст всегда текст
+        isText: isTextFile(f.name, extList) || isLocalContext,
       });
     });
 
@@ -190,8 +167,6 @@ export function ProjectToContext() {
     setProcessing(true);
     setProgress(0);
     setResult(null);
-
-    // Сортировка с учетом новых приоритетов в calculateFileScore
     const sortedFiles = [...files].sort((a, b) => {
       return (
         calculateFileScore(a.name, undefined, a.path) -
@@ -212,34 +187,27 @@ export function ProjectToContext() {
         processedCount++;
         continue;
       }
-
       try {
         const originalText = await readFileAsText(node.file);
         const ext = node.name.split('.').pop() || 'txt';
-
         const rawFile: RawFile = {
           name: node.name,
           path: node.path,
           content: originalText,
           extension: ext,
         };
-
         const contextNode = processFileToContext(rawFile);
-
         totalOriginalBytes += contextNode.originalSize;
         totalCleanedBytes += contextNode.cleanedSize;
-
         let reportLang = LANGUAGE_MAP[contextNode.langTag] || contextNode.langTag;
         if (node.name.includes('config') || node.name.startsWith('.')) reportLang = 'config/meta';
         composition[reportLang] = (composition[reportLang] || 0) + 1;
-
         filesForGenerator.push({
           path: contextNode.path,
           content: contextNode.content,
           langTag: contextNode.langTag,
           size: contextNode.cleanedSize,
         });
-
         processedFileStats.push({
           path: contextNode.path,
           size: contextNode.cleanedSize,
@@ -248,7 +216,6 @@ export function ProjectToContext() {
       } catch (e) {
         console.error(`Error processing ${node.path}`, e);
       }
-
       processedCount++;
       setProgress(Math.round((processedCount / sortedFiles.length) * 80));
       if (processedCount % 5 === 0) await new Promise((r) => setTimeout(r, 0));
@@ -256,7 +223,6 @@ export function ProjectToContext() {
 
     const treeString = includeTree ? generateAsciiTree(sortedFiles) : '';
     const { output, stats: coreStats } = generateContextOutput(filesForGenerator, treeString);
-
     const savingsBytes = totalOriginalBytes - totalCleanedBytes;
     const savingsPercent = totalOriginalBytes > 0 ? (savingsBytes / totalOriginalBytes) * 100 : 0;
     const topFiles = processedFileStats.sort((a, b) => b.size - a.size).slice(0, 5);
@@ -272,7 +238,6 @@ export function ProjectToContext() {
       composition,
       topFiles,
     });
-
     setResult(output);
     setLastGeneratedAt(new Date());
     setProgress(100);
@@ -305,21 +270,8 @@ export function ProjectToContext() {
         throw new Error('Clipboard API unavailable');
       }
     } catch {
-      try {
-        const textArea = document.createElement('textarea');
-        textArea.value = result;
-        textArea.style.position = 'fixed';
-        textArea.style.left = '-9999px';
-        document.body.appendChild(textArea);
-        textArea.focus();
-        textArea.select();
-        document.execCommand('copy');
-        document.body.removeChild(textArea);
-      } catch (fallbackErr) {
-        console.error('Copy failed', fallbackErr);
-        alert('Не удалось скопировать.');
-        return;
-      }
+      alert('Не удалось скопировать.');
+      return;
     }
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
@@ -335,6 +287,29 @@ export function ProjectToContext() {
 
   const sidebar = (
     <div className="flex flex-col gap-6 pb-4">
+      {/* Header */}
+      <div>
+        <Link
+          href="/"
+          className="mb-4 inline-flex items-center gap-2 text-sm font-medium text-zinc-500 transition-colors hover:text-zinc-900 dark:hover:text-zinc-200"
+        >
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <path d="M19 12H5M12 19l-7-7 7-7" />
+          </svg>{' '}
+          На главную
+        </Link>
+        <h2 className="text-xl font-bold">Project to Context</h2>
+      </div>
+
       <div className="flex flex-col gap-2">
         <label className="text-sm font-bold text-zinc-700 dark:text-zinc-300">1. Источник</label>
         <div
@@ -469,60 +444,63 @@ export function ProjectToContext() {
   );
 
   return (
-    <ToolLayout title="Project to LLM Context" sidebar={sidebar}>
-      <div className="relative flex h-full w-full flex-col overflow-hidden bg-zinc-50 p-4 dark:bg-black/20">
-        {result ? (
-          <Card
-            className="flex h-full flex-1 flex-col shadow-sm"
-            title={
-              <div className="flex items-center gap-3">
-                <span>Результат</span>
-                {lastGeneratedAt && (
-                  <span className="rounded bg-zinc-100 px-2 py-0.5 text-[10px] font-normal text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400">
-                    Обновлено: {formatTime(lastGeneratedAt)}
-                  </span>
-                )}
+    <Workbench.Root>
+      <Workbench.Sidebar>{sidebar}</Workbench.Sidebar>
+      <Workbench.Stage>
+        <div className="relative flex h-full w-full flex-col overflow-hidden bg-zinc-50 p-4 dark:bg-black/20">
+          {result ? (
+            <Card
+              className="flex h-full flex-1 flex-col shadow-sm"
+              title={
+                <div className="flex items-center gap-3">
+                  <span>Результат</span>
+                  {lastGeneratedAt && (
+                    <span className="rounded bg-zinc-100 px-2 py-0.5 text-[10px] font-normal text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400">
+                      Обновлено: {formatTime(lastGeneratedAt)}
+                    </span>
+                  )}
+                </div>
+              }
+              contentClassName="p-0 flex-1 overflow-hidden flex flex-col"
+              headerActions={
+                <div className="flex gap-2">
+                  <button
+                    onClick={copyToClipboard}
+                    className={`rounded px-3 py-1.5 text-xs transition-all duration-200 ${
+                      copied
+                        ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300'
+                        : 'bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700'
+                    }`}
+                  >
+                    {copied ? 'Скопировано!' : 'Копировать'}
+                  </button>
+                  <button
+                    onClick={downloadResult}
+                    className="rounded bg-blue-600 px-3 py-1.5 text-xs font-bold text-white shadow-sm hover:bg-blue-700"
+                  >
+                    Скачать .txt
+                  </button>
+                </div>
+              }
+            >
+              <div className="flex-1 overflow-y-auto bg-white p-4 font-mono text-xs leading-relaxed whitespace-pre-wrap text-zinc-700 dark:bg-zinc-950 dark:text-zinc-300">
+                {result}
               </div>
-            }
-            contentClassName="p-0 flex-1 overflow-hidden flex flex-col"
-            headerActions={
-              <div className="flex gap-2">
-                <button
-                  onClick={copyToClipboard}
-                  className={`rounded px-3 py-1.5 text-xs transition-all duration-200 ${
-                    copied
-                      ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300'
-                      : 'bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700'
-                  }`}
-                >
-                  {copied ? 'Скопировано!' : 'Копировать'}
-                </button>
-                <button
-                  onClick={downloadResult}
-                  className="rounded bg-blue-600 px-3 py-1.5 text-xs font-bold text-white shadow-sm hover:bg-blue-700"
-                >
-                  Скачать .txt
-                </button>
+            </Card>
+          ) : (
+            <div className="flex flex-1 flex-col items-center justify-center text-zinc-400">
+              <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-zinc-100 dark:bg-zinc-800">
+                <span className="text-2xl">🤖</span>
               </div>
-            }
-          >
-            <div className="flex-1 overflow-y-auto bg-white p-4 font-mono text-xs leading-relaxed whitespace-pre-wrap text-zinc-700 dark:bg-zinc-950 dark:text-zinc-300">
-              {result}
+              <p>
+                {processing
+                  ? 'Обработка и генерация контекста...'
+                  : 'Генератор контекста для LLM (Ultra Optimized)'}
+              </p>
             </div>
-          </Card>
-        ) : (
-          <div className="flex flex-1 flex-col items-center justify-center text-zinc-400">
-            <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-zinc-100 dark:bg-zinc-800">
-              <span className="text-2xl">🤖</span>
-            </div>
-            <p>
-              {processing
-                ? 'Обработка и генерация контекста...'
-                : 'Генератор контекста для LLM (Ultra Optimized)'}
-            </p>
-          </div>
-        )}
-      </div>
-    </ToolLayout>
+          )}
+        </div>
+      </Workbench.Stage>
+    </Workbench.Root>
   );
 }

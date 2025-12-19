@@ -1,9 +1,9 @@
 'use client';
 
 import Image from 'next/image';
+import Link from 'next/link'; // Добавлен для хедера
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 
-import { ToolLayout } from '@/app/_components/ToolLayout';
 import { useDebounceEffect } from '@/lib/core/hooks/use-debounce-effect';
 import { useObjectUrl } from '@/lib/core/hooks/use-object-url';
 import { useWorker } from '@/lib/core/hooks/use-worker';
@@ -22,8 +22,10 @@ import { ControlLabel, ControlSection } from '@/ui/ControlSection';
 import { FileDropzone, FileDropzonePlaceholder } from '@/ui/FileDropzone';
 import { Slider } from '@/ui/Slider';
 import { ToggleGroup, ToggleGroupItem } from '@/ui/ToggleGroup';
+import { Workbench } from '@/ui/Workbench'; // Обновленный импорт
 
 // --- CONSTANTS ---
+// ... (Константы остаются без изменений)
 const DEBOUNCE_DELAY = 50;
 const VIEW_RESET_DELAY = 50;
 const MOUSE_BUTTON_LEFT = 0;
@@ -45,6 +47,7 @@ const DEFAULT_SETTINGS = {
 };
 
 export function MonochromeBackgroundRemover() {
+  // ... (Вся логика хуков и стейта остается без изменений) ...
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const originalUrl = useObjectUrl(selectedFile);
 
@@ -74,7 +77,6 @@ export function MonochromeBackgroundRemover() {
   const sourceCanvasRef = useRef<HTMLCanvasElement>(null);
   const previewCanvasRef = useRef<HTMLCanvasElement>(null);
 
-  // --- WORKER INTEGRATION ---
   const createWorker = useCallback(
     () =>
       new Worker(new URL('@/lib/modules/graphics/processing/processor.worker.ts', import.meta.url)),
@@ -111,28 +113,22 @@ export function MonochromeBackgroundRemover() {
     onMessage: handleWorkerMessage,
   });
 
-  // --- LOGIC ---
-
   const loadOriginalToCanvas = useCallback(async (url: string) => {
     try {
       const img = await loadImage(url);
-
       setImgDimensions({ w: img.width, h: img.height });
-
       if (sourceCanvasRef.current) {
         sourceCanvasRef.current.width = img.width;
         sourceCanvasRef.current.height = img.height;
         const ctx = sourceCanvasRef.current.getContext('2d', { willReadFrequently: true });
         ctx?.drawImage(img, 0, 0);
       }
-
       if (previewCanvasRef.current) {
         previewCanvasRef.current.width = img.width;
         previewCanvasRef.current.height = img.height;
         const ctx = previewCanvasRef.current.getContext('2d');
         ctx?.drawImage(img, 0, 0);
       }
-
       setTimeout(() => workspaceRef.current?.resetView(img.width, img.height), VIEW_RESET_DELAY);
     } catch (e) {
       console.error(e);
@@ -141,22 +137,15 @@ export function MonochromeBackgroundRemover() {
 
   const processImage = useCallback(() => {
     if (!originalUrl || !sourceCanvasRef.current) return;
-
     const sourceCtx = sourceCanvasRef.current.getContext('2d', { willReadFrequently: true });
     if (!sourceCtx) return;
-
     const width = sourceCanvasRef.current.width;
     const height = sourceCanvasRef.current.height;
-
     const imageData = sourceCtx.getImageData(0, 0, width, height);
-
     const targetRGB = hexToRgb(targetColor);
     const contourRGB = hexToRgb(contourColor);
-
     if (!targetRGB || !contourRGB) return;
-
     setIsProcessing(true);
-
     const payload: WorkerPayload = {
       imageData: imageData.data,
       width,
@@ -174,7 +163,6 @@ export function MonochromeBackgroundRemover() {
         floodPoints: [...floodPoints],
       },
     };
-
     postMessage(payload, [imageData.data.buffer]);
   }, [
     originalUrl,
@@ -189,8 +177,6 @@ export function MonochromeBackgroundRemover() {
     edgePaint,
     postMessage,
   ]);
-
-  // --- EFFECTS ---
 
   useEffect(() => {
     if (originalUrl) {
@@ -220,15 +206,11 @@ export function MonochromeBackgroundRemover() {
     return undefined;
   }, [manualTrigger, processingMode, processImage]);
 
-  // --- EVENT HANDLERS ---
-
   const handleFilesSelected = async (files: File[]) => {
     const file = files[0];
     if (!file) return;
-
     setFloodPoints([]);
     setSelectedFile(file);
-
     try {
       const tempUrl = URL.createObjectURL(file);
       const img = await loadImage(tempUrl);
@@ -261,10 +243,7 @@ export function MonochromeBackgroundRemover() {
     e.stopPropagation();
     e.preventDefault();
     if (e.button !== MOUSE_BUTTON_LEFT) return;
-
     setDraggingPointIndex(index);
-
-    // FIX: Используем instanceof для Type Guard вместо `as HTMLElement`
     if (e.target instanceof HTMLElement) {
       e.target.setPointerCapture(e.pointerId);
     }
@@ -297,10 +276,8 @@ export function MonochromeBackgroundRemover() {
 
   const handleEyedropper = (e: React.MouseEvent) => {
     if (!sourceCanvasRef.current) return;
-
     const coords = getRelativeImageCoords(e.clientX, e.clientY);
     if (!coords) return;
-
     const ctx = sourceCanvasRef.current.getContext('2d', { willReadFrequently: true });
     if (ctx) {
       const p = ctx.getImageData(coords.x, coords.y, 1, 1).data;
@@ -313,8 +290,32 @@ export function MonochromeBackgroundRemover() {
   const handleRunFloodFill = () => setManualTrigger((prev) => prev + 1);
 
   // --- RENDER ---
+
   const sidebarContent = (
     <div className="flex flex-col gap-6 pb-4">
+      {/* Header */}
+      <div>
+        <Link
+          href="/"
+          className="mb-4 inline-flex items-center gap-2 text-sm font-medium text-zinc-500 transition-colors hover:text-zinc-900 dark:hover:text-zinc-200"
+        >
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <path d="M19 12H5M12 19l-7-7 7-7" />
+          </svg>{' '}
+          На главную
+        </Link>
+        <h2 className="text-xl font-bold">MonoRemover</h2>
+      </div>
+
       <div className="space-y-2">
         <ControlLabel>Исходник</ControlLabel>
         <FileDropzone
@@ -483,57 +484,60 @@ export function MonochromeBackgroundRemover() {
   );
 
   return (
-    <ToolLayout title="MonoRemover" sidebar={sidebarContent}>
-      <div
-        className="relative h-full w-full"
-        onPointerMove={handleGlobalPointerMove}
-        onPointerUp={handleGlobalPointerUp}
-      >
-        <Canvas
-          ref={workspaceRef}
-          isLoading={isProcessing}
-          contentWidth={imgDimensions.w}
-          contentHeight={imgDimensions.h}
-          shadowOverlayOpacity={originalUrl ? 0.8 : 0}
-          showTransparencyGrid={true}
-          placeholder={
-            !originalUrl ? (
-              <FileDropzonePlaceholder onUpload={(files) => handleFilesSelected(files)} />
-            ) : null
-          }
+    <Workbench.Root>
+      <Workbench.Sidebar>{sidebarContent}</Workbench.Sidebar>
+      <Workbench.Stage>
+        <div
+          className="relative h-full w-full"
+          onPointerMove={handleGlobalPointerMove}
+          onPointerUp={handleGlobalPointerUp}
         >
-          <canvas ref={sourceCanvasRef} className="hidden" />
-          <canvas
-            ref={previewCanvasRef}
-            className="block select-none"
-            onPointerDown={handleImagePointerDown}
-            style={{
-              width: '100%',
-              height: '100%',
-              imageRendering: 'pixelated',
-              cursor: processingMode === 'flood-clear' ? 'crosshair' : 'default',
-              display: originalUrl ? 'block' : 'none',
-            }}
-          />
-          {processingMode === 'flood-clear' &&
-            floodPoints.map((pt, i) => (
-              <div
-                key={i}
-                onPointerDown={(e) => handlePointPointerDown(e, i)}
-                className={`absolute z-20 cursor-grab hover:brightness-125 active:cursor-grabbing ${draggingPointIndex === i ? 'brightness-150' : ''}`}
-                style={{
-                  left: pt.x,
-                  top: pt.y,
-                  width: '10px',
-                  height: '10px',
-                  transform: 'translate(-50%, -50%) scale(calc(1 / var(--canvas-scale)))',
-                }}
-              >
-                <div className="h-full w-full rounded-full border border-white bg-red-500 shadow-[0_0_2px_rgba(0,0,0,0.8)]" />
-              </div>
-            ))}
-        </Canvas>
-      </div>
-    </ToolLayout>
+          <Canvas
+            ref={workspaceRef}
+            isLoading={isProcessing}
+            contentWidth={imgDimensions.w}
+            contentHeight={imgDimensions.h}
+            shadowOverlayOpacity={originalUrl ? 0.8 : 0}
+            showTransparencyGrid={true}
+            placeholder={
+              !originalUrl ? (
+                <FileDropzonePlaceholder onUpload={(files) => handleFilesSelected(files)} />
+              ) : null
+            }
+          >
+            <canvas ref={sourceCanvasRef} className="hidden" />
+            <canvas
+              ref={previewCanvasRef}
+              className="block select-none"
+              onPointerDown={handleImagePointerDown}
+              style={{
+                width: '100%',
+                height: '100%',
+                imageRendering: 'pixelated',
+                cursor: processingMode === 'flood-clear' ? 'crosshair' : 'default',
+                display: originalUrl ? 'block' : 'none',
+              }}
+            />
+            {processingMode === 'flood-clear' &&
+              floodPoints.map((pt, i) => (
+                <div
+                  key={i}
+                  onPointerDown={(e) => handlePointPointerDown(e, i)}
+                  className={`absolute z-20 cursor-grab hover:brightness-125 active:cursor-grabbing ${draggingPointIndex === i ? 'brightness-150' : ''}`}
+                  style={{
+                    left: pt.x,
+                    top: pt.y,
+                    width: '10px',
+                    height: '10px',
+                    transform: 'translate(-50%, -50%) scale(calc(1 / var(--canvas-scale)))',
+                  }}
+                >
+                  <div className="h-full w-full rounded-full border border-white bg-red-500 shadow-[0_0_2px_rgba(0,0,0,0.8)]" />
+                </div>
+              ))}
+          </Canvas>
+        </div>
+      </Workbench.Stage>
+    </Workbench.Root>
   );
 }

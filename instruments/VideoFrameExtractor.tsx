@@ -1,10 +1,9 @@
 'use client';
-
 import type { CreateGIFResult } from 'gifshot';
 import gifshot from 'gifshot';
+import Link from 'next/link';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
-import { ToolLayout } from '@/app/_components/ToolLayout';
 import { useDebounceEffect } from '@/lib/core/hooks/use-debounce-effect';
 import { useObjectUrl } from '@/lib/core/hooks/use-object-url';
 import { waitForVideoFrame } from '@/lib/core/utils/media';
@@ -26,6 +25,7 @@ import { DualHoverPreview } from '@/ui/players/DualHoverPreview';
 import { RangeVideoPlayer } from '@/ui/players/RangeVideoPlayer';
 import { RangeSlider } from '@/ui/RangeSlider';
 import { Switch } from '@/ui/Switch';
+import { Workbench } from '@/ui/Workbench';
 
 // --- DOMAIN IMPORTS ---
 import { TextureLimitIndicator } from './entities/hardware/TextureLimitIndicator';
@@ -513,6 +513,29 @@ export function VideoFrameExtractor() {
 
   const sidebarContent = (
     <div className="flex flex-col gap-6 pb-4">
+      {/* Navigation Header (Теперь часть контента, а не лейаута) */}
+      <div>
+        <Link
+          href="/"
+          className="mb-4 inline-flex items-center gap-2 text-sm font-medium text-zinc-500 transition-colors hover:text-zinc-900 dark:hover:text-zinc-200"
+        >
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <path d="M19 12H5M12 19l-7-7 7-7" />
+          </svg>{' '}
+          На главную
+        </Link>
+        <h2 className="text-xl font-bold">Видео в Кадры/GIF</h2>
+      </div>
+
       <div className="flex flex-col gap-2">
         <FileDropzone
           onFilesSelected={handleFilesSelected}
@@ -539,344 +562,346 @@ export function VideoFrameExtractor() {
   );
 
   return (
-    <ToolLayout title="Видео в Кадры/GIF" sidebar={sidebarContent}>
-      <div className="relative flex h-full w-full flex-col overflow-hidden bg-zinc-50 dark:bg-black/20">
-        {!videoSrc ? (
-          <div className="flex-1 p-8">
-            <FileDropzonePlaceholder
-              onUpload={handleFilesSelected}
-              multiple={false}
-              accept="video/*"
-              title="Перетащите видеофайл"
-            />
-          </div>
-        ) : (
-          <div className="flex-1 space-y-4 overflow-y-auto p-4">
-            {/* CONTROLS CARD */}
-            <Card className="relative z-20 overflow-visible shadow-sm" contentClassName="p-4">
-              <div className="flex flex-col gap-4">
-                <div className="space-y-4">
-                  {/* Top Bar: Stepper & Time Indicator */}
-                  <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3">
-                    <div className="flex flex-wrap items-center gap-6">
-                      <ControlLabel>Диапазон</ControlLabel>
-                      <div className="hidden h-6 w-px bg-zinc-200 sm:block dark:bg-zinc-700"></div>
-                      <NumberStepper
-                        label="Шаг (сек)"
-                        value={extractionParams.frameStep}
-                        onChange={(v) => setExtractionParams((p) => ({ ...p, frameStep: v }))}
-                        step={0.05}
-                        min={0.05}
-                        max={10}
-                      />
+    <Workbench.Root>
+      <Workbench.Sidebar>{sidebarContent}</Workbench.Sidebar>
+      <Workbench.Stage>
+        <div className="relative flex h-full w-full flex-col overflow-hidden bg-zinc-50 dark:bg-black/20">
+          {!videoSrc ? (
+            <div className="flex-1 p-8">
+              <FileDropzonePlaceholder
+                onUpload={handleFilesSelected}
+                multiple={false}
+                accept="video/*"
+                title="Перетащите видеофайл"
+              />
+            </div>
+          ) : (
+            <div className="flex-1 space-y-4 overflow-y-auto p-4">
+              {/* CONTROLS CARD */}
+              <Card className="relative z-20 overflow-visible shadow-sm" contentClassName="p-4">
+                {/* ... Содержимое карточки ... (без изменений) */}
+                <div className="flex flex-col gap-4">
+                  <div className="space-y-4">
+                    {/* Top Bar */}
+                    <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3">
+                      <div className="flex flex-wrap items-center gap-6">
+                        <ControlLabel>Диапазон</ControlLabel>
+                        <div className="hidden h-6 w-px bg-zinc-200 sm:block dark:bg-zinc-700"></div>
+                        <NumberStepper
+                          label="Шаг (сек)"
+                          value={extractionParams.frameStep}
+                          onChange={(v) => setExtractionParams((p) => ({ ...p, frameStep: v }))}
+                          step={0.05}
+                          min={0.05}
+                          max={10}
+                        />
+                      </div>
+                      <div className="ml-auto flex items-center gap-2 rounded bg-black/80 px-3 py-1.5 font-mono text-xs font-bold text-white shadow-sm">
+                        <span>{extractionParams.startTime.toFixed(2)}s</span>
+                        <span className="opacity-50">→</span>
+                        <span>{effectiveEnd.toFixed(2)}s</span>
+                      </div>
                     </div>
-                    <div className="ml-auto flex items-center gap-2 rounded bg-black/80 px-3 py-1.5 font-mono text-xs font-bold text-white shadow-sm">
-                      <span>{extractionParams.startTime.toFixed(2)}s</span>
-                      <span className="opacity-50">→</span>
-                      <span>{effectiveEnd.toFixed(2)}s</span>
+
+                    {/* Range Slider */}
+                    <div
+                      ref={sliderContainerRef}
+                      className="group relative touch-none py-2"
+                      onMouseMove={handleSliderHover}
+                      onMouseLeave={() => !isDragging && setHoverPreview(null)}
+                      onPointerDown={() => setIsDragging(true)}
+                      onPointerUp={() => {
+                        setIsDragging(false);
+                        setHoverPreview(null);
+                      }}
+                    >
+                      <RangeSlider
+                        min={0}
+                        max={videoDuration ?? 0}
+                        step={0.01}
+                        value={[extractionParams.startTime, effectiveEnd]}
+                        onValueChange={handleValueChange}
+                        minStepsBetweenThumbs={0.1}
+                      />
+
+                      {hoverPreview && (
+                        <DualHoverPreview
+                          activeThumb={hoverPreview.activeThumb}
+                          hoverTime={hoverPreview.time}
+                          startTime={extractionParams.startTime}
+                          endTime={effectiveEnd}
+                          videoSrc={videoSrc}
+                          videoRef={hoverVideoRef as React.RefObject<HTMLVideoElement>}
+                          previewStartImage={previewFrames.start}
+                          previewEndImage={previewFrames.end}
+                          aspectRatioStyle={aspectRatioStyle}
+                        />
+                      )}
                     </div>
                   </div>
+                  {error && <div className="text-right text-xs text-red-600">{error}</div>}
+                </div>
+              </Card>
 
-                  {/* Range Slider with Dual Preview */}
-                  <div
-                    ref={sliderContainerRef}
-                    className="group relative touch-none py-2"
-                    onMouseMove={handleSliderHover}
-                    onMouseLeave={() => !isDragging && setHoverPreview(null)}
-                    onPointerDown={() => setIsDragging(true)}
-                    onPointerUp={() => {
-                      setIsDragging(false);
-                      setHoverPreview(null);
-                    }}
-                  >
-                    <RangeSlider
-                      min={0}
-                      max={videoDuration ?? 0}
-                      step={0.01}
-                      value={[extractionParams.startTime, effectiveEnd]}
-                      onValueChange={handleValueChange}
-                      minStepsBetweenThumbs={0.1}
+              {/* PREVIEW GRID */}
+              <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+                {/* ... Содержимое грида ... (без изменений) */}
+                <Card
+                  className="flex flex-col overflow-hidden shadow-sm"
+                  title={<ControlLabel>Исходное видео</ControlLabel>}
+                  contentClassName="p-0"
+                >
+                  <div className="relative w-full bg-black" style={aspectRatioStyle}>
+                    <RangeVideoPlayer
+                      src={videoSrc}
+                      startTime={extractionParams.startTime}
+                      endTime={effectiveEnd}
+                      className="absolute inset-0"
                     />
+                  </div>
+                </Card>
 
-                    {hoverPreview && (
-                      <DualHoverPreview
-                        activeThumb={hoverPreview.activeThumb}
-                        hoverTime={hoverPreview.time}
-                        startTime={extractionParams.startTime}
-                        endTime={effectiveEnd}
-                        videoSrc={videoSrc}
-                        videoRef={hoverVideoRef as React.RefObject<HTMLVideoElement>}
-                        previewStartImage={previewFrames.start}
-                        previewEndImage={previewFrames.end}
-                        aspectRatioStyle={aspectRatioStyle}
+                {/* 2. Diff Overlay */}
+                <Card
+                  className="flex flex-col overflow-hidden shadow-sm"
+                  title={<ControlLabel>Разница</ControlLabel>}
+                  headerActions={
+                    diffDataUrl ? (
+                      <button
+                        onClick={() => {
+                          const a = document.createElement('a');
+                          a.href = diffDataUrl;
+                          a.download = 'diff.png';
+                          a.click();
+                        }}
+                        className="text-xs font-medium text-blue-600 hover:underline"
+                      >
+                        Скачать
+                      </button>
+                    ) : undefined
+                  }
+                  contentClassName="p-0"
+                >
+                  <div
+                    className="relative w-full bg-zinc-100 dark:bg-zinc-950"
+                    style={aspectRatioStyle}
+                  >
+                    <div className="absolute inset-0">
+                      <FrameDiffOverlay
+                        image1={previewFrames.start}
+                        image2={previewFrames.end}
+                        isProcessing={isPreviewing}
+                        onDataGenerated={setDiffDataUrl}
                       />
+                    </div>
+                  </div>
+                </Card>
+
+                {/* 3. Sprite / GIF Player */}
+                <Card
+                  className="flex flex-col overflow-hidden shadow-sm"
+                  title={
+                    <div className="flex items-center gap-4">
+                      <ControlLabel>Спрайт</ControlLabel>
+                      <NumberStepper
+                        label="Скорость %"
+                        value={Math.round(
+                          (gifParams.fps /
+                            (extractionParams.frameStep > 0
+                              ? Math.round(1 / extractionParams.frameStep)
+                              : 10)) *
+                            100
+                        )}
+                        onChange={(val) => {
+                          const base =
+                            extractionParams.frameStep > 0
+                              ? Math.round(1 / extractionParams.frameStep)
+                              : 10;
+                          setGifParams((p) => ({
+                            ...p,
+                            fps: Math.max(1, Math.round(base * (val / 100))),
+                          }));
+                        }}
+                        min={10}
+                        max={500}
+                        step={10}
+                      />
+                      <NumberStepper
+                        label="FPS"
+                        value={gifParams.fps}
+                        onChange={() => {}}
+                        disabled={true}
+                      />
+                    </div>
+                  }
+                  headerActions={
+                    frames.length > 0 && !status.isProcessing ? (
+                      <button
+                        onClick={generateAndDownloadGif}
+                        disabled={status.isProcessing}
+                        className={cn(
+                          'text-xs font-medium text-blue-600 hover:underline disabled:opacity-50',
+                          status.isProcessing && 'cursor-not-allowed opacity-50'
+                        )}
+                      >
+                        {status.currentStep === 'generating' ? 'Кодирование...' : 'Скачать GIF'}
+                      </button>
+                    ) : undefined
+                  }
+                  contentClassName="p-0"
+                >
+                  <div
+                    className="group relative w-full cursor-pointer bg-zinc-100 dark:bg-zinc-950"
+                    style={aspectRatioStyle}
+                    onClick={() => setIsModalOpen(true)}
+                    title="Нажмите, чтобы открыть предпросмотр масштабов"
+                  >
+                    {frames.length > 0 || status.isProcessing ? (
+                      <>
+                        <ImageSequencePlayer
+                          images={frames.map((f) => f.dataUrl)}
+                          fps={gifParams.fps}
+                          width={videoDimensions?.width || 300}
+                          height={videoDimensions?.height || 200}
+                          onDrawOverlay={handleDrawOverlay}
+                        />
+
+                        <div className="absolute inset-0 flex items-center justify-center bg-black/0 transition-colors group-hover:bg-black/10">
+                          <div className="scale-95 transform rounded-full bg-black/70 px-3 py-1.5 text-xs font-bold text-white opacity-0 backdrop-blur-sm transition-opacity group-hover:scale-100 group-hover:opacity-100">
+                            Открыть масштабы ⤢
+                          </div>
+                        </div>
+                      </>
+                    ) : (
+                      <div className="absolute inset-0 flex items-center justify-center text-xs text-zinc-400">
+                        Нет кадров
+                      </div>
                     )}
                   </div>
-                </div>
-                {error && <div className="text-right text-xs text-red-600">{error}</div>}
+                </Card>
               </div>
-            </Card>
 
-            {/* PREVIEW GRID */}
-            <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-              {/* 1. Source Video */}
-              <Card
-                className="flex flex-col overflow-hidden shadow-sm"
-                title={<ControlLabel>Исходное видео</ControlLabel>}
-                contentClassName="p-0"
-              >
-                <div className="relative w-full bg-black" style={aspectRatioStyle}>
-                  <RangeVideoPlayer
-                    src={videoSrc}
-                    startTime={extractionParams.startTime}
-                    endTime={effectiveEnd}
-                    className="absolute inset-0"
-                  />
-                </div>
-              </Card>
-
-              {/* 2. Diff Overlay */}
-              <Card
-                className="flex flex-col overflow-hidden shadow-sm"
-                title={<ControlLabel>Разница</ControlLabel>}
-                headerActions={
-                  diffDataUrl ? (
-                    <button
-                      onClick={() => {
-                        const a = document.createElement('a');
-                        a.href = diffDataUrl;
-                        a.download = 'diff.png';
-                        a.click();
-                      }}
-                      className="text-xs font-medium text-blue-600 hover:underline"
-                    >
-                      Скачать
-                    </button>
-                  ) : undefined
-                }
-                contentClassName="p-0"
-              >
-                <div
-                  className="relative w-full bg-zinc-100 dark:bg-zinc-950"
-                  style={aspectRatioStyle}
-                >
-                  <div className="absolute inset-0">
-                    <FrameDiffOverlay
-                      image1={previewFrames.start}
-                      image2={previewFrames.end}
-                      isProcessing={isPreviewing}
-                      onDataGenerated={setDiffDataUrl}
-                    />
-                  </div>
-                </div>
-              </Card>
-
-              {/* 3. Sprite / GIF Player */}
-              <Card
-                className="flex flex-col overflow-hidden shadow-sm"
-                title={
-                  <div className="flex items-center gap-4">
-                    <ControlLabel>Спрайт</ControlLabel>
-                    <NumberStepper
-                      label="Скорость %"
-                      value={Math.round(
-                        (gifParams.fps /
-                          (extractionParams.frameStep > 0
-                            ? Math.round(1 / extractionParams.frameStep)
-                            : 10)) *
-                          100
-                      )}
-                      onChange={(val) => {
-                        const base =
-                          extractionParams.frameStep > 0
-                            ? Math.round(1 / extractionParams.frameStep)
-                            : 10;
-                        setGifParams((p) => ({
-                          ...p,
-                          fps: Math.max(1, Math.round(base * (val / 100))),
-                        }));
-                      }}
-                      min={10}
-                      max={500}
-                      step={10}
-                    />
-                    <NumberStepper
-                      label="FPS"
-                      value={gifParams.fps}
-                      onChange={() => {}}
-                      disabled={true}
-                    />
-                  </div>
-                }
-                headerActions={
-                  frames.length > 0 && !status.isProcessing ? (
-                    <button
-                      onClick={generateAndDownloadGif}
-                      disabled={status.isProcessing}
-                      className={cn(
-                        'text-xs font-medium text-blue-600 hover:underline disabled:opacity-50',
-                        status.isProcessing && 'cursor-not-allowed opacity-50'
-                      )}
-                    >
-                      {status.currentStep === 'generating' ? 'Кодирование...' : 'Скачать GIF'}
-                    </button>
-                  ) : undefined
-                }
-                contentClassName="p-0"
-              >
-                <div
-                  className="group relative w-full cursor-pointer bg-zinc-100 dark:bg-zinc-950"
-                  style={aspectRatioStyle}
-                  onClick={() => setIsModalOpen(true)}
-                  title="Нажмите, чтобы открыть предпросмотр масштабов"
-                >
-                  {frames.length > 0 || status.isProcessing ? (
-                    <>
-                      <ImageSequencePlayer
-                        images={frames.map((f) => f.dataUrl)}
-                        fps={gifParams.fps}
-                        width={videoDimensions?.width || 300}
-                        height={videoDimensions?.height || 200}
-                        onDrawOverlay={handleDrawOverlay}
+              {/* SPRITE SHEET SETTINGS & LIST */}
+              <ControlSection
+                title="Спрайт-лист"
+                className="shadow-sm"
+                headerRight={
+                  frames.length > 0 && (
+                    <div className="flex items-center gap-4">
+                      <NumberStepper
+                        label="Кадров"
+                        value={frames.length}
+                        onChange={() => {}}
+                        disabled={true}
                       />
-
-                      <div className="absolute inset-0 flex items-center justify-center bg-black/0 transition-colors group-hover:bg-black/10">
-                        <div className="scale-95 transform rounded-full bg-black/70 px-3 py-1.5 text-xs font-bold text-white opacity-0 backdrop-blur-sm transition-opacity group-hover:scale-100 group-hover:opacity-100">
-                          Открыть масштабы ⤢
-                        </div>
+                      <div className="w-48 pt-1">
+                        <TextureLimitIndicator value={totalSpriteWidth} label="ШИРИНА" />
                       </div>
-                    </>
-                  ) : (
-                    <div className="absolute inset-0 flex items-center justify-center text-xs text-zinc-400">
-                      Нет кадров
+                      <button
+                        onClick={handleDownloadSpriteSheet}
+                        className={cn(
+                          'text-xs font-bold transition-colors',
+                          totalSpriteWidth > MAX_BROWSER_TEXTURE
+                            ? 'cursor-not-allowed text-zinc-400'
+                            : 'text-blue-600 hover:underline'
+                        )}
+                        disabled={totalSpriteWidth > MAX_BROWSER_TEXTURE}
+                      >
+                        Скачать PNG
+                      </button>
                     </div>
-                  )}
-                </div>
-              </Card>
-            </div>
-
-            {/* SPRITE SHEET SETTINGS & LIST */}
-            <ControlSection
-              title="Спрайт-лист"
-              className="shadow-sm"
-              headerRight={
-                frames.length > 0 && (
-                  <div className="flex items-center gap-4">
-                    <NumberStepper
-                      label="Кадров"
-                      value={frames.length}
-                      onChange={() => {}}
-                      disabled={true}
+                  )
+                }
+              >
+                {frames.length > 0 && (
+                  <div className="mb-4 flex items-center gap-4">
+                    <Switch
+                      label="Loop"
+                      checked={extractionParams.symmetricLoop}
+                      onCheckedChange={(c) =>
+                        setExtractionParams((p) => ({ ...p, symmetricLoop: c }))
+                      }
+                      className="gap-2 text-xs font-medium whitespace-nowrap"
                     />
-                    <div className="w-48 pt-1">
-                      <TextureLimitIndicator value={totalSpriteWidth} label="ШИРИНА" />
-                    </div>
-                    <button
-                      onClick={handleDownloadSpriteSheet}
-                      className={cn(
-                        'text-xs font-bold transition-colors',
-                        totalSpriteWidth > MAX_BROWSER_TEXTURE
-                          ? 'cursor-not-allowed text-zinc-400'
-                          : 'text-blue-600 hover:underline'
-                      )}
-                      disabled={totalSpriteWidth > MAX_BROWSER_TEXTURE}
-                    >
-                      Скачать PNG
-                    </button>
+                    <div className="h-6 w-px bg-zinc-200 dark:bg-zinc-700"></div>
+
+                    <NumberStepper
+                      label="Высота"
+                      value={spriteOptions.maxHeight}
+                      onChange={(v) => setSpriteOptions((p) => ({ ...p, maxHeight: v }))}
+                      step={10}
+                      min={10}
+                      max={2000}
+                    />
+                    <div className="h-6 w-px bg-zinc-200 dark:bg-zinc-700"></div>
+                    <NumberStepper
+                      label="Отступ"
+                      value={spriteOptions.spacing}
+                      onChange={(v) => setSpriteOptions((p) => ({ ...p, spacing: v }))}
+                      step={1}
+                      min={0}
+                      max={100}
+                    />
+
+                    {/* Replaced manual picker with ColorInput */}
+                    <ColorInput
+                      value={spriteOptions.bg === 'transparent' ? null : spriteOptions.bg}
+                      onChange={(v) => setSpriteOptions((p) => ({ ...p, bg: v }))}
+                      allowTransparent
+                      onClear={() => setSpriteOptions((p) => ({ ...p, bg: 'transparent' }))}
+                    />
                   </div>
-                )
-              }
-            >
-              {frames.length > 0 && (
-                <div className="mb-4 flex items-center gap-4">
-                  <Switch
-                    label="Loop"
-                    checked={extractionParams.symmetricLoop}
-                    onCheckedChange={(c) =>
-                      setExtractionParams((p) => ({ ...p, symmetricLoop: c }))
-                    }
-                    className="gap-2 text-xs font-medium whitespace-nowrap"
-                  />
-                  <div className="h-6 w-px bg-zinc-200 dark:bg-zinc-700"></div>
+                )}
 
-                  <NumberStepper
-                    label="Высота"
-                    value={spriteOptions.maxHeight}
-                    onChange={(v) => setSpriteOptions((p) => ({ ...p, maxHeight: v }))}
-                    step={10}
-                    min={10}
-                    max={2000}
-                  />
-                  <div className="h-6 w-px bg-zinc-200 dark:bg-zinc-700"></div>
-                  <NumberStepper
-                    label="Отступ"
-                    value={spriteOptions.spacing}
-                    onChange={(v) => setSpriteOptions((p) => ({ ...p, spacing: v }))}
-                    step={1}
-                    min={0}
-                    max={100}
-                  />
-
-                  {/* Replaced manual picker with ColorInput */}
-                  <ColorInput
-                    value={spriteOptions.bg === 'transparent' ? null : spriteOptions.bg}
-                    onChange={(v) => setSpriteOptions((p) => ({ ...p, bg: v }))}
-                    allowTransparent
-                    onClear={() => setSpriteOptions((p) => ({ ...p, bg: 'transparent' }))}
+                <div className="custom-scrollbar overflow-x-auto bg-zinc-100 p-4 dark:bg-zinc-950">
+                  <SpriteFrameList
+                    frames={frames}
+                    maxHeight={spriteOptions.maxHeight}
+                    spacing={spriteOptions.spacing}
+                    backgroundColor={spriteOptions.bg}
+                    videoAspectRatio={videoRatio}
                   />
                 </div>
-              )}
-
-              <div className="custom-scrollbar overflow-x-auto bg-zinc-100 p-4 dark:bg-zinc-950">
-                <SpriteFrameList
-                  frames={frames}
-                  maxHeight={spriteOptions.maxHeight}
-                  spacing={spriteOptions.spacing}
-                  backgroundColor={spriteOptions.bg}
-                  videoAspectRatio={videoRatio}
-                />
-              </div>
-            </ControlSection>
-          </div>
-        )}
-
-        {/* Hidden Processing Elements:
-            FIX: Используем "Visual Hiding" вместо display:none.
-            requestVideoFrameCallback требует, чтобы элемент был частью render tree.
-        */}
-        <video
-          ref={videoRef}
-          className="pointer-events-none absolute top-0 left-0 -z-50 h-1 w-1 opacity-0"
-          crossOrigin="anonymous"
-          muted
-          playsInline
-        />
-        <video
-          ref={previewVideoRef}
-          className="pointer-events-none absolute top-0 left-0 -z-50 h-1 w-1 opacity-0"
-          crossOrigin="anonymous"
-          muted
-          playsInline
-        />
-        <canvas ref={canvasRef} className="hidden" />
-        {/* MODAL */}
-        <Modal
-          isOpen={isModalOpen}
-          onClose={() => setIsModalOpen(false)}
-          title={
-            <div className="flex items-center gap-3">
-              <span className="h-2 w-2 animate-pulse rounded-full bg-green-500" />
-              Предпросмотр масштабов
+              </ControlSection>
             </div>
-          }
-          headerActions={
-            <span className="font-mono text-xs text-zinc-500">FPS: {gifParams.fps}</span>
-          }
-          className="h-[92vh] w-[96vw] max-w-[1920px]"
-        >
-          <MultiScalePreview frames={frames.map((f) => f.dataUrl)} fps={gifParams.fps} />
-        </Modal>
-      </div>
-    </ToolLayout>
+          )}
+
+          {/* Hidden Processing Elements */}
+          <video
+            ref={videoRef}
+            className="pointer-events-none absolute top-0 left-0 -z-50 h-1 w-1 opacity-0"
+            crossOrigin="anonymous"
+            muted
+            playsInline
+          />
+          <video
+            ref={previewVideoRef}
+            className="pointer-events-none absolute top-0 left-0 -z-50 h-1 w-1 opacity-0"
+            crossOrigin="anonymous"
+            muted
+            playsInline
+          />
+          <canvas ref={canvasRef} className="hidden" />
+
+          {/* MODAL */}
+          <Modal
+            isOpen={isModalOpen}
+            onClose={() => setIsModalOpen(false)}
+            title={
+              <div className="flex items-center gap-3">
+                <span className="h-2 w-2 animate-pulse rounded-full bg-green-500" />
+                Предпросмотр масштабов
+              </div>
+            }
+            headerActions={
+              <span className="font-mono text-xs text-zinc-500">FPS: {gifParams.fps}</span>
+            }
+            className="h-[92vh] w-[96vw] max-w-[1920px]"
+          >
+            <MultiScalePreview frames={frames.map((f) => f.dataUrl)} fps={gifParams.fps} />
+          </Modal>
+        </div>
+      </Workbench.Stage>
+    </Workbench.Root>
   );
 }

@@ -18,10 +18,10 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import Image from 'next/image';
+import Link from 'next/link';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { filter, map, pipe } from 'remeda';
 
-import { ToolLayout } from '@/app/_components/ToolLayout';
 import { rgbToHex } from '@/lib/core/utils/colors';
 import {
   downloadDataUrl,
@@ -29,13 +29,14 @@ import {
   loadImage,
   revokeObjectURLSafely,
 } from '@/lib/core/utils/media';
-import { cn } from '@/lib/core/utils/styles'; // NEW
+import { cn } from '@/lib/core/utils/styles';
 import type { CanvasRef } from '@/ui/Canvas';
 import { Canvas } from '@/ui/Canvas';
 import { ControlLabel, ControlSection } from '@/ui/ControlSection';
 import { FileDropzone, FileDropzonePlaceholder } from '@/ui/FileDropzone';
 import { Slider } from '@/ui/Slider';
 import { Switch } from '@/ui/Switch';
+import { Workbench } from '@/ui/Workbench';
 
 import { TextureDimensionSlider } from './entities/hardware/TextureDimensionSlider';
 
@@ -45,16 +46,13 @@ const VIEW_RESET_DELAY = 50;
 const EXPORT_FILENAME = 'aligned-export.png';
 const MOUSE_BUTTON_LEFT = 0;
 const CANVAS_SCALE_DEFAULT = 1;
-
 const GRID_FRAME_DASH = 10;
 const GRID_FRAME_OFFSET_CSS = '-5px -5px';
-
 const Z_INDEX_SLOT_BASE = 10;
 const Z_INDEX_SLOT_ACTIVE = 30;
 const Z_INDEX_LABEL = 40;
 const Z_INDEX_GRID_RED = 50;
 const Z_INDEX_GRID_FRAME = 60;
-
 const DEFAULT_SETTINGS = {
   slotSize: 1,
   frameStep: 1,
@@ -62,7 +60,6 @@ const DEFAULT_SETTINGS = {
   redGridColor: '#ff0000',
   bgColor: '#ffffff',
 };
-
 type AlignImage = {
   id: string;
   file: File;
@@ -75,7 +72,8 @@ type AlignImage = {
   naturalHeight: number;
 };
 
-// --- COMPONENTS ---
+// ... (Components SortableLayerItem и DraggableImageSlot без изменений) ...
+// (Они были в прошлом ответе корректны, если нужно, я могу повторить)
 
 // 1. Sortable Item for Sidebar (DND-KIT)
 interface SortableLayerItemProps {
@@ -89,14 +87,12 @@ function SortableLayerItem({ img, index, onActivate, onRemove }: SortableLayerIt
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: img.id,
   });
-
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
     zIndex: isDragging ? 100 : 'auto',
     opacity: isDragging ? 0.5 : 1,
   };
-
   return (
     <div
       ref={setNodeRef}
@@ -149,7 +145,6 @@ const DraggableImageSlot = React.memo(
     onUpdatePosition,
   }: DraggableImageSlotProps) => {
     const [isDragging, setIsDragging] = useState(false);
-
     const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
       if (e.button !== MOUSE_BUTTON_LEFT) return;
       e.stopPropagation();
@@ -157,33 +152,25 @@ const DraggableImageSlot = React.memo(
       setIsDragging(true);
       const target = e.currentTarget;
       target.setPointerCapture(e.pointerId);
-
       const startX = e.clientX;
       const startY = e.clientY;
       const initialOffsetX = img.offsetX;
       const initialOffsetY = img.offsetY;
       const scale = getCanvasScale();
-
-      // FIX: Используем общий тип Event, чтобы избежать приведения (as EventListener).
-      // Внутри сужаем тип до PointerEvent.
       const handlePointerMove = (moveEvent: Event) => {
         if (!(moveEvent instanceof PointerEvent)) return;
-
         const dx = (moveEvent.clientX - startX) / scale;
         const dy = (moveEvent.clientY - startY) / scale;
         onUpdatePosition(img.id, initialOffsetX + dx, initialOffsetY + dy);
       };
-
       const handlePointerUp = () => {
         setIsDragging(false);
         target.removeEventListener('pointermove', handlePointerMove);
         target.removeEventListener('pointerup', handlePointerUp);
       };
-
       target.addEventListener('pointermove', handlePointerMove);
       target.addEventListener('pointerup', handlePointerUp);
     };
-
     return (
       <div
         className={cn(
@@ -234,11 +221,9 @@ const DraggableImageSlot = React.memo(
 );
 DraggableImageSlot.displayName = 'DraggableImageSlot';
 
-// --- MAIN COMPONENT ---
 export function VerticalImageAligner() {
   const [images, setImages] = useState<AlignImage[]>([]);
-
-  // ... (Остальная логика без изменений до рендера Canvas) ...
+  // ... (Логика хуков без изменений) ...
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
@@ -409,12 +394,35 @@ export function VerticalImageAligner() {
     }
   }, [images, slotHeight, slotWidth]);
 
-  // Sidebar content
   const sidebarContent = (
     <div className="flex flex-col gap-6 pb-4">
+      {/* Header */}
+      <div>
+        <Link
+          href="/"
+          className="mb-4 inline-flex items-center gap-2 text-sm font-medium text-zinc-500 transition-colors hover:text-zinc-900 dark:hover:text-zinc-200"
+        >
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <path d="M19 12H5M12 19l-7-7 7-7" />
+          </svg>{' '}
+          На главную
+        </Link>
+        <h2 className="text-xl font-bold">Вертикальный склейщик</h2>
+      </div>
+
       <div className="flex flex-col gap-2">
         <FileDropzone onFilesSelected={processFiles} multiple={true} label="Добавить изображения" />
       </div>
+
       {images.length > 0 && (
         <>
           <div className="space-y-2">
@@ -429,6 +437,7 @@ export function VerticalImageAligner() {
               {isExporting ? 'Экспорт...' : 'Скачать PNG'}
             </button>
           </div>
+          {/* ... Controls ... (без изменений) */}
           <ControlSection title="Размеры слота">
             <div className="flex flex-col gap-6">
               <TextureDimensionSlider
@@ -451,6 +460,7 @@ export function VerticalImageAligner() {
               </span>
             </div>
           </ControlSection>
+
           <ControlSection title="Зеленая сетка (Кадр)">
             <Switch checked={showFrameGrid} onCheckedChange={setShowFrameGrid} label="Отображать" />
             {showFrameGrid && (
@@ -465,6 +475,7 @@ export function VerticalImageAligner() {
               </div>
             )}
           </ControlSection>
+
           <ControlSection title="Красная сетка (Сдвиг)">
             <Switch checked={showRedGrid} onCheckedChange={setShowRedGrid} label="Отображать" />
             {showRedGrid && (
@@ -488,6 +499,7 @@ export function VerticalImageAligner() {
               </div>
             )}
           </ControlSection>
+
           <div className="space-y-1.5">
             <div className="flex items-center justify-between px-1 pb-1">
               <ControlLabel>Слои</ControlLabel>
@@ -506,6 +518,7 @@ export function VerticalImageAligner() {
                 </button>
               </div>
             </div>
+
             <DndContext
               sensors={sensors}
               collisionDetection={closestCenter}
@@ -529,6 +542,7 @@ export function VerticalImageAligner() {
               </SortableContext>
             </DndContext>
           </div>
+
           {activeImageId && (
             <div className="rounded-lg border border-yellow-200 bg-yellow-50 p-4 dark:border-yellow-800 dark:bg-yellow-900/20">
               <p className="mb-3 text-xs font-bold tracking-wide text-yellow-800 uppercase dark:text-yellow-200">
@@ -570,60 +584,63 @@ export function VerticalImageAligner() {
   );
 
   return (
-    <ToolLayout title="Вертикальный склейщик" sidebar={sidebarContent}>
-      <Canvas
-        ref={workspaceRef}
-        isLoading={isExporting}
-        contentWidth={bounds.width}
-        contentHeight={bounds.height}
-        shadowOverlayOpacity={images.length ? 0.5 : 0}
-        showTransparencyGrid={true}
-        defaultBackgroundColor={DEFAULT_SETTINGS.bgColor}
-        placeholder={
-          !images.length ? (
-            <FileDropzonePlaceholder
-              onUpload={processFiles}
-              multiple={true}
-              title="Перетащите изображения для склейки"
+    <Workbench.Root>
+      <Workbench.Sidebar>{sidebarContent}</Workbench.Sidebar>
+      <Workbench.Stage>
+        <Canvas
+          ref={workspaceRef}
+          isLoading={isExporting}
+          contentWidth={bounds.width}
+          contentHeight={bounds.height}
+          shadowOverlayOpacity={images.length ? 0.5 : 0}
+          showTransparencyGrid={true}
+          defaultBackgroundColor={DEFAULT_SETTINGS.bgColor}
+          placeholder={
+            !images.length ? (
+              <FileDropzonePlaceholder
+                onUpload={processFiles}
+                multiple={true}
+                title="Перетащите изображения для склейки"
+              />
+            ) : null
+          }
+        >
+          {showRedGrid && (
+            <div
+              className="pointer-events-none absolute inset-0 opacity-50"
+              style={{
+                zIndex: Z_INDEX_GRID_RED,
+                backgroundImage: `linear-gradient(to right, ${redGridColor} 1px, transparent 1px), linear-gradient(to bottom, ${redGridColor} 1px, transparent 1px)`,
+                backgroundSize: `${frameStepX}px ${slotHeight}px`,
+                backgroundPosition: `${redGridOffsetX}px ${redGridOffsetY}px`,
+              }}
             />
-          ) : null
-        }
-      >
-        {showRedGrid && (
-          <div
-            className="pointer-events-none absolute inset-0 opacity-50"
-            style={{
-              zIndex: Z_INDEX_GRID_RED,
-              backgroundImage: `linear-gradient(to right, ${redGridColor} 1px, transparent 1px), linear-gradient(to bottom, ${redGridColor} 1px, transparent 1px)`,
-              backgroundSize: `${frameStepX}px ${slotHeight}px`,
-              backgroundPosition: `${redGridOffsetX}px ${redGridOffsetY}px`,
-            }}
-          />
-        )}
-        {showFrameGrid && (
-          <div
-            className="pointer-events-none absolute inset-0 opacity-80"
-            style={{
-              zIndex: Z_INDEX_GRID_FRAME,
-              backgroundImage: `linear-gradient(to right, ${frameBorderColor} ${GRID_FRAME_DASH}px, transparent ${GRID_FRAME_DASH}px), linear-gradient(to bottom, ${frameBorderColor} ${GRID_FRAME_DASH}px, transparent ${GRID_FRAME_DASH}px)`,
-              backgroundSize: `${frameStepX}px ${slotHeight}px`,
-              backgroundPosition: GRID_FRAME_OFFSET_CSS,
-            }}
-          />
-        )}
-        {images.map((img, i) => (
-          <DraggableImageSlot
-            key={img.id}
-            img={img}
-            index={i}
-            slotHeight={slotHeight}
-            slotWidth={slotWidth}
-            getCanvasScale={getCanvasScale}
-            onActivate={handleActivate}
-            onUpdatePosition={handleUpdatePosition}
-          />
-        ))}
-      </Canvas>
-    </ToolLayout>
+          )}
+          {showFrameGrid && (
+            <div
+              className="pointer-events-none absolute inset-0 opacity-80"
+              style={{
+                zIndex: Z_INDEX_GRID_FRAME,
+                backgroundImage: `linear-gradient(to right, ${frameBorderColor} ${GRID_FRAME_DASH}px, transparent ${GRID_FRAME_DASH}px), linear-gradient(to bottom, ${frameBorderColor} ${GRID_FRAME_DASH}px, transparent ${GRID_FRAME_DASH}px)`,
+                backgroundSize: `${frameStepX}px ${slotHeight}px`,
+                backgroundPosition: GRID_FRAME_OFFSET_CSS,
+              }}
+            />
+          )}
+          {images.map((img, i) => (
+            <DraggableImageSlot
+              key={img.id}
+              img={img}
+              index={i}
+              slotHeight={slotHeight}
+              slotWidth={slotWidth}
+              getCanvasScale={getCanvasScale}
+              onActivate={handleActivate}
+              onUpdatePosition={handleUpdatePosition}
+            />
+          ))}
+        </Canvas>
+      </Workbench.Stage>
+    </Workbench.Root>
   );
 }
