@@ -20,18 +20,17 @@ const eslintConfig = defineConfig([
       unicorn: eslintPluginUnicorn,
     },
     settings: {
-      'boundaries/include': ['app/**/*', 'lib/**/*', 'instruments/**/*'],
+      'boundaries/include': ['app/**/*', 'lib/**/*', 'view/**/*'],
       'boundaries/elements': [
         {
           type: 'app-layer',
           pattern: 'app/(page|layout|loading|error|not-found|tools/**/page).tsx',
           mode: 'file',
         },
-        { type: 'tool', pattern: 'instruments/*.tsx', mode: 'file', capture: ['toolName'] },
-        { type: 'entity', pattern: 'instruments/entities/*', capture: ['entityName'] },
-        { type: 'app-component', pattern: 'app/_components/*', mode: 'folder' },
-       
-        { type: 'ui', pattern: 'ui/*', mode: 'folder' },
+        { type: 'tool', pattern: 'view/instruments/*.tsx', mode: 'file', capture: ['toolName'] },
+        { type: 'entity', pattern: 'view/instruments/*/*.tsx', mode: 'file', capture: ['entityName'] },
+        { type: 'app-component', pattern: 'view/(catalog|shell)/*', mode: 'folder' },
+        { type: 'ui', pattern: 'view/ui/*', mode: 'folder' },
         { type: 'module', pattern: 'lib/modules/*', mode: 'folder', capture: ['moduleName'] },
         { type: 'core', pattern: ['lib/core/*', 'lib/types/*'], mode: 'folder' },
       ],
