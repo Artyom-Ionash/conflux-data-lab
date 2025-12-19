@@ -1,5 +1,5 @@
 import { ToolGrid } from '@/app/_components/ToolGrid';
-import { categoryLabels, tools, toolsByCategory } from '@/lib/modules/tool-registry/config';
+import { categoryLabels, tools, toolsByCategory } from '@/lib/core/registry/config';
 import { Badge } from '@/ui/Badge';
 
 export default function Home() {

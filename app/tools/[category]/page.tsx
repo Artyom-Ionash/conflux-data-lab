@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 
 import { ToolGrid } from '@/app/_components/ToolGrid';
-import { categoryLabels, toolsByCategory } from '@/lib/modules/tool-registry/config';
+import { categoryLabels, toolsByCategory } from '@/lib/core/registry/config';
 
 interface CategoryPageProps {
   params: Promise<{

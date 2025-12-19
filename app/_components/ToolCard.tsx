@@ -1,6 +1,6 @@
 import Link from 'next/link';
 
-import type { ToolConfig } from '@/lib/modules/tool-registry/types';
+import type { ToolConfig } from '@/lib/core/registry/types';
 import { Badge } from '@/ui/Badge';
 import { Card } from '@/ui/Card';
 

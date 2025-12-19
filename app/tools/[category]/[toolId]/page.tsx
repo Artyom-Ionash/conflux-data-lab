@@ -2,8 +2,8 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 
-import { categoryLabels, getToolById } from '@/lib/modules/tool-registry/config';
-import { getToolComponent } from '@/lib/modules/tool-registry/loader';
+import { getToolComponent } from '@/app/_components/registry/tool-loader';
+import { categoryLabels, getToolById } from '@/lib/core/registry/config';
 import { Badge } from '@/ui/Badge';
 
 interface ToolPageProps {
@@ -71,7 +71,7 @@ export default async function ToolPage({ params }: ToolPageProps) {
             </code>{' '}
             и добавьте его в{' '}
             <code className="rounded bg-zinc-100 px-1.5 py-0.5 text-sm dark:bg-zinc-800">
-              lib/modules/tool-registry/loader.tsx
+              app/_components/registry/tool-loader.tsx
             </code>
           </p>
         </div>

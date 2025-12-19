@@ -87,9 +87,10 @@
 
 Добавление инструмента стандартизировано:
 
-1.  **Конфигурация:** Метаданные в `lib/modules/tool-registry/config.ts`.
-2.  **Реализация:** Компонент в `instruments/[ToolName].tsx` (например, `instruments/VideoFrameExtractor.tsx`).
-3.  **Регистрация:** Lazy-loading через `dynamic import` в `lib/modules/tool-registry/loader.tsx`.
+1.  **Конфигурация:** Метаданные в `lib/core/registry/config.ts`.
+2.  **Типы:** Определения типов в `lib/core/registry/types.ts`.
+3.  **Реализация:** Компонент в `instruments/[ToolName].tsx` (например, `instruments/VideoFrameExtractor.tsx`).
+4.  **Регистрация:** Lazy-loading через `dynamic import` в `app/_components/registry/tool-loader.tsx`.
 
 ---
 
