@@ -10,6 +10,12 @@ import { waitForVideoFrame } from '@/lib/core/utils/media';
 import { cn } from '@/lib/core/utils/styles';
 import { generateSpriteSheet } from '@/lib/modules/graphics/processing/sprite-generator';
 import { TEXTURE_LIMITS } from '@/lib/modules/graphics/standards';
+import {
+  calculateTimestamps,
+  type ExtractedFrame,
+  type ExtractionParams,
+  runExtractionTask,
+} from '@/lib/modules/video/extraction';
 // --- UI IMPORTS ---
 import { Card } from '@/view/ui/Card';
 import { MultiScalePreview } from '@/view/ui/collections/MultiScalePreview';
@@ -37,19 +43,6 @@ const DEFAULT_FRAME_STEP = 0.1; // seconds
 const DEFAULT_FPS = 10;
 const DEFAULT_ASPECT_RATIO = 1.77; // 16:9 approx
 const MAX_BROWSER_TEXTURE = TEXTURE_LIMITS.MAX_BROWSER;
-
-// --- TYPES ---
-export interface ExtractedFrame {
-  time: number;
-  dataUrl: string | null;
-}
-
-export interface ExtractionParams {
-  startTime: number;
-  endTime: number;
-  frameStep: number;
-  symmetricLoop: boolean;
-}
 
 // --- LOGIC HOOKS ---
 
@@ -208,97 +201,62 @@ function useVideoFrameExtraction() {
       URL.revokeObjectURL(objectUrl);
     };
   }, []);
-
   const runExtraction = useCallback(async () => {
-    if (!videoRef.current || !canvasRef.current || !videoSrc) return;
-    if (abortControllerRef.current) abortControllerRef.current.abort();
-    abortControllerRef.current = new AbortController();
-    const signal = abortControllerRef.current.signal;
+    // 1. Проверяем наличие ресурсов
+    if (!videoRef.current || !videoSrc) return;
 
     const videoEl = videoRef.current;
-    const canvasEl = canvasRef.current;
-    if (videoEl.src !== videoSrc) videoEl.src = videoSrc;
+
+    // 2. Управление отменой
+    if (abortControllerRef.current) abortControllerRef.current.abort();
+    abortControllerRef.current = new AbortController();
 
     setStatus({ isProcessing: true, currentStep: 'extracting', progress: 0 });
     setError(null);
-    setRawFrames([]);
-    setGifParams((p) => ({ ...p, dataUrl: null }));
 
     try {
+      // 3. СИНХРОНИЗАЦИЯ: Устанавливаем источник и ждем готовности
+      if (videoEl.src !== videoSrc) {
+        videoEl.src = videoSrc;
+      }
+
       if (videoEl.readyState < 1) {
-        await new Promise<void>((resolve, reject) => {
-          videoEl.onloadedmetadata = () => resolve();
-          videoEl.onerror = () => reject(new Error('Load failed'));
+        await new Promise((resolve) => {
+          videoEl.onloadedmetadata = resolve;
         });
       }
 
-      const duration = videoEl.duration;
-      const safeStart = Math.max(0, extractionParams.startTime);
-      const interval = extractionParams.frameStep;
-      if (interval <= 0) throw new Error('Invalid step');
+      // 4. ПРЕД-ИНИЦИАЛИЗАЦИЯ: Сразу создаем пустой массив нужной длины
+      const totalTimestamps = calculateTimestamps(extractionParams, videoEl.duration);
+      const initialFrames: ExtractedFrame[] = totalTimestamps.map((t) => ({
+        time: t,
+        dataUrl: null,
+      }));
 
-      canvasEl.width = videoEl.videoWidth;
-      canvasEl.height = videoEl.videoHeight;
-      const ctx = canvasEl.getContext('2d');
-      if (!ctx) throw new Error('No ctx');
-
-      const numberOfSteps = Math.floor((Math.min(effectiveEnd, duration) - safeStart) / interval);
-
-      const initialFrames: ExtractedFrame[] = [];
-      for (let i = 0; i <= numberOfSteps; i++) {
-        initialFrames.push({ time: safeStart + i * interval, dataUrl: null });
-      }
       setRawFrames(initialFrames);
 
-      const totalSteps = numberOfSteps + 1;
-      for (let i = 0; i <= numberOfSteps; i++) {
-        if (signal.aborted) throw new Error('Aborted');
-        const current = safeStart + i * interval;
+      // 5. ЗАПУСК КРИСТАЛЛИЗОВАННОЙ ЗАДАЧИ
+      await runExtractionTask(videoEl, extractionParams, {
+        signal: abortControllerRef.current.signal,
+        onFrame: (frame, index) => {
+          setRawFrames((prev) => {
+            // Если массив был сброшен (например, при повторном запуске), защищаемся
+            if (prev.length === 0) return prev;
+            return prev.map((f, i) => (i === index ? frame : f));
+          });
+        },
+        onProgress: (progress) => setStatus((s) => ({ ...s, progress })),
+      });
 
-        // ВАЖНО: Асинхронное ожидание кадра
-        await new Promise<void>((resolve, reject) => {
-          const onSeeked = async () => {
-            try {
-              // 1. Ждем реальной готовности текстуры в GPU (фикс прозрачного кадра)
-              await waitForVideoFrame(videoEl);
-
-              // 2. Проверяем, не отменили ли задачу во время ожидания
-              if (signal.aborted) {
-                reject(new Error('Aborted'));
-                return;
-              }
-
-              // 3. Рисуем
-              ctx.drawImage(videoEl, 0, 0, canvasEl.width, canvasEl.height);
-              const url = canvasEl.toDataURL('image/png');
-              setRawFrames((prev) =>
-                prev.map((f, idx) => (idx === i ? { ...f, dataUrl: url } : f))
-              );
-              resolve();
-            } catch (e) {
-              reject(e);
-            }
-          };
-
-          // Подписываемся разово на событие seeked
-          videoEl.addEventListener('seeked', onSeeked, { once: true });
-          videoEl.currentTime = current;
-        });
-
-        setStatus((s) => ({ ...s, progress: Math.min(100, ((i + 1) / totalSteps) * 100) }));
-        await new Promise((r) => requestAnimationFrame(r));
-      }
       setStatus({ isProcessing: false, currentStep: '', progress: 100 });
     } catch (e: unknown) {
-      if (e instanceof Error && e.message !== 'Aborted') {
+      // Игнорируем ошибку отмены, остальные выводим
+      if (e instanceof Error && e.message !== 'Extraction Aborted') {
         setError(e.message);
-        setStatus({ isProcessing: false, currentStep: '', progress: 0 });
-      } else if (!(e instanceof Error)) {
-        setError('Error');
         setStatus({ isProcessing: false, currentStep: '', progress: 0 });
       }
     }
-  }, [videoSrc, extractionParams.startTime, extractionParams.frameStep, effectiveEnd]);
+  }, [videoSrc, extractionParams]);
 
   useDebounceEffect(
     () => {
