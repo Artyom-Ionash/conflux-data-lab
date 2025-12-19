@@ -44,10 +44,23 @@ export function revokeObjectURLSafely(url: string | null | undefined) {
 }
 
 /**
- * Извлекает RGB-цвет верхнего левого пикселя (0,0) источника.
+ * Извлекает RGB-цвет конкретного пикселя источника (по умолчанию 0,0).
+ * Использует кроппинг 1x1 вместо масштабирования всего изображения.
  */
 export function getTopLeftPixelColor(source: CanvasImageSource): RGB {
-  const { canvas, ctx } = captureToCanvas(source, 1, 1);
+  const canvas = document.createElement('canvas');
+  canvas.width = 1;
+  canvas.height = 1;
+
+  // Важно: избежание искажений
+  const ctx = canvas.getContext('2d', { willReadFrequently: true });
+
+  if (!ctx) return { r: 255, g: 255, b: 255 }; // Fallback (White)
+
+  // Используем сигнатуру drawImage(image, sx, sy, sWidth, sHeight, dx, dy, dWidth, dHeight)
+  // Это копирует ровно 1 пиксель из координат 0,0 источника в 0,0 холста.
+  ctx.drawImage(source, 0, 0, 1, 1, 0, 0, 1, 1);
+
   const data = ctx.getImageData(0, 0, 1, 1).data;
 
   return {

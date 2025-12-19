@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { waitForVideoFrame } from './media';
+import { getTopLeftPixelColor,waitForVideoFrame } from './media';
 
 // --- TYPE DEFINITIONS FOR JSDOM ENVIRONMENT ---
 interface VideoFrameMetadata {
@@ -82,5 +82,56 @@ describe('waitForVideoFrame (Race Condition Simulation)', () => {
     drawAction();
 
     expect(drawAction).toHaveBeenCalled();
+  });
+});
+
+describe('getTopLeftPixelColor (Unit Test with Mocks)', () => {
+  it('should use cropping (9 arguments) instead of scaling to avoid color averaging', () => {
+    // 1. Создаем моки данных
+    const mockImageData = { data: new Uint8ClampedArray([10, 20, 30, 255]) };
+    const drawImageSpy = vi.fn();
+    const getImageDataSpy = vi.fn().mockReturnValue(mockImageData);
+
+    const mockContext = {
+      drawImage: drawImageSpy,
+      getImageData: getImageDataSpy,
+    };
+
+    const mockCanvas = {
+      width: 0,
+      height: 0,
+      getContext: vi.fn().mockReturnValue(mockContext),
+    };
+
+    // 2. Мокируем createElement без использования 'any'
+    vi.spyOn(document, 'createElement').mockImplementation((tagName) => {
+      if (tagName === 'canvas') {
+        // Используем unknown как безопасный мост для приведения типов в моках
+        return mockCanvas as unknown as HTMLCanvasElement;
+      }
+      return {} as HTMLElement;
+    });
+
+    // 3. Выполняем тест
+    const source = {} as CanvasImageSource;
+    const result = getTopLeftPixelColor(source);
+
+    // 4. Проверяем аргументы вызова (именно 9 аргументов гарантируют кроппинг)
+    expect(drawImageSpy).toHaveBeenCalledWith(
+      source,
+      0,
+      0,
+      1,
+      1, // Откуда (source x, y, w, h)
+      0,
+      0,
+      1,
+      1 // Куда (dest x, y, w, h)
+    );
+
+    expect(getImageDataSpy).toHaveBeenCalledWith(0, 0, 1, 1);
+    expect(result).toEqual({ r: 10, g: 20, b: 30 });
+
+    vi.restoreAllMocks();
   });
 });
