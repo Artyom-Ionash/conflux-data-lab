@@ -2,17 +2,17 @@ import { writeFileSync, readFileSync, readdirSync, statSync, existsSync, mkdirSy
 import { join, relative } from 'node:path';
 import { execSync } from 'node:child_process';
 import ignore from 'ignore';
-import { FileNode } from '@/lib/modules/file-system/tree-view';
+import { FileNode } from '@/lib/modules/file-system/topology';
 // SHARED IMPORTS
-import { isTextFile } from '@/lib/modules/file-system/file-utils';
-import { generateAsciiTree } from '@/lib/modules/file-system/tree-view';
+import { isTextFile } from '@/lib/modules/file-system/analyzers';
+import { generateAsciiTree } from '@/lib/modules/file-system/topology';
 import {
   CONTEXT_PRESETS,
   MANDATORY_REPO_FILES,
   LOCAL_CONTEXT_FOLDER,
-} from '../lib/modules/context-generator/config';
+} from '../lib/modules/context-generator/rules';
 import { generateContextOutput, ProcessedContextFile } from '@/lib/modules/context-generator/core';
-import { processFileToContext, type RawFile } from '@/lib/modules/context-generator/pipeline';
+import { processFileToContext, type RawFile } from '@/lib/modules/context-generator/assembly';
 
 // --- CONFIG ---
 const PRESET = CONTEXT_PRESETS.nextjs;

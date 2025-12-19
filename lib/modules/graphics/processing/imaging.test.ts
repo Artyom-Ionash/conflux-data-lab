@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import type { RGB } from '@/lib/core/utils/colors';
 
-import { applyFloodFillMask, applyMorphologyChoke } from './filters';
+import { applyFloodFillMask, applyMorphologyChoke } from './imaging';
 
 // --- HELPERS ---
 

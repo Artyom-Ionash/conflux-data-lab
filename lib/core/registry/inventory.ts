@@ -1,4 +1,4 @@
-import type { ToolConfig } from './types';
+import type { ToolConfig } from './specifications';
 
 // Порядок ключей определяет порядок отображения категорий на странице
 export const categoryLabels: Record<string, string> = {

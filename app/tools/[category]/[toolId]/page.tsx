@@ -1,6 +1,6 @@
 import { notFound } from 'next/navigation';
 
-import { getToolById } from '@/lib/core/registry/config';
+import { getToolById } from '@/lib/core/registry/inventory';
 import { ToolRegistry } from '@/view/shell/registry/tool-loader';
 
 interface ToolPageProps {

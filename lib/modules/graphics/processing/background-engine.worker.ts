@@ -3,14 +3,14 @@ import { pipe } from 'remeda';
 import type { RGB } from '@/lib/core/utils/colors';
 import { PIXEL_STRIDE } from '@/lib/core/utils/colors';
 
-import type { Point } from './filters';
+import type { Point } from './imaging';
 import {
   applyBlur,
   applyColorFilter,
   applyEdgePaint,
   applyFloodFillMask,
   applyMorphologyChoke,
-} from './filters';
+} from './imaging';
 
 // --- Types ---
 

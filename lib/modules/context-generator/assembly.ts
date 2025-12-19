@@ -1,9 +1,9 @@
 import { pipe } from 'remeda';
 
-import { getLanguageTag } from '@/lib/modules/file-system/file-utils';
+import { getLanguageTag } from '@/lib/modules/file-system/analyzers';
 import { GodotSceneParser } from '@/lib/modules/file-system/godot-scene';
 
-import { LOCAL_CONTEXT_FOLDER, MANDATORY_REPO_FILES } from './config';
+import { LOCAL_CONTEXT_FOLDER, MANDATORY_REPO_FILES } from './rules';
 
 // --- Types ---
 

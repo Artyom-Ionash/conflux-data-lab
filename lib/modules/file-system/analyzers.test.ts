@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { getLanguageTag, isTextFile, shouldIgnore } from './file-utils';
+import { getLanguageTag, isTextFile, shouldIgnore } from './analyzers';
 
 describe('File Utils', () => {
   describe('shouldIgnore', () => {

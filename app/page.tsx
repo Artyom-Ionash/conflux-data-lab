@@ -1,4 +1,4 @@
-import { categoryLabels, TOOLS_MANIFEST, toolsByCategory } from '@/lib/core/registry/config';
+import { categoryLabels, TOOLS_MANIFEST, toolsByCategory } from '@/lib/core/registry/inventory';
 import { ToolGrid } from '@/view/catalog/ToolGrid';
 import { Badge } from '@/view/ui/Badge';
 

@@ -1,4 +1,4 @@
-import { calculateFileScore } from './pipeline'; // Обновленный импорт
+import { calculateFileScore } from './assembly'; // Обновленный импорт
 
 export interface ProcessedContextFile {
   path: string; // Относительный путь (app/page.tsx)

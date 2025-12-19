@@ -9,12 +9,12 @@ import { useObjectUrl } from '@/lib/core/hooks/use-object-url';
 import { useWorker } from '@/lib/core/hooks/use-worker';
 import { hexToRgb, invertHex, rgbToHex } from '@/lib/core/utils/colors';
 import { downloadDataUrl, getTopLeftPixelColor, loadImage } from '@/lib/core/utils/media';
-import type { Point } from '@/lib/modules/graphics/processing/filters';
 import type {
   ProcessingMode,
   WorkerPayload,
   WorkerResponse,
-} from '@/lib/modules/graphics/processing/processor.worker';
+} from '@/lib/modules/graphics/processing/background-engine.worker';
+import type { Point } from '@/lib/modules/graphics/processing/imaging';
 import type { CanvasRef } from '@/view/ui/Canvas';
 import { Canvas } from '@/view/ui/Canvas';
 import { ColorInput } from '@/view/ui/ColorInput';
@@ -79,7 +79,9 @@ export function MonochromeBackgroundRemover() {
 
   const createWorker = useCallback(
     () =>
-      new Worker(new URL('@/lib/modules/graphics/processing/processor.worker.ts', import.meta.url)),
+      new Worker(
+        new URL('@/lib/modules/graphics/processing/background-engine.worker.ts', import.meta.url)
+      ),
     []
   );
 

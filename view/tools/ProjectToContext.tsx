@@ -4,25 +4,25 @@ import ignore from 'ignore';
 import Link from 'next/link';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 
+import {
+  calculateFileScore,
+  processFileToContext,
+  type RawFile,
+} from '@/lib/modules/context-generator/assembly';
+import {
+  generateContextOutput,
+  type ProcessedContextFile,
+} from '@/lib/modules/context-generator/core';
 // --- SHARED LOGIC IMPORTS ---
 import {
   CONTEXT_PRESETS,
   LOCAL_CONTEXT_FOLDER,
   MANDATORY_REPO_FILES,
   type PresetKey,
-} from '@/lib/modules/context-generator/config';
-import {
-  generateContextOutput,
-  type ProcessedContextFile,
-} from '@/lib/modules/context-generator/core';
-import {
-  calculateFileScore,
-  processFileToContext,
-  type RawFile,
-} from '@/lib/modules/context-generator/pipeline';
+} from '@/lib/modules/context-generator/rules';
 // --- UTILS ---
-import { isTextFile, LANGUAGE_MAP } from '@/lib/modules/file-system/file-utils';
-import { formatBytes, generateAsciiTree } from '@/lib/modules/file-system/tree-view';
+import { isTextFile, LANGUAGE_MAP } from '@/lib/modules/file-system/analyzers';
+import { formatBytes, generateAsciiTree } from '@/lib/modules/file-system/topology';
 // --- UI COMPONENTS ---
 import { Card } from '@/view/ui/Card';
 import { Switch } from '@/view/ui/Switch';
