@@ -9,13 +9,14 @@ interface WorkbenchProps {
   className?: string;
 }
 
+// FIX: Используем fixed позиционирование.
+// inset-x-0 bottom-0: Прибиваем к низу и бокам.
+// top-[65px]: Отступаем место под глобальный хедер (его высота ~65px).
+// Это гарантирует, что футер (который внизу страницы) окажется ПОД верстаком и не вызовет скролл.
 const Root = ({ children, className }: WorkbenchProps) => (
-  // h-[calc(100vh-65px)] — костыль для учета высоты хедера.
-  // В идеале хедер не должен быть частью скролла страницы,
-  // но для текущей структуры это работает.
   <div
     className={cn(
-      'flex h-[calc(100vh-65px)] w-full overflow-hidden bg-zinc-50 dark:bg-zinc-950',
+      'fixed inset-x-0 top-[65px] bottom-0 flex overflow-hidden bg-zinc-50 dark:bg-zinc-950',
       className
     )}
   >
@@ -37,7 +38,10 @@ const Sidebar = ({ children, className }: WorkbenchProps) => (
 );
 
 const Stage = ({ children, className }: WorkbenchProps) => (
-  <main className={cn('relative z-10 flex-1 overflow-hidden', className)}>{children}</main>
+  // overscroll-none: Предотвращает "эластичный" скролл всей страницы на Mac/Mobile при зуме канваса
+  <main className={cn('relative z-10 flex-1 overflow-hidden overscroll-none', className)}>
+    {children}
+  </main>
 );
 
 const Toolbar = ({ children, className }: WorkbenchProps) => (

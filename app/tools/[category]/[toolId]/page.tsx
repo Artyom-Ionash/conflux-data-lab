@@ -1,8 +1,10 @@
 /* eslint-disable react-hooks/static-components */
+import Link from 'next/link';
 import { notFound } from 'next/navigation';
 
 import { getToolComponent } from '@/app/_components/registry/tool-loader';
-import { getToolById } from '@/lib/core/registry/config';
+import { categoryLabels, getToolById } from '@/lib/core/registry/config';
+import { Badge } from '@/ui/Badge';
 
 interface ToolPageProps {
   params: Promise<{
@@ -21,15 +23,15 @@ export default async function ToolPage({ params }: ToolPageProps) {
 
   const ToolComponent = getToolComponent(toolId);
 
-  // ИЗМЕНЕНИЕ: Убраны классы container, mx-auto, padding.
-  // Теперь компонент занимает всю ширину и высоту родителя (main).
+  // FIX: Удален container и отступы.
+  // Используем flex-col h-full, чтобы занять всё пространство, предоставленное лейаутом (или Workbench).
   return (
     <div className="flex h-full w-full flex-col bg-zinc-50 dark:bg-zinc-950">
       {ToolComponent ? (
         <ToolComponent />
       ) : (
-        <div className="flex h-full items-center justify-center">
-          <p className="text-zinc-500">Загрузка инструмента...</p>
+        <div className="rounded-lg border border-zinc-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-900">
+          <p className="text-zinc-600 dark:text-zinc-400">Загрузка компонента...</p>
         </div>
       )}
     </div>
