@@ -41,9 +41,9 @@
     "colord": "^2.9.3",
     "gifshot": "^0.4.5",
     "ignore": "^7.0.5",
-    "next": "^16.0.7",
-    "react": "^19.2.1",
-    "react-dom": "^19.2.1",
+    "next": "^16.1.0",
+    "react": "^19.2.3",
+    "react-dom": "^19.2.3",
     "remeda": "^2.32.0",
     "tailwind-merge": "^3.4.0"
   },
@@ -52,12 +52,12 @@
     "@testing-library/dom": "^10.4.1",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.1",
-    "@types/node": "^20",
+    "@types/node": "^25",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "@vitejs/plugin-react": "^5.1.2",
     "eslint": "^9",
-    "eslint-config-next": "16.0.5",
+    "eslint-config-next": "^16.1.0",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-boundaries": "^5.3.1",
     "eslint-plugin-simple-import-sort": "^12.1.1",
@@ -73,8 +73,8 @@
     "tailwindcss": "^4",
     "tsx": "^4.21.0",
     "typescript": "^5",
-    "vite-tsconfig-paths": "^6.0.1",
-    "vitest": "^4.0.15"
+    "vite-tsconfig-paths": "^6.0.3",
+    "vitest": "^4.0.16"
   },
   "lint-staged": {
     "*.{js,jsx,ts,tsx}": [
