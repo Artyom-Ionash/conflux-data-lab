@@ -1,19 +1,10 @@
 'use client';
-import type { CreateGIFResult } from 'gifshot';
-import gifshot from 'gifshot';
 import Link from 'next/link';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
-import { useDebounceEffect } from '@/lib/core/hooks/use-debounce-effect';
-import { useObjectUrl } from '@/lib/core/hooks/use-object-url';
 import { generateSpriteSheet } from '@/lib/modules/graphics/processing/sprite-generator';
 import { TEXTURE_LIMITS } from '@/lib/modules/graphics/standards';
-import {
-  calculateTimestamps,
-  type ExtractedFrame,
-  type ExtractionParams,
-  runExtractionTask,
-} from '@/lib/modules/video/extraction';
+import { useFrameExtractor } from '@/lib/modules/video/use-frame-extractor';
 // --- UI IMPORTS ---
 import { Card } from '@/view/ui/Card';
 import { MultiScalePreview } from '@/view/ui/collections/MultiScalePreview';
@@ -36,86 +27,43 @@ import { Workbench } from '@/view/ui/Workbench';
 import { TextureLimitIndicator } from './hardware/TextureLimitIndicator';
 import { FrameDiffOverlay } from './video/FrameDiffOverlay';
 
-// --- CONSTANTS ---
-const DEFAULT_CLIP_DURATION = 0.5; // seconds
-const DEFAULT_FRAME_STEP = 0.1; // seconds
-const DEFAULT_FPS = 10;
-const DEFAULT_ASPECT_RATIO = 1.77; // 16:9 approx
+const DEFAULT_ASPECT_RATIO = 1.77;
 const MAX_BROWSER_TEXTURE = TEXTURE_LIMITS.MAX_BROWSER;
 
-// --- LOGIC HOOKS ---
+export function VideoFrameExtractor() {
+  const { refs, state, actions } = useFrameExtractor();
 
-function useVideoFrameExtraction() {
-  const [videoFile, setVideoFile] = useState<File | null>(null);
-  const videoSrc = useObjectUrl(videoFile);
-
-  const [videoDuration, setVideoDuration] = useState<number | null>(null);
-  const [videoDimensions, setVideoDimensions] = useState<{ width: number; height: number } | null>(
-    null
-  );
-
-  const [extractionParams, setExtractionParams] = useState<ExtractionParams>({
-    startTime: 0,
-    endTime: 0,
-    frameStep: 1,
-    symmetricLoop: false,
+  // --- Local UI State ---
+  const [spriteOptions, setSpriteOptions] = useState({
+    maxHeight: 300,
+    spacing: 0,
+    bg: 'transparent',
   });
-  const [rawFrames, setRawFrames] = useState<ExtractedFrame[]>([]);
-
-  const frames = useMemo(() => {
-    if (rawFrames.length < 2) return rawFrames;
-    if (!extractionParams.symmetricLoop) return rawFrames;
-    const loopBack = rawFrames.slice(1, -1).reverse();
-    return [...rawFrames, ...loopBack];
-  }, [rawFrames, extractionParams.symmetricLoop]);
-
-  const [gifParams, setGifParams] = useState({ fps: DEFAULT_FPS, dataUrl: null as string | null });
-  const [status, setStatus] = useState({ isProcessing: false, currentStep: '', progress: 0 });
-  const [error, setError] = useState<string | null>(null);
-
+  const [diffDataUrl, setDiffDataUrl] = useState<string | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
   const [previewFrames, setPreviewFrames] = useState<{ start: string | null; end: string | null }>({
     start: null,
     end: null,
   });
   const [isPreviewing, setIsPreviewing] = useState(false);
-
-  // Refs
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const previewVideoRef = useRef<HTMLVideoElement>(null);
-  const hoverVideoRef = useRef<HTMLVideoElement>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const abortControllerRef = useRef<AbortController | null>(null);
-
-  const effectiveEnd = useMemo(
-    () => (extractionParams.endTime > 0 ? extractionParams.endTime : (videoDuration ?? 0)),
-    [extractionParams.endTime, videoDuration]
+  const [hoverPreview, setHoverPreview] = useState<{ activeThumb: 0 | 1; time: number } | null>(
+    null
   );
+  const [isDragging, setIsDragging] = useState(false);
 
-  // Auto-FPS Logic
+  const sliderContainerRef = useRef<HTMLDivElement>(null);
+
+  // --- Preview Generation Effect ---
   useEffect(() => {
-    if (extractionParams.frameStep > 0) {
-      const calculatedFps = Math.round(1 / extractionParams.frameStep);
-      const safeFps = Math.max(1, Math.min(60, calculatedFps));
-      setGifParams((prev) => ({ ...prev, fps: safeFps }));
-    }
-  }, [extractionParams.frameStep]);
+    const vid = refs.previewVideoRef.current;
+    const canvas = refs.canvasRef.current;
+    const src = state.videoSrc;
 
-  // Sync Hover Video Source
-  useEffect(() => {
-    if (hoverVideoRef.current && videoSrc && hoverVideoRef.current.src !== videoSrc) {
-      hoverVideoRef.current.src = videoSrc;
-    }
-  }, [videoSrc]);
+    if (!src || !vid || !canvas || !state.videoDuration) return;
+    if (state.status.isProcessing) return;
 
-  // Generate Start/End Previews (Cache)
-  useEffect(() => {
-    if (!videoSrc || !previewVideoRef.current || !canvasRef.current || !videoDuration) return;
-    if (status.isProcessing) return;
-
-    const vid = previewVideoRef.current;
-    const canvas = canvasRef.current;
+    if (vid.src !== src) vid.src = src;
     const ctx = canvas.getContext('2d');
-    if (vid.src !== videoSrc) vid.src = videoSrc;
 
     const timer = setTimeout(async () => {
       setIsPreviewing(true);
@@ -124,15 +72,13 @@ function useVideoFrameExtraction() {
           await new Promise<void>((r) => {
             vid.onloadedmetadata = () => r();
           });
+
         canvas.width = vid.videoWidth;
         canvas.height = vid.videoHeight;
 
-        const safeStart = Math.max(0, extractionParams.startTime);
-        const interval = extractionParams.frameStep;
-        const steps = Math.floor((Math.min(effectiveEnd, videoDuration) - safeStart) / interval);
-        const actualEndTime = safeStart + steps * interval;
+        const safeStart = Math.max(0, state.extractionParams.startTime);
 
-        // Generate Start Cache
+        // Start Frame
         vid.currentTime = safeStart;
         await new Promise<void>((r) => {
           vid.onseeked = () => r();
@@ -140,8 +86,8 @@ function useVideoFrameExtraction() {
         ctx?.drawImage(vid, 0, 0);
         const startUrl = canvas.toDataURL('image/png');
 
-        // Generate End Cache
-        vid.currentTime = actualEndTime;
+        // End Frame
+        vid.currentTime = Math.min(state.effectiveEnd, state.videoDuration ?? 0);
         await new Promise<void>((r) => {
           vid.onseeked = () => r();
         });
@@ -155,260 +101,44 @@ function useVideoFrameExtraction() {
         setIsPreviewing(false);
       }
     }, 500);
+
     return () => clearTimeout(timer);
   }, [
-    videoSrc,
-    extractionParams.startTime,
-    effectiveEnd,
-    videoDuration,
-    status.isProcessing,
-    extractionParams.frameStep,
+    state.videoSrc,
+    state.extractionParams.startTime,
+    state.effectiveEnd,
+    state.videoDuration,
+    state.status.isProcessing,
+    refs.previewVideoRef,
+    refs.canvasRef,
   ]);
 
-  const handleFilesSelected = useCallback(async (files: File[]) => {
-    if (!files.length) return;
-    const file = files[0];
-    if (!file) return;
-    setRawFrames([]);
-    setPreviewFrames({ start: null, end: null });
-    setError(null);
-    setGifParams((p) => ({ ...p, dataUrl: null }));
-    setVideoDuration(null);
-    setVideoDimensions(null);
-
-    setVideoFile(file);
-
-    const objectUrl = URL.createObjectURL(file);
-    const tempVideo = document.createElement('video');
-    tempVideo.src = objectUrl;
-    tempVideo.onloadedmetadata = () => {
-      const duration = tempVideo.duration || 0;
-      setVideoDuration(duration);
-      setVideoDimensions({ width: tempVideo.videoWidth, height: tempVideo.videoHeight });
-
-      const safeStartTime = Math.max(0, duration - DEFAULT_CLIP_DURATION);
-      setExtractionParams({
-        startTime: safeStartTime,
-        endTime: duration,
-        frameStep: DEFAULT_FRAME_STEP,
-        symmetricLoop: true,
-      });
-      URL.revokeObjectURL(objectUrl);
-    };
-    tempVideo.onerror = () => {
-      setError('Ошибка загрузки');
-      URL.revokeObjectURL(objectUrl);
-    };
-  }, []);
-  const runExtraction = useCallback(async () => {
-    // 1. Проверяем наличие ресурсов
-    if (!videoRef.current || !videoSrc) return;
-
-    const videoEl = videoRef.current;
-
-    // 2. Управление отменой
-    if (abortControllerRef.current) abortControllerRef.current.abort();
-    abortControllerRef.current = new AbortController();
-
-    setStatus({ isProcessing: true, currentStep: 'extracting', progress: 0 });
-    setError(null);
-
-    try {
-      // 3. СИНХРОНИЗАЦИЯ: Устанавливаем источник и ждем готовности
-      if (videoEl.src !== videoSrc) {
-        videoEl.src = videoSrc;
-      }
-
-      if (videoEl.readyState < 1) {
-        await new Promise((resolve) => {
-          videoEl.onloadedmetadata = resolve;
-        });
-      }
-
-      // 4. ПРЕД-ИНИЦИАЛИЗАЦИЯ: Сразу создаем пустой массив нужной длины
-      const totalTimestamps = calculateTimestamps(extractionParams, videoEl.duration);
-      const initialFrames: ExtractedFrame[] = totalTimestamps.map((t) => ({
-        time: t,
-        dataUrl: null,
-      }));
-
-      setRawFrames(initialFrames);
-
-      // 5. ЗАПУСК КРИСТАЛЛИЗОВАННОЙ ЗАДАЧИ
-      await runExtractionTask(videoEl, extractionParams, {
-        signal: abortControllerRef.current.signal,
-        onFrame: (frame, index) => {
-          setRawFrames((prev) => {
-            // Если массив был сброшен (например, при повторном запуске), защищаемся
-            if (prev.length === 0) return prev;
-            return prev.map((f, i) => (i === index ? frame : f));
-          });
-        },
-        onProgress: (progress) => setStatus((s) => ({ ...s, progress })),
-      });
-
-      setStatus({ isProcessing: false, currentStep: '', progress: 100 });
-    } catch (e: unknown) {
-      // Игнорируем ошибку отмены, остальные выводим
-      if (e instanceof Error && e.message !== 'Extraction Aborted') {
-        setError(e.message);
-        setStatus({ isProcessing: false, currentStep: '', progress: 0 });
-      }
-    }
-  }, [videoSrc, extractionParams]);
-
-  useDebounceEffect(
-    () => {
-      if (videoSrc) {
-        void runExtraction();
-      }
-    },
-    [runExtraction, videoSrc],
-    600
-  );
-
-  const generateAndDownloadGif = useCallback(() => {
-    // Type Guard: фильтруем и гарантируем, что dataUrl не null
-    const validFrames = frames.filter(
-      (f): f is ExtractedFrame & { dataUrl: string } => f.dataUrl !== null
-    );
-
-    if (validFrames.length === 0) return;
-
-    setStatus({ isProcessing: true, currentStep: 'generating', progress: 0 });
-    setError(null);
-
-    setTimeout(() => {
-      if (gifshot !== undefined) {
-        gifshot.createGIF(
-          {
-            images: validFrames.map((f) => f.dataUrl),
-            interval: 1 / gifParams.fps,
-            gifWidth: videoDimensions?.width || 300,
-            gifHeight: videoDimensions?.height || 200,
-            numFrames: validFrames.length,
-          },
-          (obj: CreateGIFResult) => {
-            if (!obj.error && obj.image) {
-              const a = document.createElement('a');
-              a.href = obj.image;
-              a.download = 'animation.gif';
-              a.click();
-              setGifParams((p) => ({ ...p, dataUrl: obj.image ?? null }));
-            } else {
-              setError(`Error: ${obj.errorCode ?? obj.errorMsg ?? 'unknown'}`);
-            }
-            setStatus({ isProcessing: false, currentStep: '', progress: 0 });
-          }
-        );
-      }
-    }, 50);
-  }, [frames, gifParams.fps, videoDimensions]);
-
-  return {
-    videoRef,
-    previewVideoRef,
-    hoverVideoRef,
-    canvasRef,
-    videoSrc,
-    videoDuration,
-    videoDimensions,
-    extractionParams,
-    setExtractionParams,
-    frames,
-    gifParams,
-    setGifParams,
-    status,
-    error,
-    effectiveEnd,
-    previewFrames,
-    isPreviewing,
-    handleFilesSelected,
-    runExtraction,
-    generateAndDownloadGif,
-  };
-}
-
-// --- MAIN COMPONENT ---
-
-export function VideoFrameExtractor() {
-  const {
-    videoRef,
-    previewVideoRef,
-    hoverVideoRef,
-    canvasRef,
-    videoSrc,
-    videoDuration,
-    videoDimensions,
-    extractionParams,
-    setExtractionParams,
-    frames,
-    gifParams,
-    setGifParams,
-    status,
-    error,
-    effectiveEnd,
-    previewFrames,
-    isPreviewing,
-    handleFilesSelected,
-    generateAndDownloadGif,
-  } = useVideoFrameExtraction();
-
-  // Local UI State
-  const [spriteOptions, setSpriteOptions] = useState({
-    maxHeight: 300,
-    spacing: 0,
-    bg: 'transparent',
-  });
-  const [diffDataUrl, setDiffDataUrl] = useState<string | null>(null);
-  const [isModalOpen, setIsModalOpen] = useState(false);
-
-  // Hover Preview State
-  const [hoverPreview, setHoverPreview] = useState<{ activeThumb: 0 | 1; time: number } | null>(
-    null
-  );
-  const [isDragging, setIsDragging] = useState(false);
-  const sliderContainerRef = useRef<HTMLDivElement>(null);
-
-  // Draw overlay for SequencePlayer
+  // --- Helpers ---
   const handleDrawOverlay = useCallback(
     (ctx: CanvasRenderingContext2D, index: number, w: number, h: number) => {
-      const frame = frames[index];
+      const frame = state.frames[index];
       if (!frame) return;
       const timeText = `${frame.time.toFixed(2)}s`;
       const fontSize = Math.max(14, Math.floor(w * 0.05));
       ctx.font = `bold ${fontSize}px monospace`;
-      const textMetrics = ctx.measureText(timeText);
 
-      const padX = fontSize * 0.6;
-      const padY = fontSize * 0.4;
       const margin = Math.max(8, w * 0.03);
       const x = margin;
-      const y = h - margin - (fontSize + padY * 2);
-      const boxWidth = textMetrics.width + padX * 2;
-      const boxHeight = fontSize + padY * 2;
+      const y = h - margin - fontSize;
 
       ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
-      ctx.beginPath();
-      if (typeof ctx.roundRect === 'function') {
-        ctx.roundRect(x, y, boxWidth, boxHeight, fontSize * 0.4);
-      } else {
-        ctx.rect(x, y, boxWidth, boxHeight);
-      }
-      ctx.fill();
+      ctx.fillText(timeText, x + 2, y + 2);
 
       ctx.fillStyle = 'white';
-      ctx.textBaseline = 'middle';
-      ctx.fillText(timeText, x + padX, y + boxHeight / 2);
+      ctx.fillText(timeText, x, y);
     },
-    [frames]
+    [state.frames]
   );
 
   const handleDownloadSpriteSheet = async () => {
-    if (frames.length === 0) return;
+    if (state.frames.length === 0) return;
     try {
-      // USING NEW ABSTRACTION
-      const url = await generateSpriteSheet(frames, {
+      const url = await generateSpriteSheet(state.frames, {
         maxHeight: spriteOptions.maxHeight,
         spacing: spriteOptions.spacing,
         backgroundColor: spriteOptions.bg,
@@ -422,55 +152,61 @@ export function VideoFrameExtractor() {
     }
   };
 
-  const aspectRatioStyle = useMemo(() => {
-    if (!videoDimensions) return {};
-    return { aspectRatio: `${videoDimensions.width} / ${videoDimensions.height}` };
-  }, [videoDimensions]);
-
-  const totalSpriteWidth = useMemo(() => {
-    if (!videoDimensions || frames.length === 0) return 0;
-    const scale = spriteOptions.maxHeight / videoDimensions.height;
-    const scaledWidth = Math.floor(videoDimensions.width * scale);
-    return (scaledWidth + spriteOptions.spacing) * frames.length - spriteOptions.spacing;
-  }, [videoDimensions, frames.length, spriteOptions.maxHeight, spriteOptions.spacing]);
-
-  const videoRatio = videoDimensions
-    ? videoDimensions.width / videoDimensions.height
-    : DEFAULT_ASPECT_RATIO;
-
-  // --- PREVIEW LOGIC ---
-
   const handleSliderHover = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (!videoDuration || isDragging) return;
+    if (!state.videoDuration || isDragging) return;
     const rect = e.currentTarget.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const percentage = Math.max(0, Math.min(1, x / rect.width));
-    const time = percentage * videoDuration;
+    const time = percentage * state.videoDuration;
 
-    const distToStart = Math.abs(time - extractionParams.startTime);
-    const distToEnd = Math.abs(time - effectiveEnd);
+    const distToStart = Math.abs(time - state.extractionParams.startTime);
+    const distToEnd = Math.abs(time - state.effectiveEnd);
     const nearestThumb = distToStart < distToEnd ? 0 : 1;
 
     setHoverPreview({ activeThumb: nearestThumb, time });
-    if (hoverVideoRef.current) hoverVideoRef.current.currentTime = time;
+    if (refs.hoverVideoRef.current) refs.hoverVideoRef.current.currentTime = time;
   };
 
   const handleValueChange = (newValues: number[], thumbIndex?: 0 | 1) => {
     const start = newValues[0] ?? 0;
     const end = newValues[1] ?? 0;
-
-    setExtractionParams((p) => ({ ...p, startTime: start, endTime: end }));
+    actions.setExtractionParams((p) => ({ ...p, startTime: start, endTime: end }));
 
     if (isDragging && typeof thumbIndex === 'number') {
       const changedTime = newValues[thumbIndex] ?? 0;
       setHoverPreview({ activeThumb: thumbIndex, time: changedTime });
-      if (hoverVideoRef.current) hoverVideoRef.current.currentTime = changedTime;
+      if (refs.hoverVideoRef.current) refs.hoverVideoRef.current.currentTime = changedTime;
     }
   };
 
+  // --- Derived Calculations ---
+
+  const aspectRatioStyle = useMemo(() => {
+    if (!state.videoDimensions) return {};
+    return { aspectRatio: `${state.videoDimensions.width} / ${state.videoDimensions.height}` };
+  }, [state.videoDimensions]);
+
+  const totalSpriteWidth = useMemo(() => {
+    if (!state.videoDimensions || state.frames.length === 0) return 0;
+    const scale = spriteOptions.maxHeight / state.videoDimensions.height;
+    const scaledWidth = Math.floor(state.videoDimensions.width * scale);
+    return (scaledWidth + spriteOptions.spacing) * state.frames.length - spriteOptions.spacing;
+  }, [state.videoDimensions, state.frames.length, spriteOptions.maxHeight, spriteOptions.spacing]);
+
+  const videoRatio = state.videoDimensions
+    ? state.videoDimensions.width / state.videoDimensions.height
+    : DEFAULT_ASPECT_RATIO;
+
+  // Расчет FPS и Скорости
+  const captureFps =
+    state.extractionParams.frameStep > 0 ? Math.round(1 / state.extractionParams.frameStep) : 10;
+
+  const currentSpeedPercent = Math.round((state.gifParams.fps / captureFps) * 100);
+
+  // --- RENDER ---
+
   const sidebarContent = (
     <div className="flex flex-col gap-6 pb-4">
-      {/* Navigation Header (Теперь часть контента, а не лейаута) */}
       <div>
         <Link
           href="/"
@@ -483,8 +219,6 @@ export function VideoFrameExtractor() {
             fill="none"
             stroke="currentColor"
             strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
           >
             <path d="M19 12H5M12 19l-7-7 7-7" />
           </svg>{' '}
@@ -495,21 +229,21 @@ export function VideoFrameExtractor() {
 
       <div className="flex flex-col gap-2">
         <FileDropzone
-          onFilesSelected={handleFilesSelected}
+          onFilesSelected={actions.handleFilesSelected}
           multiple={false}
           accept="video/*"
           label="Загрузить видео"
         />
-        {status.isProcessing && (
+        {state.status.isProcessing && (
           <div className="mt-2 rounded border border-blue-100 bg-blue-50 p-3 dark:border-blue-800 dark:bg-blue-900/20">
             <div className="mb-1 flex justify-between text-xs font-semibold text-blue-700 dark:text-blue-300">
               <span>Обработка...</span>
-              <span className="font-mono">{Math.round(status.progress)}%</span>
+              <span className="font-mono">{Math.round(state.status.progress)}%</span>
             </div>
             <div className="h-1 w-full overflow-hidden rounded-full bg-blue-200 dark:bg-blue-800">
               <div
                 className="h-full bg-blue-600 transition-all duration-300"
-                style={{ width: `${status.progress}%` }}
+                style={{ width: `${state.status.progress}%` }}
               />
             </div>
           </div>
@@ -523,10 +257,10 @@ export function VideoFrameExtractor() {
       <Workbench.Sidebar>{sidebarContent}</Workbench.Sidebar>
       <Workbench.Stage>
         <div className="relative flex h-full w-full flex-col overflow-hidden bg-zinc-50 dark:bg-black/20">
-          {!videoSrc ? (
+          {!state.videoSrc ? (
             <div className="flex-1 p-8">
               <FileDropzonePlaceholder
-                onUpload={handleFilesSelected}
+                onUpload={actions.handleFilesSelected}
                 multiple={false}
                 accept="video/*"
                 title="Перетащите видеофайл"
@@ -534,33 +268,31 @@ export function VideoFrameExtractor() {
             </div>
           ) : (
             <div className="flex-1 space-y-4 overflow-y-auto p-4">
-              {/* CONTROLS CARD */}
               <Card className="relative z-20 overflow-visible shadow-sm" contentClassName="p-4">
-                {/* ... Содержимое карточки ... (без изменений) */}
                 <div className="flex flex-col gap-4">
                   <div className="space-y-4">
-                    {/* Top Bar */}
                     <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3">
                       <div className="flex flex-wrap items-center gap-6">
                         <ControlLabel>Диапазон</ControlLabel>
                         <div className="hidden h-6 w-px bg-zinc-200 sm:block dark:bg-zinc-700"></div>
                         <NumberStepper
                           label="Шаг (сек)"
-                          value={extractionParams.frameStep}
-                          onChange={(v) => setExtractionParams((p) => ({ ...p, frameStep: v }))}
+                          value={state.extractionParams.frameStep}
+                          onChange={(v) =>
+                            actions.setExtractionParams((p) => ({ ...p, frameStep: v }))
+                          }
                           step={0.05}
                           min={0.05}
                           max={10}
                         />
                       </div>
                       <div className="ml-auto flex items-center gap-2 rounded bg-black/80 px-3 py-1.5 font-mono text-xs font-bold text-white shadow-sm">
-                        <span>{extractionParams.startTime.toFixed(2)}s</span>
+                        <span>{state.extractionParams.startTime.toFixed(2)}s</span>
                         <span className="opacity-50">→</span>
-                        <span>{effectiveEnd.toFixed(2)}s</span>
+                        <span>{state.effectiveEnd.toFixed(2)}s</span>
                       </div>
                     </div>
 
-                    {/* Range Slider */}
                     <div
                       ref={sliderContainerRef}
                       className="group relative touch-none py-2"
@@ -574,21 +306,20 @@ export function VideoFrameExtractor() {
                     >
                       <RangeSlider
                         min={0}
-                        max={videoDuration ?? 0}
+                        max={state.videoDuration ?? 0}
                         step={0.01}
-                        value={[extractionParams.startTime, effectiveEnd]}
+                        value={[state.extractionParams.startTime, state.effectiveEnd]}
                         onValueChange={handleValueChange}
                         minStepsBetweenThumbs={0.1}
                       />
-
                       {hoverPreview && (
                         <DualHoverPreview
                           activeThumb={hoverPreview.activeThumb}
                           hoverTime={hoverPreview.time}
-                          startTime={extractionParams.startTime}
-                          endTime={effectiveEnd}
-                          videoSrc={videoSrc}
-                          videoRef={hoverVideoRef as React.RefObject<HTMLVideoElement>}
+                          startTime={state.extractionParams.startTime}
+                          endTime={state.effectiveEnd}
+                          videoSrc={state.videoSrc}
+                          videoRef={refs.hoverVideoRef as React.RefObject<HTMLVideoElement>}
                           previewStartImage={previewFrames.start}
                           previewEndImage={previewFrames.end}
                           aspectRatioStyle={aspectRatioStyle}
@@ -596,13 +327,13 @@ export function VideoFrameExtractor() {
                       )}
                     </div>
                   </div>
-                  {error && <div className="text-right text-xs text-red-600">{error}</div>}
+                  {state.error && (
+                    <div className="text-right text-xs text-red-600">{state.error}</div>
+                  )}
                 </div>
               </Card>
 
-              {/* PREVIEW GRID */}
               <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-                {/* ... Содержимое грида ... (без изменений) */}
                 <Card
                   className="flex flex-col overflow-hidden shadow-sm"
                   title={<ControlLabel>Исходное видео</ControlLabel>}
@@ -610,15 +341,14 @@ export function VideoFrameExtractor() {
                 >
                   <div className="relative w-full bg-black" style={aspectRatioStyle}>
                     <RangeVideoPlayer
-                      src={videoSrc}
-                      startTime={extractionParams.startTime}
-                      endTime={effectiveEnd}
+                      src={state.videoSrc}
+                      startTime={state.extractionParams.startTime}
+                      endTime={state.effectiveEnd}
                       className="absolute inset-0"
                     />
                   </div>
                 </Card>
 
-                {/* 2. Diff Overlay */}
                 <Card
                   className="flex flex-col overflow-hidden shadow-sm"
                   title={<ControlLabel>Разница</ControlLabel>}
@@ -654,54 +384,45 @@ export function VideoFrameExtractor() {
                   </div>
                 </Card>
 
-                {/* 3. Sprite / GIF Player */}
                 <Card
                   className="flex flex-col overflow-hidden shadow-sm"
                   title={
                     <div className="flex items-center gap-4">
                       <ControlLabel>Спрайт</ControlLabel>
+                      {/* [RESTORED] Speed % Control */}
                       <NumberStepper
                         label="Скорость %"
-                        value={Math.round(
-                          (gifParams.fps /
-                            (extractionParams.frameStep > 0
-                              ? Math.round(1 / extractionParams.frameStep)
-                              : 10)) *
-                            100
-                        )}
+                        value={currentSpeedPercent}
                         onChange={(val) => {
-                          const base =
-                            extractionParams.frameStep > 0
-                              ? Math.round(1 / extractionParams.frameStep)
-                              : 10;
-                          setGifParams((p) => ({
-                            ...p,
-                            fps: Math.max(1, Math.round(base * (val / 100))),
-                          }));
+                          const newFps = Math.max(1, Math.round(captureFps * (val / 100)));
+                          actions.setGifParams((p) => ({ ...p, fps: newFps }));
                         }}
                         min={10}
                         max={500}
                         step={10}
                       />
+                      {/* Read-only FPS */}
                       <NumberStepper
                         label="FPS"
-                        value={gifParams.fps}
+                        value={state.gifParams.fps}
                         onChange={() => {}}
                         disabled={true}
                       />
                     </div>
                   }
                   headerActions={
-                    frames.length > 0 && !status.isProcessing ? (
+                    state.frames.length > 0 && !state.status.isProcessing ? (
                       <button
-                        onClick={generateAndDownloadGif}
-                        disabled={status.isProcessing}
+                        onClick={actions.generateAndDownloadGif}
+                        disabled={state.status.isProcessing}
                         className={cn(
                           'text-xs font-medium text-blue-600 hover:underline disabled:opacity-50',
-                          status.isProcessing && 'cursor-not-allowed opacity-50'
+                          state.status.isProcessing && 'cursor-not-allowed opacity-50'
                         )}
                       >
-                        {status.currentStep === 'generating' ? 'Кодирование...' : 'Скачать GIF'}
+                        {state.status.currentStep === 'generating'
+                          ? 'Кодирование...'
+                          : 'Скачать GIF'}
                       </button>
                     ) : undefined
                   }
@@ -711,18 +432,16 @@ export function VideoFrameExtractor() {
                     className="group relative w-full cursor-pointer bg-zinc-100 dark:bg-zinc-950"
                     style={aspectRatioStyle}
                     onClick={() => setIsModalOpen(true)}
-                    title="Нажмите, чтобы открыть предпросмотр масштабов"
                   >
-                    {frames.length > 0 || status.isProcessing ? (
+                    {state.frames.length > 0 || state.status.isProcessing ? (
                       <>
                         <ImageSequencePlayer
-                          images={frames.map((f) => f.dataUrl)}
-                          fps={gifParams.fps}
-                          width={videoDimensions?.width || 300}
-                          height={videoDimensions?.height || 200}
+                          images={state.frames.map((f) => f.dataUrl)}
+                          fps={state.gifParams.fps}
+                          width={state.videoDimensions?.width || 300}
+                          height={state.videoDimensions?.height || 200}
                           onDrawOverlay={handleDrawOverlay}
                         />
-
                         <div className="absolute inset-0 flex items-center justify-center bg-black/0 transition-colors group-hover:bg-black/10">
                           <div className="scale-95 transform rounded-full bg-black/70 px-3 py-1.5 text-xs font-bold text-white opacity-0 backdrop-blur-sm transition-opacity group-hover:scale-100 group-hover:opacity-100">
                             Открыть масштабы ⤢
@@ -738,16 +457,15 @@ export function VideoFrameExtractor() {
                 </Card>
               </div>
 
-              {/* SPRITE SHEET SETTINGS & LIST */}
               <ControlSection
                 title="Спрайт-лист"
                 className="shadow-sm"
                 headerRight={
-                  frames.length > 0 && (
+                  state.frames.length > 0 && (
                     <div className="flex items-center gap-4">
                       <NumberStepper
                         label="Кадров"
-                        value={frames.length}
+                        value={state.frames.length}
                         onChange={() => {}}
                         disabled={true}
                       />
@@ -770,18 +488,17 @@ export function VideoFrameExtractor() {
                   )
                 }
               >
-                {frames.length > 0 && (
+                {state.frames.length > 0 && (
                   <div className="mb-4 flex items-center gap-4">
                     <Switch
                       label="Loop"
-                      checked={extractionParams.symmetricLoop}
+                      checked={state.extractionParams.symmetricLoop}
                       onCheckedChange={(c) =>
-                        setExtractionParams((p) => ({ ...p, symmetricLoop: c }))
+                        actions.setExtractionParams((p) => ({ ...p, symmetricLoop: c }))
                       }
                       className="gap-2 text-xs font-medium whitespace-nowrap"
                     />
                     <div className="h-6 w-px bg-zinc-200 dark:bg-zinc-700"></div>
-
                     <NumberStepper
                       label="Высота"
                       value={spriteOptions.maxHeight}
@@ -791,6 +508,7 @@ export function VideoFrameExtractor() {
                       max={2000}
                     />
                     <div className="h-6 w-px bg-zinc-200 dark:bg-zinc-700"></div>
+                    {/* [RESTORED] Spacing Control */}
                     <NumberStepper
                       label="Отступ"
                       value={spriteOptions.spacing}
@@ -799,8 +517,6 @@ export function VideoFrameExtractor() {
                       min={0}
                       max={100}
                     />
-
-                    {/* Replaced manual picker with ColorInput */}
                     <ColorInput
                       value={spriteOptions.bg === 'transparent' ? null : spriteOptions.bg}
                       onChange={(v) => setSpriteOptions((p) => ({ ...p, bg: v }))}
@@ -809,10 +525,9 @@ export function VideoFrameExtractor() {
                     />
                   </div>
                 )}
-
                 <div className="custom-scrollbar overflow-x-auto bg-zinc-100 p-4 dark:bg-zinc-950">
                   <SpriteFrameList
-                    frames={frames}
+                    frames={state.frames}
                     maxHeight={spriteOptions.maxHeight}
                     spacing={spriteOptions.spacing}
                     backgroundColor={spriteOptions.bg}
@@ -824,38 +539,33 @@ export function VideoFrameExtractor() {
           )}
 
           {/* Hidden Processing Elements */}
+          <video ref={refs.videoRef} className="hidden" crossOrigin="anonymous" muted playsInline />
           <video
-            ref={videoRef}
-            className="pointer-events-none absolute top-0 left-0 -z-50 h-1 w-1 opacity-0"
+            ref={refs.previewVideoRef}
+            className="hidden"
             crossOrigin="anonymous"
             muted
             playsInline
           />
           <video
-            ref={previewVideoRef}
-            className="pointer-events-none absolute top-0 left-0 -z-50 h-1 w-1 opacity-0"
+            ref={refs.hoverVideoRef}
+            className="hidden"
             crossOrigin="anonymous"
             muted
             playsInline
           />
-          <canvas ref={canvasRef} className="hidden" />
+          <canvas ref={refs.canvasRef} className="hidden" />
 
-          {/* MODAL */}
           <Modal
             isOpen={isModalOpen}
             onClose={() => setIsModalOpen(false)}
-            title={
-              <div className="flex items-center gap-3">
-                <span className="h-2 w-2 animate-pulse rounded-full bg-green-500" />
-                Предпросмотр масштабов
-              </div>
-            }
-            headerActions={
-              <span className="font-mono text-xs text-zinc-500">FPS: {gifParams.fps}</span>
-            }
+            title="Предпросмотр масштабов"
             className="h-[92vh] w-[96vw] max-w-[1920px]"
           >
-            <MultiScalePreview frames={frames.map((f) => f.dataUrl)} fps={gifParams.fps} />
+            <MultiScalePreview
+              frames={state.frames.map((f) => f.dataUrl)}
+              fps={state.gifParams.fps}
+            />
           </Modal>
         </div>
       </Workbench.Stage>
