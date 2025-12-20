@@ -70,7 +70,6 @@ export function MonochromeBackgroundRemover() {
   const [manualTrigger, setManualTrigger] = useState(0);
 
   const [isProcessing, setIsProcessing] = useState(false);
-  const [canvasScale, setCanvasScale] = useState(CANVAS_SCALE_DEFAULT);
 
   const workspaceRef = useRef<CanvasRef>(null);
   const sourceCanvasRef = useRef<HTMLCanvasElement>(null);
@@ -130,7 +129,7 @@ export function MonochromeBackgroundRemover() {
       }
       setTimeout(() => {
         workspaceRef.current?.resetView(img.width, img.height);
-        if (workspaceRef.current) setCanvasScale(workspaceRef.current.getTransform().scale);
+        // УДАЛЕНО: setCanvasScale(...)
       }, VIEW_RESET_DELAY);
     } catch (e) {
       console.error(e);
@@ -182,8 +181,6 @@ export function MonochromeBackgroundRemover() {
 
   useEffect(() => {
     if (originalUrl) {
-      // FIX: Оборачиваем в requestAnimationFrame, чтобы линтер видел, что вызов отложен
-      // и не блокирует рендер синхронно.
       requestAnimationFrame(() => {
         void loadOriginalToCanvas(originalUrl);
       });
@@ -206,9 +203,11 @@ export function MonochromeBackgroundRemover() {
     return undefined;
   }, [manualTrigger, processingMode, processImage]);
 
-  const updateScale = () => {
-    if (workspaceRef.current) setCanvasScale(workspaceRef.current.getTransform().scale);
-  };
+  // NEW: Геттер масштаба для корректной физики перетаскивания
+  const getCanvasScale = useCallback(
+    () => workspaceRef.current?.getTransform().scale || CANVAS_SCALE_DEFAULT,
+    []
+  );
 
   const handleFilesSelected = async (files: File[]) => {
     const file = files[0];
@@ -458,7 +457,7 @@ export function MonochromeBackgroundRemover() {
   );
 
   return (
-    <Workbench.Root onPointerUp={updateScale} onWheel={updateScale}>
+    <Workbench.Root>
       <Workbench.Sidebar>{sidebarContent}</Workbench.Sidebar>
       <Workbench.Stage>
         <div className="relative h-full w-full">
@@ -495,14 +494,15 @@ export function MonochromeBackgroundRemover() {
                   key={i}
                   x={pt.x}
                   y={pt.y}
-                  scale={canvasScale}
+                  // FIX: Передаем функцию-геттер для динамического расчета
+                  scale={getCanvasScale}
                   onMove={(pos) => handlePointMove(i, pos)}
                   className="z-20"
                 >
                   {() => (
                     <div
                       style={{
-                        transform: 'translate(-50%, -50%) scale(calc(1 / var(--canvas-scale)))',
+                        transform: 'translate(-50%, -50%)',
                       }}
                     >
                       <div className="h-2.5 w-2.5 rounded-full border border-white bg-red-500 shadow-[0_0_2px_rgba(0,0,0,0.8)] transition-all" />
