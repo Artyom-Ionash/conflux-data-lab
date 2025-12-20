@@ -5,22 +5,21 @@ import react from '@vitejs/plugin-react';
 import tsconfigPaths from 'vite-tsconfig-paths';
 import { defineConfig } from 'vitest/config';
 
-// Эмуляция __dirname для ESM модулей (.mts)
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 export default defineConfig({
   plugins: [
     react(),
-    tsconfigPaths(), // Оставляем как фоллбэк
+    tsconfigPaths(),
   ],
   test: {
     environment: 'happy-dom',
     globals: true,
+    setupFiles: ['./vitest.setup.ts'],
   },
   resolve: {
     alias: {
-      // Явное указание: @ -> корень проекта
       '@': resolve(__dirname, './'),
     },
   },

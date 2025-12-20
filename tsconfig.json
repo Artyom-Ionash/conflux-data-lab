@@ -1,4 +1,3 @@
-// conflux-data-lab/tsconfig.json
 {
   "compilerOptions": {
     // Безопасный и современный стандарт для Node 18+
@@ -52,7 +51,9 @@
     ".next/types/**/*.ts",
     "**/*.mts",
     "lib/types/**/*.d.ts",
-    ".next/dev/types/**/*.ts"
+    ".next/dev/types/**/*.ts",
+    "vitest.d.ts",
+    "vitest.setup.ts"
   ],
   "exclude": ["node_modules", ".next/dev"]
 }

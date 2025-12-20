@@ -22,6 +22,16 @@ const eslintConfig = defineConfig([
     settings: {
       'boundaries/include': ['app/**/*', 'lib/**/*', 'view/**/*'],
       'boundaries/elements': [
+        // [UPDATED] 1. ТЕСТЫ (Первый приоритет)
+        // Выделяем тесты в отдельный слой, чтобы на них не действовали ограничения кода.
+        // Так как это первое правило, *.test.tsx попадет сюда и не будет считаться ui-component.
+        {
+          type: 'test',
+          pattern: ['**/*.test.ts', '**/*.test.tsx'],
+          mode: 'file',
+        },
+
+        // 2. ОСТАЛЬНЫЕ ЭЛЕМЕНТЫ
         {
           type: 'app-layer',
           pattern: 'app/(page|layout|loading|error|not-found|tools/**/page).tsx',
@@ -30,18 +40,18 @@ const eslintConfig = defineConfig([
         { type: 'tool', pattern: 'view/tools/*.tsx', mode: 'file', capture: ['toolName'] },
         { type: 'entity', pattern: 'view/tools/*/*.tsx', mode: 'file', capture: ['entityName'] },
         { type: 'app-component', pattern: 'view/(catalog|shell)/*', mode: 'folder' },
-        
+
         // --- ПЕРИМЕТР UI ---
-        { 
-          type: 'ui-infrastructure', 
-          pattern: 'view/ui/infrastructure/*', 
-          mode: 'folder' 
+        {
+          type: 'ui-infrastructure',
+          pattern: 'view/ui/infrastructure/*',
+          mode: 'folder',
         },
-        { 
-          type: 'ui-component', 
-          pattern: 'view/ui/*.tsx', 
-          mode: 'file', 
-          capture: ['componentName'] 
+        {
+          type: 'ui-component',
+          pattern: 'view/ui/*.tsx',
+          mode: 'file',
+          capture: ['componentName'],
         },
         // --- --- --- --- ---
 
@@ -61,11 +71,18 @@ const eslintConfig = defineConfig([
       'boundaries/element-types': [
         'error',
         {
-          default: 'allow',
+          default: 'allow', // По умолчанию разрешаем всё (в т.ч. тестам импортировать код)
           rules: [
             {
               from: 'core',
-              disallow: ['module', 'ui-component', 'ui-infrastructure', 'entity', 'tool', 'app-layer'],
+              disallow: [
+                'module',
+                'ui-component',
+                'ui-infrastructure',
+                'entity',
+                'tool',
+                'app-layer',
+              ],
               message: '❌ Core must not depend on upper layers',
             },
             {
@@ -78,7 +95,8 @@ const eslintConfig = defineConfig([
             {
               from: 'ui-component',
               disallow: ['core', 'module', 'entity', 'tool', 'app-layer'],
-              message: '❌ UI Component must be a stand-alone crystal. Imports from /lib or /app are forbidden.',
+              message:
+                '❌ UI Component must be a stand-alone crystal. Imports from /lib or /app are forbidden.',
             },
             {
               from: 'ui-component',
