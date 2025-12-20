@@ -14,11 +14,10 @@ import {
 } from '@/lib/core/utils/media';
 import { WorkbenchCanvas } from '@/view/tools/graphics/WorkbenchCanvas';
 import { TextureDimensionSlider } from '@/view/tools/hardware/TextureDimensionSlider';
-import { useCanvasRef } from '@/view/ui/Canvas';
+import { CanvasMovable, useCanvasRef } from '@/view/ui/Canvas';
 import { ControlLabel, ControlSection } from '@/view/ui/ControlSection';
 import { FileDropzone, FileDropzonePlaceholder } from '@/view/ui/FileDropzone';
 import { cn } from '@/view/ui/infrastructure/standards';
-import { CanvasMovable } from '@/view/ui/interaction/CanvasMovable';
 import { SortableList } from '@/view/ui/interaction/SortableList';
 import { Slider } from '@/view/ui/Slider';
 import { Switch } from '@/view/ui/Switch';

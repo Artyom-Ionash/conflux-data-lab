@@ -2,7 +2,7 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import React from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { CanvasMovable } from './CanvasMovable';
+import { CanvasMovable } from './Canvas';
 
 describe('CanvasMovable (Interaction Physics)', () => {
   // Mock Pointer Capture API (not implemented in JSDOM)

@@ -106,7 +106,7 @@ interface CanvasProps {
   placeholder?: ReactNode | undefined;
 }
 
-// --- COMPONENT ---
+// --- MAIN COMPONENT: Canvas ---
 
 export const Canvas = forwardRef<CanvasRef, CanvasProps>(
   (
@@ -142,7 +142,7 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(
       [resizeRef]
     );
 
-    const transform = useRef<CanvasTransform>({ scale: initialScale || 1, x: 0, y: 0 });
+    const transform = useRef<CanvasTransform>({ scale: initialScale ?? 1, x: 0, y: 0 });
     const interactionTimer = useRef<NodeJS.Timeout | null>(null);
     const rafId = useRef<number | null>(null);
 
@@ -359,7 +359,7 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(
           ref={contentRef}
           className="absolute top-0 left-0 z-10 origin-top-left"
           style={{
-            transform: `translate3d(${initialScale || 1}px, 0px, 0) scale(${initialScale || 1})`,
+            transform: `translate3d(${initialScale ?? 1}px, 0px, 0) scale(${initialScale ?? 1})`,
             backfaceVisibility: 'hidden',
           }}
         >
@@ -415,6 +415,126 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(
 );
 
 Canvas.displayName = 'Canvas';
+
+// --- SUB-COMPONENT: CanvasMovable ---
+// Ранее находился в view/ui/interaction/CanvasMovable.tsx
+// Перемещен сюда (Colocation Principle) т.к. зависит от логики масштабирования Canvas.
+
+export interface CanvasMovableProps {
+  x: number;
+  y: number;
+  /** Текущий масштаб. Можно передать функцию для получения актуального значения без ре-рендера. */
+  scale: number | (() => number);
+  onMove: (newPos: Point) => void;
+  onDragStart?: () => void;
+  onDragEnd?: () => void;
+  className?: string;
+  style?: React.CSSProperties;
+  children: React.ReactNode | ((isDragging: boolean) => React.ReactNode);
+  disabled?: boolean;
+}
+
+export function CanvasMovable({
+  x,
+  y,
+  scale,
+  onMove,
+  onDragStart,
+  onDragEnd,
+  className,
+  style,
+  children,
+  disabled = false,
+}: CanvasMovableProps) {
+  const [isDragging, setIsDragging] = useState(false);
+
+  const dragStateRef = useRef<{
+    startX: number;
+    startY: number;
+    initialX: number;
+    initialY: number;
+  } | null>(null);
+
+  const handlePointerDown = useCallback(
+    (e: React.PointerEvent<HTMLDivElement>) => {
+      if (disabled || e.button !== 0) return;
+
+      e.stopPropagation();
+
+      const target = e.currentTarget;
+      target.setPointerCapture(e.pointerId);
+
+      setIsDragging(true);
+      dragStateRef.current = {
+        startX: e.clientX,
+        startY: e.clientY,
+        initialX: x,
+        initialY: y,
+      };
+
+      onDragStart?.();
+    },
+    [disabled, x, y, onDragStart]
+  );
+
+  const handlePointerMove = useCallback(
+    (e: React.PointerEvent<HTMLDivElement>) => {
+      if (!dragStateRef.current) return;
+
+      e.stopPropagation();
+
+      const { startX, startY, initialX, initialY } = dragStateRef.current;
+
+      // Получаем актуальный масштаб динамически
+      const currentScale = typeof scale === 'function' ? scale() : scale;
+
+      const dx = (e.clientX - startX) / currentScale;
+      const dy = (e.clientY - startY) / currentScale;
+
+      onMove({
+        x: initialX + dx,
+        y: initialY + dy,
+      });
+    },
+    [scale, onMove]
+  );
+
+  const handlePointerUp = useCallback(
+    (e: React.PointerEvent<HTMLDivElement>) => {
+      if (!dragStateRef.current) return;
+
+      e.stopPropagation();
+      const target = e.currentTarget;
+      target.releasePointerCapture(e.pointerId);
+
+      setIsDragging(false);
+      dragStateRef.current = null;
+      onDragEnd?.();
+    },
+    [onDragEnd]
+  );
+
+  return (
+    <div
+      onPointerDown={handlePointerDown}
+      onPointerMove={handlePointerMove}
+      onPointerUp={handlePointerUp}
+      className={cn(
+        'absolute touch-none select-none',
+        disabled ? 'cursor-default' : isDragging ? 'cursor-grabbing' : 'cursor-grab',
+        className
+      )}
+      style={{
+        left: 0,
+        top: 0,
+        transform: `translate3d(${x}px, ${y}px, 0)`,
+        ...style,
+      }}
+    >
+      {typeof children === 'function' ? children(isDragging) : children}
+    </div>
+  );
+}
 
 // --- HOOKS ---
 
