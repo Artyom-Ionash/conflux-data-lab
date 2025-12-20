@@ -20,6 +20,7 @@ import type { CanvasRef } from '@/view/ui/Canvas';
 import { ColorInput } from '@/view/ui/ColorInput';
 import { ControlLabel, ControlSection } from '@/view/ui/ControlSection';
 import { FileDropzone, FileDropzonePlaceholder } from '@/view/ui/FileDropzone';
+import { CanvasMovable } from '@/view/ui/interaction/CanvasMovable';
 import { Slider } from '@/view/ui/Slider';
 import { ToggleGroup, ToggleGroupItem } from '@/view/ui/ToggleGroup';
 import { Workbench } from '@/view/ui/Workbench';
@@ -28,12 +29,12 @@ import { Workbench } from '@/view/ui/Workbench';
 const DEBOUNCE_DELAY = 50;
 const VIEW_RESET_DELAY = 50;
 const MOUSE_BUTTON_LEFT = 0;
-// const RGB_MAX = 255;
 const MAX_RGB_DISTANCE = Math.sqrt(3 * 255 ** 2);
 const DOWNLOAD_FILENAME = 'removed_bg.png';
 const OFFSET_R = 0;
 const OFFSET_G = 1;
 const OFFSET_B = 2;
+const CANVAS_SCALE_DEFAULT = 1;
 
 const DEFAULT_SETTINGS = {
   targetColor: '#ffffff',
@@ -69,7 +70,7 @@ export function MonochromeBackgroundRemover() {
   const [manualTrigger, setManualTrigger] = useState(0);
 
   const [isProcessing, setIsProcessing] = useState(false);
-  const [draggingPointIndex, setDraggingPointIndex] = useState<number | null>(null);
+  const [canvasScale, setCanvasScale] = useState(CANVAS_SCALE_DEFAULT);
 
   const workspaceRef = useRef<CanvasRef>(null);
   const sourceCanvasRef = useRef<HTMLCanvasElement>(null);
@@ -85,13 +86,11 @@ export function MonochromeBackgroundRemover() {
 
   const handleWorkerMessage = useCallback((data: WorkerResponse) => {
     const { processedData, error } = data;
-
     if (error) {
       console.error(error);
       setIsProcessing(false);
       return;
     }
-
     if (previewCanvasRef.current && processedData) {
       const ctx = previewCanvasRef.current.getContext('2d');
       const imgData = new ImageData(
@@ -129,7 +128,10 @@ export function MonochromeBackgroundRemover() {
         const ctx = previewCanvasRef.current.getContext('2d');
         ctx?.drawImage(img, 0, 0);
       }
-      setTimeout(() => workspaceRef.current?.resetView(img.width, img.height), VIEW_RESET_DELAY);
+      setTimeout(() => {
+        workspaceRef.current?.resetView(img.width, img.height);
+        if (workspaceRef.current) setCanvasScale(workspaceRef.current.getTransform().scale);
+      }, VIEW_RESET_DELAY);
     } catch (e) {
       console.error(e);
     }
@@ -180,6 +182,8 @@ export function MonochromeBackgroundRemover() {
 
   useEffect(() => {
     if (originalUrl) {
+      // FIX: Оборачиваем в requestAnimationFrame, чтобы линтер видел, что вызов отложен
+      // и не блокирует рендер синхронно.
       requestAnimationFrame(() => {
         void loadOriginalToCanvas(originalUrl);
       });
@@ -188,9 +192,7 @@ export function MonochromeBackgroundRemover() {
 
   useDebounceEffect(
     () => {
-      if (originalUrl) {
-        requestAnimationFrame(() => processImage());
-      }
+      if (originalUrl) void processImage();
     },
     [originalUrl, processImage],
     DEBOUNCE_DELAY
@@ -198,13 +200,15 @@ export function MonochromeBackgroundRemover() {
 
   useEffect(() => {
     if (manualTrigger > 0 && processingMode === 'flood-clear') {
-      const timer = setTimeout(() => {
-        processImage();
-      }, 0);
+      const timer = setTimeout(() => processImage(), 0);
       return () => clearTimeout(timer);
     }
     return undefined;
   }, [manualTrigger, processingMode, processImage]);
+
+  const updateScale = () => {
+    if (workspaceRef.current) setCanvasScale(workspaceRef.current.getTransform().scale);
+  };
 
   const handleFilesSelected = async (files: File[]) => {
     const file = files[0];
@@ -239,16 +243,6 @@ export function MonochromeBackgroundRemover() {
     return null;
   };
 
-  const handlePointPointerDown = (e: React.PointerEvent, index: number) => {
-    e.stopPropagation();
-    e.preventDefault();
-    if (e.button !== MOUSE_BUTTON_LEFT) return;
-    setDraggingPointIndex(index);
-    if (e.target instanceof HTMLElement) {
-      e.target.setPointerCapture(e.pointerId);
-    }
-  };
-
   const handleImagePointerDown = (e: React.PointerEvent) => {
     if (e.button !== MOUSE_BUTTON_LEFT) return;
     if (processingMode === 'flood-clear') {
@@ -257,22 +251,13 @@ export function MonochromeBackgroundRemover() {
     }
   };
 
-  const handleGlobalPointerMove = (e: React.PointerEvent) => {
-    if (draggingPointIndex !== null) {
-      const newCoords = getRelativeImageCoords(e.clientX, e.clientY);
-      if (newCoords) {
-        setFloodPoints((prev) => {
-          const next = [...prev];
-          next[draggingPointIndex] = newCoords;
-          return next;
-        });
-      }
-    }
-  };
-
-  const handleGlobalPointerUp = () => {
-    if (draggingPointIndex !== null) setDraggingPointIndex(null);
-  };
+  const handlePointMove = useCallback((index: number, newPos: { x: number; y: number }) => {
+    setFloodPoints((prev) => {
+      const next = [...prev];
+      if (next[index]) next[index] = newPos;
+      return next;
+    });
+  }, []);
 
   const handleEyedropper = (e: React.MouseEvent) => {
     if (!sourceCanvasRef.current) return;
@@ -288,8 +273,6 @@ export function MonochromeBackgroundRemover() {
   const removeLastPoint = () => setFloodPoints((prev) => prev.slice(0, -1));
   const clearAllPoints = () => setFloodPoints([]);
   const handleRunFloodFill = () => setManualTrigger((prev) => prev + 1);
-
-  // --- RENDER ---
 
   const sidebarContent = (
     <div className="flex flex-col gap-6 pb-4">
@@ -346,15 +329,6 @@ export function MonochromeBackgroundRemover() {
                 Заливка невидимостью
               </ToggleGroupItem>
             </ToggleGroup>
-
-            {processingMode === 'flood-clear' && (
-              <div className="rounded border border-blue-100 bg-blue-50 p-2 text-[10px] leading-tight text-blue-600 dark:border-blue-800 dark:bg-blue-900/20 dark:text-blue-400">
-                1. Кликните на холст, чтобы поставить точки.
-                <br />
-                2. Точки можно <b>перетаскивать</b>.<br />
-                3. Заливка обновляется <b>автоматически</b>.
-              </div>
-            )}
           </ControlSection>
 
           <ControlSection>
@@ -484,14 +458,10 @@ export function MonochromeBackgroundRemover() {
   );
 
   return (
-    <Workbench.Root>
+    <Workbench.Root onPointerUp={updateScale} onWheel={updateScale}>
       <Workbench.Sidebar>{sidebarContent}</Workbench.Sidebar>
       <Workbench.Stage>
-        <div
-          className="relative h-full w-full"
-          onPointerMove={handleGlobalPointerMove}
-          onPointerUp={handleGlobalPointerUp}
-        >
+        <div className="relative h-full w-full">
           <WorkbenchCanvas
             ref={workspaceRef}
             isLoading={isProcessing}
@@ -518,22 +488,27 @@ export function MonochromeBackgroundRemover() {
                 display: originalUrl ? 'block' : 'none',
               }}
             />
+
             {processingMode === 'flood-clear' &&
               floodPoints.map((pt, i) => (
-                <div
+                <CanvasMovable
                   key={i}
-                  onPointerDown={(e) => handlePointPointerDown(e, i)}
-                  className={`absolute z-20 cursor-grab hover:brightness-125 active:cursor-grabbing ${draggingPointIndex === i ? 'brightness-150' : ''}`}
-                  style={{
-                    left: pt.x,
-                    top: pt.y,
-                    width: '10px',
-                    height: '10px',
-                    transform: 'translate(-50%, -50%) scale(calc(1 / var(--canvas-scale)))',
-                  }}
+                  x={pt.x}
+                  y={pt.y}
+                  scale={canvasScale}
+                  onMove={(pos) => handlePointMove(i, pos)}
+                  className="z-20"
                 >
-                  <div className="h-full w-full rounded-full border border-white bg-red-500 shadow-[0_0_2px_rgba(0,0,0,0.8)]" />
-                </div>
+                  {() => (
+                    <div
+                      style={{
+                        transform: 'translate(-50%, -50%) scale(calc(1 / var(--canvas-scale)))',
+                      }}
+                    >
+                      <div className="h-2.5 w-2.5 rounded-full border border-white bg-red-500 shadow-[0_0_2px_rgba(0,0,0,0.8)] transition-all" />
+                    </div>
+                  )}
+                </CanvasMovable>
               ))}
           </WorkbenchCanvas>
         </div>
