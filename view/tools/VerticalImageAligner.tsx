@@ -14,7 +14,7 @@ import {
 } from '@/lib/core/utils/media';
 import { WorkbenchCanvas } from '@/view/tools/graphics/WorkbenchCanvas';
 import { TextureDimensionSlider } from '@/view/tools/hardware/TextureDimensionSlider';
-import type { CanvasRef } from '@/view/ui/Canvas';
+import { useCanvasRef } from '@/view/ui/Canvas';
 import { ControlLabel, ControlSection } from '@/view/ui/ControlSection';
 import { FileDropzone, FileDropzonePlaceholder } from '@/view/ui/FileDropzone';
 import { cn } from '@/view/ui/infrastructure/standards';
@@ -27,12 +27,10 @@ import { Workbench } from '@/view/ui/Workbench';
 const LIMIT_MAX_BROWSER = 16_384;
 const VIEW_RESET_DELAY = 50;
 const EXPORT_FILENAME = 'aligned-export.png';
-const CANVAS_SCALE_DEFAULT = 1;
 const GRID_FRAME_DASH = 10;
 const GRID_FRAME_OFFSET_CSS = '-5px -5px';
 const Z_INDEX_SLOT_BASE = 10;
 const Z_INDEX_SLOT_ACTIVE = 30;
-// Z_INDEX_LABEL удален
 const Z_INDEX_GRID_RED = 50;
 const Z_INDEX_GRID_FRAME = 60;
 
@@ -60,10 +58,12 @@ export function VerticalImageAligner() {
   const [images, setImages] = useState<AlignImage[]>([]);
   const imagesRef = useRef(images);
 
+  // Sync ref for cleanup
   useEffect(() => {
     imagesRef.current = images;
   }, [images]);
 
+  // Clean up object URLs on unmount
   useEffect(() => () => imagesRef.current.forEach((img) => revokeObjectURLSafely(img.url)), []);
 
   const [slotHeight, setSlotHeight] = useState(DEFAULT_SETTINGS.slotSize);
@@ -77,7 +77,8 @@ export function VerticalImageAligner() {
   const [redGridColor] = useState(DEFAULT_SETTINGS.redGridColor);
   const [isExporting, setIsExporting] = useState(false);
 
-  const workspaceRef = useRef<CanvasRef>(null);
+  // Использование нового хука
+  const { ref: workspaceRef, getScale } = useCanvasRef();
 
   const activeImageId = useMemo(() => images.find((img) => img.isActive)?.id ?? null, [images]);
 
@@ -88,10 +89,7 @@ export function VerticalImageAligner() {
     return { bounds: { width, height }, totalHeight: height };
   }, [images.length, slotHeight, slotWidth]);
 
-  const getCanvasScale = useCallback(
-    () => workspaceRef.current?.getTransform().scale || CANVAS_SCALE_DEFAULT,
-    []
-  );
+  // --- Handlers ---
 
   const handleUpdatePosition = useCallback((id: string, pos: { x: number; y: number }) => {
     setImages((prev) =>
@@ -191,7 +189,7 @@ export function VerticalImageAligner() {
         }
       });
     },
-    [images.length]
+    [images.length, workspaceRef]
   );
 
   const handleExport = useCallback(async () => {
@@ -240,9 +238,10 @@ export function VerticalImageAligner() {
     } finally {
       setIsExporting(false);
     }
-  }, [images, slotHeight, slotWidth]);
+  }, [images, slotHeight, slotWidth, workspaceRef]);
 
-  // FIX: any -> React.HTMLAttributes<HTMLDivElement>
+  // --- Render Props ---
+
   const renderSortableItem = (
     img: AlignImage,
     index: number,
@@ -519,14 +518,13 @@ export function VerticalImageAligner() {
               <CanvasMovable
                 x={img.offsetX}
                 y={img.offsetY}
-                scale={getCanvasScale}
+                scale={getScale} // Pass getter from hook
                 onMove={(pos) =>
                   handleUpdatePosition(img.id, { x: Math.round(pos.x), y: Math.round(pos.y) })
                 }
                 onDragStart={() => handleActivate(img.id)}
                 className={cn('pointer-events-auto', img.isActive && 'ring-1 ring-blue-500')}
               >
-                {/* FIX: isDragging удален из аргументов, так как не использовался */}
                 {() => (
                   <>
                     <Image

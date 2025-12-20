@@ -16,7 +16,7 @@ import type {
 } from '@/lib/modules/graphics/processing/background-engine.worker';
 import type { Point } from '@/lib/modules/graphics/processing/imaging';
 import { WorkbenchCanvas } from '@/view/tools/graphics/WorkbenchCanvas';
-import type { CanvasRef } from '@/view/ui/Canvas';
+import { useCanvasRef } from '@/view/ui/Canvas';
 import { ColorInput } from '@/view/ui/ColorInput';
 import { ControlLabel, ControlSection } from '@/view/ui/ControlSection';
 import { FileDropzone, FileDropzonePlaceholder } from '@/view/ui/FileDropzone';
@@ -34,7 +34,6 @@ const DOWNLOAD_FILENAME = 'removed_bg.png';
 const OFFSET_R = 0;
 const OFFSET_G = 1;
 const OFFSET_B = 2;
-const CANVAS_SCALE_DEFAULT = 1;
 
 const DEFAULT_SETTINGS = {
   targetColor: '#ffffff',
@@ -71,7 +70,8 @@ export function MonochromeBackgroundRemover() {
 
   const [isProcessing, setIsProcessing] = useState(false);
 
-  const workspaceRef = useRef<CanvasRef>(null);
+  // Использование нового хука
+  const { ref: workspaceRef, getScale } = useCanvasRef();
   const sourceCanvasRef = useRef<HTMLCanvasElement>(null);
   const previewCanvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -111,30 +111,32 @@ export function MonochromeBackgroundRemover() {
     onMessage: handleWorkerMessage,
   });
 
-  const loadOriginalToCanvas = useCallback(async (url: string) => {
-    try {
-      const img = await loadImage(url);
-      setImgDimensions({ w: img.width, h: img.height });
-      if (sourceCanvasRef.current) {
-        sourceCanvasRef.current.width = img.width;
-        sourceCanvasRef.current.height = img.height;
-        const ctx = sourceCanvasRef.current.getContext('2d', { willReadFrequently: true });
-        ctx?.drawImage(img, 0, 0);
+  const loadOriginalToCanvas = useCallback(
+    async (url: string) => {
+      try {
+        const img = await loadImage(url);
+        setImgDimensions({ w: img.width, h: img.height });
+        if (sourceCanvasRef.current) {
+          sourceCanvasRef.current.width = img.width;
+          sourceCanvasRef.current.height = img.height;
+          const ctx = sourceCanvasRef.current.getContext('2d', { willReadFrequently: true });
+          ctx?.drawImage(img, 0, 0);
+        }
+        if (previewCanvasRef.current) {
+          previewCanvasRef.current.width = img.width;
+          previewCanvasRef.current.height = img.height;
+          const ctx = previewCanvasRef.current.getContext('2d');
+          ctx?.drawImage(img, 0, 0);
+        }
+        setTimeout(() => {
+          workspaceRef.current?.resetView(img.width, img.height);
+        }, VIEW_RESET_DELAY);
+      } catch (e) {
+        console.error(e);
       }
-      if (previewCanvasRef.current) {
-        previewCanvasRef.current.width = img.width;
-        previewCanvasRef.current.height = img.height;
-        const ctx = previewCanvasRef.current.getContext('2d');
-        ctx?.drawImage(img, 0, 0);
-      }
-      setTimeout(() => {
-        workspaceRef.current?.resetView(img.width, img.height);
-        // УДАЛЕНО: setCanvasScale(...)
-      }, VIEW_RESET_DELAY);
-    } catch (e) {
-      console.error(e);
-    }
-  }, []);
+    },
+    [workspaceRef]
+  );
 
   const processImage = useCallback(() => {
     if (!originalUrl || !sourceCanvasRef.current) return;
@@ -181,6 +183,7 @@ export function MonochromeBackgroundRemover() {
 
   useEffect(() => {
     if (originalUrl) {
+      // Fix for set-state-in-effect warning & safe execution
       requestAnimationFrame(() => {
         void loadOriginalToCanvas(originalUrl);
       });
@@ -202,12 +205,6 @@ export function MonochromeBackgroundRemover() {
     }
     return undefined;
   }, [manualTrigger, processingMode, processImage]);
-
-  // NEW: Геттер масштаба для корректной физики перетаскивания
-  const getCanvasScale = useCallback(
-    () => workspaceRef.current?.getTransform().scale || CANVAS_SCALE_DEFAULT,
-    []
-  );
 
   const handleFilesSelected = async (files: File[]) => {
     const file = files[0];
@@ -494,8 +491,7 @@ export function MonochromeBackgroundRemover() {
                   key={i}
                   x={pt.x}
                   y={pt.y}
-                  // FIX: Передаем функцию-геттер для динамического расчета
-                  scale={getCanvasScale}
+                  scale={getScale} // Pass getter from hook
                   onMove={(pos) => handlePointMove(i, pos)}
                   className="z-20"
                 >

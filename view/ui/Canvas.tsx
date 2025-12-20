@@ -81,7 +81,7 @@ export interface CanvasRef {
   resetView: (width?: number, height?: number) => void;
   getTransform: () => CanvasTransform;
   screenToWorld: (clientX: number, clientY: number) => Point;
-  // Backward compatibility signatures, though now controlled via props
+  // Backward compatibility signatures
   getBackgroundColor: () => string | null;
   setBackgroundColor: (color: string | null) => void;
 }
@@ -108,15 +108,6 @@ interface CanvasProps {
 
 // --- COMPONENT ---
 
-/**
- * [PRIMITIVE] Canvas
- * Низкоуровневый компонент холста. Отвечает ТОЛЬКО за:
- * 1. Pan/Zoom трансформации (математика и DOM).
- * 2. Рендеринг сетки/фона.
- * 3. Контейнеризацию контента.
- *
- * Не содержит: тулбаров, кнопок, оверлеев загрузки, бизнес-логики.
- */
 export const Canvas = forwardRef<CanvasRef, CanvasProps>(
   (
     {
@@ -156,11 +147,6 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(
     const rafId = useRef<number | null>(null);
 
     const [isPanning, setIsPanning] = useState(false);
-
-    // Для совместимости с imperative handle, храним цвет, если он не передан через props
-    // Но оставим локальный стейт только для поддержки метода setBackgroundColor, если он будет вызван императивно.
-    // Однако, лучше полагаться на props.
-    // const [canvasBgColor, setCanvasBgColor] = useState<string | null>(defaultBackgroundColor);
 
     const panStartRef = useRef<Point | null>(null);
     const transformStartRef = useRef<CanvasTransform | null>(null);
@@ -291,7 +277,6 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(
       const current = transform.current;
       let newScale = current.scale * factor;
 
-      // Fallbacks for optional props
       const mnScale = minScale ?? ZOOM_CONFIG.MIN;
       const mxScale = maxScale ?? ZOOM_CONFIG.MAX;
 
@@ -357,7 +342,6 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(
           transitionDuration: `${ANIMATION_CONFIG.DEFAULT_DURATION}ms`,
         }}
       >
-        {/* Grid Background */}
         <div
           className={cn(
             'pointer-events-none absolute inset-0 transition-opacity ease-in-out',
@@ -371,7 +355,6 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(
           }}
         />
 
-        {/* Content Transform Container */}
         <div
           ref={contentRef}
           className="absolute top-0 left-0 z-10 origin-top-left"
@@ -432,3 +415,43 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(
 );
 
 Canvas.displayName = 'Canvas';
+
+// --- HOOKS ---
+
+/**
+ * Хук для управления ссылкой на Canvas.
+ * Предоставляет стабильный геттер масштаба для передачи в CanvasMovable
+ * и другие интерактивные элементы.
+ *
+ * @example
+ * const { ref, getScale } = useCanvasRef();
+ * <Canvas ref={ref} />
+ * <CanvasMovable scale={getScale} />
+ */
+export function useCanvasRef() {
+  const ref = useRef<CanvasRef>(null);
+
+  /**
+   * Возвращает текущий масштаб холста.
+   * Безопасно обрабатывает отсутствие рефа (возвращает 1).
+   */
+  const getScale = useCallback(() => {
+    return ref.current?.getTransform().scale ?? 1;
+  }, []);
+
+  /**
+   * Сброс вида к дефолтному состоянию.
+   */
+  const resetView = useCallback((width?: number, height?: number) => {
+    ref.current?.resetView(width, height);
+  }, []);
+
+  return {
+    ref,
+    getScale,
+    resetView,
+    get current() {
+      return ref.current;
+    },
+  };
+}
