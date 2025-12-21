@@ -1,115 +1,65 @@
 'use client';
 
 import Link from 'next/link';
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useRef, useState } from 'react';
 
+import { useCopyToClipboard } from '@/lib/core/hooks/use-copy-to-clipboard';
 import { type ContextStats } from '@/lib/modules/context-generator/core';
 import { runContextPipeline } from '@/lib/modules/context-generator/engine';
 import { CONTEXT_PRESETS, type PresetKey } from '@/lib/modules/context-generator/rules';
-import { FileBundle } from '@/lib/modules/file-system/bundle';
-import { createIgnoreManager } from '@/lib/modules/file-system/scanner';
+import { useBundleManager } from '@/lib/modules/context-generator/use-bundle-manager';
 import { Card } from '@/view/ui/Card';
 import { cn } from '@/view/ui/infrastructure/standards';
-import { ProcessingOverlay } from '@/view/ui/ProcessingOverlay'; // Добавлено
+import { ProcessingOverlay } from '@/view/ui/ProcessingOverlay';
 import { Switch } from '@/view/ui/Switch';
 import { Workbench } from '@/view/ui/Workbench';
 
 export function ProjectToContext() {
-  const [selectedPreset, setSelectedPreset] = useState<PresetKey>('nextjs');
+  const { bundle, filteredPaths, handleFiles } = useBundleManager();
+  const { isCopied, copy } = useCopyToClipboard();
 
+  const [selectedPreset, setSelectedPreset] = useState<PresetKey>('nextjs');
   const [customExtensions, setCustomExtensions] = useState<string>(
     CONTEXT_PRESETS.nextjs.textExtensions.join(', ')
   );
   const [customIgnore, setCustomIgnore] = useState<string>('');
   const [includeTree, setIncludeTree] = useState(true);
 
-  const [bundle, setBundle] = useState<FileBundle | null>(null);
-  const [filteredPaths, setFilteredPaths] = useState<string[]>([]);
   const [processing, setProcessing] = useState(false);
   const [result, setResult] = useState<string | null>(null);
   const [stats, setStats] = useState<ContextStats | null>(null);
-  const [copied, setCopied] = useState(false);
   const [lastGeneratedAt, setLastGeneratedAt] = useState<Date | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => () => bundle?.dispose(), [bundle]);
-
-  const handlePresetChange = (key: PresetKey) => {
-    const preset = CONTEXT_PRESETS[key];
-    setSelectedPreset(key);
-    setCustomExtensions(preset.textExtensions.join(', '));
-    setCustomIgnore('');
-    // Сбрасываем результат, так как он не соответствует новому пресету
-    setResult(null);
-    setStats(null);
-  };
-
-  const handleDirectorySelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (!e.target.files || e.target.files.length === 0) return;
-
-    // Мгновенная визуальная индикация сброса
-    setResult(null);
-    setStats(null);
+  const onDirectorySelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files?.length) return;
     setProcessing(true);
 
-    bundle?.dispose();
-    const fileList = Array.from(e.target.files);
+    const {
+      presetKey,
+      visiblePaths,
+      bundle: newBundle,
+    } = await handleFiles(Array.from(e.target.files), customExtensions, customIgnore);
 
-    const newBundle = new FileBundle(fileList, {
-      customExtensions: customExtensions.split(',').map((s) => s.trim()),
-    });
+    setSelectedPreset(presetKey);
+    setCustomExtensions(CONTEXT_PRESETS[presetKey].textExtensions.join(', '));
 
-    const activePresetKey = newBundle.detectedPreset;
-    setSelectedPreset(activePresetKey);
-
-    const activePreset = CONTEXT_PRESETS[activePresetKey];
-    setCustomExtensions(activePreset.textExtensions.join(', '));
-
-    const gitIgnoreFile = fileList.find((f) => f.name === '.gitignore');
-    const gitIgnoreContent = gitIgnoreFile ? await gitIgnoreFile.text() : null;
-
-    const ig = createIgnoreManager({
-      gitIgnoreContent,
-      ignorePatterns: [
-        ...activePreset.hardIgnore,
-        ...customIgnore
-          .split(',')
-          .map((s) => s.trim())
-          .filter(Boolean),
-      ],
-    });
-
-    const items = newBundle.getItems();
-    const visiblePaths = items.filter((item) => !ig.ignores(item.path)).map((item) => item.path);
-
-    setBundle(newBundle);
-    setFilteredPaths(visiblePaths);
-
-    if (visiblePaths.length > 0) {
-      void processFiles(newBundle, visiblePaths, activePresetKey);
-    } else {
-      setProcessing(false);
-    }
+    // Auto-process after load
+    void processFiles(newBundle, visiblePaths, presetKey);
   };
 
   const processFiles = useCallback(
-    async (activeBundle?: FileBundle, paths?: string[], presetKey?: PresetKey) => {
-      const targetBundle = activeBundle || bundle;
-      const targetPaths = paths || filteredPaths;
-      const targetPreset = presetKey || selectedPreset;
+    async (activeBundle = bundle, paths = filteredPaths, presetKey = selectedPreset) => {
+      if (!activeBundle || paths.length === 0) return;
 
-      if (!targetBundle || targetPaths.length === 0) return;
-
-      // Очистка старого состояния перед началом новой генерации
       setResult(null);
-      setStats(null);
       setProcessing(true);
 
       try {
-        const textFiles = targetBundle
+        const textFiles = activeBundle
           .getItems()
-          .filter((item) => targetPaths.includes(item.path) && item.isText);
+          .filter((item) => paths.includes(item.path) && item.isText);
 
         const sources = await Promise.all(
           textFiles.map(async (f) => ({
@@ -121,7 +71,7 @@ export function ProjectToContext() {
 
         const generation = await runContextPipeline(sources, {
           includeTree,
-          preset: CONTEXT_PRESETS[targetPreset],
+          preset: CONTEXT_PRESETS[presetKey],
         });
 
         setStats(generation.stats);
@@ -135,17 +85,6 @@ export function ProjectToContext() {
     },
     [bundle, filteredPaths, includeTree, selectedPreset]
   );
-
-  const copyToClipboard = async () => {
-    if (!result) return;
-    try {
-      await navigator.clipboard.writeText(result);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    } catch {
-      alert('Ошибка при копировании.');
-    }
-  };
 
   const downloadResult = () => {
     if (!result) return;
@@ -194,11 +133,14 @@ export function ProjectToContext() {
             type="file"
             className="hidden"
             multiple
-            onChange={handleDirectorySelect}
+            onChange={onDirectorySelect}
             {...({
               webkitdirectory: '',
               directory: '',
-            } as React.InputHTMLAttributes<HTMLInputElement>)}
+            } as React.InputHTMLAttributes<HTMLInputElement> & {
+              webkitdirectory?: string;
+              directory?: string;
+            })}
           />
         </div>
       </div>
@@ -211,7 +153,10 @@ export function ProjectToContext() {
           {(Object.keys(CONTEXT_PRESETS) as PresetKey[]).map((key) => (
             <button
               key={key}
-              onClick={() => handlePresetChange(key)}
+              onClick={() => {
+                setSelectedPreset(key);
+                setCustomExtensions(CONTEXT_PRESETS[key].textExtensions.join(', '));
+              }}
               className={cn(
                 'rounded border px-3 py-1.5 text-xs font-medium',
                 selectedPreset === key
@@ -275,7 +220,6 @@ export function ProjectToContext() {
       <Workbench.Sidebar>{sidebar}</Workbench.Sidebar>
       <Workbench.Stage>
         <div className="relative flex h-full w-full flex-col overflow-hidden bg-zinc-50 p-4 dark:bg-black/20">
-          {/* Условие изменено: показываем результат только если не идет обработка */}
           {result && !processing ? (
             <Card
               className="flex h-full flex-1 flex-col"
@@ -284,13 +228,13 @@ export function ProjectToContext() {
               headerActions={
                 <div className="flex gap-2">
                   <button
-                    onClick={copyToClipboard}
+                    onClick={() => result && copy(result)}
                     className={cn(
-                      'rounded px-3 py-1.5 text-xs font-bold',
-                      copied ? 'bg-green-100 text-green-700' : 'bg-zinc-100'
+                      'rounded px-3 py-1.5 text-xs font-bold transition-colors',
+                      isCopied ? 'bg-green-100 text-green-700' : 'bg-zinc-100'
                     )}
                   >
-                    {copied ? 'Готово!' : 'Копировать'}
+                    {isCopied ? 'Готово!' : 'Копировать'}
                   </button>
                   <button
                     onClick={downloadResult}
@@ -313,8 +257,6 @@ export function ProjectToContext() {
               </p>
             </div>
           )}
-
-          {/* Дополнительный слой индикации для "тяжелых" процессов */}
           <ProcessingOverlay isVisible={processing} message="Сборка контекста проекта..." />
         </div>
       </Workbench.Stage>
