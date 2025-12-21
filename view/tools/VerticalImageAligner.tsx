@@ -6,12 +6,12 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { filter, map, pipe } from 'remeda';
 
 import { rgbToHex } from '@/lib/core/utils/colors';
+import { getTopLeftPixelColor, loadImage, revokeObjectURLSafely } from '@/lib/core/utils/media';
 import {
-  downloadDataUrl,
-  getTopLeftPixelColor,
-  loadImage,
-  revokeObjectURLSafely,
-} from '@/lib/core/utils/media';
+  bakeVerticalStack,
+  calculateCenterOffset,
+  type CompositionLayer,
+} from '@/lib/modules/graphics/processing/composition';
 import { WorkbenchCanvas } from '@/view/tools/graphics/WorkbenchCanvas';
 import { TextureDimensionSlider } from '@/view/tools/hardware/TextureDimensionSlider';
 import { CanvasMovable, useCanvasRef } from '@/view/ui/Canvas';
@@ -76,15 +76,14 @@ export function VerticalImageAligner() {
   const [redGridColor] = useState(DEFAULT_SETTINGS.redGridColor);
   const [isExporting, setIsExporting] = useState(false);
 
-  // Использование нового хука
   const { ref: workspaceRef, getScale } = useCanvasRef();
 
   const activeImageId = useMemo(() => images.find((img) => img.isActive)?.id ?? null, [images]);
 
   const { bounds, totalHeight } = useMemo(() => {
-    if (!images.length) return { bounds: { width: 1, height: 1 }, totalHeight: 0 };
+    if (images.length === 0) return { bounds: { width: 1, height: 1 }, totalHeight: 0 };
     const width = slotWidth;
-    const height = Math.max(1, images.length * slotHeight);
+    const height = images.length * slotHeight;
     return { bounds: { width, height }, totalHeight: height };
   }, [images.length, slotHeight, slotWidth]);
 
@@ -99,7 +98,10 @@ export function VerticalImageAligner() {
   const handleCenterAllX = useCallback(
     () =>
       setImages((prev) =>
-        prev.map((img) => ({ ...img, offsetX: Math.round((slotWidth - img.naturalWidth) / 2) }))
+        prev.map((img) => ({
+          ...img,
+          offsetX: calculateCenterOffset(img.naturalWidth, slotWidth),
+        }))
       ),
     [slotWidth]
   );
@@ -107,7 +109,10 @@ export function VerticalImageAligner() {
   const handleCenterAllY = useCallback(
     () =>
       setImages((prev) =>
-        prev.map((img) => ({ ...img, offsetY: Math.round((slotHeight - img.naturalHeight) / 2) }))
+        prev.map((img) => ({
+          ...img,
+          offsetY: calculateCenterOffset(img.naturalHeight, slotHeight),
+        }))
       ),
     [slotHeight]
   );
@@ -133,21 +138,17 @@ export function VerticalImageAligner() {
       const newImages = pipe(
         files,
         filter((f) => f.type.startsWith('image/')),
-        map((file, index) => {
-          const url = URL.createObjectURL(file);
-          const id = `${Date.now()}-${index}-${Math.random().toString(36).substr(2, 9)}`;
-          return {
-            id,
-            file,
-            url,
-            name: file.name,
-            offsetX: 0,
-            offsetY: 0,
-            isActive: isListEmpty && index === 0,
-            naturalWidth: 0,
-            naturalHeight: 0,
-          };
-        })
+        map((file, index) => ({
+          id: `${Date.now()}-${index}-${Math.random().toString(36).slice(2, 11)}`,
+          file,
+          url: URL.createObjectURL(file),
+          name: file.name,
+          offsetX: 0,
+          offsetY: 0,
+          isActive: isListEmpty && index === 0,
+          naturalWidth: 0,
+          naturalHeight: 0,
+        }))
       );
 
       if (newImages.length === 0) return;
@@ -161,22 +162,16 @@ export function VerticalImageAligner() {
           if (isListEmpty && idx === 0) {
             setSlotHeight(img.height);
             setFrameStepX(img.height);
-            try {
-              const { r, g, b } = getTopLeftPixelColor(img);
-              const hex = rgbToHex(r, g, b);
-              workspaceRef.current?.setBackgroundColor(hex);
-            } catch (e) {
-              console.warn('Could not extract color from image', e);
-            }
+            const { r, g, b } = getTopLeftPixelColor(img);
+            workspaceRef.current?.setBackgroundColor(rgbToHex(r, g, b));
             setTimeout(() => {
               workspaceRef.current?.resetView(img.width, img.height);
             }, VIEW_RESET_DELAY);
           }
 
-          setSlotWidth((prev) => {
-            if (isListEmpty && idx === 0) return img.width;
-            return Math.max(prev, img.width);
-          });
+          setSlotWidth((prev) =>
+            isListEmpty && idx === 0 ? img.width : Math.max(prev, img.width)
+          );
 
           setImages((current) =>
             current.map((ex) =>
@@ -184,7 +179,7 @@ export function VerticalImageAligner() {
             )
           );
         } catch (e) {
-          console.error(e);
+          console.error('Failed to load image metadata', e);
         }
       });
     },
@@ -192,52 +187,32 @@ export function VerticalImageAligner() {
   );
 
   const handleExport = useCallback(async () => {
-    if (!images.length) return;
+    if (images.length === 0) return;
     setIsExporting(true);
 
+    const compositionLayers: CompositionLayer[] = images.map((img) => ({
+      url: img.url,
+      x: img.offsetX,
+      y: img.offsetY,
+      width: img.naturalWidth,
+      height: img.naturalHeight,
+    }));
+
     try {
-      const loaded = await Promise.all(
-        images.map(async (item) => {
-          const img = await loadImage(item.url);
-          return { meta: item, img };
-        })
-      );
-
-      const finalW = slotWidth;
-      const finalH = images.length * slotHeight;
-
-      const canvas = document.createElement('canvas');
-      canvas.width = finalW;
-      canvas.height = finalH;
-
-      const ctx = canvas.getContext('2d');
-      if (!ctx) return;
-
-      const currentBg = workspaceRef.current?.getBackgroundColor();
-      if (currentBg) {
-        ctx.fillStyle = currentBg;
-        ctx.fillRect(0, 0, finalW, finalH);
-      } else {
-        ctx.clearRect(0, 0, finalW, finalH);
-      }
-
-      loaded.forEach(({ meta, img }, index) => {
-        const slotY = index * slotHeight;
-        ctx.save();
-        ctx.beginPath();
-        ctx.rect(0, slotY, slotWidth, slotHeight);
-        ctx.clip();
-        ctx.drawImage(img, meta.offsetX, slotY + meta.offsetY, img.width, img.height);
-        ctx.restore();
+      await bakeVerticalStack({
+        layers: compositionLayers,
+        canvasWidth: slotWidth,
+        canvasHeight: totalHeight,
+        slotHeight,
+        backgroundColor: workspaceRef.current?.getBackgroundColor() || null,
+        filename: EXPORT_FILENAME,
       });
-
-      downloadDataUrl(canvas.toDataURL('image/png'), EXPORT_FILENAME);
     } catch (e) {
       console.error('Export failed', e);
     } finally {
       setIsExporting(false);
     }
-  }, [images, slotHeight, slotWidth, workspaceRef]);
+  }, [images, slotHeight, slotWidth, totalHeight, workspaceRef]);
 
   // --- Render Props ---
 
@@ -287,8 +262,6 @@ export function VerticalImageAligner() {
             fill="none"
             stroke="currentColor"
             strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
           >
             <path d="M19 12H5M12 19l-7-7 7-7" />
           </svg>{' '}
@@ -467,11 +440,11 @@ export function VerticalImageAligner() {
           isLoading={isExporting}
           contentWidth={bounds.width}
           contentHeight={bounds.height}
-          shadowOverlayOpacity={images.length ? 0.5 : 0}
+          shadowOverlayOpacity={images.length > 0 ? 0.5 : 0}
           showTransparencyGrid={true}
           defaultBackgroundColor={DEFAULT_SETTINGS.bgColor}
           placeholder={
-            !images.length ? (
+            images.length === 0 ? (
               <FileDropzonePlaceholder
                 onUpload={processFiles}
                 multiple={true}
