@@ -19,6 +19,8 @@ import { NumberStepper } from '@/view/ui/NumberStepper';
 // --- EXTRACTED COMPONENTS ---
 import { DualHoverPreview } from '@/view/ui/players/DualHoverPreview';
 import { RangeVideoPlayer } from '@/view/ui/players/RangeVideoPlayer';
+// --- NEW CONSOLIDATED UI ---
+import { ProgressBar } from '@/view/ui/ProcessingOverlay';
 import { RangeSlider } from '@/view/ui/RangeSlider';
 import { Switch } from '@/view/ui/Switch';
 import { Workbench } from '@/view/ui/Workbench';
@@ -236,16 +238,7 @@ export function VideoFrameExtractor() {
         />
         {state.status.isProcessing && (
           <div className="mt-2 rounded border border-blue-100 bg-blue-50 p-3 dark:border-blue-800 dark:bg-blue-900/20">
-            <div className="mb-1 flex justify-between text-xs font-semibold text-blue-700 dark:text-blue-300">
-              <span>Обработка...</span>
-              <span className="font-mono">{Math.round(state.status.progress)}%</span>
-            </div>
-            <div className="h-1 w-full overflow-hidden rounded-full bg-blue-200 dark:bg-blue-800">
-              <div
-                className="h-full bg-blue-600 transition-all duration-300"
-                style={{ width: `${state.status.progress}%` }}
-              />
-            </div>
+            <ProgressBar progress={state.status.progress} label="Обработка..." />
           </div>
         )}
       </div>
@@ -389,7 +382,7 @@ export function VideoFrameExtractor() {
                   title={
                     <div className="flex items-center gap-4">
                       <ControlLabel>Спрайт</ControlLabel>
-                      {/* [RESTORED] Speed % Control */}
+                      {/* Speed % Control */}
                       <NumberStepper
                         label="Скорость %"
                         value={currentSpeedPercent}
@@ -508,7 +501,7 @@ export function VideoFrameExtractor() {
                       max={2000}
                     />
                     <div className="h-6 w-px bg-zinc-200 dark:bg-zinc-700"></div>
-                    {/* [RESTORED] Spacing Control */}
+                    {/* Spacing Control */}
                     <NumberStepper
                       label="Отступ"
                       value={spriteOptions.spacing}
