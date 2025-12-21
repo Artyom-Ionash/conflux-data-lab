@@ -20,22 +20,25 @@ const eslintConfig = defineConfig([
       unicorn: eslintPluginUnicorn,
     },
     settings: {
-      'boundaries/include': ['app/**/*', 'lib/**/*', 'view/**/*'],
+      'boundaries/include': ['app/**/*', 'lib/**/*', 'view/**/*', 'app-registry/**/*'],
       'boundaries/elements': [
-        // [UPDATED] 1. ТЕСТЫ (Первый приоритет)
-        // Выделяем тесты в отдельный слой, чтобы на них не действовали ограничения кода.
-        // Так как это первое правило, *.test.tsx попадет сюда и не будет считаться ui-component.
+        // 1. ТЕСТЫ (Первый приоритет)
         {
           type: 'test',
           pattern: ['**/*.test.ts', '**/*.test.tsx'],
           mode: 'file',
         },
 
-        // 2. ОСТАЛЬНЫЕ ЭЛЕМЕНТЫ
+        // 2. СТРУКТУРНЫЕ ЭЛЕМЕНТЫ
         {
           type: 'app-layer',
           pattern: 'app/(page|layout|loading|error|not-found|tools/**/page).tsx',
           mode: 'file',
+        },
+        {
+          type: 'app-registry',
+          pattern: 'app-registry/*',
+          mode: 'folder',
         },
         { type: 'tool', pattern: 'view/tools/*.tsx', mode: 'file', capture: ['toolName'] },
         { type: 'entity', pattern: 'view/tools/*/*.tsx', mode: 'file', capture: ['entityName'] },
@@ -71,11 +74,12 @@ const eslintConfig = defineConfig([
       'boundaries/element-types': [
         'error',
         {
-          default: 'allow', // По умолчанию разрешаем всё (в т.ч. тестам импортировать код)
+          default: 'allow',
           rules: [
             {
               from: 'core',
               disallow: [
+                'app-registry',
                 'module',
                 'ui-component',
                 'ui-infrastructure',
@@ -87,42 +91,61 @@ const eslintConfig = defineConfig([
             },
             {
               from: 'module',
-              disallow: ['ui-component', 'ui-infrastructure', 'entity', 'tool', 'app-layer'],
+              disallow: [
+                'app-registry',
+                'ui-component',
+                'ui-infrastructure',
+                'entity',
+                'tool',
+                'app-layer',
+              ],
               message: '❌ Modules must not depend on UI or App layers',
             },
 
             // --- ПРАВИЛА ИЗОЛЯЦИИ UI ---
             {
               from: 'ui-component',
-              disallow: ['core', 'module', 'entity', 'tool', 'app-layer'],
+              disallow: ['app-registry', 'core', 'module', 'entity', 'tool', 'app-layer'],
               message:
                 '❌ UI Component must be a stand-alone crystal. Imports from /lib or /app are forbidden.',
             },
             {
               from: 'ui-component',
-              // Запрещаем импорт других компонентов UI (каждый файл сам по себе)
               disallow: [['ui-component', { componentName: '!${from.componentName}' }]],
-              // Но разрешаем импорт своей внутренней инфраструктуры
               allow: ['ui-infrastructure'],
               message: '❌ UI Components cannot depend on each other. Use slots or infrastructure.',
             },
             {
               from: 'ui-infrastructure',
-              // Инфраструктура UI не может зависеть от логики проекта
-              disallow: ['ui-component', 'core', 'module', 'entity', 'tool', 'app-layer'],
+              disallow: [
+                'app-registry',
+                'ui-component',
+                'core',
+                'module',
+                'entity',
+                'tool',
+                'app-layer',
+              ],
               message: '❌ UI Infrastructure must be pure and depend only on third-party packages.',
             },
             // --- --- --- --- --- ---
 
             {
               from: 'entity',
-              disallow: ['tool', 'app-layer'],
+              disallow: ['app-registry', 'tool', 'app-layer'],
               message: '❌ Entities must not depend on specific Tools or Pages',
             },
             {
               from: 'tool',
-              disallow: [['tool', { toolName: '!${from.toolName}' }], 'app-layer'],
-              message: '❌ Tools must be isolated from each other and the App Layer',
+              disallow: [['tool', { toolName: '!${from.toolName}' }], 'app-layer', 'app-registry'],
+              message: '❌ Tools must be isolated from each other and the Registry/App Layer',
+            },
+            {
+              from: 'app-registry',
+              disallow: ['app-layer'],
+              // Разрешаем app-registry импортировать инструменты для динамической загрузки
+              allow: ['tool', 'core', 'entity', 'ui-component', 'ui-infrastructure'],
+              message: '❌ App Registry must not depend on the App Layer (Routing/Pages)',
             },
           ],
         },
@@ -151,7 +174,6 @@ const eslintConfig = defineConfig([
     },
   },
 
-  // 3. ОТКЛЮЧЕНИЕ КОНФЛИКТУЮЩИХ ПРАВИЛ
   eslintConfigPrettier,
 ]);
 

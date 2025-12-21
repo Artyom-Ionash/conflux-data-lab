@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 
-import { categoryLabels, toolsByCategory } from '@/lib/core/registry/inventory';
+import { categoryLabels, toolsByCategory } from '@/app-registry/inventory';
 import { ToolGrid } from '@/view/catalog/ToolGrid';
 
 interface CategoryPageProps {
