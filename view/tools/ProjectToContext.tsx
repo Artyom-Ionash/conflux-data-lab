@@ -9,6 +9,7 @@ import { runContextPipeline } from '@/lib/modules/context-generator/engine';
 import { CONTEXT_PRESETS, type PresetKey } from '@/lib/modules/context-generator/rules';
 import { useBundleManager } from '@/lib/modules/context-generator/use-bundle-manager';
 import { Card } from '@/view/ui/Card';
+import { CopyButton } from '@/view/ui/CopyButton';
 import { cn } from '@/view/ui/infrastructure/standards';
 import { ProcessingOverlay } from '@/view/ui/ProcessingOverlay';
 import { Switch } from '@/view/ui/Switch';
@@ -227,15 +228,7 @@ export function ProjectToContext() {
               contentClassName="p-0 flex-1 overflow-hidden flex flex-col"
               headerActions={
                 <div className="flex gap-2">
-                  <button
-                    onClick={() => result && copy(result)}
-                    className={cn(
-                      'rounded px-3 py-1.5 text-xs font-bold transition-colors',
-                      isCopied ? 'bg-green-100 text-green-700' : 'bg-zinc-100'
-                    )}
-                  >
-                    {isCopied ? 'Готово!' : 'Копировать'}
-                  </button>
+                  <CopyButton onCopy={() => copy(result)} isCopied={isCopied} variant="subtle" />
                   <button
                     onClick={downloadResult}
                     className="rounded bg-blue-600 px-3 py-1.5 text-xs font-bold text-white"

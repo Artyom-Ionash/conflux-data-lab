@@ -5,14 +5,13 @@ import { useState } from 'react';
 import { useCopyToClipboard } from '@/lib/core/hooks/use-copy-to-clipboard';
 import { convertJsonToCsv } from '@/lib/modules/converters/json-to-csv';
 import { Card } from '@/view/ui/Card';
-import { cn } from '@/view/ui/infrastructure/standards';
+import { CopyButton } from '@/view/ui/CopyButton';
 
 export function JsonToCsvConverter() {
   const [jsonInput, setJsonInput] = useState('');
   const [csvOutput, setCsvOutput] = useState('');
   const [error, setError] = useState('');
 
-  // Используем переиспользуемую абстракцию
   const { isCopied, copy } = useCopyToClipboard();
 
   const handleConvert = () => {
@@ -78,17 +77,7 @@ export function JsonToCsvConverter() {
                 CSV Output
               </label>
               {csvOutput && (
-                <button
-                  onClick={() => copy(csvOutput)}
-                  className={cn(
-                    'text-xs font-bold transition-colors',
-                    isCopied
-                      ? 'text-green-600 dark:text-green-400'
-                      : 'text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300'
-                  )}
-                >
-                  {isCopied ? '✓ Скопировано' : 'Копировать'}
-                </button>
+                <CopyButton onCopy={() => copy(csvOutput)} isCopied={isCopied} variant="link" />
               )}
             </div>
             <textarea
