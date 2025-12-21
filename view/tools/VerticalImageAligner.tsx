@@ -16,6 +16,7 @@ import { WorkbenchCanvas } from '@/view/tools/graphics/WorkbenchCanvas';
 import { TextureDimensionSlider } from '@/view/tools/hardware/TextureDimensionSlider';
 import { CanvasMovable, useCanvasRef } from '@/view/ui/Canvas';
 import { ControlLabel, ControlSection } from '@/view/ui/ControlSection';
+import { DownloadButton } from '@/view/ui/DownloadButton';
 import { FileDropzone, FileDropzonePlaceholder } from '@/view/ui/FileDropzone';
 import { cn } from '@/view/ui/infrastructure/standards';
 import { SortableList } from '@/view/ui/interaction/SortableList';
@@ -277,16 +278,12 @@ export function VerticalImageAligner() {
       {images.length > 0 && (
         <>
           <div className="space-y-2">
-            <button
-              onClick={handleExport}
+            <DownloadButton
+              onDownload={handleExport}
               disabled={isExporting}
-              className={cn(
-                'w-full rounded-md bg-blue-600 py-2.5 text-sm font-semibold text-white shadow-sm transition-all hover:bg-blue-700 hover:shadow-md',
-                isExporting && 'opacity-50'
-              )}
-            >
-              {isExporting ? 'Экспорт...' : 'Скачать PNG'}
-            </button>
+              label={isExporting ? 'Экспорт...' : 'Скачать PNG'}
+              className="w-full"
+            />
           </div>
 
           <ControlSection title="Размеры слота">

@@ -10,6 +10,7 @@ import { CONTEXT_PRESETS, type PresetKey } from '@/lib/modules/context-generator
 import { useBundleManager } from '@/lib/modules/context-generator/use-bundle-manager';
 import { Card } from '@/view/ui/Card';
 import { CopyButton } from '@/view/ui/CopyButton';
+import { DownloadButton } from '@/view/ui/DownloadButton';
 import { cn } from '@/view/ui/infrastructure/standards';
 import { ProcessingOverlay } from '@/view/ui/ProcessingOverlay';
 import { Switch } from '@/view/ui/Switch';
@@ -229,12 +230,11 @@ export function ProjectToContext() {
               headerActions={
                 <div className="flex gap-2">
                   <CopyButton onCopy={() => copy(result)} isCopied={isCopied} variant="subtle" />
-                  <button
-                    onClick={downloadResult}
-                    className="rounded bg-blue-600 px-3 py-1.5 text-xs font-bold text-white"
-                  >
-                    Скачать .txt
-                  </button>
+                  <DownloadButton
+                    onDownload={downloadResult}
+                    variant="primary"
+                    label="Скачать .txt"
+                  />
                 </div>
               }
             >

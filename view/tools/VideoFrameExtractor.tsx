@@ -11,6 +11,7 @@ import { MultiScalePreview } from '@/view/ui/collections/MultiScalePreview';
 import { SpriteFrameList } from '@/view/ui/collections/SpriteFrameList';
 import { ColorInput } from '@/view/ui/ColorInput';
 import { ControlLabel, ControlSection } from '@/view/ui/ControlSection';
+import { DownloadButton } from '@/view/ui/DownloadButton';
 import { FileDropzone, FileDropzonePlaceholder } from '@/view/ui/FileDropzone';
 import { ImageSequencePlayer } from '@/view/ui/ImageSequencePlayer';
 import { cn } from '@/view/ui/infrastructure/standards';
@@ -19,7 +20,6 @@ import { NumberStepper } from '@/view/ui/NumberStepper';
 // --- EXTRACTED COMPONENTS ---
 import { DualHoverPreview } from '@/view/ui/players/DualHoverPreview';
 import { RangeVideoPlayer } from '@/view/ui/players/RangeVideoPlayer';
-// --- NEW CONSOLIDATED UI ---
 import { ProgressBar } from '@/view/ui/ProcessingOverlay';
 import { RangeSlider } from '@/view/ui/RangeSlider';
 import { Switch } from '@/view/ui/Switch';
@@ -347,17 +347,15 @@ export function VideoFrameExtractor() {
                   title={<ControlLabel>Разница</ControlLabel>}
                   headerActions={
                     diffDataUrl ? (
-                      <button
-                        onClick={() => {
+                      <DownloadButton
+                        onDownload={() => {
                           const a = document.createElement('a');
                           a.href = diffDataUrl;
                           a.download = 'diff.png';
                           a.click();
                         }}
-                        className="text-xs font-medium text-blue-600 hover:underline"
-                      >
-                        Скачать
-                      </button>
+                        variant="link"
+                      />
                     ) : undefined
                   }
                   contentClassName="p-0"
@@ -382,7 +380,6 @@ export function VideoFrameExtractor() {
                   title={
                     <div className="flex items-center gap-4">
                       <ControlLabel>Спрайт</ControlLabel>
-                      {/* Speed % Control */}
                       <NumberStepper
                         label="Скорость %"
                         value={currentSpeedPercent}
@@ -405,18 +402,16 @@ export function VideoFrameExtractor() {
                   }
                   headerActions={
                     state.frames.length > 0 && !state.status.isProcessing ? (
-                      <button
-                        onClick={actions.generateAndDownloadGif}
+                      <DownloadButton
+                        onDownload={actions.generateAndDownloadGif}
+                        variant="link"
+                        label={
+                          state.status.currentStep === 'generating'
+                            ? 'Кодирование...'
+                            : 'Скачать GIF'
+                        }
                         disabled={state.status.isProcessing}
-                        className={cn(
-                          'text-xs font-medium text-blue-600 hover:underline disabled:opacity-50',
-                          state.status.isProcessing && 'cursor-not-allowed opacity-50'
-                        )}
-                      >
-                        {state.status.currentStep === 'generating'
-                          ? 'Кодирование...'
-                          : 'Скачать GIF'}
-                      </button>
+                      />
                     ) : undefined
                   }
                   contentClassName="p-0"
@@ -465,18 +460,12 @@ export function VideoFrameExtractor() {
                       <div className="w-48 pt-1">
                         <TextureLimitIndicator value={totalSpriteWidth} label="ШИРИНА" />
                       </div>
-                      <button
-                        onClick={handleDownloadSpriteSheet}
-                        className={cn(
-                          'text-xs font-bold transition-colors',
-                          totalSpriteWidth > MAX_BROWSER_TEXTURE
-                            ? 'cursor-not-allowed text-zinc-400'
-                            : 'text-blue-600 hover:underline'
-                        )}
+                      <DownloadButton
+                        onDownload={handleDownloadSpriteSheet}
+                        variant="link"
+                        label="Скачать PNG"
                         disabled={totalSpriteWidth > MAX_BROWSER_TEXTURE}
-                      >
-                        Скачать PNG
-                      </button>
+                      />
                     </div>
                   )
                 }

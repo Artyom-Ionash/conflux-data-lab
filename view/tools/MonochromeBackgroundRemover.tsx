@@ -19,6 +19,7 @@ import { WorkbenchCanvas } from '@/view/tools/graphics/WorkbenchCanvas';
 import { CanvasMovable, useCanvasRef } from '@/view/ui/Canvas';
 import { ColorInput } from '@/view/ui/ColorInput';
 import { ControlLabel, ControlSection } from '@/view/ui/ControlSection';
+import { DownloadButton } from '@/view/ui/DownloadButton';
 import { FileDropzone, FileDropzonePlaceholder } from '@/view/ui/FileDropzone';
 import { Slider } from '@/view/ui/Slider';
 import { ToggleGroup, ToggleGroupItem } from '@/view/ui/ToggleGroup';
@@ -69,7 +70,6 @@ export function MonochromeBackgroundRemover() {
 
   const [isProcessing, setIsProcessing] = useState(false);
 
-  // Использование нового хука
   const { ref: workspaceRef, getScale } = useCanvasRef();
   const sourceCanvasRef = useRef<HTMLCanvasElement>(null);
   const previewCanvasRef = useRef<HTMLCanvasElement>(null);
@@ -440,13 +440,7 @@ export function MonochromeBackgroundRemover() {
             </div>
           )}
 
-          <button
-            onClick={handleDownload}
-            disabled={!originalUrl}
-            className="w-full rounded bg-zinc-900 py-3 text-sm font-bold text-white shadow transition hover:opacity-90 disabled:opacity-50 dark:bg-white dark:text-black"
-          >
-            Скачать
-          </button>
+          <DownloadButton onDownload={handleDownload} className="w-full" />
         </div>
       )}
     </div>
