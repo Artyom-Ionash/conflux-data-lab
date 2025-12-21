@@ -14,10 +14,8 @@ export const IGNORE_COMMON = [
   'CHANGELOG.md',
 ];
 
-// Имя папки для локального контекста (игнорируется git, но читается генератором)
 export const LOCAL_CONTEXT_FOLDER = '.ai';
 
-// Файлы, которые ОБЯЗАНЫ быть в контексте, если они есть в репозитории
 export const MANDATORY_REPO_FILES = [
   'docs/ENGINEER_PROFILE.md',
   'docs/ARCHITECTURE.md',
@@ -25,6 +23,16 @@ export const MANDATORY_REPO_FILES = [
   'docs/TECH_DEBT.md',
 ];
 
+export interface ContextPreset {
+  name: string;
+  textExtensions: string[];
+  hardIgnore: string[];
+  /** Пути, которые отображаются в дереве, но контент которых исключается */
+  treeOnly: string[];
+}
+
+// Используем satisfies вместо явного Record<string, ContextPreset>
+// Это позволяет TS знать, что ключи 'godot' и 'nextjs' точно существуют.
 export const CONTEXT_PRESETS = {
   godot: {
     name: 'Godot 4 (Logic Only)',
@@ -39,60 +47,16 @@ export const CONTEXT_PRESETS = {
       '.txt',
       '.md',
       '.py',
-      '.gitignore',
-      '.sh',
     ],
-    hardIgnore: [
-      ...IGNORE_COMMON,
-      '.godot',
-      '.import',
-      'builds',
-      '__pycache__',
-      '.next',
-      'dist',
-      'build',
-      '*.uid',
-      '*.import',
-    ],
+    hardIgnore: [...IGNORE_COMMON, '.godot', '.import', 'builds', '*.uid', '*.import'],
+    treeOnly: ['addons/'],
   },
   nextjs: {
     name: 'Next.js / React',
-    textExtensions: [
-      '.ts',
-      '.tsx',
-      '.js',
-      '.jsx',
-      '.mjs',
-      '.cjs',
-      '.css',
-      '.scss',
-      '.sass',
-      '.json',
-      '.md',
-      '.yaml',
-      '.yml',
-      '.toml',
-      '.env.example',
-      '.conf',
-      '.xml',
-      '.gd',
-      '.tscn',
-      'dockerfile',
-      '.gitignore',
-      '.sh',
-    ],
-    hardIgnore: [
-      ...IGNORE_COMMON,
-      '.next',
-      'out',
-      'build',
-      'dist',
-      'coverage',
-      '.vercel',
-      '.turbo',
-      '__pycache__',
-    ],
+    textExtensions: ['.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs', '.css', '.json', '.md', '.yaml'],
+    hardIgnore: [...IGNORE_COMMON, '.next', 'out', 'dist', 'coverage', '.vercel'],
+    treeOnly: ['public/'],
   },
-};
+} satisfies Record<string, ContextPreset>;
 
 export type PresetKey = keyof typeof CONTEXT_PRESETS;

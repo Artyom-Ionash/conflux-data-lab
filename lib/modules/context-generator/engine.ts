@@ -1,11 +1,8 @@
 import { type FileNode, generateAsciiTree } from '@/lib/modules/file-system/topology';
 
 import { processFileToContext, type RawFile } from './assembly';
-import {
-  type ContextGenerationResult,
-  generateContextOutput,
-  type ProcessedContextFile,
-} from './core';
+import { type ContextGenerationResult, generateContextOutput } from './core';
+import { type ContextPreset } from './rules';
 
 export interface ContextFileSource {
   path: string;
@@ -15,33 +12,43 @@ export interface ContextFileSource {
 
 /**
  * Универсальный конвейер сборки контекста.
- * Агностичен к среде (Node.js/Browser).
  */
 export async function runContextPipeline(
   sources: ContextFileSource[],
-  options: { includeTree: boolean }
+  options: {
+    includeTree: boolean;
+    // Для совместимости с exactOptionalPropertyTypes
+    preset?: ContextPreset | undefined;
+  }
 ): Promise<ContextGenerationResult> {
-  const processedFiles: ProcessedContextFile[] = [];
+  const processedFiles = [];
   const treeNodes: FileNode[] = [];
 
   for (const source of sources) {
     const ext = source.name.split('.').pop() || 'txt';
 
-    // 1. Подготовка для дерева
+    // 1. Проверяем политику "Tree Only" (Source of Truth)
+    const activeTreeOnlyRule = options.preset?.treeOnly?.find((p) => source.path.startsWith(p));
+
+    // 2. Подготовка для дерева (Всегда сохраняем оригинальный размер для метаданных)
     if (options.includeTree) {
       treeNodes.push({
         path: source.path,
         name: source.name,
         size: source.content.length,
-        isText: true, // Engine работает только с уже отфильтрованным текстом
+        isText: true,
       });
     }
 
-    // 2. Трансформация контента
+    // 3. Обработка контента: если файл в treeOnly, заменяем контент на заглушку
+    const finalContent = activeTreeOnlyRule
+      ? `[File content omitted: matches tree-only pattern "${activeTreeOnlyRule}"]`
+      : source.content;
+
     const raw: RawFile = {
       name: source.name,
       path: source.path,
-      content: source.content,
+      content: finalContent,
       extension: ext,
     };
 
