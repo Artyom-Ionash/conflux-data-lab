@@ -1,8 +1,7 @@
 'use client';
 
-import ignore from 'ignore';
 import Link from 'next/link';
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useRef, useState } from 'react';
 
 import {
   calculateFileScore,
@@ -13,22 +12,20 @@ import {
   generateContextOutput,
   type ProcessedContextFile,
 } from '@/lib/modules/context-generator/core';
-// --- SHARED LOGIC IMPORTS ---
 import {
   CONTEXT_PRESETS,
   LOCAL_CONTEXT_FOLDER,
-  MANDATORY_REPO_FILES,
   type PresetKey,
 } from '@/lib/modules/context-generator/rules';
-// --- UTILS ---
 import { isTextFile, LANGUAGE_MAP } from '@/lib/modules/file-system/analyzers';
+import { createIgnoreManager } from '@/lib/modules/file-system/scanner';
 import { formatBytes, generateAsciiTree } from '@/lib/modules/file-system/topology';
-// --- UI COMPONENTS ---
 import { Card } from '@/view/ui/Card';
 import { Switch } from '@/view/ui/Switch';
-import { Workbench } from '@/view/ui/Workbench'; // NEW
+import { Workbench } from '@/view/ui/Workbench';
 
-// ... (TYPES и HELPERS без изменений)
+// --- TYPES ---
+
 interface FileNode {
   path: string;
   name: string;
@@ -52,17 +49,16 @@ interface ProjectStats {
   topFiles: { path: string; size: number; tokens: number }[];
 }
 
-const readFileAsText = (file: File): Promise<string> => {
-  return file.text();
-};
+// --- HELPERS ---
+
+const readFileAsText = (file: File): Promise<string> => file.text();
 
 // --- COMPONENT ---
 
 export function ProjectToContext() {
-  // ... (Логика и хуки без изменений) ...
-  const [selectedPreset, setSelectedPreset] = useState<PresetKey>('godot');
+  const [selectedPreset, setSelectedPreset] = useState<PresetKey>('nextjs');
   const [customExtensions, setCustomExtensions] = useState<string>(
-    CONTEXT_PRESETS.godot.textExtensions.join(', ')
+    CONTEXT_PRESETS.nextjs.textExtensions.join(', ')
   );
   const [customIgnore, setCustomIgnore] = useState<string>('');
   const [includeTree, setIncludeTree] = useState(true);
@@ -83,30 +79,30 @@ export function ProjectToContext() {
     setCustomIgnore('');
   };
 
+  /**
+   * [REFINED] Обработка выбора директории с использованием централизованного сканера.
+   */
   const handleDirectorySelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files) return;
-    const fileList = [...e.target.files];
-    const gitIgnoreFile = fileList.find((f) => f.name === '.gitignore');
-    let gitIgnoreContent = '';
+    const fileList = Array.from(e.target.files);
 
+    // 1. Поиск .gitignore для настройки менеджера игнорирования
+    const gitIgnoreFile = fileList.find((f) => f.name === '.gitignore');
+    let gitIgnoreContent: string | null = null;
     if (gitIgnoreFile) {
       try {
         gitIgnoreContent = await readFileAsText(gitIgnoreFile);
       } catch (err) {
-        console.warn('Failed to read .gitignore', err);
+        console.warn('⚠️ Не удалось прочитать .gitignore', err);
       }
     }
 
+    // 2. Эвристическое определение пресета
     let detectedPreset: PresetKey | null = null;
     const fileNames = fileList.map((f) => f.name);
-
     if (fileNames.includes('project.godot')) {
       detectedPreset = 'godot';
-    } else if (
-      fileNames.includes('next.config.js') ||
-      fileNames.includes('next.config.ts') ||
-      fileNames.includes('package.json')
-    ) {
+    } else if (fileNames.includes('package.json') || fileNames.includes('next.config.ts')) {
       detectedPreset = 'nextjs';
     }
 
@@ -116,178 +112,173 @@ export function ProjectToContext() {
     if (detectedPreset && detectedPreset !== selectedPreset) {
       setSelectedPreset(detectedPreset);
       setCustomExtensions(activePreset.textExtensions.join(', '));
-      setCustomIgnore('');
     }
 
-    const ig = ignore();
-    ig.add(activePreset.hardIgnore);
-    if (gitIgnoreContent) ig.add(gitIgnoreContent);
-    if (customIgnore.trim()) {
-      ig.add(
-        customIgnore
-          .split(',')
-          .map((s) => s.trim())
-          .filter((s) => s.length > 0)
-      );
-    }
-    if (MANDATORY_REPO_FILES.length > 0) {
-      ig.add(MANDATORY_REPO_FILES.map((f) => `!${f}`));
-    }
-    ig.add(`!${LOCAL_CONTEXT_FOLDER}`);
-    ig.add(`!${LOCAL_CONTEXT_FOLDER}/**`);
+    // 3. Создание менеджера игнорирования через новый модуль
+    const customPatterns = customIgnore
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean);
 
-    const extList = activePreset.textExtensions;
+    const ig = createIgnoreManager({
+      gitIgnoreContent,
+      ignorePatterns: [...activePreset.hardIgnore, ...customPatterns],
+    });
+
     const nodes: FileNode[] = [];
+    const extList = customExtensions.split(',').map((s) => s.trim().toLowerCase());
 
-    fileList.forEach((f) => {
+    for (const f of fileList) {
       let path = f.webkitRelativePath || f.name;
-      if (f.webkitRelativePath) {
-        const parts = path.split('/');
-        if (parts.length > 1) {
-          path = parts.slice(1).join('/');
-        }
-      }
-      if (ig.ignores(path)) return;
+      const parts = path.split('/');
+      if (parts.length > 1) path = parts.slice(1).join('/');
+
+      // ТЕПЕРЬ ЭТО БЕЗОПАСНО: .ai/.git будет отсечен внутри ig.ignores
+      if (ig.ignores(path)) continue;
+
       const isLocalContext = path.startsWith(LOCAL_CONTEXT_FOLDER + '/');
       nodes.push({
-        path: path,
+        path,
         name: f.name,
         size: f.size,
         file: f,
         isText: isTextFile(f.name, extList) || isLocalContext,
       });
-    });
+    }
 
     setFiles(nodes);
     setResult(null);
-    setStats(null);
+
+    // ВМЕСТО useEffect: Запускаем обработку немедленно с новыми данными
+    if (nodes.length > 0) {
+      void processFiles(nodes);
+    }
   };
 
-  const processFiles = useCallback(async () => {
-    setProcessing(true);
-    setProgress(0);
-    setResult(null);
-    const sortedFiles = [...files].sort((a, b) => {
-      return (
-        calculateFileScore(a.name, undefined, a.path) -
-        calculateFileScore(b.name, undefined, b.path)
-      );
-    });
+  // 1. Обновляем processFiles, чтобы он мог принимать файлы напрямую
+  const processFiles = useCallback(
+    async (filesToProcess?: FileNode[]) => {
+      const targetFiles = filesToProcess || files; // Используем переданные файлы или стейт
+      if (targetFiles.length === 0) return;
 
-    let totalOriginalBytes = 0;
-    let totalCleanedBytes = 0;
-    const composition: Record<string, number> = {};
-    const processedFileStats: { path: string; size: number; tokens: number }[] = [];
-    const filesForGenerator: ProcessedContextFile[] = [];
+      setProcessing(true);
+      setProgress(0);
+      setResult(null);
 
-    let processedCount = 0;
+      // Сортировка по важности (Score)
+      const sortedFiles = [...files].sort((a, b) => {
+        return (
+          calculateFileScore(a.name, undefined, a.path) -
+          calculateFileScore(b.name, undefined, b.path)
+        );
+      });
 
-    for (const node of sortedFiles) {
-      if (!node.isText) {
+      let totalOriginalBytes = 0;
+      let totalCleanedBytes = 0;
+      const composition: Record<string, number> = {};
+      const processedFileStats: { path: string; size: number; tokens: number }[] = [];
+      const filesForGenerator: ProcessedContextFile[] = [];
+
+      let processedCount = 0;
+
+      for (const node of sortedFiles) {
+        if (!node.isText) {
+          processedCount++;
+          continue;
+        }
+        try {
+          const originalText = await readFileAsText(node.file);
+          const ext = node.name.split('.').pop() || 'txt';
+          const rawFile: RawFile = {
+            name: node.name,
+            path: node.path,
+            content: originalText,
+            extension: ext,
+          };
+
+          const contextNode = processFileToContext(rawFile);
+
+          totalOriginalBytes += contextNode.originalSize;
+          totalCleanedBytes += contextNode.cleanedSize;
+
+          let reportLang = LANGUAGE_MAP[contextNode.langTag] || contextNode.langTag;
+          if (node.name.includes('config') || node.name.startsWith('.')) reportLang = 'config/meta';
+          composition[reportLang] = (composition[reportLang] || 0) + 1;
+
+          filesForGenerator.push({
+            path: contextNode.path,
+            content: contextNode.content,
+            langTag: contextNode.langTag,
+            size: contextNode.cleanedSize,
+          });
+
+          processedFileStats.push({
+            path: contextNode.path,
+            size: contextNode.cleanedSize,
+            tokens: Math.ceil(contextNode.cleanedSize / 4),
+          });
+        } catch (e) {
+          console.error(`❌ Ошибка обработки ${node.path}`, e);
+        }
+
         processedCount++;
-        continue;
+        // Неблокирующее обновление прогресса
+        if (processedCount % 10 === 0 || processedCount === sortedFiles.length) {
+          setProgress(Math.round((processedCount / sortedFiles.length) * 100));
+          await new Promise((r) => requestAnimationFrame(r));
+        }
       }
-      try {
-        const originalText = await readFileAsText(node.file);
-        const ext = node.name.split('.').pop() || 'txt';
-        const rawFile: RawFile = {
-          name: node.name,
-          path: node.path,
-          content: originalText,
-          extension: ext,
-        };
-        const contextNode = processFileToContext(rawFile);
-        totalOriginalBytes += contextNode.originalSize;
-        totalCleanedBytes += contextNode.cleanedSize;
-        let reportLang = LANGUAGE_MAP[contextNode.langTag] || contextNode.langTag;
-        if (node.name.includes('config') || node.name.startsWith('.')) reportLang = 'config/meta';
-        composition[reportLang] = (composition[reportLang] || 0) + 1;
-        filesForGenerator.push({
-          path: contextNode.path,
-          content: contextNode.content,
-          langTag: contextNode.langTag,
-          size: contextNode.cleanedSize,
-        });
-        processedFileStats.push({
-          path: contextNode.path,
-          size: contextNode.cleanedSize,
-          tokens: Math.ceil(contextNode.cleanedSize / 4),
-        });
-      } catch (e) {
-        console.error(`Error processing ${node.path}`, e);
-      }
-      processedCount++;
-      setProgress(Math.round((processedCount / sortedFiles.length) * 80));
-      if (processedCount % 5 === 0) await new Promise((r) => setTimeout(r, 0));
-    }
 
-    const treeString = includeTree ? generateAsciiTree(sortedFiles) : '';
-    const { output, stats: coreStats } = generateContextOutput(filesForGenerator, treeString);
-    const savingsBytes = totalOriginalBytes - totalCleanedBytes;
-    const savingsPercent = totalOriginalBytes > 0 ? (savingsBytes / totalOriginalBytes) * 100 : 0;
-    const topFiles = processedFileStats.sort((a, b) => b.size - a.size).slice(0, 5);
+      const treeString = includeTree ? generateAsciiTree(sortedFiles) : '';
+      const { output, stats: coreStats } = generateContextOutput(filesForGenerator, treeString);
 
-    setStats({
-      totalFiles: sortedFiles.length,
-      processedFiles: filesForGenerator.length,
-      totalChars: totalCleanedBytes,
-      estimatedTokens: coreStats.totalTokens,
-      originalSize: totalOriginalBytes,
-      cleanedSize: totalCleanedBytes,
-      savings: { bytes: savingsBytes, percentage: savingsPercent },
-      composition,
-      topFiles,
-    });
-    setResult(output);
-    setLastGeneratedAt(new Date());
-    setProgress(100);
-    setProcessing(false);
-  }, [files, includeTree]);
+      const savingsBytes = totalOriginalBytes - totalCleanedBytes;
+      const savingsPercent = totalOriginalBytes > 0 ? (savingsBytes / totalOriginalBytes) * 100 : 0;
+      const topFiles = processedFileStats.sort((a, b) => b.size - a.size).slice(0, 5);
 
-  useEffect(() => {
-    if (files.length > 0 && result === null && !processing) {
-      void processFiles();
-    }
-  }, [files, result, processing, processFiles]);
+      setStats({
+        totalFiles: sortedFiles.length,
+        processedFiles: filesForGenerator.length,
+        totalChars: totalCleanedBytes,
+        estimatedTokens: coreStats.totalTokens,
+        originalSize: totalOriginalBytes,
+        cleanedSize: totalCleanedBytes,
+        savings: { bytes: savingsBytes, percentage: savingsPercent },
+        composition,
+        topFiles,
+      });
 
-  const downloadResult = () => {
-    if (!result) return;
-    const blob = new Blob([result], { type: 'text/markdown' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'gemini_context.txt';
-    a.click();
-    URL.revokeObjectURL(url);
-  };
+      setResult(output);
+      setLastGeneratedAt(new Date());
+      setProcessing(false);
+    },
+    [files, includeTree]
+  );
 
   const copyToClipboard = async () => {
     if (!result) return;
     try {
-      if (navigator.clipboard && navigator.clipboard.writeText) {
-        await navigator.clipboard.writeText(result);
-      } else {
-        throw new Error('Clipboard API unavailable');
-      }
+      await navigator.clipboard.writeText(result);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
     } catch {
-      alert('Не удалось скопировать.');
-      return;
+      alert('Ошибка при копировании в буфер обмена.');
     }
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
   };
 
-  const formatTime = (date: Date) => {
-    return date.toLocaleTimeString('ru-RU', {
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit',
-    });
+  const downloadResult = () => {
+    if (!result) return;
+    const blob = new Blob([result], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'project_context.txt';
+    a.click();
+    URL.revokeObjectURL(url);
   };
 
   const sidebar = (
     <div className="flex flex-col gap-6 pb-4">
-      {/* Header */}
       <div>
         <Link
           href="/"
@@ -304,12 +295,13 @@ export function ProjectToContext() {
             strokeLinejoin="round"
           >
             <path d="M19 12H5M12 19l-7-7 7-7" />
-          </svg>{' '}
+          </svg>
           На главную
         </Link>
         <h2 className="text-xl font-bold">Project to Context</h2>
       </div>
 
+      {/* 1. ИСТОЧНИК */}
       <div className="flex flex-col gap-2">
         <label className="text-sm font-bold text-zinc-700 dark:text-zinc-300">1. Источник</label>
         <div
@@ -317,7 +309,7 @@ export function ProjectToContext() {
           onClick={() => fileInputRef.current?.click()}
         >
           <span className="text-sm font-medium">
-            {files.length > 0 ? `Найдено: ${files.length}` : 'Выбрать папку'}
+            {files.length > 0 ? `Найдено файлов: ${files.length}` : 'Выбрать папку проекта'}
           </span>
           <input
             ref={fileInputRef}
@@ -330,13 +322,13 @@ export function ProjectToContext() {
             onChange={handleDirectorySelect}
           />
         </div>
-        <p className="px-1 text-[10px] leading-tight text-zinc-400">
-          Выберите папку корневого проекта.
-        </p>
       </div>
 
+      {/* 2. НАСТРОЙКИ */}
       <div className="flex flex-col gap-4">
-        <label className="text-sm font-bold text-zinc-700 dark:text-zinc-300">2. Настройки</label>
+        <label className="text-sm font-bold text-zinc-700 dark:text-zinc-300">
+          2. Конфигурация
+        </label>
         <div className="flex flex-wrap gap-2">
           {(Object.keys(CONTEXT_PRESETS) as PresetKey[]).map((key) => (
             <button
@@ -355,7 +347,9 @@ export function ProjectToContext() {
 
         <div className="space-y-3">
           <div>
-            <span className="mb-1 block text-xs text-zinc-500">Контент (расширения)</span>
+            <span className="mb-1 block text-[10px] font-bold text-zinc-500 uppercase">
+              Расширения
+            </span>
             <input
               type="text"
               value={customExtensions}
@@ -364,8 +358,8 @@ export function ProjectToContext() {
             />
           </div>
           <div>
-            <span className="mb-1 block text-xs text-zinc-500">
-              Дополнительно игнорировать (поверх .gitignore)
+            <span className="mb-1 block text-[10px] font-bold text-zinc-500 uppercase">
+              Игнорировать
             </span>
             <input
               type="text"
@@ -375,12 +369,16 @@ export function ProjectToContext() {
               className="w-full rounded border border-zinc-200 bg-white px-3 py-2 font-mono text-xs dark:border-zinc-700 dark:bg-zinc-900"
             />
           </div>
-          <Switch label="Дерево файлов" checked={includeTree} onCheckedChange={setIncludeTree} />
+          <Switch
+            label="Генерировать дерево"
+            checked={includeTree}
+            onCheckedChange={setIncludeTree}
+          />
         </div>
       </div>
 
       <button
-        onClick={processFiles}
+        onClick={() => void processFiles()} // Change: wrap in arrow function
         disabled={files.length === 0 || processing}
         className={`w-full rounded-lg py-3 font-bold text-white shadow-sm transition-all ${
           files.length === 0 ? 'bg-zinc-300 dark:bg-zinc-700' : 'bg-blue-600 hover:bg-blue-700'
@@ -389,54 +387,44 @@ export function ProjectToContext() {
         {processing ? `Обработка ${progress}%...` : 'Сгенерировать'}
       </button>
 
-      {/* --- STATS BLOCK --- */}
+      {/* 3. СТАТИСТИКА */}
       {stats && (
         <div className="animate-in fade-in slide-in-from-bottom-2 space-y-4 border-t border-zinc-200 pt-4 dark:border-zinc-800">
           <div className="rounded-lg border border-blue-100 bg-blue-50 p-3 dark:border-blue-800 dark:bg-blue-900/20">
-            <div className="mb-1 text-xs font-bold tracking-wide text-blue-600 uppercase dark:text-blue-300">
+            <div className="mb-1 text-[10px] font-bold text-blue-600 uppercase dark:text-blue-300">
               Токены (Est.)
             </div>
             <div className="font-mono text-2xl font-bold text-blue-700 dark:text-blue-200">
               ~{stats.estimatedTokens.toLocaleString()}
             </div>
-            <div className="mt-1 text-[10px] text-blue-500">
-              {((stats.estimatedTokens / 1_000_000) * 100).toFixed(1)}% от контекста 1M
-            </div>
           </div>
 
           <div className="grid grid-cols-2 gap-2">
             <div className="rounded border border-zinc-200 bg-zinc-50 p-2 dark:border-zinc-700 dark:bg-zinc-800">
-              <div className="text-[10px] font-bold text-zinc-500">Файлы</div>
+              <div className="text-[10px] font-bold text-zinc-500 uppercase">Файлы</div>
               <div className="font-mono text-sm">
-                {stats.processedFiles} <span className="text-zinc-400">/ {stats.totalFiles}</span>
+                {stats.processedFiles} / {stats.totalFiles}
               </div>
             </div>
             <div className="rounded border border-green-100 bg-green-50 p-2 dark:border-green-800 dark:bg-green-900/20">
-              <div className="text-[10px] font-bold text-green-600 dark:text-green-400">Сжатие</div>
-              <div className="font-mono text-sm text-green-700 dark:text-green-300">
+              <div className="text-[10px] font-bold text-green-600 uppercase">Сжатие</div>
+              <div className="font-mono text-sm text-green-700">
                 -{stats.savings.percentage.toFixed(0)}%
               </div>
             </div>
           </div>
 
           <div className="space-y-1">
-            <div className="text-[10px] font-bold text-zinc-500 uppercase">Самые тяжелые файлы</div>
-            <div className="space-y-1">
-              {stats.topFiles.map((f, i) => (
-                <div
-                  key={i}
-                  className="flex items-center justify-between rounded bg-zinc-50 px-2 py-1 font-mono text-[10px] dark:bg-zinc-800/50"
-                >
-                  <span className="max-w-[140px] truncate" title={f.path}>
-                    {f.path.split('/').pop()}
-                  </span>
-                  <div className="flex items-center gap-2">
-                    <span className="text-zinc-500">~{f.tokens.toLocaleString()}t</span>
-                    <span className="w-10 text-right text-zinc-400">{formatBytes(f.size)}</span>
-                  </div>
-                </div>
-              ))}
-            </div>
+            <div className="text-[10px] font-bold text-zinc-500 uppercase">Топ тяжелых файлов</div>
+            {stats.topFiles.map((f, i) => (
+              <div
+                key={i}
+                className="flex items-center justify-between rounded bg-zinc-50 px-2 py-1 font-mono text-[10px] dark:bg-zinc-800/50"
+              >
+                <span className="max-w-[140px] truncate">{f.path.split('/').pop()}</span>
+                <span className="text-zinc-400">{formatBytes(f.size)}</span>
+              </div>
+            ))}
           </div>
         </div>
       )}
@@ -453,10 +441,10 @@ export function ProjectToContext() {
               className="flex h-full flex-1 flex-col shadow-sm"
               title={
                 <div className="flex items-center gap-3">
-                  <span>Результат</span>
+                  <span>Результат контекста</span>
                   {lastGeneratedAt && (
-                    <span className="rounded bg-zinc-100 px-2 py-0.5 text-[10px] font-normal text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400">
-                      Обновлено: {formatTime(lastGeneratedAt)}
+                    <span className="text-[10px] font-normal text-zinc-400">
+                      {lastGeneratedAt.toLocaleTimeString()}
                     </span>
                   )}
                 </div>
@@ -466,24 +454,22 @@ export function ProjectToContext() {
                 <div className="flex gap-2">
                   <button
                     onClick={copyToClipboard}
-                    className={`rounded px-3 py-1.5 text-xs transition-all duration-200 ${
-                      copied
-                        ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300'
-                        : 'bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700'
+                    className={`rounded px-3 py-1.5 text-xs transition-all ${
+                      copied ? 'bg-green-100 text-green-700' : 'bg-zinc-100 hover:bg-zinc-200'
                     }`}
                   >
-                    {copied ? 'Скопировано!' : 'Копировать'}
+                    {copied ? 'Готово!' : 'Копировать'}
                   </button>
                   <button
                     onClick={downloadResult}
-                    className="rounded bg-blue-600 px-3 py-1.5 text-xs font-bold text-white shadow-sm hover:bg-blue-700"
+                    className="rounded bg-blue-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-blue-700"
                   >
                     Скачать .txt
                   </button>
                 </div>
               }
             >
-              <div className="flex-1 overflow-y-auto bg-white p-4 font-mono text-xs leading-relaxed whitespace-pre-wrap text-zinc-700 dark:bg-zinc-950 dark:text-zinc-300">
+              <div className="flex-1 overflow-y-auto bg-white p-4 font-mono text-[11px] leading-relaxed whitespace-pre-wrap text-zinc-700 dark:bg-zinc-950 dark:text-zinc-300">
                 {result}
               </div>
             </Card>
@@ -492,10 +478,10 @@ export function ProjectToContext() {
               <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-zinc-100 dark:bg-zinc-800">
                 <span className="text-2xl">🤖</span>
               </div>
-              <p>
+              <p className="text-sm">
                 {processing
-                  ? 'Обработка и генерация контекста...'
-                  : 'Генератор контекста для LLM (Ultra Optimized)'}
+                  ? 'Выполняется генерация...'
+                  : 'Выберите папку проекта для создания контекста'}
               </p>
             </div>
           )}

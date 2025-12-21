@@ -13,6 +13,7 @@ import {
 } from '../lib/modules/context-generator/rules';
 import { generateContextOutput, ProcessedContextFile } from '@/lib/modules/context-generator/core';
 import { processFileToContext, type RawFile } from '@/lib/modules/context-generator/assembly';
+import { createIgnoreManager } from '@/lib/modules/file-system/scanner';
 
 // --- CONFIG ---
 const PRESET = CONTEXT_PRESETS.nextjs;
@@ -83,35 +84,14 @@ function calculateGitDelta(rootDir: string): string {
 }
 
 // --- UTILS ---
-
 function getIgManager(rootDir: string) {
-  const ig = ignore();
-
-  // 1. Базовые правила
-  ig.add(PRESET.hardIgnore);
-
-  // 2. .gitignore
   const gitIgnorePath = join(rootDir, '.gitignore');
-  if (existsSync(gitIgnorePath)) {
-    try {
-      const content = readFileSync(gitIgnorePath, 'utf-8');
-      ig.add(content);
-    } catch (e) {
-      console.warn('⚠️ Could not read .gitignore:', e);
-    }
-  }
+  const gitIgnoreContent = existsSync(gitIgnorePath) ? readFileSync(gitIgnorePath, 'utf-8') : null;
 
-  // 3. ПРИНУДИТЕЛЬНОЕ ВКЛЮЧЕНИЕ (Un-ignore)
-  // Снимаем игнор с обязательных файлов документации
-  if (MANDATORY_REPO_FILES.length > 0) {
-    ig.add(MANDATORY_REPO_FILES.map((f) => `!${f}`));
-  }
-
-  // Снимаем игнор с папки локального контекста и её содержимого
-  ig.add(`!${LOCAL_CONTEXT_FOLDER}`);
-  ig.add(`!${LOCAL_CONTEXT_FOLDER}/**`);
-
-  return ig;
+  return createIgnoreManager({
+    gitIgnoreContent,
+    ignorePatterns: PRESET.hardIgnore,
+  });
 }
 
 // --- MAIN ---
