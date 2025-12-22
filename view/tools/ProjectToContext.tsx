@@ -7,13 +7,12 @@ import { type ContextStats } from '@/lib/modules/context-generator/core';
 import { runContextPipeline } from '@/lib/modules/context-generator/engine';
 import { CONTEXT_PRESETS, type PresetKey } from '@/lib/modules/context-generator/rules';
 import { useBundleManager } from '@/lib/modules/context-generator/use-bundle-manager';
-import { Card } from '@/view/ui/Card';
-import { CopyButton } from '@/view/ui/CopyButton';
-import { DownloadButton } from '@/view/ui/DownloadButton';
 import { cn } from '@/view/ui/infrastructure/standards';
 import { ProcessingOverlay } from '@/view/ui/ProcessingOverlay';
 import { Switch } from '@/view/ui/Switch';
 import { Workbench } from '@/view/ui/Workbench';
+
+import { ResultViewer } from './text/ResultViewer';
 
 export function ProjectToContext() {
   const { bundle, filteredPaths, handleFiles } = useBundleManager();
@@ -203,34 +202,19 @@ export function ProjectToContext() {
       <Workbench.Sidebar>{sidebar}</Workbench.Sidebar>
       <Workbench.Stage>
         <div className="relative flex h-full w-full flex-col overflow-hidden bg-zinc-50 p-4 dark:bg-black/20">
-          {result && !processing ? (
-            <Card
-              className="flex h-full flex-1 flex-col"
-              title={<span>Результат контекста {lastGeneratedAt?.toLocaleTimeString()}</span>}
-              contentClassName="p-0 flex-1 overflow-hidden flex flex-col"
-              headerActions={
-                <div className="flex gap-2">
-                  <CopyButton onCopy={() => copy(result)} isCopied={isCopied} variant="subtle" />
-                  <DownloadButton
-                    onDownload={downloadResult}
-                    variant="primary"
-                    label="Скачать .txt"
-                  />
-                </div>
-              }
-            >
-              <div className="flex-1 overflow-y-auto bg-white p-4 font-mono text-[11px] whitespace-pre-wrap dark:bg-zinc-950">
-                {result}
-              </div>
-            </Card>
-          ) : (
-            <div className="flex flex-1 flex-col items-center justify-center text-zinc-400">
-              <span className="mb-4 text-2xl">{processing ? '⚙️' : '🤖'}</span>
-              <p className="text-sm">
-                {processing ? 'Сборка контекста...' : 'Выберите папку проекта'}
-              </p>
-            </div>
-          )}
+          <ResultViewer
+            title={
+              result && !processing
+                ? `Результат контекста ${lastGeneratedAt?.toLocaleTimeString()}`
+                : 'Ожидание сборки'
+            }
+            value={!processing ? result : null}
+            isCopied={isCopied}
+            onCopy={copy}
+            onDownload={downloadResult}
+            downloadLabel="Скачать .txt"
+            placeholder={processing ? 'Сборка контекста...' : 'Выберите папку проекта'}
+          />
           <ProcessingOverlay isVisible={processing} message="Сборка контекста проекта..." />
         </div>
       </Workbench.Stage>

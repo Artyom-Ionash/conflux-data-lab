@@ -5,7 +5,8 @@ import { useState } from 'react';
 import { useCopyToClipboard } from '@/lib/core/hooks/use-copy-to-clipboard';
 import { convertJsonToCsv } from '@/lib/modules/converters/json-to-csv';
 import { Card } from '@/view/ui/Card';
-import { CopyButton } from '@/view/ui/CopyButton';
+
+import { ResultViewer } from './text/ResultViewer';
 
 export function JsonToCsvConverter() {
   const [jsonInput, setJsonInput] = useState('');
@@ -69,32 +70,18 @@ export function JsonToCsvConverter() {
           </div>
         </Card>
 
-        {/* Output */}
-        <Card>
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <label className="text-sm font-medium text-zinc-900 dark:text-zinc-100">
-                CSV Output
-              </label>
-              {csvOutput && (
-                <CopyButton onCopy={() => copy(csvOutput)} isCopied={isCopied} variant="link" />
-              )}
-            </div>
-            <textarea
-              value={csvOutput}
-              readOnly
-              placeholder="Результат конвертации появится здесь..."
-              className="h-64 w-full rounded-md border border-zinc-300 bg-zinc-50 px-3 py-2 font-mono text-sm dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
-            />
-          </div>
-        </Card>
+        {/* Output - Используем новый Кристалл */}
+        <ResultViewer
+          title="CSV Output"
+          value={csvOutput}
+          isCopied={isCopied}
+          onCopy={copy}
+          className="h-[400px] md:h-auto"
+        />
       </div>
 
       {/* Example */}
-      <Card>
-        <h3 className="mb-3 text-sm font-medium text-zinc-900 dark:text-zinc-100">
-          Пример использования
-        </h3>
+      <Card title="Пример использования">
         <div className="space-y-3 text-sm">
           <div>
             <p className="mb-1 text-zinc-600 dark:text-zinc-400">JSON:</p>
