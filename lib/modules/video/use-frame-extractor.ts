@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { useDebounceEffect } from '@/lib/core/hooks/use-debounce-effect';
 import { useObjectUrl } from '@/lib/core/hooks/use-object-url';
+import { downloadDataUrl } from '@/lib/core/utils/media';
 import {
   calculateTimestamps,
   type ExtractedFrame,
@@ -220,10 +221,7 @@ export function useFrameExtractor() {
         height: videoDimensions?.height || 200,
       });
 
-      const a = document.createElement('a');
-      a.href = imageUrl;
-      a.download = 'animation.gif';
-      a.click();
+      downloadDataUrl(imageUrl, 'animation.gif');
 
       setGifParams((p) => ({ ...p, dataUrl: imageUrl }));
       setStatus({ isProcessing: false, currentStep: '', progress: 100 });

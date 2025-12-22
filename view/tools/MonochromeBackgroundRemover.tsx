@@ -21,6 +21,7 @@ import { ActionButton, ActionGroup } from '@/view/ui/ActionGroup';
 import { CanvasMovable, useCanvasRef } from '@/view/ui/Canvas';
 import { ColorInput } from '@/view/ui/ColorInput';
 import { ControlLabel, ControlSection } from '@/view/ui/ControlSection';
+import { EngineRoom } from '@/view/ui/EngineRoom';
 import { Slider } from '@/view/ui/Slider';
 import { StatusBox } from '@/view/ui/StatusBox';
 import { ToggleGroup, ToggleGroupItem } from '@/view/ui/ToggleGroup';
@@ -121,7 +122,7 @@ export function MonochromeBackgroundRemover() {
   useEffect(() => {
     if (!originalUrl || !imgW || !imgH) return;
 
-    // Используем RAF для избежания синхронного каскада рендеров и ошибки линтера
+    // Используем RAF для избежания синхронного каскада рендеров
     requestAnimationFrame(() => {
       if (bgColor) {
         setTargetColor(bgColor);
@@ -264,7 +265,7 @@ export function MonochromeBackgroundRemover() {
     <div className="flex flex-col gap-6 pb-4">
       <Workbench.Header title="MonoRemover" />
 
-      {/* [КРИСТАЛЛИЗАЦИЯ] Единый узел ввода-вывода */}
+      {/* Единый узел ввода-вывода */}
       <SidebarIO
         onFilesSelected={handleFilesSelected}
         accept="image/*"
@@ -430,7 +431,10 @@ export function MonochromeBackgroundRemover() {
               ) : null
             }
           >
-            <canvas ref={sourceCanvasRef} className="hidden" />
+            <EngineRoom>
+              <canvas ref={sourceCanvasRef} />
+            </EngineRoom>
+
             <canvas
               ref={previewCanvasRef}
               className="block select-none"

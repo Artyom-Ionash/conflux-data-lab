@@ -11,7 +11,7 @@ import React, {
   useState,
 } from 'react';
 
-import { cn } from '@/view/ui/infrastructure/standards';
+import { cn, TRANSPARENCY_PATTERN_CSS } from '@/view/ui/infrastructure/standards';
 import { useElementSize } from '@/view/ui/infrastructure/use-element-size';
 
 // --- CONFIGURATION CONSTANTS ---
@@ -58,11 +58,8 @@ const THEME_COLORS = {
   },
 } as const;
 
-// CSS Patterns
+// Фоновая сетка самого Canvas (бесконечное поле)
 const GRID_CSS_PATTERN = `linear-gradient(45deg, #888 25%, transparent 25%), linear-gradient(-45deg, #888 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #888 75%), linear-gradient(-45deg, transparent 75%, #888 75%)`;
-
-const CHECKER_CSS_TEMPLATE = (color: string) =>
-  `linear-gradient(45deg, ${color} 25%, transparent 25%), linear-gradient(-45deg, ${color} 25%, transparent 25%), linear-gradient(45deg, transparent 75%, ${color} 75%), linear-gradient(-45deg, transparent 75%, ${color} 75%)`;
 
 // --- TYPES ---
 
@@ -388,7 +385,8 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(
               <div
                 className="pointer-events-none absolute inset-0 z-0 transition-colors duration-300"
                 style={{
-                  backgroundImage: CHECKER_CSS_TEMPLATE(currentTheme.CHECKER),
+                  // ИСПОЛЬЗУЕМ ОБЩИЙ СТАНДАРТ
+                  backgroundImage: TRANSPARENCY_PATTERN_CSS(currentTheme.CHECKER),
                   backgroundSize: `${GRID_SIZE}px ${GRID_SIZE}px`,
                   backgroundPosition: `0 0, 0 ${GRID_SIZE / 2}px, ${GRID_SIZE / 2}px -${GRID_SIZE / 2}px, -${GRID_SIZE / 2}px 0px`,
                   backgroundColor: currentTheme.CHECKER_BG,
@@ -415,10 +413,6 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(
 );
 
 Canvas.displayName = 'Canvas';
-
-// --- SUB-COMPONENT: CanvasMovable ---
-// Ранее находился в view/ui/interaction/CanvasMovable.tsx
-// Перемещен сюда (Colocation Principle) т.к. зависит от логики масштабирования Canvas.
 
 export interface CanvasMovableProps {
   x: number;
