@@ -41,31 +41,7 @@ export function ProjectToContext() {
   }, []);
 
   /**
-   * ⚠️ ПРЕДУПРЕЖДЕНИЕ:
-   * Эта функция отвечает только за формирование СПИСКА файлов (FileBundle).
-   * В ней НЕЛЬЗЯ вызывать чтение контента (file.text()), иначе интерфейс
-   * зависнет на проектах с 5000+ файлами.
-   */
-  const onFilesSelected = async (files: File[]) => {
-    if (files.length === 0) {
-      setProcessing(false);
-      return;
-    }
-
-    try {
-      const { presetKey } = await handleFiles(files, customExtensions, customIgnore);
-
-      setSelectedPreset(presetKey);
-      setCustomExtensions(CONTEXT_PRESETS[presetKey].textExtensions.join(', '));
-      setProcessing(false);
-    } catch (err) {
-      console.error('File selection failed:', err);
-      setProcessing(false);
-    }
-  };
-
-  /**
-   * ⚠️ Чтение контента происходит только здесь, лениво, по требованию.
+   * Логика сборки контекста (чтение контента файлов).
    */
   const processFiles = useCallback(
     async (activeBundle = bundle, paths = filteredPaths, presetKey = selectedPreset) => {
@@ -77,7 +53,7 @@ export function ProjectToContext() {
       setResult(null);
       setProcessing(true);
 
-      // Маленькая пауза, чтобы UI успел отрисовать состояние "Processing"
+      // Маленькая пауза для отрисовки индикатора загрузки
       await new Promise((r) => setTimeout(r, 50));
 
       try {
@@ -110,6 +86,39 @@ export function ProjectToContext() {
     [bundle, filteredPaths, includeTree, selectedPreset]
   );
 
+  /**
+   * Обработка выбора файлов.
+   * АВТОМАТИЗАЦИЯ: Сразу после индексации запускается генерация.
+   *
+   * ⚠️ ПРЕДУПРЕЖДЕНИЕ:
+   * Эта функция отвечает только за формирование СПИСКА файлов (FileBundle).
+   * В ней НЕЛЬЗЯ вызывать чтение контента (file.text()), иначе интерфейс
+   * зависнет на проектах с 5000+ файлами.
+   */
+  const onFilesSelected = async (files: File[]) => {
+    if (files.length === 0) {
+      setProcessing(false);
+      return;
+    }
+
+    try {
+      const {
+        presetKey,
+        visiblePaths,
+        bundle: newBundle,
+      } = await handleFiles(files, customExtensions, customIgnore);
+
+      setSelectedPreset(presetKey);
+      setCustomExtensions(CONTEXT_PRESETS[presetKey].textExtensions.join(', '));
+
+      // Автоматический запуск генерации
+      void processFiles(newBundle, visiblePaths, presetKey);
+    } catch (err) {
+      console.error('File selection failed:', err);
+      setProcessing(false);
+    }
+  };
+
   const downloadResult = () => {
     if (!result) return;
     const blob = new Blob([result], { type: 'text/plain' });
@@ -125,6 +134,10 @@ export function ProjectToContext() {
     <Stack gap={6}>
       <Workbench.Header title="Project to Context" />
 
+      {/* 
+          Главная кнопка теперь СКАЧИВАНИЕ (чёрная). 
+          Генерация происходит автоматически или по нажатию синей кнопки ниже.
+      */}
       <SidebarIO
         onFilesSelected={onFilesSelected}
         onScanStarted={() => setProcessing(true)}
@@ -132,9 +145,9 @@ export function ProjectToContext() {
         directory
         accept="*"
         dropLabel={filteredPaths.length > 0 ? `Файлов: ${filteredPaths.length}` : 'Выбрать папку'}
-        hasFiles={filteredPaths.length > 0}
-        onDownload={() => void processFiles()}
-        downloadLabel={processing ? 'Сборка...' : 'Сгенерировать'}
+        hasFiles={filteredPaths.length > 0 && !!result}
+        onDownload={downloadResult}
+        downloadLabel="Скачать .txt"
         downloadDisabled={processing}
       />
 
@@ -177,6 +190,17 @@ export function ProjectToContext() {
             onCheckedChange={setIncludeTree}
           />
         </Stack>
+
+        {/* Кнопка повторной генерации (Синяя), если пользователь изменил настройки */}
+        {filteredPaths.length > 0 && (
+          <button
+            onClick={() => void processFiles()}
+            disabled={processing}
+            className="w-full rounded-md bg-blue-600 py-2.5 text-xs font-bold tracking-wide text-white uppercase shadow-sm transition-all hover:bg-blue-700 active:scale-95 disabled:opacity-50"
+          >
+            {processing ? 'Обновление...' : 'Обновить контекст'}
+          </button>
+        )}
       </Stack>
 
       {stats && (
@@ -187,12 +211,6 @@ export function ProjectToContext() {
           <InfoBadge label="Токены (Est.)" className="justify-between py-2 text-lg">
             ~{stats.totalTokens.toLocaleString()}
           </InfoBadge>
-          <button
-            onClick={downloadResult}
-            className="text-center text-xs font-bold text-blue-600 hover:underline dark:text-blue-400"
-          >
-            Скачать как .txt
-          </button>
         </Stack>
       )}
     </Stack>
