@@ -5,6 +5,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 
 import { filterFileList, scanEntries } from '@/lib/modules/file-system/scanner';
 import { cn } from '@/view/ui/infrastructure/standards';
+import { Tooltip } from '@/view/ui/Tooltip';
 
 // --- Helper: Validate File Type ---
 const isFileAccepted = (file: File, accept: string): boolean => {
@@ -173,6 +174,44 @@ export const FileDropzone = ({
           className
         )}
       >
+        {/* Информационная подсказка для режима папок */}
+        {directory && (
+          <div className="absolute top-2 right-2 z-10">
+            <Tooltip
+              side="left"
+              content={
+                <div className="space-y-1.5">
+                  <p className="font-bold text-blue-400 uppercase">Совет по производительности</p>
+                  <p>
+                    Выбор папки через диалог заставляет браузер сканировать{' '}
+                    <span className="font-bold text-white">все</span> файлы (включая node_modules)
+                    перед началом работы.
+                  </p>
+                  <p className="border-t border-zinc-700 pt-1.5 opacity-80">
+                    Для мгновенного сканирования больших проектов используйте{' '}
+                    <span className="italic">Drag-and-Drop</span>.
+                  </p>
+                </div>
+              }
+            >
+              <div className="rounded-full bg-zinc-200 p-1 text-zinc-500 transition-colors hover:bg-blue-500 hover:text-white dark:bg-zinc-700 dark:text-zinc-400">
+                <svg
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="3"
+                >
+                  <circle cx="12" cy="12" r="10" />
+                  <line x1="12" y1="16" x2="12" y2="12" />
+                  <line x1="12" y1="8" x2="12.01" y2="8" />
+                </svg>
+              </div>
+            </Tooltip>
+          </div>
+        )}
+
         {children || (
           <div className="pointer-events-none flex flex-col items-center justify-center pt-5 pb-6 text-center">
             <svg
