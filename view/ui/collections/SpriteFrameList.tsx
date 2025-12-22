@@ -1,7 +1,8 @@
-import Image from 'next/image'; // 1. Импортируем компонент
+import Image from 'next/image';
 import React, { useMemo } from 'react';
 
-// Определяем интерфейс локально
+import { getAspectRatioStyle } from '@/view/ui/infrastructure/standards';
+
 interface FrameData {
   time: number;
   dataUrl: string | null;
@@ -27,10 +28,19 @@ export function SpriteFrameList({
   backgroundColor,
   videoAspectRatio,
 }: SpriteFrameListProps) {
-  // Вычисляем ширину для пропорционального отображения
-  const frameWidth = useMemo(() => {
-    return Math.floor(maxHeight * (videoAspectRatio || 1.77));
-  }, [maxHeight, videoAspectRatio]);
+  // [LEMON] Используем стандартный стиль для контейнера кадра
+  const frameStyle = useMemo(() => {
+    return {
+      ...getAspectRatioStyle(videoAspectRatio),
+      height: maxHeight,
+    };
+  }, [videoAspectRatio, maxHeight]);
+
+  // Расчёт ширины нужен для атрибута width компонента Image (Next.js требует числа)
+  const calculatedWidth = useMemo(
+    () => Math.floor(maxHeight * videoAspectRatio),
+    [maxHeight, videoAspectRatio]
+  );
 
   if (frames.length === 0) {
     return <div className="py-8 text-center text-zinc-400">Нет кадров</div>;
@@ -48,23 +58,18 @@ export function SpriteFrameList({
       }}
     >
       {frames.map((frame, idx) => (
-        <div key={idx} className="group relative shrink-0">
+        <div key={idx} className="group relative shrink-0 overflow-hidden" style={frameStyle}>
           {frame.dataUrl ? (
-            // 2. Используем Image вместо img
             <Image
               src={frame.dataUrl}
               alt={`frame-${idx}`}
-              width={frameWidth}
+              width={calculatedWidth}
               height={maxHeight}
-              unoptimized // Важно для Data URL (отключает серверную обработку)
-              className="rounded-sm object-contain shadow-sm"
-              style={{ height: maxHeight, width: frameWidth }} // Явно задаем размеры стилями для надежности
+              unoptimized
+              className="h-full w-full object-contain shadow-sm"
             />
           ) : (
-            <div
-              className="animate-pulse rounded-sm bg-black/5"
-              style={{ height: maxHeight, width: frameWidth }}
-            />
+            <div className="h-full w-full animate-pulse bg-black/5" />
           )}
 
           <div className={TIMESTAMP_CLASS}>{frame.time.toFixed(2)}s</div>

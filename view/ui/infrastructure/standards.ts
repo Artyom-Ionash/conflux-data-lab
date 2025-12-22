@@ -22,12 +22,19 @@ export function getAspectRatio(width?: number | null, height?: number | null): n
 }
 
 /**
- * Генерирует объект стилей aspectRatio для CSS на основе размеров.
+ * Генерирует объект стилей aspectRatio для CSS.
+ * Может принимать (width, height) или (ratio).
  */
 export function getAspectRatioStyle(
-  width?: number | null,
+  widthOrRatio?: number | null,
   height?: number | null
 ): React.CSSProperties {
-  if (!width || !height) return {};
-  return { aspectRatio: `${width} / ${height}` };
+  if (!widthOrRatio) return {};
+
+  // Если передан только один аргумент — считаем его готовым ratio
+  if (height === undefined || height === null) {
+    return { aspectRatio: `${widthOrRatio}` };
+  }
+
+  return { aspectRatio: `${widthOrRatio} / ${height}` };
 }
