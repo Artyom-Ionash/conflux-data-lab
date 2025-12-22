@@ -42,6 +42,8 @@ interface FileDropzoneProps {
   className?: string;
   enableWindowDrop?: boolean;
   children?: ReactNode;
+  /** Поддержка выбора папок */
+  directory?: boolean;
 }
 
 // --- Base Component ---
@@ -53,6 +55,7 @@ export const FileDropzone = ({
   className = '',
   enableWindowDrop = true,
   children,
+  directory = false,
 }: FileDropzoneProps) => {
   const [isDragActive, setIsDragActive] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -60,16 +63,13 @@ export const FileDropzone = ({
   // Обработка списка файлов с валидацией
   const processFiles = useCallback(
     (fileList: FileList | File[]) => {
-      const filesArray = [...fileList]; // FIX: unicorn/prefer-spread (можно было [...fileList], но здесь типизация FileList)
-
-      // Фильтруем файлы согласно accept
-      const validFiles = filesArray.filter((file) => isFileAccepted(file, accept));
+      const filesArray = Array.from(fileList);
+      // Если accept="*", пропускаем валидацию
+      const validFiles =
+        accept === '*' ? filesArray : filesArray.filter((file) => isFileAccepted(file, accept));
 
       if (validFiles.length > 0) {
         onFilesSelected(validFiles);
-      } else {
-        // Опционально: можно добавить уведомление, что файлы не подошли по формату
-        console.warn('Файлы были проигнорированы, так как не соответствуют формату:', accept);
       }
     },
     [accept, onFilesSelected]
@@ -122,34 +122,39 @@ export const FileDropzone = ({
     inputRef.current?.click();
   };
 
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDragActive(true);
-  };
-
-  const handleDragLeave = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDragActive(false);
-  };
-
-  const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDragActive(false);
-    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-      processFiles(e.dataTransfer.files);
-    }
-  };
+  // [LEMON] Безопасная типизация нестандартных атрибутов
+  const directoryAttributes = directory
+    ? ({
+        webkitdirectory: '',
+        directory: '',
+      } as React.InputHTMLAttributes<HTMLInputElement> & {
+        webkitdirectory?: string;
+        directory?: string;
+      })
+    : {};
 
   return (
     <>
       <div
         onClick={handleClick}
-        onDragOver={handleDragOver}
-        onDragLeave={handleDragLeave}
-        onDrop={handleDrop}
+        onDragOver={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          setIsDragActive(true);
+        }}
+        onDragLeave={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          setIsDragActive(false);
+        }}
+        onDrop={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          setIsDragActive(false);
+          if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+            processFiles(e.dataTransfer.files);
+          }
+        }}
         className={cn(
           'group relative flex cursor-pointer flex-col items-center justify-center transition-all duration-200',
           !className.includes('border') && 'rounded-lg border-2 border-dashed',
@@ -161,7 +166,6 @@ export const FileDropzone = ({
           className
         )}
       >
-        {/* FIX: unicorn/prefer-logical-operator-over-ternary */}
         {children || (
           <div className="pointer-events-none flex flex-col items-center justify-center pt-5 pb-6">
             <svg
@@ -192,7 +196,7 @@ export const FileDropzone = ({
                   : 'text-zinc-500 dark:text-zinc-400'
               )}
             >
-              {isDragActive ? (multiple ? 'Бросайте файлы сюда' : 'Бросайте файл сюда') : label}
+              {isDragActive ? 'Бросайте сюда' : label}
             </p>
           </div>
         )}
@@ -201,9 +205,10 @@ export const FileDropzone = ({
           ref={inputRef}
           type="file"
           className="hidden"
-          multiple={multiple}
+          multiple={multiple || directory}
           accept={accept}
           onChange={handleInputChange}
+          {...directoryAttributes}
         />
       </div>
 

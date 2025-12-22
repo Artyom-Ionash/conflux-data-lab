@@ -4,27 +4,28 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { generateSpriteSheet } from '@/lib/modules/graphics/processing/sprite-generator';
 import { TEXTURE_LIMITS } from '@/lib/modules/graphics/standards';
 import { useFrameExtractor } from '@/lib/modules/video/use-frame-extractor';
+import { Card } from '@/view/ui/Card';
+import { MultiScalePreview } from '@/view/ui/collections/MultiScalePreview';
+import { SpriteFrameList } from '@/view/ui/collections/SpriteFrameList';
+import { ColorInput } from '@/view/ui/ColorInput';
+import { ControlLabel, ControlSection } from '@/view/ui/ControlSection';
+import { DownloadButton } from '@/view/ui/DownloadButton';
+import { EngineRoom } from '@/view/ui/EngineRoom';
+import { FileDropzone, FileDropzonePlaceholder } from '@/view/ui/FileDropzone';
+import { ImageSequencePlayer } from '@/view/ui/ImageSequencePlayer';
+import { InfoBadge } from '@/view/ui/InfoBadge';
+import { getAspectRatio, getAspectRatioStyle } from '@/view/ui/infrastructure/standards';
+import { Group, Stack } from '@/view/ui/Layout';
+import { Modal } from '@/view/ui/Modal';
+import { NumberStepper } from '@/view/ui/NumberStepper';
+import { DualHoverPreview } from '@/view/ui/players/DualHoverPreview';
+import { RangeVideoPlayer } from '@/view/ui/players/RangeVideoPlayer';
+import { ProgressBar } from '@/view/ui/ProcessingOverlay';
+import { RangeSlider } from '@/view/ui/RangeSlider';
+import { Separator } from '@/view/ui/Separator';
+import { Switch } from '@/view/ui/Switch';
+import { Workbench } from '@/view/ui/Workbench';
 
-import { Card } from '../ui/Card';
-import { MultiScalePreview } from '../ui/collections/MultiScalePreview';
-import { SpriteFrameList } from '../ui/collections/SpriteFrameList';
-import { ColorInput } from '../ui/ColorInput';
-import { ControlLabel, ControlSection } from '../ui/ControlSection';
-import { DownloadButton } from '../ui/DownloadButton';
-import { FileDropzone, FileDropzonePlaceholder } from '../ui/FileDropzone';
-import { ImageSequencePlayer } from '../ui/ImageSequencePlayer';
-import { InfoBadge } from '../ui/InfoBadge';
-import { getAspectRatio, getAspectRatioStyle } from '../ui/infrastructure/standards';
-import { Group, Stack } from '../ui/Layout';
-import { Modal } from '../ui/Modal';
-import { NumberStepper } from '../ui/NumberStepper';
-import { DualHoverPreview } from '../ui/players/DualHoverPreview';
-import { RangeVideoPlayer } from '../ui/players/RangeVideoPlayer';
-import { ProgressBar } from '../ui/ProcessingOverlay';
-import { RangeSlider } from '../ui/RangeSlider';
-import { Separator } from '../ui/Separator';
-import { Switch } from '../ui/Switch';
-import { Workbench } from '../ui/Workbench';
 // --- DOMAIN IMPORTS ---
 import { TextureLimitIndicator } from './hardware/TextureLimitIndicator';
 import { FrameDiffOverlay } from './video/FrameDiffOverlay';
@@ -499,22 +500,12 @@ export function VideoFrameExtractor() {
           </Workbench.Content>
         )}
 
-        <video ref={refs.videoRef} className="hidden" crossOrigin="anonymous" muted playsInline />
-        <video
-          ref={refs.previewVideoRef}
-          className="hidden"
-          crossOrigin="anonymous"
-          muted
-          playsInline
-        />
-        <video
-          ref={refs.hoverVideoRef}
-          className="hidden"
-          crossOrigin="anonymous"
-          muted
-          playsInline
-        />
-        <canvas ref={refs.canvasRef} className="hidden" />
+        <EngineRoom>
+          <video ref={refs.videoRef} crossOrigin="anonymous" muted playsInline />
+          <video ref={refs.previewVideoRef} crossOrigin="anonymous" muted playsInline />
+          <video ref={refs.hoverVideoRef} crossOrigin="anonymous" muted playsInline />
+          <canvas ref={refs.canvasRef} />
+        </EngineRoom>
 
         <Modal
           isOpen={isModalOpen}

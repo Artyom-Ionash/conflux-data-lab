@@ -13,7 +13,7 @@ import {
 } from '@/lib/modules/graphics/processing/composition';
 import { WorkbenchCanvas } from '@/view/tools/graphics/WorkbenchCanvas';
 import { TextureDimensionSlider } from '@/view/tools/hardware/TextureDimensionSlider';
-import { ActionButton,ActionGroup } from '@/view/ui/ActionGroup';
+import { ActionButton, ActionGroup } from '@/view/ui/ActionGroup';
 import { CanvasMovable, useCanvasRef } from '@/view/ui/Canvas';
 import { OverlayLabel } from '@/view/ui/collections/SpriteFrameList';
 import { ControlSection, SectionHeader } from '@/view/ui/ControlSection';
@@ -22,6 +22,7 @@ import { FileDropzone, FileDropzonePlaceholder } from '@/view/ui/FileDropzone';
 import { InfoBadge } from '@/view/ui/InfoBadge';
 import { cn } from '@/view/ui/infrastructure/standards';
 import { SortableList } from '@/view/ui/interaction/SortableList';
+import { Group, Stack } from '@/view/ui/Layout';
 import { Slider } from '@/view/ui/Slider';
 import { StatusBox } from '@/view/ui/StatusBox';
 import { Switch } from '@/view/ui/Switch';
@@ -226,10 +227,10 @@ export function VerticalImageAligner() {
     isDragging: boolean,
     dragProps: React.HTMLAttributes<HTMLDivElement>
   ) => (
-    <div
+    <Group
       {...dragProps}
       className={cn(
-        'flex cursor-grab items-center gap-3 rounded-md border p-2.5 text-sm transition-colors select-none active:cursor-grabbing',
+        'cursor-grab rounded-md border p-2.5 text-sm transition-colors select-none active:cursor-grabbing',
         img.isActive
           ? 'border-blue-200 bg-blue-50 text-blue-800 shadow-sm dark:border-blue-800 dark:bg-blue-900/30 dark:text-blue-100'
           : 'border-zinc-200 bg-white hover:border-zinc-300 dark:border-zinc-700 dark:bg-zinc-800',
@@ -249,30 +250,26 @@ export function VerticalImageAligner() {
       >
         ✕
       </ActionButton>
-    </div>
+    </Group>
   );
 
   const sidebarContent = (
-    <div className="flex flex-col gap-6 pb-4">
+    <Stack gap={6}>
       <Workbench.Header title="Вертикальный склейщик" />
 
-      <div className="flex flex-col gap-2">
-        <FileDropzone onFilesSelected={processFiles} multiple={true} label="Добавить изображения" />
-      </div>
+      <FileDropzone onFilesSelected={processFiles} multiple={true} label="Добавить изображения" />
 
       {images.length > 0 && (
         <>
-          <div className="space-y-2">
-            <DownloadButton
-              onDownload={handleExport}
-              disabled={isExporting}
-              label={isExporting ? 'Экспорт...' : 'Скачать PNG'}
-              className="w-full"
-            />
-          </div>
+          <DownloadButton
+            onDownload={handleExport}
+            disabled={isExporting}
+            label={isExporting ? 'Экспорт...' : 'Скачать PNG'}
+            className="w-full"
+          />
 
           <ControlSection title="Размеры слота">
-            <div className="flex flex-col gap-6">
+            <Stack gap={6}>
               <TextureDimensionSlider
                 label="Ширина"
                 value={slotWidth}
@@ -285,24 +282,26 @@ export function VerticalImageAligner() {
                 onChange={setSlotHeight}
                 max={LIMIT_MAX_BROWSER}
               />
-            </div>
+            </Stack>
 
-            <div className="mt-4 flex items-center justify-between border-t border-zinc-200 pt-3 dark:border-zinc-700">
+            <Group
+              justify="between"
+              className="mt-4 border-t border-zinc-200 pt-3 dark:border-zinc-700"
+            >
               <span className="text-xs font-medium text-zinc-500">Итого:</span>
               <InfoBadge>
                 {slotWidth} x {totalHeight} px
               </InfoBadge>
-            </div>
+            </Group>
           </ControlSection>
 
           <ControlSection title="Сетки">
-            <div className="flex flex-col gap-4">
-              <div className="space-y-3">
+            <Stack gap={4}>
+              <Stack gap={3}>
                 <Switch
                   checked={showFrameGrid}
                   onCheckedChange={setShowFrameGrid}
                   label="Зеленая (Кадр)"
-                  className="w-full"
                 />
                 {showFrameGrid && (
                   <Slider
@@ -314,17 +313,16 @@ export function VerticalImageAligner() {
                     className="mb-0 px-1"
                   />
                 )}
-              </div>
+              </Stack>
 
-              <div className="space-y-3 border-t border-zinc-200 pt-3 dark:border-zinc-700">
+              <Stack gap={3} className="border-t border-zinc-200 pt-3 dark:border-zinc-700">
                 <Switch
                   checked={showRedGrid}
                   onCheckedChange={setShowRedGrid}
                   label="Красная (Сдвиг)"
-                  className="w-full"
                 />
                 {showRedGrid && (
-                  <div className="space-y-4 px-1 pt-1">
+                  <Stack gap={4} className="px-1 pt-1">
                     <Slider
                       label="Сдвиг X"
                       value={redGridOffsetX}
@@ -343,13 +341,13 @@ export function VerticalImageAligner() {
                       statusColor="red"
                       className="mb-0"
                     />
-                  </div>
+                  </Stack>
                 )}
-              </div>
-            </div>
+              </Stack>
+            </Stack>
           </ControlSection>
 
-          <div className="space-y-1.5">
+          <Stack gap={1.5}>
             <SectionHeader
               title="Слои"
               actions={
@@ -380,7 +378,7 @@ export function VerticalImageAligner() {
               renderItem={renderSortableItem}
               className="max-h-[300px] overflow-y-auto pr-1"
             />
-          </div>
+          </Stack>
 
           {activeImageId && (
             <StatusBox variant="warning" title="Смещение активного слоя">
@@ -414,7 +412,7 @@ export function VerticalImageAligner() {
           )}
         </>
       )}
-    </div>
+    </Stack>
   );
 
   return (
@@ -476,7 +474,7 @@ export function VerticalImageAligner() {
                 <CanvasMovable
                   x={img.offsetX}
                   y={img.offsetY}
-                  scale={getScale} // Pass getter from hook
+                  scale={getScale}
                   onMove={(pos) =>
                     handleUpdatePosition(img.id, { x: Math.round(pos.x), y: Math.round(pos.y) })
                   }

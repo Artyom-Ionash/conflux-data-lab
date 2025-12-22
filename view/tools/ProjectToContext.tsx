@@ -1,19 +1,21 @@
 'use client';
 
-import React, { useCallback, useRef, useState } from 'react';
+import React, { useCallback, useState } from 'react';
 
 import { useCopyToClipboard } from '@/lib/core/hooks/use-copy-to-clipboard';
 import { type ContextStats } from '@/lib/modules/context-generator/core';
 import { runContextPipeline } from '@/lib/modules/context-generator/engine';
 import { CONTEXT_PRESETS, type PresetKey } from '@/lib/modules/context-generator/rules';
 import { useBundleManager } from '@/lib/modules/context-generator/use-bundle-manager';
+import { Field, TextInput } from '@/view/tools/text/Input';
+import { FileDropzone } from '@/view/ui/FileDropzone';
+import { InfoBadge } from '@/view/ui/InfoBadge';
+import { Stack } from '@/view/ui/Layout';
+import { ProcessingOverlay } from '@/view/ui/ProcessingOverlay';
+import { Switch } from '@/view/ui/Switch';
+import { ToggleGroup, ToggleGroupItem } from '@/view/ui/ToggleGroup';
+import { Workbench } from '@/view/ui/Workbench';
 
-import { InfoBadge } from '../ui/InfoBadge';
-import { Stack } from '../ui/Layout';
-import { ProcessingOverlay } from '../ui/ProcessingOverlay';
-import { Switch } from '../ui/Switch';
-import { ToggleGroup, ToggleGroupItem } from '../ui/ToggleGroup';
-import { Workbench } from '../ui/Workbench';
 import { ResultViewer } from './text/ResultViewer';
 
 export function ProjectToContext() {
@@ -32,23 +34,27 @@ export function ProjectToContext() {
   const [stats, setStats] = useState<ContextStats | null>(null);
   const [lastGeneratedAt, setLastGeneratedAt] = useState<Date | null>(null);
 
-  const fileInputRef = useRef<HTMLInputElement>(null);
-
-  const onDirectorySelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (!e.target.files?.length) return;
+  // [LEMON] Обработка выбора директории
+  const onFilesSelected = async (files: File[]) => {
+    if (files.length === 0) return;
     setProcessing(true);
 
-    const {
-      presetKey,
-      visiblePaths,
-      bundle: newBundle,
-    } = await handleFiles(Array.from(e.target.files), customExtensions, customIgnore);
+    try {
+      const {
+        presetKey,
+        visiblePaths,
+        bundle: newBundle,
+      } = await handleFiles(files, customExtensions, customIgnore);
 
-    setSelectedPreset(presetKey);
-    setCustomExtensions(CONTEXT_PRESETS[presetKey].textExtensions.join(', '));
+      setSelectedPreset(presetKey);
+      setCustomExtensions(CONTEXT_PRESETS[presetKey].textExtensions.join(', '));
 
-    // Auto-process after load
-    void processFiles(newBundle, visiblePaths, presetKey);
+      // Auto-process after load
+      void processFiles(newBundle, visiblePaths, presetKey);
+    } catch (err) {
+      console.error('File selection failed:', err);
+      setProcessing(false);
+    }
   };
 
   const processFiles = useCallback(
@@ -103,69 +109,49 @@ export function ProjectToContext() {
     <Stack gap={6}>
       <Workbench.Header title="Project to Context" />
 
-      <Stack gap={2}>
-        <label className="text-sm font-bold text-zinc-700 dark:text-zinc-300">1. Источник</label>
-        <div
-          className="flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-zinc-300 p-6 text-center hover:bg-zinc-50 dark:border-zinc-700 dark:hover:bg-zinc-800/50"
-          onClick={() => fileInputRef.current?.click()}
-        >
-          <span className="text-sm font-medium">
-            {filteredPaths.length > 0 ? `Файлов: ${filteredPaths.length}` : 'Выбрать папку проекта'}
-          </span>
-          <input
-            ref={fileInputRef}
-            type="file"
-            className="hidden"
-            multiple
-            onChange={onDirectorySelect}
-            {...({
-              webkitdirectory: '',
-              directory: '',
-            } as React.InputHTMLAttributes<HTMLInputElement> & {
-              webkitdirectory?: string;
-              directory?: string;
-            })}
-          />
-        </div>
-      </Stack>
+      <Field label="1. Источник">
+        <FileDropzone
+          onFilesSelected={onFilesSelected}
+          directory
+          accept="*"
+          label={
+            filteredPaths.length > 0 ? `Файлов: ${filteredPaths.length}` : 'Выбрать папку проекта'
+          }
+        />
+      </Field>
 
       <Stack gap={4}>
-        <label className="text-sm font-bold text-zinc-700 dark:text-zinc-300">
-          2. Конфигурация
-        </label>
-
-        <ToggleGroup
-          type="single"
-          value={selectedPreset}
-          onValueChange={(val) => {
-            if (val) {
-              const key = val as PresetKey;
-              setSelectedPreset(key);
-              setCustomExtensions(CONTEXT_PRESETS[key].textExtensions.join(', '));
-            }
-          }}
-          gridCols={2}
-        >
-          {(Object.keys(CONTEXT_PRESETS) as PresetKey[]).map((key) => (
-            <ToggleGroupItem key={key} value={key}>
-              {CONTEXT_PRESETS[key].name}
-            </ToggleGroupItem>
-          ))}
-        </ToggleGroup>
+        <Field label="2. Конфигурация">
+          <ToggleGroup
+            type="single"
+            value={selectedPreset}
+            onValueChange={(val) => {
+              if (val) {
+                const key = val as PresetKey;
+                setSelectedPreset(key);
+                setCustomExtensions(CONTEXT_PRESETS[key].textExtensions.join(', '));
+              }
+            }}
+            gridCols={2}
+          >
+            {(Object.keys(CONTEXT_PRESETS) as PresetKey[]).map((key) => (
+              <ToggleGroupItem key={key} value={key}>
+                {CONTEXT_PRESETS[key].name}
+              </ToggleGroupItem>
+            ))}
+          </ToggleGroup>
+        </Field>
 
         <Stack gap={3}>
-          <input
-            type="text"
+          <TextInput
             value={customExtensions}
             onChange={(e) => setCustomExtensions(e.target.value)}
-            className="w-full rounded border border-zinc-200 bg-white px-3 py-2 font-mono text-xs dark:border-zinc-700 dark:bg-zinc-900"
+            placeholder="Расширения через запятую"
           />
-          <input
-            type="text"
+          <TextInput
             value={customIgnore}
             onChange={(e) => setCustomIgnore(e.target.value)}
-            placeholder="*.log, temp/"
-            className="w-full rounded border border-zinc-200 bg-white px-3 py-2 font-mono text-xs dark:border-zinc-700 dark:bg-zinc-900"
+            placeholder="*.log, temp/ (игнорирование)"
           />
           <Switch
             label="Генерировать дерево"

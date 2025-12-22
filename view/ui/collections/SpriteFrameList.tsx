@@ -12,6 +12,15 @@ interface OverlayLabelProps {
 /**
  * Техническая метка, накладываемая поверх визуального контента (кадров, слоёв).
  */
+interface OverlayLabelProps {
+  children: React.ReactNode;
+  position?: 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right';
+  className?: string;
+}
+
+/**
+ * Техническая метка, накладываемая поверх визуального контента (кадров, слоёв).
+ */
 export function OverlayLabel({
   children,
   position = 'top-left',
