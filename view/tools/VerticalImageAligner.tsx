@@ -13,12 +13,12 @@ import {
 } from '@/lib/modules/graphics/processing/composition';
 import { WorkbenchCanvas } from '@/view/tools/graphics/WorkbenchCanvas';
 import { TextureDimensionSlider } from '@/view/tools/hardware/TextureDimensionSlider';
-import { FileDropzone, FileDropzonePlaceholder } from '@/view/tools/io/FileDropzone';
+import { FileDropzonePlaceholder } from '@/view/tools/io/FileDropzone';
+import { SidebarIO } from '@/view/tools/io/SidebarIO';
 import { ActionButton, ActionGroup } from '@/view/ui/ActionGroup';
 import { CanvasMovable, useCanvasRef } from '@/view/ui/Canvas';
 import { OverlayLabel } from '@/view/ui/collections/SpriteFrameList';
 import { ControlSection, SectionHeader } from '@/view/ui/ControlSection';
-import { DownloadButton } from '@/view/ui/DownloadButton';
 import { InfoBadge } from '@/view/ui/InfoBadge';
 import { cn } from '@/view/ui/infrastructure/standards';
 import { SortableList } from '@/view/ui/interaction/SortableList';
@@ -74,11 +74,9 @@ export function VerticalImageAligner() {
   const [slotWidth, setSlotWidth] = useState(DEFAULT_SETTINGS.slotSize);
   const [showFrameGrid, setShowFrameGrid] = useState(true);
   const [frameStepX, setFrameStepX] = useState(DEFAULT_SETTINGS.frameStep);
-  const [frameBorderColor] = useState(DEFAULT_SETTINGS.frameColor);
   const [showRedGrid, setShowRedGrid] = useState(true);
   const [redGridOffsetX, setRedGridOffsetX] = useState(0);
   const [redGridOffsetY, setRedGridOffsetY] = useState(0);
-  const [redGridColor] = useState(DEFAULT_SETTINGS.redGridColor);
   const [isExporting, setIsExporting] = useState(false);
 
   const { ref: workspaceRef, getScale } = useCanvasRef();
@@ -92,7 +90,64 @@ export function VerticalImageAligner() {
     return { bounds: { width, height }, totalHeight: height };
   }, [images.length, slotHeight, slotWidth]);
 
-  // --- Handlers ---
+  const processFiles = useCallback(
+    (files: File[]) => {
+      if (!files || files.length === 0) return;
+      const isListEmpty = images.length === 0;
+
+      const newImages = pipe(
+        files,
+        filter((f) => f.type.startsWith('image/')),
+        map((file, index) => ({
+          id: `${Date.now()}-${index}-${Math.random().toString(36).slice(2, 11)}`,
+          file,
+          url: URL.createObjectURL(file),
+          name: file.name,
+          offsetX: 0,
+          offsetY: 0,
+          isActive: isListEmpty && index === 0,
+          naturalWidth: 0,
+          naturalHeight: 0,
+        }))
+      );
+
+      if (newImages.length === 0) return;
+
+      setImages((prev) => [...prev, ...newImages]);
+
+      newImages.forEach(async (item, idx) => {
+        try {
+          const img = await loadImage(item.url);
+
+          if (isListEmpty && idx === 0) {
+            setSlotHeight(img.height);
+            setFrameStepX(img.height);
+
+            // ВОССТАНОВЛЕНИЕ: Забор цвета пикселя 0,0
+            const { r, g, b } = getTopLeftPixelColor(img);
+            workspaceRef.current?.setBackgroundColor(rgbToHex(r, g, b));
+
+            setTimeout(() => {
+              workspaceRef.current?.resetView(img.width, img.height);
+            }, VIEW_RESET_DELAY);
+          }
+
+          setSlotWidth((prev) =>
+            isListEmpty && idx === 0 ? img.width : Math.max(prev, img.width)
+          );
+
+          setImages((current) =>
+            current.map((ex) =>
+              ex.id === item.id ? { ...ex, naturalWidth: img.width, naturalHeight: img.height } : ex
+            )
+          );
+        } catch (e) {
+          console.error('Failed to load image metadata', e);
+        }
+      });
+    },
+    [images.length, workspaceRef]
+  );
 
   const handleUpdatePosition = useCallback((id: string, pos: { x: number; y: number }) => {
     setImages((prev) =>
@@ -135,62 +190,6 @@ export function VerticalImageAligner() {
     });
   }, []);
 
-  const processFiles = useCallback(
-    (files: File[]) => {
-      if (!files || files.length === 0) return;
-      const isListEmpty = images.length === 0;
-
-      const newImages = pipe(
-        files,
-        filter((f) => f.type.startsWith('image/')),
-        map((file, index) => ({
-          id: `${Date.now()}-${index}-${Math.random().toString(36).slice(2, 11)}`,
-          file,
-          url: URL.createObjectURL(file),
-          name: file.name,
-          offsetX: 0,
-          offsetY: 0,
-          isActive: isListEmpty && index === 0,
-          naturalWidth: 0,
-          naturalHeight: 0,
-        }))
-      );
-
-      if (newImages.length === 0) return;
-
-      setImages((prev) => [...prev, ...newImages]);
-
-      newImages.forEach(async (item, idx) => {
-        try {
-          const img = await loadImage(item.url);
-
-          if (isListEmpty && idx === 0) {
-            setSlotHeight(img.height);
-            setFrameStepX(img.height);
-            const { r, g, b } = getTopLeftPixelColor(img);
-            workspaceRef.current?.setBackgroundColor(rgbToHex(r, g, b));
-            setTimeout(() => {
-              workspaceRef.current?.resetView(img.width, img.height);
-            }, VIEW_RESET_DELAY);
-          }
-
-          setSlotWidth((prev) =>
-            isListEmpty && idx === 0 ? img.width : Math.max(prev, img.width)
-          );
-
-          setImages((current) =>
-            current.map((ex) =>
-              ex.id === item.id ? { ...ex, naturalWidth: img.width, naturalHeight: img.height } : ex
-            )
-          );
-        } catch (e) {
-          console.error('Failed to load image metadata', e);
-        }
-      });
-    },
-    [images.length, workspaceRef]
-  );
-
   const handleExport = useCallback(async () => {
     if (images.length === 0) return;
     setIsExporting(true);
@@ -225,7 +224,7 @@ export function VerticalImageAligner() {
     img: AlignImage,
     index: number,
     isDragging: boolean,
-    dragProps: React.HTMLAttributes<HTMLDivElement>
+    dragProps: React.HTMLAttributes<HTMLElement>
   ) => (
     <Group
       {...dragProps}
@@ -257,17 +256,18 @@ export function VerticalImageAligner() {
     <Stack gap={6}>
       <Workbench.Header title="Вертикальный склейщик" />
 
-      <FileDropzone onFilesSelected={processFiles} multiple={true} label="Добавить изображения" />
+      <SidebarIO
+        onFilesSelected={processFiles}
+        multiple
+        accept="image/*"
+        dropLabel="Добавить изображения"
+        hasFiles={images.length > 0}
+        onDownload={handleExport}
+        isDownloading={isExporting}
+      />
 
       {images.length > 0 && (
         <>
-          <DownloadButton
-            onDownload={handleExport}
-            disabled={isExporting}
-            label={isExporting ? 'Экспорт...' : 'Скачать PNG'}
-            className="w-full"
-          />
-
           <ControlSection title="Размеры слота">
             <Stack gap={6}>
               <TextureDimensionSlider
@@ -442,7 +442,7 @@ export function VerticalImageAligner() {
                 className="pointer-events-none absolute inset-0 opacity-50"
                 style={{
                   zIndex: Z_INDEX_GRID_RED,
-                  backgroundImage: `linear-gradient(to right, ${redGridColor} 1px, transparent 1px), linear-gradient(to bottom, ${redGridColor} 1px, transparent 1px)`,
+                  backgroundImage: `linear-gradient(to right, #ff0000 1px, transparent 1px), linear-gradient(to bottom, #ff0000 1px, transparent 1px)`,
                   backgroundSize: `${frameStepX}px ${slotHeight}px`,
                   backgroundPosition: `${redGridOffsetX}px ${redGridOffsetY}px`,
                 }}
@@ -453,7 +453,7 @@ export function VerticalImageAligner() {
                 className="pointer-events-none absolute inset-0 opacity-80"
                 style={{
                   zIndex: Z_INDEX_GRID_FRAME,
-                  backgroundImage: `linear-gradient(to right, ${frameBorderColor} ${GRID_FRAME_DASH}px, transparent ${GRID_FRAME_DASH}px), linear-gradient(to bottom, ${frameBorderColor} ${GRID_FRAME_DASH}px, transparent ${GRID_FRAME_DASH}px)`,
+                  backgroundImage: `linear-gradient(to right, #00ff00 ${GRID_FRAME_DASH}px, transparent ${GRID_FRAME_DASH}px), linear-gradient(to bottom, #00ff00 ${GRID_FRAME_DASH}px, transparent ${GRID_FRAME_DASH}px)`,
                   backgroundSize: `${frameStepX}px ${slotHeight}px`,
                   backgroundPosition: GRID_FRAME_OFFSET_CSS,
                 }}

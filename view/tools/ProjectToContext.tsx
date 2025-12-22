@@ -7,7 +7,6 @@ import { type ContextStats } from '@/lib/modules/context-generator/core';
 import { runContextPipeline } from '@/lib/modules/context-generator/engine';
 import { CONTEXT_PRESETS, type PresetKey } from '@/lib/modules/context-generator/rules';
 import { useBundleManager } from '@/lib/modules/context-generator/use-bundle-manager';
-import { FileDropzone } from '@/view/tools/io/FileDropzone';
 import { InfoBadge } from '@/view/ui/InfoBadge';
 import { Stack } from '@/view/ui/Layout';
 import { ProcessingOverlay } from '@/view/ui/ProcessingOverlay';
@@ -17,6 +16,7 @@ import { Workbench } from '@/view/ui/Workbench';
 
 import { Field, TextInput } from './io/Input';
 import { ResultViewer } from './io/ResultViewer';
+import { SidebarIO } from './io/SidebarIO';
 
 export function ProjectToContext() {
   const { filteredPaths, handleFiles, bundle } = useBundleManager();
@@ -34,16 +34,18 @@ export function ProjectToContext() {
   const [stats, setStats] = useState<ContextStats | null>(null);
   const [lastGeneratedAt, setLastGeneratedAt] = useState<Date | null>(null);
 
-  /**
-   * Предикат для раннего игнорирования тяжелых папок при сканировании.
-   */
   const shouldSkipScan = useCallback((path: string) => {
     const parts = path.split('/');
-    // Игнорируем стандартные тяжелые папки на самом первом этапе
     const heavyFolders = ['node_modules', '.git', '.next', 'out', 'dist', '.godot', '.import'];
     return parts.some((p) => heavyFolders.includes(p));
   }, []);
 
+  /**
+   * ⚠️ ПРЕДУПРЕЖДЕНИЕ:
+   * Эта функция отвечает только за формирование СПИСКА файлов (FileBundle).
+   * В ней НЕЛЬЗЯ вызывать чтение контента (file.text()), иначе интерфейс
+   * зависнет на проектах с 5000+ файлами.
+   */
   const onFilesSelected = async (files: File[]) => {
     if (files.length === 0) {
       setProcessing(false);
@@ -51,23 +53,20 @@ export function ProjectToContext() {
     }
 
     try {
-      const {
-        presetKey,
-        visiblePaths,
-        bundle: newBundle,
-      } = await handleFiles(files, customExtensions, customIgnore);
+      const { presetKey } = await handleFiles(files, customExtensions, customIgnore);
 
       setSelectedPreset(presetKey);
       setCustomExtensions(CONTEXT_PRESETS[presetKey].textExtensions.join(', '));
-
-      // Auto-process after load
-      void processFiles(newBundle, visiblePaths, presetKey);
+      setProcessing(false);
     } catch (err) {
       console.error('File selection failed:', err);
       setProcessing(false);
     }
   };
 
+  /**
+   * ⚠️ Чтение контента происходит только здесь, лениво, по требованию.
+   */
   const processFiles = useCallback(
     async (activeBundle = bundle, paths = filteredPaths, presetKey = selectedPreset) => {
       if (!activeBundle || paths.length === 0) {
@@ -77,6 +76,9 @@ export function ProjectToContext() {
 
       setResult(null);
       setProcessing(true);
+
+      // Маленькая пауза, чтобы UI успел отрисовать состояние "Processing"
+      await new Promise((r) => setTimeout(r, 50));
 
       try {
         const textFiles = activeBundle
@@ -123,18 +125,18 @@ export function ProjectToContext() {
     <Stack gap={6}>
       <Workbench.Header title="Project to Context" />
 
-      <Field label="1. Источник">
-        <FileDropzone
-          onScanStarted={() => setProcessing(true)}
-          shouldSkip={shouldSkipScan}
-          onFilesSelected={onFilesSelected}
-          directory
-          accept="*"
-          label={
-            filteredPaths.length > 0 ? `Файлов: ${filteredPaths.length}` : 'Выбрать папку проекта'
-          }
-        />
-      </Field>
+      <SidebarIO
+        onFilesSelected={onFilesSelected}
+        onScanStarted={() => setProcessing(true)}
+        shouldSkip={shouldSkipScan}
+        directory
+        accept="*"
+        dropLabel={filteredPaths.length > 0 ? `Файлов: ${filteredPaths.length}` : 'Выбрать папку'}
+        hasFiles={filteredPaths.length > 0}
+        onDownload={() => void processFiles()}
+        downloadLabel={processing ? 'Сборка...' : 'Сгенерировать'}
+        downloadDisabled={processing}
+      />
 
       <Stack gap={4}>
         <Field label="2. Конфигурация">
@@ -177,14 +179,6 @@ export function ProjectToContext() {
         </Stack>
       </Stack>
 
-      <button
-        onClick={() => void processFiles()}
-        disabled={filteredPaths.length === 0 || processing}
-        className="w-full rounded-lg bg-blue-600 py-3 font-bold text-white transition-opacity hover:opacity-90 disabled:bg-zinc-300 dark:disabled:bg-zinc-800"
-      >
-        {processing ? 'Сборка...' : 'Сгенерировать'}
-      </button>
-
       {stats && (
         <Stack
           gap={4}
@@ -193,6 +187,12 @@ export function ProjectToContext() {
           <InfoBadge label="Токены (Est.)" className="justify-between py-2 text-lg">
             ~{stats.totalTokens.toLocaleString()}
           </InfoBadge>
+          <button
+            onClick={downloadResult}
+            className="text-center text-xs font-bold text-blue-600 hover:underline dark:text-blue-400"
+          >
+            Скачать как .txt
+          </button>
         </Stack>
       )}
     </Stack>

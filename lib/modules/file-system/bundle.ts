@@ -33,6 +33,7 @@ export abstract class BaseBundle<T extends BaseFileNode> {
    * Детекция "почерка" проекта по списку имен файлов.
    */
   protected detectSignature(names: string[] | Set<string>): PresetKey {
+    // Оптимизация: проверяем только корневые файлы
     const nameSet = Array.isArray(names) ? new Set(names) : names;
     if (nameSet.has('project.godot')) return 'godot';
     if (nameSet.has('package.json')) return 'nextjs';
@@ -43,10 +44,15 @@ export abstract class BaseBundle<T extends BaseFileNode> {
    * Универсальная нормализация пути.
    */
   protected normalizePath(rawPath: string): string {
-    const unixPath = rawPath.replaceAll('\\', '/');
-    const parts = unixPath.split('/');
-    // Убираем имя корневой папки, если это путь из input.webkitdirectory
-    return parts.length > 1 ? parts.slice(1).join('/') : unixPath;
+    const unixPath = rawPath.includes('\\') ? rawPath.replaceAll('\\', '/') : rawPath;
+
+    // Если путь начинается с имени папки (как в input webkitdirectory),
+    // отсекаем первый сегмент.
+    const firstSlashIndex = unixPath.indexOf('/');
+    if (firstSlashIndex !== -1) {
+      return unixPath.substring(firstSlashIndex + 1);
+    }
+    return unixPath;
   }
 
   public getItems(): T[] {
@@ -60,7 +66,6 @@ export abstract class BaseBundle<T extends BaseFileNode> {
 
 /**
  * [SPECIFIC] Реализация для браузера.
- * Работает с объектами File и управляет Blob URL.
  */
 export interface BrowserNode extends BaseFileNode {
   readonly id: string;
@@ -75,7 +80,8 @@ export class FileBundle extends BaseBundle<BrowserNode> {
     options: { customExtensions?: string[]; presetOverride?: PresetKey } = {}
   ) {
     super(
-      files.map((f) => f.name),
+      // Передаем только первые 50 имен для детекции пресета (оптимизация)
+      files.slice(0, 50).map((f) => f.name),
       options.presetOverride
     );
 
@@ -88,13 +94,21 @@ export class FileBundle extends BaseBundle<BrowserNode> {
   }
 
   private ingest(files: File[], textExtensions: string[]) {
-    files.forEach((file, index) => {
+    // Используем обычный цикл for для производительности на огромных массивах
+    const now = Date.now();
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      if (!file) continue;
+
       const rawPath = file.webkitRelativePath || file.name;
       const normalizedPath = this.normalizePath(rawPath);
-      const ext = `.${file.name.split('.').pop()?.toLowerCase() || ''}`;
+
+      // Кэшируем расширение
+      const dotIndex = file.name.lastIndexOf('.');
+      const ext = dotIndex !== -1 ? file.name.substring(dotIndex).toLowerCase() : '';
 
       this.nodes.set(normalizedPath, {
-        id: `${Date.now()}-${index}`,
+        id: `${now}-${i}`,
         path: normalizedPath,
         name: file.name,
         size: file.size,
@@ -103,7 +117,7 @@ export class FileBundle extends BaseBundle<BrowserNode> {
         isText: isTextFile(file.name, textExtensions),
         file,
       });
-    });
+    }
   }
 
   public getObjectUrl(path: string): string | null {

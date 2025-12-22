@@ -15,12 +15,12 @@ import type {
 } from '@/lib/modules/graphics/processing/background-engine.worker';
 import type { Point } from '@/lib/modules/graphics/processing/imaging';
 import { WorkbenchCanvas } from '@/view/tools/graphics/WorkbenchCanvas';
-import { FileDropzone, FileDropzonePlaceholder } from '@/view/tools/io/FileDropzone';
+import { FileDropzonePlaceholder } from '@/view/tools/io/FileDropzone';
+import { SidebarIO } from '@/view/tools/io/SidebarIO';
 import { ActionButton, ActionGroup } from '@/view/ui/ActionGroup';
 import { CanvasMovable, useCanvasRef } from '@/view/ui/Canvas';
 import { ColorInput } from '@/view/ui/ColorInput';
 import { ControlLabel, ControlSection } from '@/view/ui/ControlSection';
-import { DownloadButton } from '@/view/ui/DownloadButton';
 import { Slider } from '@/view/ui/Slider';
 import { StatusBox } from '@/view/ui/StatusBox';
 import { ToggleGroup, ToggleGroupItem } from '@/view/ui/ToggleGroup';
@@ -117,7 +117,7 @@ export function MonochromeBackgroundRemover() {
     onMessage: handleWorkerMessage,
   });
 
-  // [LEMON] Автоматическая инициализация при получении новых метаданных
+  // Автоматическая инициализация при получении новых метаданных
   useEffect(() => {
     if (!originalUrl || !imgW || !imgH) return;
 
@@ -264,14 +264,15 @@ export function MonochromeBackgroundRemover() {
     <div className="flex flex-col gap-6 pb-4">
       <Workbench.Header title="MonoRemover" />
 
-      <div className="space-y-2">
-        <ControlLabel>Исходник</ControlLabel>
-        <FileDropzone
-          onFilesSelected={handleFilesSelected}
-          multiple={false}
-          label="Загрузить изображение"
-        />
-      </div>
+      {/* [КРИСТАЛЛИЗАЦИЯ] Единый узел ввода-вывода */}
+      <SidebarIO
+        onFilesSelected={handleFilesSelected}
+        accept="image/*"
+        dropLabel="Загрузить изображение"
+        hasFiles={!!originalUrl}
+        onDownload={handleDownload}
+        downloadLabel="Скачать PNG"
+      />
 
       {originalUrl && (
         <div className="animate-fade-in space-y-6">
@@ -406,8 +407,6 @@ export function MonochromeBackgroundRemover() {
               </button>
             </StatusBox>
           )}
-
-          <DownloadButton onDownload={handleDownload} className="w-full" />
         </div>
       )}
     </div>
