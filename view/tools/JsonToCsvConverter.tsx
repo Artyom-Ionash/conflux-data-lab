@@ -6,7 +6,9 @@ import { useCopyToClipboard } from '@/lib/core/hooks/use-copy-to-clipboard';
 import { downloadText } from '@/lib/core/utils/media';
 import { convertJsonToCsv } from '@/lib/modules/converters/json-to-csv';
 import { TextArea } from '@/view/tools/io/Input';
+import { ActionButton } from '@/view/ui/ActionGroup';
 import { Card } from '@/view/ui/Card';
+import { Stack } from '@/view/ui/Layout';
 import { Workbench } from '@/view/ui/Workbench';
 
 import { ResultViewer } from './io/ResultViewer';
@@ -76,7 +78,7 @@ export function JsonToCsvConverter() {
   };
 
   const sidebarContent = (
-    <div className="flex flex-col gap-6">
+    <Stack gap={6}>
       <Workbench.Header title="JSON → CSV" />
 
       <SidebarIO
@@ -87,7 +89,7 @@ export function JsonToCsvConverter() {
         onDownload={handleDownload}
         downloadLabel="Скачать CSV"
       />
-    </div>
+    </Stack>
   );
 
   return (
@@ -95,7 +97,7 @@ export function JsonToCsvConverter() {
       <Workbench.Sidebar>{sidebarContent}</Workbench.Sidebar>
       <Workbench.Stage>
         <Workbench.Content>
-          <div className="flex h-full flex-col gap-4 lg:flex-row">
+          <div className="grid h-full grid-cols-1 gap-4 lg:grid-cols-2">
             {/* Input Column */}
             <Card
               className="flex flex-1 flex-col overflow-hidden"
@@ -103,16 +105,17 @@ export function JsonToCsvConverter() {
             >
               <div className="flex items-center justify-between border-b border-zinc-200 bg-zinc-50 px-4 py-2 dark:border-zinc-800 dark:bg-zinc-900">
                 <span className="text-xs font-semibold text-zinc-500 uppercase">Input JSON</span>
-                <button
+                <ActionButton
                   onClick={() => {
                     setJsonInput('');
                     setCsvOutput('');
                     setError('');
                   }}
-                  className="text-[10px] font-bold text-zinc-400 uppercase transition-colors hover:text-red-500"
+                  variant="destructive"
+                  size="xs"
                 >
                   Очистить
-                </button>
+                </ActionButton>
               </div>
               <TextArea
                 value={jsonInput}

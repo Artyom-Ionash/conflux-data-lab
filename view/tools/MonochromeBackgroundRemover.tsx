@@ -22,9 +22,12 @@ import { CanvasMovable, useCanvasRef } from '@/view/ui/Canvas';
 import { ColorInput } from '@/view/ui/ColorInput';
 import { ControlLabel, ControlSection } from '@/view/ui/ControlSection';
 import { EngineRoom } from '@/view/ui/EngineRoom';
+import { Group, Stack } from '@/view/ui/Layout';
+import { Separator } from '@/view/ui/Separator';
 import { Slider } from '@/view/ui/Slider';
 import { StatusBox } from '@/view/ui/StatusBox';
 import { ToggleGroup, ToggleGroupItem } from '@/view/ui/ToggleGroup';
+import { Typography } from '@/view/ui/Typography';
 import { Workbench } from '@/view/ui/Workbench';
 
 // --- CONSTANTS ---
@@ -130,7 +133,6 @@ export function MonochromeBackgroundRemover() {
       }
     });
 
-    // Готовим холсты (императивная часть)
     if (sourceCanvasRef.current) {
       sourceCanvasRef.current.width = imgW;
       sourceCanvasRef.current.height = imgH;
@@ -262,7 +264,7 @@ export function MonochromeBackgroundRemover() {
   const handleRunFloodFill = () => setManualTrigger((prev) => prev + 1);
 
   const sidebarContent = (
-    <div className="flex flex-col gap-6 pb-4">
+    <Stack gap={6} className="pb-4">
       <Workbench.Header title="MonoRemover" />
 
       {/* Единый узел ввода-вывода */}
@@ -276,7 +278,7 @@ export function MonochromeBackgroundRemover() {
       />
 
       {originalUrl && (
-        <div className="animate-fade-in space-y-6">
+        <Stack gap={6} className="animate-fade-in">
           <ControlSection title="Режим">
             <ToggleGroup
               type="single"
@@ -299,8 +301,8 @@ export function MonochromeBackgroundRemover() {
           </ControlSection>
 
           <ControlSection>
-            <div className="flex flex-col gap-2">
-              <div className="flex items-center gap-3">
+            <Stack gap={2}>
+              <Group gap={3}>
                 <div className="group relative h-8 w-8 flex-shrink-0 cursor-crosshair overflow-hidden rounded border bg-white dark:border-zinc-700">
                   <Image
                     src={originalUrl}
@@ -311,26 +313,36 @@ export function MonochromeBackgroundRemover() {
                     unoptimized
                   />
                 </div>
-                <div className="flex flex-1 items-center gap-2 rounded border bg-zinc-50 p-2 dark:border-zinc-700 dark:bg-zinc-800">
+                <Group
+                  gap={2}
+                  className="flex-1 rounded border bg-zinc-50 p-2 dark:border-zinc-700 dark:bg-zinc-800"
+                >
                   <ColorInput value={targetColor} onChange={setTargetColor} size="sm" />
-                  <div className="flex flex-col">
+                  <Stack gap={0}>
                     <ControlLabel className="text-[10px]! opacity-70">Цель (Фон)</ControlLabel>
-                    <span className="font-mono text-xs font-bold uppercase">{targetColor}</span>
-                  </div>
-                </div>
-              </div>
+                    <Typography.Text className="font-mono text-xs font-bold uppercase">
+                      {targetColor}
+                    </Typography.Text>
+                  </Stack>
+                </Group>
+              </Group>
 
-              <div className="flex items-center gap-3">
+              <Group gap={3}>
                 <div className="h-8 w-8 flex-shrink-0" />
-                <div className="flex flex-1 items-center gap-2 rounded border bg-zinc-50 p-2 dark:border-zinc-700 dark:bg-zinc-800">
+                <Group
+                  gap={2}
+                  className="flex-1 rounded border bg-zinc-50 p-2 dark:border-zinc-700 dark:bg-zinc-800"
+                >
                   <ColorInput value={contourColor} onChange={setContourColor} size="sm" />
-                  <div className="flex flex-col">
+                  <Stack gap={0}>
                     <ControlLabel className="text-[10px]! opacity-70">Контур / Окрас</ControlLabel>
-                    <span className="font-mono text-xs font-bold uppercase">{contourColor}</span>
-                  </div>
-                </div>
-              </div>
-            </div>
+                    <Typography.Text className="font-mono text-xs font-bold uppercase">
+                      {contourColor}
+                    </Typography.Text>
+                  </Stack>
+                </Group>
+              </Group>
+            </Stack>
           </ControlSection>
 
           <ControlSection>
@@ -350,10 +362,9 @@ export function MonochromeBackgroundRemover() {
                 max={50}
               />
             )}
-            <div className="border-t border-zinc-200 pt-2 dark:border-zinc-700/50">
-              <div className="mb-3 flex justify-between text-xs">
-                <ControlLabel>Удаление ореолов</ControlLabel>
-              </div>
+            <Separator className="my-2" />
+            <Stack gap={4}>
+              <ControlLabel>Удаление ореолов</ControlLabel>
               <Slider
                 label="Сжатие (Choke)"
                 value={edgeChoke}
@@ -361,6 +372,7 @@ export function MonochromeBackgroundRemover() {
                 min={0}
                 max={5}
                 step={1}
+                className="mb-0"
               />
               <Slider
                 label="Смягчение (Blur)"
@@ -368,6 +380,7 @@ export function MonochromeBackgroundRemover() {
                 onChange={setEdgeBlur}
                 min={0}
                 max={5}
+                className="mb-0"
               />
               <Slider
                 label="Окрашивание (Paint)"
@@ -376,8 +389,9 @@ export function MonochromeBackgroundRemover() {
                 min={0}
                 max={5}
                 step={1}
+                className="mb-0"
               />
-            </div>
+            </Stack>
           </ControlSection>
 
           {processingMode === 'flood-clear' && (
@@ -408,9 +422,9 @@ export function MonochromeBackgroundRemover() {
               </button>
             </StatusBox>
           )}
-        </div>
+        </Stack>
       )}
-    </div>
+    </Stack>
   );
 
   return (

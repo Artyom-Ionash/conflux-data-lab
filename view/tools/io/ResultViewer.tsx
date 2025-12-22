@@ -5,6 +5,7 @@ import React from 'react';
 import { Card } from '@/view/ui/Card';
 import { CopyButton } from '@/view/ui/CopyButton';
 import { DownloadButton } from '@/view/ui/DownloadButton';
+import { Group } from '@/view/ui/Layout';
 
 interface ResultViewerProps {
   title: React.ReactNode;
@@ -20,7 +21,6 @@ interface ResultViewerProps {
 
 /**
  * Унифицированная панель для отображения текстовых результатов (код, логи, CSV).
- * Инкапсулирует Card, CopyButton и DownloadButton.
  */
 export function ResultViewer({
   title,
@@ -40,12 +40,12 @@ export function ResultViewer({
       contentClassName="p-0 flex-1 flex flex-col overflow-hidden"
       headerActions={
         value ? (
-          <div className="flex items-center gap-2">
+          <Group gap={2}>
             <CopyButton onCopy={() => onCopy(value)} isCopied={isCopied} variant="subtle" />
             {onDownload && (
               <DownloadButton onDownload={onDownload} variant="primary" label={downloadLabel} />
             )}
-          </div>
+          </Group>
         ) : null
       }
     >
