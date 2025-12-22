@@ -13,6 +13,7 @@ import { ControlLabel, ControlSection } from '@/view/ui/ControlSection';
 import { DownloadButton } from '@/view/ui/DownloadButton';
 import { FileDropzone, FileDropzonePlaceholder } from '@/view/ui/FileDropzone';
 import { ImageSequencePlayer } from '@/view/ui/ImageSequencePlayer';
+import { cn, getAspectRatio, getAspectRatioStyle } from '@/view/ui/infrastructure/standards';
 import { Modal } from '@/view/ui/Modal';
 import { NumberStepper } from '@/view/ui/NumberStepper';
 // --- EXTRACTED COMPONENTS ---
@@ -179,12 +180,19 @@ export function VideoFrameExtractor() {
     }
   };
 
-  // --- Derived Calculations ---
+  // --- Calculations ---
 
-  const aspectRatioStyle = useMemo(() => {
-    if (!state.videoDimensions) return {};
-    return { aspectRatio: `${state.videoDimensions.width} / ${state.videoDimensions.height}` };
-  }, [state.videoDimensions]);
+  const aspectRatioStyle = useMemo(
+    () => getAspectRatioStyle(state.videoDimensions?.width, state.videoDimensions?.height),
+    [state.videoDimensions]
+  );
+
+  const videoRatio = useMemo(
+    () =>
+      getAspectRatio(state.videoDimensions?.width, state.videoDimensions?.height) ||
+      DEFAULT_ASPECT_RATIO,
+    [state.videoDimensions]
+  );
 
   const totalSpriteWidth = useMemo(() => {
     if (!state.videoDimensions || state.frames.length === 0) return 0;
@@ -192,10 +200,6 @@ export function VideoFrameExtractor() {
     const scaledWidth = Math.floor(state.videoDimensions.width * scale);
     return (scaledWidth + spriteOptions.spacing) * state.frames.length - spriteOptions.spacing;
   }, [state.videoDimensions, state.frames.length, spriteOptions.maxHeight, spriteOptions.spacing]);
-
-  const videoRatio = state.videoDimensions
-    ? state.videoDimensions.width / state.videoDimensions.height
-    : DEFAULT_ASPECT_RATIO;
 
   const captureFps =
     state.extractionParams.frameStep > 0 ? Math.round(1 / state.extractionParams.frameStep) : 10;
@@ -230,14 +234,14 @@ export function VideoFrameExtractor() {
       <Workbench.Stage>
         <div className="relative flex h-full w-full flex-col overflow-hidden bg-zinc-50 dark:bg-black/20">
           {!state.videoSrc ? (
-            <div className="flex-1 p-8">
+            <Workbench.EmptyStage>
               <FileDropzonePlaceholder
                 onUpload={actions.handleFilesSelected}
                 multiple={false}
                 accept="video/*"
                 title="Перетащите видеофайл"
               />
-            </div>
+            </Workbench.EmptyStage>
           ) : (
             <div className="flex-1 space-y-4 overflow-y-auto p-4">
               <Card className="relative z-20 overflow-visible shadow-sm" contentClassName="p-4">

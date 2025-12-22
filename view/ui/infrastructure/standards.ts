@@ -13,4 +13,21 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-// Здесь же в будущем могут появиться константы (например, общие длительности анимаций)
+/**
+ * Возвращает числовой коэффициент соотношения сторон.
+ */
+export function getAspectRatio(width?: number | null, height?: number | null): number {
+  if (!width || !height) return 1;
+  return width / height;
+}
+
+/**
+ * Генерирует объект стилей aspectRatio для CSS на основе размеров.
+ */
+export function getAspectRatioStyle(
+  width?: number | null,
+  height?: number | null
+): React.CSSProperties {
+  if (!width || !height) return {};
+  return { aspectRatio: `${width} / ${height}` };
+}
