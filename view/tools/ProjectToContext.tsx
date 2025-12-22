@@ -7,16 +7,17 @@ import { type ContextStats } from '@/lib/modules/context-generator/core';
 import { runContextPipeline } from '@/lib/modules/context-generator/engine';
 import { CONTEXT_PRESETS, type PresetKey } from '@/lib/modules/context-generator/rules';
 import { useBundleManager } from '@/lib/modules/context-generator/use-bundle-manager';
-import { InfoBadge } from '@/view/ui/InfoBadge';
-import { ProcessingOverlay } from '@/view/ui/ProcessingOverlay';
-import { Switch } from '@/view/ui/Switch';
-import { ToggleGroup, ToggleGroupItem } from '@/view/ui/ToggleGroup';
-import { Workbench } from '@/view/ui/Workbench';
 
+import { InfoBadge } from '../ui/InfoBadge';
+import { Stack } from '../ui/Layout';
+import { ProcessingOverlay } from '../ui/ProcessingOverlay';
+import { Switch } from '../ui/Switch';
+import { ToggleGroup, ToggleGroupItem } from '../ui/ToggleGroup';
+import { Workbench } from '../ui/Workbench';
 import { ResultViewer } from './text/ResultViewer';
 
 export function ProjectToContext() {
-  const { bundle, filteredPaths, handleFiles } = useBundleManager();
+  const { filteredPaths, handleFiles, bundle } = useBundleManager();
   const { isCopied, copy } = useCopyToClipboard();
 
   const [selectedPreset, setSelectedPreset] = useState<PresetKey>('nextjs');
@@ -99,10 +100,10 @@ export function ProjectToContext() {
   };
 
   const sidebar = (
-    <div className="flex flex-col gap-6 pb-4">
+    <Stack gap={6}>
       <Workbench.Header title="Project to Context" />
 
-      <div className="flex flex-col gap-2">
+      <Stack gap={2}>
         <label className="text-sm font-bold text-zinc-700 dark:text-zinc-300">1. Источник</label>
         <div
           className="flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-zinc-300 p-6 text-center hover:bg-zinc-50 dark:border-zinc-700 dark:hover:bg-zinc-800/50"
@@ -126,9 +127,9 @@ export function ProjectToContext() {
             })}
           />
         </div>
-      </div>
+      </Stack>
 
-      <div className="flex flex-col gap-4">
+      <Stack gap={4}>
         <label className="text-sm font-bold text-zinc-700 dark:text-zinc-300">
           2. Конфигурация
         </label>
@@ -152,7 +153,7 @@ export function ProjectToContext() {
           ))}
         </ToggleGroup>
 
-        <div className="space-y-3">
+        <Stack gap={3}>
           <input
             type="text"
             value={customExtensions}
@@ -171,8 +172,8 @@ export function ProjectToContext() {
             checked={includeTree}
             onCheckedChange={setIncludeTree}
           />
-        </div>
-      </div>
+        </Stack>
+      </Stack>
 
       <button
         onClick={() => void processFiles()}
@@ -183,20 +184,23 @@ export function ProjectToContext() {
       </button>
 
       {stats && (
-        <div className="animate-in fade-in slide-in-from-bottom-2 space-y-4 border-t border-zinc-200 pt-4 dark:border-zinc-800">
-          <InfoBadge label="Токены (Est.)" className="w-full justify-between py-2 text-lg">
+        <Stack
+          gap={4}
+          className="animate-in fade-in slide-in-from-bottom-2 border-t border-zinc-200 pt-4 dark:border-zinc-800"
+        >
+          <InfoBadge label="Токены (Est.)" className="justify-between py-2 text-lg">
             ~{stats.totalTokens.toLocaleString()}
           </InfoBadge>
-        </div>
+        </Stack>
       )}
-    </div>
+    </Stack>
   );
 
   return (
     <Workbench.Root>
       <Workbench.Sidebar>{sidebar}</Workbench.Sidebar>
       <Workbench.Stage>
-        <div className="relative flex h-full w-full flex-col overflow-hidden bg-zinc-50 p-4 dark:bg-black/20">
+        <Workbench.Content className="flex flex-col overflow-hidden bg-zinc-50 dark:bg-black/20">
           <ResultViewer
             title={
               result && !processing
@@ -211,7 +215,7 @@ export function ProjectToContext() {
             placeholder={processing ? 'Сборка контекста...' : 'Выберите папку проекта'}
           />
           <ProcessingOverlay isVisible={processing} message="Сборка контекста проекта..." />
-        </div>
+        </Workbench.Content>
       </Workbench.Stage>
     </Workbench.Root>
   );

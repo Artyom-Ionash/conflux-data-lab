@@ -4,28 +4,27 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { generateSpriteSheet } from '@/lib/modules/graphics/processing/sprite-generator';
 import { TEXTURE_LIMITS } from '@/lib/modules/graphics/standards';
 import { useFrameExtractor } from '@/lib/modules/video/use-frame-extractor';
-// --- UI IMPORTS ---
-import { Card } from '@/view/ui/Card';
-import { MultiScalePreview } from '@/view/ui/collections/MultiScalePreview';
-import { SpriteFrameList } from '@/view/ui/collections/SpriteFrameList';
-import { ColorInput } from '@/view/ui/ColorInput';
-import { ControlLabel, ControlSection } from '@/view/ui/ControlSection';
-import { DownloadButton } from '@/view/ui/DownloadButton';
-import { FileDropzone, FileDropzonePlaceholder } from '@/view/ui/FileDropzone';
-import { ImageSequencePlayer } from '@/view/ui/ImageSequencePlayer';
-import { InfoBadge } from '@/view/ui/InfoBadge';
-import { getAspectRatio, getAspectRatioStyle } from '@/view/ui/infrastructure/standards';
-import { Modal } from '@/view/ui/Modal';
-import { NumberStepper } from '@/view/ui/NumberStepper';
-// --- EXTRACTED COMPONENTS ---
-import { DualHoverPreview } from '@/view/ui/players/DualHoverPreview';
-import { RangeVideoPlayer } from '@/view/ui/players/RangeVideoPlayer';
-import { ProgressBar } from '@/view/ui/ProcessingOverlay';
-import { RangeSlider } from '@/view/ui/RangeSlider';
-import { Separator } from '@/view/ui/Separator';
-import { Switch } from '@/view/ui/Switch';
-import { Workbench } from '@/view/ui/Workbench';
 
+import { Card } from '../ui/Card';
+import { MultiScalePreview } from '../ui/collections/MultiScalePreview';
+import { SpriteFrameList } from '../ui/collections/SpriteFrameList';
+import { ColorInput } from '../ui/ColorInput';
+import { ControlLabel, ControlSection } from '../ui/ControlSection';
+import { DownloadButton } from '../ui/DownloadButton';
+import { FileDropzone, FileDropzonePlaceholder } from '../ui/FileDropzone';
+import { ImageSequencePlayer } from '../ui/ImageSequencePlayer';
+import { InfoBadge } from '../ui/InfoBadge';
+import { getAspectRatio, getAspectRatioStyle } from '../ui/infrastructure/standards';
+import { Group, Stack } from '../ui/Layout';
+import { Modal } from '../ui/Modal';
+import { NumberStepper } from '../ui/NumberStepper';
+import { DualHoverPreview } from '../ui/players/DualHoverPreview';
+import { RangeVideoPlayer } from '../ui/players/RangeVideoPlayer';
+import { ProgressBar } from '../ui/ProcessingOverlay';
+import { RangeSlider } from '../ui/RangeSlider';
+import { Separator } from '../ui/Separator';
+import { Switch } from '../ui/Switch';
+import { Workbench } from '../ui/Workbench';
 // --- DOMAIN IMPORTS ---
 import { TextureLimitIndicator } from './hardware/TextureLimitIndicator';
 import { FrameDiffOverlay } from './video/FrameDiffOverlay';
@@ -211,10 +210,10 @@ export function VideoFrameExtractor() {
   // --- RENDER ---
 
   const sidebarContent = (
-    <div className="flex flex-col gap-6 pb-4">
+    <Stack gap={6}>
       <Workbench.Header title="Видео в Кадры/GIF" />
 
-      <div className="flex flex-col gap-2">
+      <Stack gap={2}>
         <FileDropzone
           onFilesSelected={actions.handleFilesSelected}
           multiple={false}
@@ -222,317 +221,312 @@ export function VideoFrameExtractor() {
           label="Загрузить видео"
         />
         {state.status.isProcessing && (
-          <div className="mt-2 rounded border border-blue-100 bg-blue-50 p-3 dark:border-blue-800 dark:bg-blue-900/20">
+          <Stack
+            gap={0}
+            className="rounded border border-blue-100 bg-blue-50 p-3 dark:border-blue-800 dark:bg-blue-900/20"
+          >
             <ProgressBar progress={state.status.progress} label="Обработка..." />
-          </div>
+          </Stack>
         )}
-      </div>
-    </div>
+      </Stack>
+    </Stack>
   );
 
   return (
     <Workbench.Root>
       <Workbench.Sidebar>{sidebarContent}</Workbench.Sidebar>
       <Workbench.Stage>
-        <div className="relative flex h-full w-full flex-col overflow-hidden bg-zinc-50 dark:bg-black/20">
-          {!state.videoSrc ? (
-            <Workbench.EmptyStage>
-              <FileDropzonePlaceholder
-                onUpload={actions.handleFilesSelected}
-                multiple={false}
-                accept="video/*"
-                title="Перетащите видеофайл"
-              />
-            </Workbench.EmptyStage>
-          ) : (
-            <div className="flex-1 space-y-4 overflow-y-auto p-4">
-              <Card className="relative z-20 overflow-visible shadow-sm" contentClassName="p-4">
-                <div className="flex flex-col gap-4">
-                  <div className="space-y-4">
-                    <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3">
-                      <div className="flex flex-wrap items-center gap-6">
-                        <ControlLabel>Диапазон</ControlLabel>
-                        <Separator />
-                        <NumberStepper
-                          label="Шаг (сек)"
-                          value={state.extractionParams.frameStep}
-                          onChange={(v) =>
-                            actions.setExtractionParams((p) => ({ ...p, frameStep: v }))
-                          }
-                          step={0.05}
-                          min={0.05}
-                          max={10}
-                        />
-                      </div>
-                      <InfoBadge label="Range">
-                        <span>{state.extractionParams.startTime.toFixed(2)}s</span>
-                        <span className="mx-1 opacity-50">→</span>
-                        <span>{state.effectiveEnd.toFixed(2)}s</span>
-                      </InfoBadge>
-                    </div>
+        {!state.videoSrc ? (
+          <Workbench.EmptyStage>
+            <FileDropzonePlaceholder
+              onUpload={actions.handleFilesSelected}
+              multiple={false}
+              accept="video/*"
+              title="Перетащите видеофайл"
+            />
+          </Workbench.EmptyStage>
+        ) : (
+          <Workbench.Content>
+            {/* [LEMON] Layout Transformation */}
+            <Card className="relative z-20 overflow-visible shadow-sm" contentClassName="p-4">
+              <Stack gap={4}>
+                <Group justify="between" wrap>
+                  <Group gap={6}>
+                    <ControlLabel>Диапазон</ControlLabel>
+                    <Separator />
+                    <NumberStepper
+                      label="Шаг (сек)"
+                      value={state.extractionParams.frameStep}
+                      onChange={(v) => actions.setExtractionParams((p) => ({ ...p, frameStep: v }))}
+                      step={0.05}
+                      min={0.05}
+                      max={10}
+                    />
+                  </Group>
+                  <InfoBadge label="Range">
+                    <span>{state.extractionParams.startTime.toFixed(2)}s</span>
+                    <span className="mx-1 opacity-50">→</span>
+                    <span>{state.effectiveEnd.toFixed(2)}s</span>
+                  </InfoBadge>
+                </Group>
 
-                    <div
-                      ref={sliderContainerRef}
-                      className="group relative touch-none py-2"
-                      onMouseMove={handleSliderHover}
-                      onMouseLeave={() => !isDragging && setHoverPreview(null)}
-                      onPointerDown={() => setIsDragging(true)}
-                      onPointerUp={() => {
-                        setIsDragging(false);
-                        setHoverPreview(null);
-                      }}
-                    >
-                      <RangeSlider
-                        min={0}
-                        max={state.videoDuration ?? 0}
-                        step={0.01}
-                        value={[state.extractionParams.startTime, state.effectiveEnd]}
-                        onValueChange={handleValueChange}
-                        minStepsBetweenThumbs={0.1}
-                      />
-                      {hoverPreview && (
-                        <DualHoverPreview
-                          activeThumb={hoverPreview.activeThumb}
-                          hoverTime={hoverPreview.time}
-                          startTime={state.extractionParams.startTime}
-                          endTime={state.effectiveEnd}
-                          videoSrc={state.videoSrc}
-                          videoRef={refs.hoverVideoRef as React.RefObject<HTMLVideoElement>}
-                          previewStartImage={previewFrames.start}
-                          previewEndImage={previewFrames.end}
-                          aspectRatioStyle={aspectRatioStyle}
-                        />
-                      )}
-                    </div>
-                  </div>
-                  {state.error && (
-                    <div className="text-right text-xs text-red-600">{state.error}</div>
+                <div
+                  ref={sliderContainerRef}
+                  className="group relative touch-none py-2"
+                  onMouseMove={handleSliderHover}
+                  onMouseLeave={() => !isDragging && setHoverPreview(null)}
+                  onPointerDown={() => setIsDragging(true)}
+                  onPointerUp={() => {
+                    setIsDragging(false);
+                    setHoverPreview(null);
+                  }}
+                >
+                  <RangeSlider
+                    min={0}
+                    max={state.videoDuration ?? 0}
+                    step={0.01}
+                    value={[state.extractionParams.startTime, state.effectiveEnd]}
+                    onValueChange={handleValueChange}
+                    minStepsBetweenThumbs={0.1}
+                  />
+                  {hoverPreview && (
+                    <DualHoverPreview
+                      activeThumb={hoverPreview.activeThumb}
+                      hoverTime={hoverPreview.time}
+                      startTime={state.extractionParams.startTime}
+                      endTime={state.effectiveEnd}
+                      videoSrc={state.videoSrc}
+                      videoRef={refs.hoverVideoRef as React.RefObject<HTMLVideoElement>}
+                      previewStartImage={previewFrames.start}
+                      previewEndImage={previewFrames.end}
+                      aspectRatioStyle={aspectRatioStyle}
+                    />
                   )}
+                </div>
+                {state.error && (
+                  <div className="text-right text-xs font-medium text-red-600">{state.error}</div>
+                )}
+              </Stack>
+            </Card>
+
+            <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+              <Card
+                className="flex flex-col overflow-hidden shadow-sm"
+                title={<ControlLabel>Исходное видео</ControlLabel>}
+                contentClassName="p-0"
+              >
+                <div className="relative w-full bg-black" style={aspectRatioStyle}>
+                  <RangeVideoPlayer
+                    src={state.videoSrc}
+                    startTime={state.extractionParams.startTime}
+                    endTime={state.effectiveEnd}
+                    className="absolute inset-0"
+                  />
                 </div>
               </Card>
 
-              <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-                <Card
-                  className="flex flex-col overflow-hidden shadow-sm"
-                  title={<ControlLabel>Исходное видео</ControlLabel>}
-                  contentClassName="p-0"
-                >
-                  <div className="relative w-full bg-black" style={aspectRatioStyle}>
-                    <RangeVideoPlayer
-                      src={state.videoSrc}
-                      startTime={state.extractionParams.startTime}
-                      endTime={state.effectiveEnd}
-                      className="absolute inset-0"
+              <Card
+                className="flex flex-col overflow-hidden shadow-sm"
+                title={<ControlLabel>Разница</ControlLabel>}
+                headerActions={
+                  diffDataUrl ? (
+                    <DownloadButton
+                      onDownload={() => {
+                        const a = document.createElement('a');
+                        a.href = diffDataUrl;
+                        a.download = 'diff.png';
+                        a.click();
+                      }}
+                      variant="link"
                     />
-                  </div>
-                </Card>
-
-                <Card
-                  className="flex flex-col overflow-hidden shadow-sm"
-                  title={<ControlLabel>Разница</ControlLabel>}
-                  headerActions={
-                    diffDataUrl ? (
-                      <DownloadButton
-                        onDownload={() => {
-                          const a = document.createElement('a');
-                          a.href = diffDataUrl;
-                          a.download = 'diff.png';
-                          a.click();
-                        }}
-                        variant="link"
-                      />
-                    ) : undefined
-                  }
-                  contentClassName="p-0"
-                >
-                  <div
-                    className="relative w-full bg-zinc-100 dark:bg-zinc-950"
-                    style={aspectRatioStyle}
-                  >
-                    <div className="absolute inset-0">
-                      <FrameDiffOverlay
-                        image1={previewFrames.start}
-                        image2={previewFrames.end}
-                        isProcessing={isPreviewing}
-                        onDataGenerated={setDiffDataUrl}
-                      />
-                    </div>
-                  </div>
-                </Card>
-
-                <Card
-                  className="flex flex-col overflow-hidden shadow-sm"
-                  title={
-                    <div className="flex items-center gap-4">
-                      <ControlLabel>Спрайт</ControlLabel>
-                      <NumberStepper
-                        label="Скорость %"
-                        value={currentSpeedPercent}
-                        onChange={(val) => {
-                          const newFps = Math.max(1, Math.round(captureFps * (val / 100)));
-                          actions.setGifParams((p) => ({ ...p, fps: newFps }));
-                        }}
-                        min={10}
-                        max={500}
-                        step={10}
-                      />
-                      <NumberStepper
-                        label="FPS"
-                        value={state.gifParams.fps}
-                        onChange={() => {}}
-                        disabled={true}
-                      />
-                    </div>
-                  }
-                  headerActions={
-                    state.frames.length > 0 && !state.status.isProcessing ? (
-                      <DownloadButton
-                        onDownload={actions.generateAndDownloadGif}
-                        variant="link"
-                        label={
-                          state.status.currentStep === 'generating'
-                            ? 'Кодирование...'
-                            : 'Скачать GIF'
-                        }
-                        disabled={state.status.isProcessing}
-                      />
-                    ) : undefined
-                  }
-                  contentClassName="p-0"
-                >
-                  <div
-                    className="group relative w-full cursor-pointer bg-zinc-100 dark:bg-zinc-950"
-                    style={aspectRatioStyle}
-                    onClick={() => setIsModalOpen(true)}
-                  >
-                    {state.frames.length > 0 || state.status.isProcessing ? (
-                      <>
-                        <ImageSequencePlayer
-                          images={state.frames.map((f) => f.dataUrl)}
-                          fps={state.gifParams.fps}
-                          width={state.videoDimensions?.width || 300}
-                          height={state.videoDimensions?.height || 200}
-                          onDrawOverlay={handleDrawOverlay}
-                        />
-                        <div className="absolute inset-0 flex items-center justify-center bg-black/0 transition-colors group-hover:bg-black/10">
-                          <div className="scale-95 transform rounded-full bg-black/70 px-3 py-1.5 text-xs font-bold text-white opacity-0 backdrop-blur-sm transition-opacity group-hover:scale-100 group-hover:opacity-100">
-                            Открыть масштабы ⤢
-                          </div>
-                        </div>
-                      </>
-                    ) : (
-                      <div className="absolute inset-0 flex items-center justify-center text-xs text-zinc-400">
-                        Нет кадров
-                      </div>
-                    )}
-                  </div>
-                </Card>
-              </div>
-
-              <ControlSection
-                title="Спрайт-лист"
-                className="shadow-sm"
-                headerRight={
-                  state.frames.length > 0 && (
-                    <div className="flex items-center gap-4">
-                      <NumberStepper
-                        label="Кадров"
-                        value={state.frames.length}
-                        onChange={() => {}}
-                        disabled={true}
-                      />
-                      <div className="w-48 pt-1">
-                        <TextureLimitIndicator value={totalSpriteWidth} label="ШИРИНА" />
-                      </div>
-                      <DownloadButton
-                        onDownload={handleDownloadSpriteSheet}
-                        variant="link"
-                        label="Скачать PNG"
-                        disabled={totalSpriteWidth > MAX_BROWSER_TEXTURE}
-                      />
-                    </div>
-                  )
+                  ) : undefined
                 }
+                contentClassName="p-0"
               >
-                {state.frames.length > 0 && (
-                  <div className="mb-4 flex items-center gap-4">
-                    <Switch
-                      label="Loop"
-                      checked={state.extractionParams.symmetricLoop}
-                      onCheckedChange={(c) =>
-                        actions.setExtractionParams((p) => ({ ...p, symmetricLoop: c }))
-                      }
-                      className="gap-2 text-xs font-medium whitespace-nowrap"
-                    />
-                    <Separator />
-                    <NumberStepper
-                      label="Высота"
-                      value={spriteOptions.maxHeight}
-                      onChange={(v) => setSpriteOptions((p) => ({ ...p, maxHeight: v }))}
-                      step={10}
-                      min={10}
-                      max={2000}
-                    />
-                    <Separator />
-                    <NumberStepper
-                      label="Отступ"
-                      value={spriteOptions.spacing}
-                      onChange={(v) => setSpriteOptions((p) => ({ ...p, spacing: v }))}
-                      step={1}
-                      min={0}
-                      max={100}
-                    />
-                    <ColorInput
-                      value={spriteOptions.bg === 'transparent' ? null : spriteOptions.bg}
-                      onChange={(v) => setSpriteOptions((p) => ({ ...p, bg: v }))}
-                      allowTransparent
-                      onClear={() => setSpriteOptions((p) => ({ ...p, bg: 'transparent' }))}
+                <div
+                  className="relative w-full bg-zinc-100 dark:bg-zinc-950"
+                  style={aspectRatioStyle}
+                >
+                  <div className="absolute inset-0">
+                    <FrameDiffOverlay
+                      image1={previewFrames.start}
+                      image2={previewFrames.end}
+                      isProcessing={isPreviewing}
+                      onDataGenerated={setDiffDataUrl}
                     />
                   </div>
-                )}
-                <div className="custom-scrollbar overflow-x-auto bg-zinc-100 p-4 dark:bg-zinc-950">
-                  <SpriteFrameList
-                    frames={state.frames}
-                    maxHeight={spriteOptions.maxHeight}
-                    spacing={spriteOptions.spacing}
-                    backgroundColor={spriteOptions.bg}
-                    videoAspectRatio={videoRatio}
-                  />
                 </div>
-              </ControlSection>
+              </Card>
+
+              <Card
+                className="flex flex-col overflow-hidden shadow-sm"
+                title={
+                  <Group gap={4}>
+                    <ControlLabel>Спрайт</ControlLabel>
+                    <NumberStepper
+                      label="Скорость %"
+                      value={currentSpeedPercent}
+                      onChange={(val) => {
+                        const newFps = Math.max(1, Math.round(captureFps * (val / 100)));
+                        actions.setGifParams((p) => ({ ...p, fps: newFps }));
+                      }}
+                      min={10}
+                      max={500}
+                      step={10}
+                    />
+                    <NumberStepper
+                      label="FPS"
+                      value={state.gifParams.fps}
+                      onChange={() => {}}
+                      disabled={true}
+                    />
+                  </Group>
+                }
+                headerActions={
+                  state.frames.length > 0 && !state.status.isProcessing ? (
+                    <DownloadButton
+                      onDownload={actions.generateAndDownloadGif}
+                      variant="link"
+                      label={
+                        state.status.currentStep === 'generating' ? 'Кодирование...' : 'Скачать GIF'
+                      }
+                      disabled={state.status.isProcessing}
+                    />
+                  ) : undefined
+                }
+                contentClassName="p-0"
+              >
+                <div
+                  className="group relative w-full cursor-pointer bg-zinc-100 dark:bg-zinc-950"
+                  style={aspectRatioStyle}
+                  onClick={() => setIsModalOpen(true)}
+                >
+                  {state.frames.length > 0 || state.status.isProcessing ? (
+                    <>
+                      <ImageSequencePlayer
+                        images={state.frames.map((f) => f.dataUrl)}
+                        fps={state.gifParams.fps}
+                        width={state.videoDimensions?.width || 300}
+                        height={state.videoDimensions?.height || 200}
+                        onDrawOverlay={handleDrawOverlay}
+                      />
+                      <div className="absolute inset-0 flex items-center justify-center bg-black/0 transition-colors group-hover:bg-black/10">
+                        <div className="scale-95 transform rounded-full bg-black/70 px-3 py-1.5 text-xs font-bold text-white opacity-0 backdrop-blur-sm transition-opacity group-hover:scale-100 group-hover:opacity-100">
+                          Открыть масштабы ⤢
+                        </div>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="absolute inset-0 flex items-center justify-center text-xs text-zinc-400">
+                      Нет кадров
+                    </div>
+                  )}
+                </div>
+              </Card>
             </div>
-          )}
 
-          {/* Hidden Processing Elements */}
-          <video ref={refs.videoRef} className="hidden" crossOrigin="anonymous" muted playsInline />
-          <video
-            ref={refs.previewVideoRef}
-            className="hidden"
-            crossOrigin="anonymous"
-            muted
-            playsInline
-          />
-          <video
-            ref={refs.hoverVideoRef}
-            className="hidden"
-            crossOrigin="anonymous"
-            muted
-            playsInline
-          />
-          <canvas ref={refs.canvasRef} className="hidden" />
+            <ControlSection
+              title="Спрайт-лист"
+              className="shadow-sm"
+              headerRight={
+                state.frames.length > 0 && (
+                  <Group gap={4}>
+                    <NumberStepper
+                      label="Кадров"
+                      value={state.frames.length}
+                      onChange={() => {}}
+                      disabled={true}
+                    />
+                    <div className="w-48 pt-1">
+                      <TextureLimitIndicator value={totalSpriteWidth} label="ШИРИНА" />
+                    </div>
+                    <DownloadButton
+                      onDownload={handleDownloadSpriteSheet}
+                      variant="link"
+                      label="Скачать PNG"
+                      disabled={totalSpriteWidth > MAX_BROWSER_TEXTURE}
+                    />
+                  </Group>
+                )
+              }
+            >
+              {state.frames.length > 0 && (
+                <Group gap={4} wrap>
+                  <Switch
+                    label="Loop"
+                    checked={state.extractionParams.symmetricLoop}
+                    onCheckedChange={(c) =>
+                      actions.setExtractionParams((p) => ({ ...p, symmetricLoop: c }))
+                    }
+                    className="gap-2 text-xs font-medium whitespace-nowrap"
+                  />
+                  <Separator />
+                  <NumberStepper
+                    label="Высота"
+                    value={spriteOptions.maxHeight}
+                    onChange={(v) => setSpriteOptions((p) => ({ ...p, maxHeight: v }))}
+                    step={10}
+                    min={10}
+                    max={2000}
+                  />
+                  <Separator />
+                  <NumberStepper
+                    label="Отступ"
+                    value={spriteOptions.spacing}
+                    onChange={(v) => setSpriteOptions((p) => ({ ...p, spacing: v }))}
+                    step={1}
+                    min={0}
+                    max={100}
+                  />
+                  <ColorInput
+                    value={spriteOptions.bg === 'transparent' ? null : spriteOptions.bg}
+                    onChange={(v) => setSpriteOptions((p) => ({ ...p, bg: v }))}
+                    allowTransparent
+                    onClear={() => setSpriteOptions((p) => ({ ...p, bg: 'transparent' }))}
+                  />
+                </Group>
+              )}
+              <div className="custom-scrollbar overflow-x-auto bg-zinc-100 p-4 dark:bg-zinc-950">
+                <SpriteFrameList
+                  frames={state.frames}
+                  maxHeight={spriteOptions.maxHeight}
+                  spacing={spriteOptions.spacing}
+                  backgroundColor={spriteOptions.bg}
+                  videoAspectRatio={videoRatio}
+                />
+              </div>
+            </ControlSection>
+          </Workbench.Content>
+        )}
 
-          <Modal
-            isOpen={isModalOpen}
-            onClose={() => setIsModalOpen(false)}
-            title="Предпросмотр масштабов"
-            className="h-[92vh] w-[96vw] max-w-[1920px]"
-          >
-            <MultiScalePreview
-              frames={state.frames.map((f) => f.dataUrl)}
-              fps={state.gifParams.fps}
-            />
-          </Modal>
-        </div>
+        <video ref={refs.videoRef} className="hidden" crossOrigin="anonymous" muted playsInline />
+        <video
+          ref={refs.previewVideoRef}
+          className="hidden"
+          crossOrigin="anonymous"
+          muted
+          playsInline
+        />
+        <video
+          ref={refs.hoverVideoRef}
+          className="hidden"
+          crossOrigin="anonymous"
+          muted
+          playsInline
+        />
+        <canvas ref={refs.canvasRef} className="hidden" />
+
+        <Modal
+          isOpen={isModalOpen}
+          onClose={() => setIsModalOpen(false)}
+          title="Предпросмотр масштабов"
+          className="h-[92vh] w-[96vw] max-w-[1920px]"
+        >
+          <MultiScalePreview
+            frames={state.frames.map((f) => f.dataUrl)}
+            fps={state.gifParams.fps}
+          />
+        </Modal>
       </Workbench.Stage>
     </Workbench.Root>
   );

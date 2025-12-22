@@ -68,6 +68,13 @@ const Stage = ({ children, className, ...props }: WorkbenchProps) => (
 );
 
 /**
+ * Внутренняя область Stage с автоматическими отступами и скроллом.
+ */
+const Content = ({ children, className }: { children: React.ReactNode; className?: string }) => (
+  <div className={cn('h-full w-full space-y-4 overflow-y-auto p-4', className)}>{children}</div>
+);
+
+/**
  * Стандартный контейнер для плейсхолдеров, когда данные ещё не загружены.
  */
 const EmptyStage = ({ children, className }: { children: React.ReactNode; className?: string }) => (
@@ -81,5 +88,6 @@ export const Workbench = {
   Sidebar,
   Header,
   Stage,
+  Content,
   EmptyStage,
 };
