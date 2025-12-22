@@ -36,25 +36,27 @@ const isFileAccepted = (file: File, accept: string): boolean => {
 // --- Helper: Recursive Entry Scanner ---
 /**
  * Рекурсивно извлекает файлы и сохраняет информацию о путях.
+ * Теперь поддерживает раннее игнорирование папок.
  */
-async function scanEntries(entries: FileSystemEntry[]): Promise<File[]> {
+async function scanEntries(
+  entries: FileSystemEntry[],
+  shouldSkip?: (path: string) => boolean
+): Promise<File[]> {
   const files: File[] = [];
 
   async function readEntry(entry: FileSystemEntry) {
+    const path = entry.fullPath.startsWith('/') ? entry.fullPath.slice(1) : entry.fullPath;
+
+    // Early Exit: Если путь в списке игнора, не заходим внутрь
+    if (shouldSkip?.(path)) return;
+
     if (entry.isFile) {
       const file = await new Promise<File>((resolve, reject) =>
         (entry as FileSystemFileEntry).file(resolve, reject)
       );
 
-      // Восстанавливаем путь.
-      // fullPath в Chrome начинается с "/", убираем его для совместимости с webkitRelativePath
-      const relativePath = entry.fullPath.startsWith('/')
-        ? entry.fullPath.slice(1)
-        : entry.fullPath;
-
-      // Патчим объект файла, так как свойство readonly
       Object.defineProperty(file, 'webkitRelativePath', {
-        value: relativePath,
+        value: path,
         writable: false,
         configurable: true,
         enumerable: true,
@@ -82,6 +84,10 @@ async function scanEntries(entries: FileSystemEntry[]): Promise<File[]> {
 // --- Base Component Props ---
 interface FileDropzoneProps {
   onFilesSelected: (files: File[]) => void;
+  /** Колбэк, вызываемый мгновенно при начале сканирования */
+  onScanStarted?: () => void;
+  /** Предикат для раннего отсечения тяжелых папок */
+  shouldSkip?: (path: string) => boolean;
   multiple?: boolean;
   accept?: string;
   label?: string;
@@ -95,6 +101,8 @@ interface FileDropzoneProps {
 // --- Base Component ---
 export const FileDropzone = ({
   onFilesSelected,
+  onScanStarted,
+  shouldSkip,
   multiple = false,
   accept = 'image/*',
   label = 'Загрузить изображение',
@@ -120,19 +128,22 @@ export const FileDropzone = ({
 
   const handleDataTransfer = useCallback(
     async (dataTransfer: DataTransfer) => {
+      // Мгновенно сообщаем о начале работы
+      onScanStarted?.();
+
       const items = Array.from(dataTransfer.items);
       const entries = items
         .map((item) => item.webkitGetAsEntry())
         .filter((entry): entry is FileSystemEntry => entry !== null);
 
       if (entries.length > 0) {
-        const allFiles = await scanEntries(entries);
+        const allFiles = await scanEntries(entries, shouldSkip);
         handleFinalFiles(allFiles);
       } else {
         handleFinalFiles(Array.from(dataTransfer.files));
       }
     },
-    [handleFinalFiles]
+    [handleFinalFiles, onScanStarted, shouldSkip]
   );
 
   // --- Global DnD (Window) ---
@@ -173,6 +184,7 @@ export const FileDropzone = ({
   // --- Local Handlers ---
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
+      onScanStarted?.();
       handleFinalFiles(Array.from(e.target.files));
     }
     e.target.value = ''; // Сброс value, чтобы можно было выбрать тот же файл повторно
@@ -268,7 +280,15 @@ export const FileDropzone = ({
           multiple={multiple || directory}
           accept={accept}
           onChange={handleInputChange}
-          {...directoryAttributes}
+          {...(directory
+            ? ({
+                webkitdirectory: '',
+                directory: '',
+              } as React.InputHTMLAttributes<HTMLInputElement> & {
+                webkitdirectory?: string;
+                directory?: string;
+              })
+            : {})}
         />
       </div>
 

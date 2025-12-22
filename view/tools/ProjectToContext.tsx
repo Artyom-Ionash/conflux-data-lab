@@ -7,7 +7,6 @@ import { type ContextStats } from '@/lib/modules/context-generator/core';
 import { runContextPipeline } from '@/lib/modules/context-generator/engine';
 import { CONTEXT_PRESETS, type PresetKey } from '@/lib/modules/context-generator/rules';
 import { useBundleManager } from '@/lib/modules/context-generator/use-bundle-manager';
-import { Field, TextInput } from '@/view/tools/text/Input';
 import { FileDropzone } from '@/view/ui/FileDropzone';
 import { InfoBadge } from '@/view/ui/InfoBadge';
 import { Stack } from '@/view/ui/Layout';
@@ -16,7 +15,8 @@ import { Switch } from '@/view/ui/Switch';
 import { ToggleGroup, ToggleGroupItem } from '@/view/ui/ToggleGroup';
 import { Workbench } from '@/view/ui/Workbench';
 
-import { ResultViewer } from './text/ResultViewer';
+import { ResultViewer } from './text//ResultViewer';
+import { Field, TextInput } from './text/Input';
 
 export function ProjectToContext() {
   const { filteredPaths, handleFiles, bundle } = useBundleManager();
@@ -34,10 +34,21 @@ export function ProjectToContext() {
   const [stats, setStats] = useState<ContextStats | null>(null);
   const [lastGeneratedAt, setLastGeneratedAt] = useState<Date | null>(null);
 
-  // [LEMON] Обработка выбора директории
+  /**
+   * Предикат для раннего игнорирования тяжелых папок при сканировании.
+   */
+  const shouldSkipScan = useCallback((path: string) => {
+    const parts = path.split('/');
+    // Игнорируем стандартные тяжелые папки на самом первом этапе
+    const heavyFolders = ['node_modules', '.git', '.next', 'out', 'dist', '.godot', '.import'];
+    return parts.some((p) => heavyFolders.includes(p));
+  }, []);
+
   const onFilesSelected = async (files: File[]) => {
-    if (files.length === 0) return;
-    setProcessing(true);
+    if (files.length === 0) {
+      setProcessing(false);
+      return;
+    }
 
     try {
       const {
@@ -59,7 +70,10 @@ export function ProjectToContext() {
 
   const processFiles = useCallback(
     async (activeBundle = bundle, paths = filteredPaths, presetKey = selectedPreset) => {
-      if (!activeBundle || paths.length === 0) return;
+      if (!activeBundle || paths.length === 0) {
+        setProcessing(false);
+        return;
+      }
 
       setResult(null);
       setProcessing(true);
@@ -111,6 +125,8 @@ export function ProjectToContext() {
 
       <Field label="1. Источник">
         <FileDropzone
+          onScanStarted={() => setProcessing(true)}
+          shouldSkip={shouldSkipScan}
           onFilesSelected={onFilesSelected}
           directory
           accept="*"
