@@ -12,12 +12,27 @@ export interface ScanOptions {
   shouldSkip?: (path: string) => boolean;
 }
 
+// --- Types for Modern API (Polyfill-like definitions for safety) ---
+interface FileSystemHandle {
+  kind: 'file' | 'directory';
+  name: string;
+}
+
+interface FileSystemFileHandle extends FileSystemHandle {
+  kind: 'file';
+  getFile(): Promise<File>;
+}
+
+interface FileSystemDirectoryHandle extends FileSystemHandle {
+  kind: 'directory';
+  values(): AsyncIterableIterator<FileSystemHandle>;
+}
+
 /**
  * Создает менеджер игнорирования.
  */
 export function createIgnoreManager(options: ScanOptions) {
   const ig = ignore();
-
   // 1. БАЗОВЫЕ ЗАПРЕТЫ (Самый низкий приоритет)
   ig.add(['node_modules', '.DS_Store', 'package-lock.json', 'yarn.lock']);
 
@@ -46,6 +61,59 @@ export function createIgnoreManager(options: ScanOptions) {
   ig.add(['.git', '.git/**']);
 
   return ig;
+}
+
+/**
+ * [MODERN API] Рекурсивно сканирует FileSystemDirectoryHandle.
+ * Патчит файлы, добавляя webkitRelativePath для совместимости.
+ */
+export async function scanDirectoryHandle(
+  dirHandle: FileSystemDirectoryHandle,
+  shouldSkip?: (path: string) => boolean
+): Promise<File[]> {
+  const files: File[] = [];
+  const rootName = dirHandle.name;
+
+  async function walk(handle: FileSystemHandle, pathSegments: string[]) {
+    // Формируем путь: Root/Folder/File.ext
+    const currentPath = pathSegments.join('/');
+
+    // Проверка на игнорирование (исключая корневую папку из проверки пути)
+    // Мы передаем путь без имени корня для проверки, чтобы логика совпадала с input webkitdirectory
+    const checkPath = pathSegments.length > 1 ? pathSegments.slice(1).join('/') : currentPath;
+
+    if (pathSegments.length > 1 && shouldSkip?.(checkPath)) {
+      return;
+    }
+
+    if (handle.kind === 'file') {
+      const fileHandle = handle as FileSystemFileHandle;
+      const file = await fileHandle.getFile();
+
+      // MONKEY PATCH: Эмулируем поведение input[webkitdirectory]
+      // Свойство webkitRelativePath доступно только для чтения, используем defineProperty
+      Object.defineProperty(file, 'webkitRelativePath', {
+        value: currentPath,
+        writable: false,
+        configurable: true,
+        enumerable: true,
+      });
+
+      files.push(file);
+    } else if (handle.kind === 'directory') {
+      const dirHandle = handle as FileSystemDirectoryHandle;
+      const promises: Promise<void>[] = [];
+
+      for await (const entry of dirHandle.values()) {
+        promises.push(walk(entry, [...pathSegments, entry.name]));
+      }
+
+      await Promise.all(promises);
+    }
+  }
+
+  await walk(dirHandle, [rootName]);
+  return files;
 }
 
 /**

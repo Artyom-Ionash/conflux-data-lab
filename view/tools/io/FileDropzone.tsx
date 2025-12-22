@@ -3,7 +3,11 @@
 import type { ReactNode } from 'react';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 
-import { filterFileList, scanEntries } from '@/lib/modules/file-system/scanner';
+import {
+  filterFileList,
+  scanDirectoryHandle,
+  scanEntries,
+} from '@/lib/modules/file-system/scanner';
 import { cn } from '@/view/ui/infrastructure/standards';
 import { Tooltip } from '@/view/ui/ZoneIndicator';
 
@@ -24,6 +28,10 @@ interface FileDropzoneProps {
 
 /**
  * Универсальный сенсор для загрузки файлов и папок.
+ * * Поддерживает:
+ * 1. Modern File System Access API (showDirectoryPicker)
+ * 2. Legacy Input (webkitdirectory)
+ * 3. Drag and Drop (DataTransfer items)
  *
  * ⚠️ ПРЕДУПРЕЖДЕНИЕ О ПРОИЗВОДИТЕЛЬНОСТИ:
  * Этот компонент реализует "Smart Scan" через API FileSystemEntry (webkitGetAsEntry).
@@ -57,7 +65,7 @@ export const FileDropzone = ({
         ? preFiltered
         : preFiltered.filter((file) => {
             if (!accept) return true;
-            // Валидация типа файла...
+            // Здесь может быть доп. валидация типов, если нужно
             return true;
           });
 
@@ -67,6 +75,33 @@ export const FileDropzone = ({
     },
     [accept, onFilesSelected, shouldSkip]
   );
+
+  // Обработчик клика: Пробуем Modern API, откатываемся на Legacy
+  const handleClick = async () => {
+    // 1. Если это режим папки и браузер поддерживает Modern API
+    if (directory && 'showDirectoryPicker' in window) {
+      try {
+        // @ts-expect-error - TS может не знать про window.showDirectoryPicker
+        const dirHandle = await window.showDirectoryPicker();
+
+        onScanStarted?.();
+
+        // Используем новую функцию из scanner.ts
+        const files = await scanDirectoryHandle(dirHandle, shouldSkip);
+        handleFinalFiles(files);
+        return;
+      } catch (err) {
+        // Игнорируем AbortError (если пользователь нажал Отмена)
+        if (err instanceof Error && err.name === 'AbortError') return;
+
+        console.warn('Modern directory picker failed, falling back to input', err);
+        // Если произошла другая ошибка, проваливаемся к input.click() ниже
+      }
+    }
+
+    // 2. Стандартный (Legacy) путь
+    inputRef.current?.click();
+  };
 
   const handleDataTransfer = useCallback(
     async (dataTransfer: DataTransfer) => {
@@ -131,7 +166,7 @@ export const FileDropzone = ({
   return (
     <>
       <div
-        onClick={() => inputRef.current?.click()}
+        onClick={handleClick}
         onDragOver={(e) => {
           e.preventDefault();
           e.stopPropagation();
