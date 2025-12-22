@@ -1,7 +1,6 @@
 'use client';
 
 import Image from 'next/image';
-import Link from 'next/link';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { filter, map, pipe } from 'remeda';
 
@@ -251,25 +250,7 @@ export function VerticalImageAligner() {
 
   const sidebarContent = (
     <div className="flex flex-col gap-6 pb-4">
-      <div>
-        <Link
-          href="/"
-          className="mb-4 inline-flex items-center gap-2 text-sm font-medium text-zinc-500 transition-colors hover:text-zinc-900 dark:hover:text-zinc-200"
-        >
-          <svg
-            width="14"
-            height="14"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-          >
-            <path d="M19 12H5M12 19l-7-7 7-7" />
-          </svg>{' '}
-          На главную
-        </Link>
-        <h2 className="text-xl font-bold">Вертикальный склейщик</h2>
-      </div>
+      <Workbench.Header title="Вертикальный склейщик" />
 
       <div className="flex flex-col gap-2">
         <FileDropzone onFilesSelected={processFiles} multiple={true} label="Добавить изображения" />

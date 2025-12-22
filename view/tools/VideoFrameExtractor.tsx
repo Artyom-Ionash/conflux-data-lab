@@ -1,5 +1,4 @@
 'use client';
-import Link from 'next/link';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { generateSpriteSheet } from '@/lib/modules/graphics/processing/sprite-generator';
@@ -14,7 +13,6 @@ import { ControlLabel, ControlSection } from '@/view/ui/ControlSection';
 import { DownloadButton } from '@/view/ui/DownloadButton';
 import { FileDropzone, FileDropzonePlaceholder } from '@/view/ui/FileDropzone';
 import { ImageSequencePlayer } from '@/view/ui/ImageSequencePlayer';
-import { cn } from '@/view/ui/infrastructure/standards';
 import { Modal } from '@/view/ui/Modal';
 import { NumberStepper } from '@/view/ui/NumberStepper';
 // --- EXTRACTED COMPONENTS ---
@@ -199,7 +197,6 @@ export function VideoFrameExtractor() {
     ? state.videoDimensions.width / state.videoDimensions.height
     : DEFAULT_ASPECT_RATIO;
 
-  // Расчет FPS и Скорости
   const captureFps =
     state.extractionParams.frameStep > 0 ? Math.round(1 / state.extractionParams.frameStep) : 10;
 
@@ -209,25 +206,7 @@ export function VideoFrameExtractor() {
 
   const sidebarContent = (
     <div className="flex flex-col gap-6 pb-4">
-      <div>
-        <Link
-          href="/"
-          className="mb-4 inline-flex items-center gap-2 text-sm font-medium text-zinc-500 transition-colors hover:text-zinc-900 dark:hover:text-zinc-200"
-        >
-          <svg
-            width="14"
-            height="14"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-          >
-            <path d="M19 12H5M12 19l-7-7 7-7" />
-          </svg>{' '}
-          На главную
-        </Link>
-        <h2 className="text-xl font-bold">Видео в Кадры/GIF</h2>
-      </div>
+      <Workbench.Header title="Видео в Кадры/GIF" />
 
       <div className="flex flex-col gap-2">
         <FileDropzone
@@ -391,7 +370,6 @@ export function VideoFrameExtractor() {
                         max={500}
                         step={10}
                       />
-                      {/* Read-only FPS */}
                       <NumberStepper
                         label="FPS"
                         value={state.gifParams.fps}
@@ -490,7 +468,6 @@ export function VideoFrameExtractor() {
                       max={2000}
                     />
                     <div className="h-6 w-px bg-zinc-200 dark:bg-zinc-700"></div>
-                    {/* Spacing Control */}
                     <NumberStepper
                       label="Отступ"
                       value={spriteOptions.spacing}

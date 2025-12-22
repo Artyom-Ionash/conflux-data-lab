@@ -1,6 +1,5 @@
 'use client';
 
-import Link from 'next/link';
 import React, { useCallback, useRef, useState } from 'react';
 
 import { useCopyToClipboard } from '@/lib/core/hooks/use-copy-to-clipboard';
@@ -101,25 +100,7 @@ export function ProjectToContext() {
 
   const sidebar = (
     <div className="flex flex-col gap-6 pb-4">
-      <div>
-        <Link
-          href="/"
-          className="mb-4 inline-flex items-center gap-2 text-sm font-medium text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-200"
-        >
-          <svg
-            width="14"
-            height="14"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-          >
-            <path d="M19 12H5M12 19l-7-7 7-7" />
-          </svg>
-          На главную
-        </Link>
-        <h2 className="text-xl font-bold">Project to Context</h2>
-      </div>
+      <Workbench.Header title="Project to Context" />
 
       <div className="flex flex-col gap-2">
         <label className="text-sm font-bold text-zinc-700 dark:text-zinc-300">1. Источник</label>

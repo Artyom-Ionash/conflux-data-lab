@@ -1,14 +1,13 @@
 'use client';
 
 import Image from 'next/image';
-import Link from 'next/link';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 
 import { useDebounceEffect } from '@/lib/core/hooks/use-debounce-effect';
-import { useObjectUrl } from '@/lib/core/hooks/use-object-url';
+import { useFileMetadata } from '@/lib/core/hooks/use-file-metadata';
 import { useWorker } from '@/lib/core/hooks/use-worker';
 import { hexToRgb, invertHex, rgbToHex } from '@/lib/core/utils/colors';
-import { downloadDataUrl, getTopLeftPixelColor, loadImage } from '@/lib/core/utils/media';
+import { downloadDataUrl } from '@/lib/core/utils/media';
 import type {
   ProcessingMode,
   WorkerPayload,
@@ -27,7 +26,6 @@ import { Workbench } from '@/view/ui/Workbench';
 
 // --- CONSTANTS ---
 const DEBOUNCE_DELAY = 50;
-const VIEW_RESET_DELAY = 50;
 const MOUSE_BUTTON_LEFT = 0;
 const MAX_RGB_DISTANCE = Math.sqrt(3 * 255 ** 2);
 const DOWNLOAD_FILENAME = 'removed_bg.png';
@@ -47,9 +45,16 @@ const DEFAULT_SETTINGS = {
 
 export function MonochromeBackgroundRemover() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const originalUrl = useObjectUrl(selectedFile);
 
-  const [imgDimensions, setImgDimensions] = useState({ w: 0, h: 0 });
+  // Используем кристалл метаданных
+  const {
+    url: originalUrl,
+    width: imgW,
+    height: imgH,
+    bgColor,
+    isLoading: isMetadataLoading,
+  } = useFileMetadata(selectedFile);
+
   const [targetColor, setTargetColor] = useState(DEFAULT_SETTINGS.targetColor);
   const [contourColor, setContourColor] = useState(DEFAULT_SETTINGS.contourColor);
 
@@ -110,32 +115,36 @@ export function MonochromeBackgroundRemover() {
     onMessage: handleWorkerMessage,
   });
 
-  const loadOriginalToCanvas = useCallback(
-    async (url: string) => {
-      try {
-        const img = await loadImage(url);
-        setImgDimensions({ w: img.width, h: img.height });
-        if (sourceCanvasRef.current) {
-          sourceCanvasRef.current.width = img.width;
-          sourceCanvasRef.current.height = img.height;
-          const ctx = sourceCanvasRef.current.getContext('2d', { willReadFrequently: true });
-          ctx?.drawImage(img, 0, 0);
-        }
-        if (previewCanvasRef.current) {
-          previewCanvasRef.current.width = img.width;
-          previewCanvasRef.current.height = img.height;
-          const ctx = previewCanvasRef.current.getContext('2d');
-          ctx?.drawImage(img, 0, 0);
-        }
-        setTimeout(() => {
-          workspaceRef.current?.resetView(img.width, img.height);
-        }, VIEW_RESET_DELAY);
-      } catch (e) {
-        console.error(e);
+  // [LEMON] Автоматическая инициализация при получении новых метаданных
+  useEffect(() => {
+    if (!originalUrl || !imgW || !imgH) return;
+
+    // Используем RAF для избежания синхронного каскада рендеров и ошибки линтера
+    requestAnimationFrame(() => {
+      if (bgColor) {
+        setTargetColor(bgColor);
+        setContourColor(invertHex(bgColor));
       }
-    },
-    [workspaceRef]
-  );
+    });
+
+    // Готовим холсты (императивная часть)
+    if (sourceCanvasRef.current) {
+      sourceCanvasRef.current.width = imgW;
+      sourceCanvasRef.current.height = imgH;
+      const ctx = sourceCanvasRef.current.getContext('2d', { willReadFrequently: true });
+      const img = new window.Image();
+      img.onload = () => {
+        ctx?.drawImage(img, 0, 0);
+        if (previewCanvasRef.current) {
+          previewCanvasRef.current.width = imgW;
+          previewCanvasRef.current.height = imgH;
+          previewCanvasRef.current.getContext('2d')?.drawImage(img, 0, 0);
+        }
+        workspaceRef.current?.resetView(imgW, imgH);
+      };
+      img.src = originalUrl;
+    }
+  }, [originalUrl, imgW, imgH, bgColor, workspaceRef]);
 
   const processImage = useCallback(() => {
     if (!originalUrl || !sourceCanvasRef.current) return;
@@ -180,15 +189,6 @@ export function MonochromeBackgroundRemover() {
     postMessage,
   ]);
 
-  useEffect(() => {
-    if (originalUrl) {
-      // Fix for set-state-in-effect warning & safe execution
-      requestAnimationFrame(() => {
-        void loadOriginalToCanvas(originalUrl);
-      });
-    }
-  }, [originalUrl, loadOriginalToCanvas]);
-
   useDebounceEffect(
     () => {
       if (originalUrl) void processImage();
@@ -205,22 +205,11 @@ export function MonochromeBackgroundRemover() {
     return undefined;
   }, [manualTrigger, processingMode, processImage]);
 
-  const handleFilesSelected = async (files: File[]) => {
+  const handleFilesSelected = (files: File[]) => {
     const file = files[0];
     if (!file) return;
     setFloodPoints([]);
     setSelectedFile(file);
-    try {
-      const tempUrl = URL.createObjectURL(file);
-      const img = await loadImage(tempUrl);
-      const { r, g, b } = getTopLeftPixelColor(img);
-      const hex = rgbToHex(r, g, b);
-      setTargetColor(hex);
-      setContourColor(invertHex(hex));
-      URL.revokeObjectURL(tempUrl);
-    } catch (e) {
-      console.error(e);
-    }
   };
 
   const handleDownload = () => {
@@ -230,11 +219,11 @@ export function MonochromeBackgroundRemover() {
   };
 
   const getRelativeImageCoords = (clientX: number, clientY: number): Point | null => {
-    if (!workspaceRef.current || !imgDimensions.w) return null;
+    if (!workspaceRef.current || !imgW) return null;
     const world = workspaceRef.current.screenToWorld(clientX, clientY);
     const x = Math.floor(world.x);
     const y = Math.floor(world.y);
-    if (x >= 0 && x < imgDimensions.w && y >= 0 && y < imgDimensions.h) return { x, y };
+    if (x >= 0 && x < imgW && y >= 0 && y < imgH) return { x, y };
     return null;
   };
 
@@ -271,28 +260,7 @@ export function MonochromeBackgroundRemover() {
 
   const sidebarContent = (
     <div className="flex flex-col gap-6 pb-4">
-      {/* Header */}
-      <div>
-        <Link
-          href="/"
-          className="mb-4 inline-flex items-center gap-2 text-sm font-medium text-zinc-500 transition-colors hover:text-zinc-900 dark:hover:text-zinc-200"
-        >
-          <svg
-            width="14"
-            height="14"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
-            <path d="M19 12H5M12 19l-7-7 7-7" />
-          </svg>{' '}
-          На главную
-        </Link>
-        <h2 className="text-xl font-bold">MonoRemover</h2>
-      </div>
+      <Workbench.Header title="MonoRemover" />
 
       <div className="space-y-2">
         <ControlLabel>Исходник</ControlLabel>
@@ -453,9 +421,9 @@ export function MonochromeBackgroundRemover() {
         <div className="relative h-full w-full">
           <WorkbenchCanvas
             ref={workspaceRef}
-            isLoading={isProcessing}
-            contentWidth={imgDimensions.w}
-            contentHeight={imgDimensions.h}
+            isLoading={isProcessing || isMetadataLoading}
+            contentWidth={imgW}
+            contentHeight={imgH}
             shadowOverlayOpacity={originalUrl ? 0.8 : 0}
             showTransparencyGrid={true}
             placeholder={

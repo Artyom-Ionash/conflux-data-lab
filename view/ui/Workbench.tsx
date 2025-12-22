@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import React from 'react';
 
 import { cn } from './infrastructure/standards';
@@ -35,6 +36,32 @@ const Sidebar = ({ children, className, ...props }: WorkbenchProps) => (
   </aside>
 );
 
+/**
+ * Стандартный заголовок инструмента в сайдбаре.
+ * Инкапсулирует навигацию назад и стилистику заголовка.
+ */
+const Header = ({ title, className }: { title: string; className?: string }) => (
+  <div className={cn('flex flex-col gap-4', className)}>
+    <Link
+      href="/"
+      className="inline-flex items-center gap-2 text-sm font-medium text-zinc-500 transition-colors hover:text-zinc-900 dark:hover:text-zinc-200"
+    >
+      <svg
+        width="14"
+        height="14"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+      >
+        <path d="M19 12H5M12 19l-7-7 7-7" />
+      </svg>
+      <span>На главную</span>
+    </Link>
+    <h2 className="text-xl font-bold tracking-tight">{title}</h2>
+  </div>
+);
+
 const Stage = ({ children, className, ...props }: WorkbenchProps) => (
   <main
     className={cn('relative z-10 flex-1 overflow-hidden overscroll-none', className)}
@@ -44,21 +71,9 @@ const Stage = ({ children, className, ...props }: WorkbenchProps) => (
   </main>
 );
 
-const Toolbar = ({ children, className, ...props }: WorkbenchProps) => (
-  <div
-    className={cn(
-      'absolute top-4 right-4 z-50 flex items-center gap-2 rounded-lg border border-zinc-200 bg-white/90 p-2 shadow-sm backdrop-blur-sm dark:border-zinc-700 dark:bg-zinc-900/90',
-      className
-    )}
-    {...props}
-  >
-    {children}
-  </div>
-);
-
 export const Workbench = {
   Root,
   Sidebar,
+  Header,
   Stage,
-  Toolbar,
 };
