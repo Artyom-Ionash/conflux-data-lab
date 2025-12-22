@@ -3,7 +3,9 @@
 import type { ReactNode } from 'react';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 
-import { cn } from './infrastructure/standards';
+import { filterFileList, scanEntries } from '@/lib/modules/file-system/scanner';
+
+import { cn } from '../../ui/infrastructure/standards';
 
 // --- Helper: Validate File Type ---
 const isFileAccepted = (file: File, accept: string): boolean => {
@@ -15,78 +17,24 @@ const isFileAccepted = (file: File, accept: string): boolean => {
 
   return acceptedTypes.some((type) => {
     // 1. Проверка расширения (например, .jpg)
-    if (type.startsWith('.')) {
-      return fileName.endsWith(type);
-    }
+    if (type.startsWith('.')) return fileName.endsWith(type);
     // 2. Проверка MIME wildcard (например, image/*)
     if (type.endsWith('/*')) {
       const mainType = type.replace('/*', '');
       // Если файл имеет MIME тип, проверяем начало.
       // Важно: иногда file.type бывает пустым, тогда полагаемся на расширение или отвергаем.
-      if (fileType) {
-        return fileType.startsWith(mainType);
-      }
-      return false;
+      return fileType ? fileType.startsWith(mainType) : false;
     }
     // 3. Точное совпадение MIME (например, image/jpeg)
     return fileType === type;
   });
 };
 
-// --- Helper: Recursive Entry Scanner ---
-/**
- * Рекурсивно извлекает файлы и сохраняет информацию о путях.
- * Теперь поддерживает раннее игнорирование папок.
- */
-async function scanEntries(
-  entries: FileSystemEntry[],
-  shouldSkip?: (path: string) => boolean
-): Promise<File[]> {
-  const files: File[] = [];
+// --- Types ---
 
-  async function readEntry(entry: FileSystemEntry) {
-    const path = entry.fullPath.startsWith('/') ? entry.fullPath.slice(1) : entry.fullPath;
-
-    // Early Exit: Если путь в списке игнора, не заходим внутрь
-    if (shouldSkip?.(path)) return;
-
-    if (entry.isFile) {
-      const file = await new Promise<File>((resolve, reject) =>
-        (entry as FileSystemFileEntry).file(resolve, reject)
-      );
-
-      Object.defineProperty(file, 'webkitRelativePath', {
-        value: path,
-        writable: false,
-        configurable: true,
-        enumerable: true,
-      });
-
-      files.push(file);
-    } else if (entry.isDirectory) {
-      const directoryReader = (entry as FileSystemDirectoryEntry).createReader();
-      const readBatch = async (): Promise<FileSystemEntry[]> => {
-        return new Promise((resolve, reject) => directoryReader.readEntries(resolve, reject));
-      };
-
-      let batch = await readBatch();
-      while (batch.length > 0) {
-        await Promise.all(batch.map((child) => readEntry(child)));
-        batch = await readBatch();
-      }
-    }
-  }
-
-  await Promise.all(entries.map((entry) => readEntry(entry)));
-  return files;
-}
-
-// --- Base Component Props ---
 interface FileDropzoneProps {
   onFilesSelected: (files: File[]) => void;
-  /** Колбэк, вызываемый мгновенно при начале сканирования */
   onScanStarted?: () => void;
-  /** Предикат для раннего отсечения тяжелых папок */
   shouldSkip?: (path: string) => boolean;
   multiple?: boolean;
   accept?: string;
@@ -94,11 +42,12 @@ interface FileDropzoneProps {
   className?: string;
   enableWindowDrop?: boolean;
   children?: ReactNode;
-  /** Поддержка выбора папок */
   directory?: boolean;
 }
 
-// --- Base Component ---
+/**
+ * Универсальный сенсор для загрузки файлов и папок.
+ */
 export const FileDropzone = ({
   onFilesSelected,
   onScanStarted,
@@ -116,14 +65,18 @@ export const FileDropzone = ({
 
   const handleFinalFiles = useCallback(
     (filesArray: File[]) => {
+      // При клике (FileList API) мы не можем остановить системный сканер,
+      // но можем мгновенно отсечь лишнее в JS перед передачей дальше.
+      const preFiltered = shouldSkip ? filterFileList(filesArray, shouldSkip) : filesArray;
+
       const validFiles =
-        accept === '*' ? filesArray : filesArray.filter((file) => isFileAccepted(file, accept));
+        accept === '*' ? preFiltered : preFiltered.filter((file) => isFileAccepted(file, accept));
 
       if (validFiles.length > 0) {
         onFilesSelected(validFiles);
       }
     },
-    [accept, onFilesSelected]
+    [accept, onFilesSelected, shouldSkip]
   );
 
   const handleDataTransfer = useCallback(
@@ -149,53 +102,33 @@ export const FileDropzone = ({
   // --- Global DnD (Window) ---
   useEffect(() => {
     if (!enableWindowDrop) return;
-
-    const handleWindowDragOver = (e: DragEvent) => {
+    const handleDrag = (e: DragEvent) => {
       e.preventDefault();
       setIsDragActive(true);
     };
-
-    const handleWindowDragLeave = (e: DragEvent) => {
+    const handleLeave = (e: DragEvent) => {
       e.preventDefault();
       if (e.relatedTarget === null || (e.relatedTarget as HTMLElement).nodeName === 'HTML') {
         setIsDragActive(false);
       }
     };
-
-    const handleWindowDrop = (e: DragEvent) => {
+    const handleDrop = (e: DragEvent) => {
       e.preventDefault();
       setIsDragActive(false);
-      if (e.dataTransfer) {
-        void handleDataTransfer(e.dataTransfer);
-      }
+      if (e.dataTransfer) void handleDataTransfer(e.dataTransfer);
     };
-
-    window.addEventListener('dragover', handleWindowDragOver);
-    window.addEventListener('dragleave', handleWindowDragLeave);
-    window.addEventListener('drop', handleWindowDrop);
-
+    window.addEventListener('dragover', handleDrag);
+    window.addEventListener('dragleave', handleLeave);
+    window.addEventListener('drop', handleDrop);
     return () => {
-      window.removeEventListener('dragover', handleWindowDragOver);
-      window.removeEventListener('dragleave', handleWindowDragLeave);
-      window.removeEventListener('drop', handleWindowDrop);
+      window.removeEventListener('dragover', handleDrag);
+      window.removeEventListener('dragleave', handleLeave);
+      window.removeEventListener('drop', handleDrop);
     };
   }, [enableWindowDrop, handleDataTransfer]);
 
-  // --- Local Handlers ---
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files.length > 0) {
-      onScanStarted?.();
-      handleFinalFiles(Array.from(e.target.files));
-    }
-    e.target.value = ''; // Сброс value, чтобы можно было выбрать тот же файл повторно
-  };
-
-  const handleClick = () => {
-    inputRef.current?.click();
-  };
-
-  // Безопасная типизация нестандартных атрибутов
-  const directoryAttributes = directory
+  // Расширение атрибутов для поддержки webkit-директорий
+  const directoryProps = directory
     ? ({
         webkitdirectory: '',
         directory: '',
@@ -208,7 +141,7 @@ export const FileDropzone = ({
   return (
     <>
       <div
-        onClick={handleClick}
+        onClick={() => inputRef.current?.click()}
         onDragOver={(e) => {
           e.preventDefault();
           e.stopPropagation();
@@ -223,15 +156,12 @@ export const FileDropzone = ({
           e.preventDefault();
           e.stopPropagation();
           setIsDragActive(false);
-          if (e.dataTransfer) {
-            void handleDataTransfer(e.dataTransfer);
-          }
+          if (e.dataTransfer) void handleDataTransfer(e.dataTransfer);
         }}
         className={cn(
           'group relative flex cursor-pointer flex-col items-center justify-center transition-all duration-200',
           !className.includes('border') && 'rounded-lg border-2 border-dashed',
           !className.includes('h-') && 'h-24',
-          !className.includes('w-') && 'w-full',
           isDragActive
             ? 'scale-[1.01] border-blue-500 bg-blue-50 shadow-lg ring-2 ring-blue-500/20 dark:border-blue-400 dark:bg-blue-900/20'
             : 'border-zinc-300 bg-zinc-50 hover:bg-zinc-100 dark:border-zinc-700 dark:bg-zinc-800/50 dark:hover:bg-zinc-800',
@@ -239,16 +169,12 @@ export const FileDropzone = ({
         )}
       >
         {children || (
-          <div className="pointer-events-none flex flex-col items-center justify-center pt-5 pb-6">
+          <div className="pointer-events-none flex flex-col items-center justify-center pt-5 pb-6 text-center">
             <svg
               className={cn(
                 'mb-2 h-8 w-8 transition-colors',
-                isDragActive
-                  ? 'text-blue-500'
-                  : 'text-zinc-400 group-hover:text-zinc-500 dark:text-zinc-500 dark:group-hover:text-zinc-400'
+                isDragActive ? 'text-blue-500' : 'text-zinc-400 dark:text-zinc-500'
               )}
-              aria-hidden="true"
-              xmlns="http://www.w3.org/2000/svg"
               fill="none"
               viewBox="0 0 20 16"
             >
@@ -262,7 +188,7 @@ export const FileDropzone = ({
             </svg>
             <p
               className={cn(
-                'text-xs font-medium transition-colors',
+                'px-4 text-xs font-medium',
                 isDragActive
                   ? 'text-blue-600 dark:text-blue-300'
                   : 'text-zinc-500 dark:text-zinc-400'
@@ -272,26 +198,22 @@ export const FileDropzone = ({
             </p>
           </div>
         )}
-
         <input
           ref={inputRef}
           type="file"
           className="hidden"
           multiple={multiple || directory}
           accept={accept}
-          onChange={handleInputChange}
-          {...(directory
-            ? ({
-                webkitdirectory: '',
-                directory: '',
-              } as React.InputHTMLAttributes<HTMLInputElement> & {
-                webkitdirectory?: string;
-                directory?: string;
-              })
-            : {})}
+          onChange={(e) => {
+            if (e.target.files) {
+              onScanStarted?.();
+              handleFinalFiles(Array.from(e.target.files));
+            }
+            e.target.value = '';
+          }}
+          {...directoryProps}
         />
       </div>
-
       {enableWindowDrop && isDragActive && (
         <div className="pointer-events-none fixed inset-0 z-[100] animate-pulse border-4 border-blue-500/50 bg-blue-500/10" />
       )}
@@ -299,9 +221,9 @@ export const FileDropzone = ({
   );
 };
 
-// --- Specialized Component: Full Size Placeholder ---
+// --- Specialized Component ---
 
-interface FileDropzonePlaceholderProps {
+interface PlaceholderProps {
   onUpload: (files: File[]) => void;
   multiple?: boolean;
   enableWindowDrop?: boolean;
@@ -319,34 +241,30 @@ export const FileDropzonePlaceholder = ({
   title = 'Перетащите изображения сюда',
   subTitle = 'или кликните для выбора',
   accept = 'image/*',
-}: FileDropzonePlaceholderProps) => {
-  return (
-    <FileDropzone
-      onFilesSelected={onUpload}
-      multiple={multiple}
-      enableWindowDrop={enableWindowDrop}
-      accept={accept}
-      className={cn(
-        'h-full w-full border-none bg-transparent transition-colors hover:bg-zinc-50/50 dark:hover:bg-zinc-900/50',
-        className
-      )}
-    >
-      <div className="animate-in fade-in zoom-in-95 flex flex-col items-center justify-center text-zinc-400 duration-300">
-        <div className="mb-4 rounded-full bg-zinc-100 p-4 transition-transform duration-200 group-hover:scale-110 dark:bg-zinc-800">
-          <svg className="h-8 w-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth="2"
-              d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
-            />
-          </svg>
-        </div>
-        <p className="mb-1 text-center text-lg font-medium text-zinc-600 dark:text-zinc-300">
-          {title}
-        </p>
-        <p className="text-center text-sm opacity-60">{subTitle}</p>
+}: PlaceholderProps) => (
+  <FileDropzone
+    onFilesSelected={onUpload}
+    multiple={multiple}
+    enableWindowDrop={enableWindowDrop}
+    accept={accept}
+    className={cn(
+      'h-full w-full border-none bg-transparent hover:bg-zinc-50/50 dark:hover:bg-zinc-900/50',
+      className
+    )}
+  >
+    <div className="flex flex-col items-center justify-center text-zinc-400">
+      <div className="mb-4 rounded-full bg-zinc-100 p-4 transition-transform group-hover:scale-110 dark:bg-zinc-800">
+        <svg className="h-8 w-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth="2"
+            d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+          />
+        </svg>
       </div>
-    </FileDropzone>
-  );
-};
+      <p className="mb-1 text-lg font-medium text-zinc-600 dark:text-zinc-300">{title}</p>
+      <p className="text-sm opacity-60">{subTitle}</p>
+    </div>
+  </FileDropzone>
+);

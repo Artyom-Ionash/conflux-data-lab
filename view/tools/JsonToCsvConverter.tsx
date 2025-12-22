@@ -6,7 +6,7 @@ import { useCopyToClipboard } from '@/lib/core/hooks/use-copy-to-clipboard';
 import { convertJsonToCsv } from '@/lib/modules/converters/json-to-csv';
 import { Card } from '@/view/ui/Card';
 
-import { ResultViewer } from './text/ResultViewer';
+import { ResultViewer } from './io/ResultViewer';
 
 export function JsonToCsvConverter() {
   const [jsonInput, setJsonInput] = useState('');

@@ -7,7 +7,7 @@ import { type ContextStats } from '@/lib/modules/context-generator/core';
 import { runContextPipeline } from '@/lib/modules/context-generator/engine';
 import { CONTEXT_PRESETS, type PresetKey } from '@/lib/modules/context-generator/rules';
 import { useBundleManager } from '@/lib/modules/context-generator/use-bundle-manager';
-import { FileDropzone } from '@/view/ui/FileDropzone';
+import { FileDropzone } from '@/view/tools/io/FileDropzone';
 import { InfoBadge } from '@/view/ui/InfoBadge';
 import { Stack } from '@/view/ui/Layout';
 import { ProcessingOverlay } from '@/view/ui/ProcessingOverlay';
@@ -15,8 +15,8 @@ import { Switch } from '@/view/ui/Switch';
 import { ToggleGroup, ToggleGroupItem } from '@/view/ui/ToggleGroup';
 import { Workbench } from '@/view/ui/Workbench';
 
-import { ResultViewer } from './text//ResultViewer';
-import { Field, TextInput } from './text/Input';
+import { Field, TextInput } from './io/Input';
+import { ResultViewer } from './io/ResultViewer';
 
 export function ProjectToContext() {
   const { filteredPaths, handleFiles, bundle } = useBundleManager();

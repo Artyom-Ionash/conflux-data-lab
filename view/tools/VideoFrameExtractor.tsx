@@ -4,6 +4,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { generateSpriteSheet } from '@/lib/modules/graphics/processing/sprite-generator';
 import { TEXTURE_LIMITS } from '@/lib/modules/graphics/standards';
 import { useFrameExtractor } from '@/lib/modules/video/use-frame-extractor';
+import { FileDropzone, FileDropzonePlaceholder } from '@/view/tools/io/FileDropzone';
 import { Card } from '@/view/ui/Card';
 import { MultiScalePreview } from '@/view/ui/collections/MultiScalePreview';
 import { SpriteFrameList } from '@/view/ui/collections/SpriteFrameList';
@@ -11,7 +12,6 @@ import { ColorInput } from '@/view/ui/ColorInput';
 import { ControlLabel, ControlSection } from '@/view/ui/ControlSection';
 import { DownloadButton } from '@/view/ui/DownloadButton';
 import { EngineRoom } from '@/view/ui/EngineRoom';
-import { FileDropzone, FileDropzonePlaceholder } from '@/view/ui/FileDropzone';
 import { ImageSequencePlayer } from '@/view/ui/ImageSequencePlayer';
 import { InfoBadge } from '@/view/ui/InfoBadge';
 import { getAspectRatio, getAspectRatioStyle } from '@/view/ui/infrastructure/standards';

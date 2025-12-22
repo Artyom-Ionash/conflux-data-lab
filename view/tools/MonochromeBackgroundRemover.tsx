@@ -15,12 +15,12 @@ import type {
 } from '@/lib/modules/graphics/processing/background-engine.worker';
 import type { Point } from '@/lib/modules/graphics/processing/imaging';
 import { WorkbenchCanvas } from '@/view/tools/graphics/WorkbenchCanvas';
-import { ActionButton,ActionGroup } from '@/view/ui/ActionGroup';
+import { FileDropzone, FileDropzonePlaceholder } from '@/view/tools/io/FileDropzone';
+import { ActionButton, ActionGroup } from '@/view/ui/ActionGroup';
 import { CanvasMovable, useCanvasRef } from '@/view/ui/Canvas';
 import { ColorInput } from '@/view/ui/ColorInput';
 import { ControlLabel, ControlSection } from '@/view/ui/ControlSection';
 import { DownloadButton } from '@/view/ui/DownloadButton';
-import { FileDropzone, FileDropzonePlaceholder } from '@/view/ui/FileDropzone';
 import { Slider } from '@/view/ui/Slider';
 import { StatusBox } from '@/view/ui/StatusBox';
 import { ToggleGroup, ToggleGroupItem } from '@/view/ui/ToggleGroup';
