@@ -13,7 +13,7 @@ interface SwitchProps {
 }
 
 export const Switch = ({ checked, onCheckedChange, label, className = '' }: SwitchProps) => (
-  <div className={cn('flex items-center justify-between py-2', className)}>
+  <div className={cn('flex items-center justify-between gap-4 py-2', className)}>
     <label
       className="cursor-pointer text-sm font-medium text-zinc-700 select-none dark:text-zinc-300"
       onClick={() => onCheckedChange(!checked)}

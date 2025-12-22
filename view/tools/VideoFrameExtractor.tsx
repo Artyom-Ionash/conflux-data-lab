@@ -4,7 +4,6 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { generateSpriteSheet } from '@/lib/modules/graphics/processing/sprite-generator';
 import { TEXTURE_LIMITS } from '@/lib/modules/graphics/standards';
 import { useFrameExtractor } from '@/lib/modules/video/use-frame-extractor';
-import { SpriteFrameList } from '@/view/tools/graphics/SpriteFrameList';
 import { FileDropzone, FileDropzonePlaceholder } from '@/view/tools/io/FileDropzone';
 import { Card } from '@/view/ui/Card';
 import { MultiScalePreview } from '@/view/ui/collections/MultiScalePreview';
@@ -15,17 +14,21 @@ import { EngineRoom } from '@/view/ui/EngineRoom';
 import { ImageSequencePlayer } from '@/view/ui/ImageSequencePlayer';
 import { InfoBadge } from '@/view/ui/InfoBadge';
 import { getAspectRatio, getAspectRatioStyle } from '@/view/ui/infrastructure/standards';
-import { Group, Stack } from '@/view/ui/Layout';
+import { Columns, Group, Stack } from '@/view/ui/Layout';
 import { Modal } from '@/view/ui/Modal';
 import { NumberStepper } from '@/view/ui/NumberStepper';
+import { OverlayLabel } from '@/view/ui/OverlayLabel';
 import { DualHoverPreview } from '@/view/ui/players/DualHoverPreview';
 import { RangeVideoPlayer } from '@/view/ui/players/RangeVideoPlayer';
 import { ProgressBar } from '@/view/ui/ProcessingOverlay';
 import { RangeSlider } from '@/view/ui/RangeSlider';
 import { Separator } from '@/view/ui/Separator';
+import { Surface } from '@/view/ui/Surface';
 import { Switch } from '@/view/ui/Switch';
+import { Typography } from '@/view/ui/Typography';
 import { Workbench } from '@/view/ui/Workbench';
 
+import { SpriteFrameList } from './graphics/SpriteFrameList';
 // --- DOMAIN IMPORTS ---
 import { TextureLimitIndicator } from './hardware/TextureLimitIndicator';
 import { FrameDiffOverlay } from './video/FrameDiffOverlay';
@@ -127,10 +130,11 @@ export function VideoFrameExtractor() {
 
       const margin = Math.max(8, w * 0.03);
       const x = margin;
-      const y = h - margin - fontSize;
+      const y = h - margin;
 
-      ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
-      ctx.fillText(timeText, x + 2, y + 2);
+      ctx.strokeStyle = 'rgba(0, 0, 0, 0.8)';
+      ctx.lineWidth = 3;
+      ctx.strokeText(timeText, x, y);
 
       ctx.fillStyle = 'white';
       ctx.fillText(timeText, x, y);
@@ -183,11 +187,6 @@ export function VideoFrameExtractor() {
   };
 
   // --- Calculations ---
-
-  const aspectRatioStyle = useMemo(
-    () => getAspectRatioStyle(state.videoDimensions?.width, state.videoDimensions?.height),
-    [state.videoDimensions]
-  );
 
   const videoRatio = useMemo(
     () =>
@@ -248,7 +247,7 @@ export function VideoFrameExtractor() {
           </Workbench.EmptyStage>
         ) : (
           <Workbench.Content>
-            {/* [LEMON] Layout Transformation */}
+            {/* Layout Transformation */}
             <Card className="relative z-20 overflow-visible shadow-sm" contentClassName="p-4">
               <Stack gap={4}>
                 <Group justify="between" wrap>
@@ -265,14 +264,21 @@ export function VideoFrameExtractor() {
                     />
                   </Group>
                   <InfoBadge label="Range">
-                    <span>{state.extractionParams.startTime.toFixed(2)}s</span>
-                    <span className="mx-1 opacity-50">→</span>
-                    <span>{state.effectiveEnd.toFixed(2)}s</span>
+                    <Typography.Text variant="white" bold>
+                      {state.extractionParams.startTime.toFixed(2)}s
+                    </Typography.Text>
+                    <Typography.Text variant="white" className="mx-1 opacity-50">
+                      →
+                    </Typography.Text>
+                    <Typography.Text variant="white" bold>
+                      {state.effectiveEnd.toFixed(2)}s
+                    </Typography.Text>
                   </InfoBadge>
                 </Group>
 
-                <div
+                <Stack
                   ref={sliderContainerRef}
+                  gap={0}
                   className="group relative touch-none py-2"
                   onMouseMove={handleSliderHover}
                   onMouseLeave={() => !isDragging && setHoverPreview(null)}
@@ -300,30 +306,35 @@ export function VideoFrameExtractor() {
                       videoRef={refs.hoverVideoRef as React.RefObject<HTMLVideoElement>}
                       previewStartImage={previewFrames.start}
                       previewEndImage={previewFrames.end}
-                      aspectRatioStyle={aspectRatioStyle}
+                      aspectRatioStyle={getAspectRatioStyle(
+                        state.videoDimensions?.width,
+                        state.videoDimensions?.height
+                      )}
                     />
                   )}
-                </div>
+                </Stack>
                 {state.error && (
-                  <div className="text-right text-xs font-medium text-red-600">{state.error}</div>
+                  <Typography.Text variant="error" align="right">
+                    {state.error}
+                  </Typography.Text>
                 )}
               </Stack>
             </Card>
 
-            <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+            <Columns desktop={3} gap={4}>
               <Card
                 className="flex flex-col overflow-hidden shadow-sm"
                 title={<ControlLabel>Исходное видео</ControlLabel>}
                 contentClassName="p-0"
               >
-                <div className="relative w-full bg-black" style={aspectRatioStyle}>
+                <Stack className="relative w-full bg-black" style={getAspectRatioStyle(videoRatio)}>
                   <RangeVideoPlayer
                     src={state.videoSrc}
                     startTime={state.extractionParams.startTime}
                     endTime={state.effectiveEnd}
                     className="absolute inset-0"
                   />
-                </div>
+                </Stack>
               </Card>
 
               <Card
@@ -344,19 +355,17 @@ export function VideoFrameExtractor() {
                 }
                 contentClassName="p-0"
               >
-                <div
+                <Stack
                   className="relative w-full bg-zinc-100 dark:bg-zinc-950"
-                  style={aspectRatioStyle}
+                  style={getAspectRatioStyle(videoRatio)}
                 >
-                  <div className="absolute inset-0">
-                    <FrameDiffOverlay
-                      image1={previewFrames.start}
-                      image2={previewFrames.end}
-                      isProcessing={isPreviewing}
-                      onDataGenerated={setDiffDataUrl}
-                    />
-                  </div>
-                </div>
+                  <FrameDiffOverlay
+                    image1={previewFrames.start}
+                    image2={previewFrames.end}
+                    isProcessing={isPreviewing}
+                    onDataGenerated={setDiffDataUrl}
+                  />
+                </Stack>
               </Card>
 
               <Card
@@ -379,7 +388,7 @@ export function VideoFrameExtractor() {
                       label="FPS"
                       value={state.gifParams.fps}
                       onChange={() => {}}
-                      disabled={true}
+                      disabled
                     />
                   </Group>
                 }
@@ -397,9 +406,9 @@ export function VideoFrameExtractor() {
                 }
                 contentClassName="p-0"
               >
-                <div
+                <Stack
                   className="group relative w-full cursor-pointer bg-zinc-100 dark:bg-zinc-950"
-                  style={aspectRatioStyle}
+                  style={getAspectRatioStyle(videoRatio)}
                   onClick={() => setIsModalOpen(true)}
                 >
                   {state.frames.length > 0 || state.status.isProcessing ? (
@@ -411,20 +420,21 @@ export function VideoFrameExtractor() {
                         height={state.videoDimensions?.height || 200}
                         onDrawOverlay={handleDrawOverlay}
                       />
-                      <div className="absolute inset-0 flex items-center justify-center bg-black/0 transition-colors group-hover:bg-black/10">
-                        <div className="scale-95 transform rounded-full bg-black/70 px-3 py-1.5 text-xs font-bold text-white opacity-0 backdrop-blur-sm transition-opacity group-hover:scale-100 group-hover:opacity-100">
-                          Открыть масштабы ⤢
-                        </div>
-                      </div>
+                      <OverlayLabel
+                        position="bottom-right"
+                        className="opacity-0 group-hover:opacity-100"
+                      >
+                        Масштабы ⤢
+                      </OverlayLabel>
                     </>
                   ) : (
-                    <div className="absolute inset-0 flex items-center justify-center text-xs text-zinc-400">
+                    <Typography.Text variant="dimmed" align="center" className="py-20">
                       Нет кадров
-                    </div>
+                    </Typography.Text>
                   )}
-                </div>
+                </Stack>
               </Card>
-            </div>
+            </Columns>
 
             <ControlSection
               title="Спрайт-лист"
@@ -436,11 +446,11 @@ export function VideoFrameExtractor() {
                       label="Кадров"
                       value={state.frames.length}
                       onChange={() => {}}
-                      disabled={true}
+                      disabled
                     />
-                    <div className="w-48 pt-1">
+                    <Stack gap={0} className="w-48">
                       <TextureLimitIndicator value={totalSpriteWidth} label="ШИРИНА" />
-                    </div>
+                    </Stack>
                     <DownloadButton
                       onDownload={handleDownloadSpriteSheet}
                       variant="link"
@@ -459,7 +469,6 @@ export function VideoFrameExtractor() {
                     onCheckedChange={(c) =>
                       actions.setExtractionParams((p) => ({ ...p, symmetricLoop: c }))
                     }
-                    className="gap-2 text-xs font-medium whitespace-nowrap"
                   />
                   <Separator />
                   <NumberStepper
@@ -479,6 +488,7 @@ export function VideoFrameExtractor() {
                     min={0}
                     max={100}
                   />
+                  <Separator />
                   <ColorInput
                     value={spriteOptions.bg === 'transparent' ? null : spriteOptions.bg}
                     onChange={(v) => setSpriteOptions((p) => ({ ...p, bg: v }))}
@@ -487,7 +497,7 @@ export function VideoFrameExtractor() {
                   />
                 </Group>
               )}
-              <div className="custom-scrollbar overflow-x-auto bg-zinc-100 p-4 dark:bg-zinc-950">
+              <Stack className="custom-scrollbar overflow-x-auto rounded-lg bg-zinc-100 p-4 dark:bg-zinc-950">
                 <SpriteFrameList
                   frames={state.frames}
                   maxHeight={spriteOptions.maxHeight}
@@ -495,16 +505,16 @@ export function VideoFrameExtractor() {
                   backgroundColor={spriteOptions.bg}
                   videoAspectRatio={videoRatio}
                 />
-              </div>
+              </Stack>
             </ControlSection>
           </Workbench.Content>
         )}
 
         <EngineRoom>
-          <video ref={refs.videoRef} crossOrigin="anonymous" muted playsInline />
-          <video ref={refs.previewVideoRef} crossOrigin="anonymous" muted playsInline />
-          <video ref={refs.hoverVideoRef} crossOrigin="anonymous" muted playsInline />
-          <canvas ref={refs.canvasRef} />
+          <Surface.Video ref={refs.videoRef} />
+          <Surface.Video ref={refs.previewVideoRef} />
+          <Surface.Video ref={refs.hoverVideoRef} />
+          <Surface.Canvas ref={refs.canvasRef} />
         </EngineRoom>
 
         <Modal
