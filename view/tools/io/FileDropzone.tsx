@@ -4,14 +4,17 @@ import type { ReactNode } from 'react';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 
 import {
+  checkDirectoryPickerSupport,
+  type DirectorySupport,
+  getLegacyDirectoryAttributes,
+  LEGACY_MESSAGES,
+} from '@/lib/modules/file-system/legacy';
+import {
   filterFileList,
   scanDirectoryHandle,
   scanEntries,
 } from '@/lib/modules/file-system/scanner';
 import { cn } from '@/view/ui/infrastructure/standards';
-import { Tooltip } from '@/view/ui/ZoneIndicator';
-
-// --- Types ---
 
 interface FileDropzoneProps {
   onFilesSelected: (files: File[]) => void;
@@ -56,46 +59,47 @@ export const FileDropzone = ({
   const [isDragActive, setIsDragActive] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
+  // --- HYDRATION FIX ---
+  // Инициализируем «серверным» значением (modern), чтобы избежать нестыковки при гидратации.
+  const [support, setSupport] = useState<DirectorySupport>({
+    isSupported: true,
+    isFirefox: false,
+    status: 'modern',
+  });
+
+  // Проверяем реальную поддержку только после того, как компонент «ожил» в браузере.
+  useEffect(() => {
+    // Используем requestAnimationFrame, чтобы избежать синхронного каскадного рендера
+    // и удовлетворить правило react-hooks/set-state-in-effect.
+    requestAnimationFrame(() => {
+      setSupport(checkDirectoryPickerSupport());
+    });
+  }, []);
+  // ---------------------
+
+  const isWarning = directory && !support.isSupported;
+
   const handleFinalFiles = useCallback(
     (filesArray: File[]) => {
-      const preFiltered = shouldSkip ? filterFileList(filesArray, shouldSkip) : filesArray;
-
-      const isAllAccepted = !accept || accept === '*' || accept === '';
-      const validFiles = isAllAccepted
-        ? preFiltered
-        : preFiltered.filter((file) => {
-            if (!accept) return true;
-            // Здесь может быть доп. валидация типов, если нужно
-            return true;
-          });
-
-      if (validFiles.length > 0) {
-        onFilesSelected(validFiles);
-      }
+      const validFiles = shouldSkip ? filterFileList(filesArray, shouldSkip) : filesArray;
+      if (validFiles.length > 0) onFilesSelected(validFiles);
     },
-    [accept, onFilesSelected, shouldSkip]
+    [onFilesSelected, shouldSkip]
   );
 
-  // Обработчик клика: Пробуем Modern API, откатываемся на Legacy
   const handleClick = async () => {
     // 1. Если это режим папки и браузер поддерживает Modern API
-    if (directory && 'showDirectoryPicker' in window) {
+    if (directory && support.isSupported) {
       try {
         // @ts-expect-error - TS может не знать про window.showDirectoryPicker
         const dirHandle = await window.showDirectoryPicker();
-
         onScanStarted?.();
-
-        // Используем новую функцию из scanner.ts
         const files = await scanDirectoryHandle(dirHandle, shouldSkip);
         handleFinalFiles(files);
         return;
       } catch (err) {
         // Игнорируем AbortError (если пользователь нажал Отмена)
         if (err instanceof Error && err.name === 'AbortError') return;
-
-        console.warn('Modern directory picker failed, falling back to input', err);
-        // Если произошла другая ошибка, проваливаемся к input.click() ниже
       }
     }
 
@@ -153,144 +157,91 @@ export const FileDropzone = ({
     };
   }, [enableWindowDrop, handleDataTransfer]);
 
-  const directoryProps = directory
-    ? ({
-        webkitdirectory: '',
-        directory: '',
-      } as React.InputHTMLAttributes<HTMLInputElement> & {
-        webkitdirectory?: string;
-        directory?: string;
-      })
-    : {};
-
   return (
-    <>
-      <div
-        onClick={handleClick}
-        onDragOver={(e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          setIsDragActive(true);
-        }}
-        onDragLeave={(e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          setIsDragActive(false);
-        }}
-        onDrop={(e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          setIsDragActive(false);
-          if (e.dataTransfer) void handleDataTransfer(e.dataTransfer);
-        }}
-        className={cn(
-          'group relative flex cursor-pointer flex-col items-center justify-center transition-all duration-200',
-          !className?.includes('border') && 'rounded-lg border-2 border-dashed',
-          !className?.includes('h-') && 'h-24',
-          isDragActive
-            ? 'scale-[1.01] border-blue-500 bg-blue-50 shadow-lg ring-2 ring-blue-500/20 dark:border-blue-400 dark:bg-blue-900/20'
-            : 'border-zinc-300 bg-zinc-50 hover:bg-zinc-100 dark:border-zinc-700 dark:bg-zinc-800/50 dark:hover:bg-zinc-800',
-          className
-        )}
-      >
-        {directory && (
-          <div className="absolute top-2 right-2 z-10">
-            <Tooltip
-              side="left"
-              content={
-                <div className="space-y-2.5">
-                  <div className="space-y-1">
-                    <p className="font-bold tracking-tight text-zinc-300 uppercase">
-                      Совместимость (декабрь 2025)
-                    </p>
-                    <p className="text-[10px] leading-tight text-zinc-400">
-                      В <span className="text-orange-400/90">Firefox</span> выбор папок всё ещё
-                      может быть ограничен. В Chromium и Safari стандарт работает штатно.
-                    </p>
-                  </div>
+    <div
+      onClick={handleClick}
+      onDragOver={(e) => {
+        e.preventDefault();
+        setIsDragActive(true);
+      }}
+      onDragLeave={() => setIsDragActive(false)}
+      onDrop={(e) => {
+        e.preventDefault();
+        setIsDragActive(false);
+        if (e.dataTransfer) void handleDataTransfer(e.dataTransfer);
+      }}
+      className={cn(
+        'group relative flex cursor-pointer flex-col items-center justify-center overflow-hidden transition-all duration-300',
+        'rounded-xl border-2 border-dashed',
+        isDragActive
+          ? 'scale-[1.01] border-blue-500 bg-blue-50/50 dark:bg-blue-500/10'
+          : isWarning
+            ? 'border-amber-500/40 bg-amber-500/5 hover:bg-amber-500/10'
+            : 'border-zinc-300 bg-zinc-50 hover:bg-zinc-100 dark:border-zinc-800 dark:bg-zinc-900/50',
+        className
+      )}
+    >
+      {children || (
+        <div className="pointer-events-none flex flex-col items-center justify-center px-6 py-7 text-center">
+          <svg
+            className={cn(
+              'mb-3 h-9 w-9 transition-colors duration-300',
+              isDragActive ? 'text-blue-500' : isWarning ? 'text-amber-500/70' : 'text-zinc-400'
+            )}
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth="1.5"
+              d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
+            />
+          </svg>
 
-                  <div className="space-y-1.5 border-t border-zinc-700/50 pt-2">
-                    <p className="font-bold tracking-tight text-blue-400 uppercase">Рекомендация</p>
-                    <p className="leading-snug">
-                      Для гарантированной работы и мгновенного доступа к файлам используйте{' '}
-                      <span className="font-bold text-white italic">Drag-and-Drop</span>.
-                    </p>
-                    <p className="text-[10px] opacity-60">
-                      Это надёжнее и быстрее, так как не заставляет браузер предварительно
-                      сканировать всё содержимое папки перед началом работы.
-                    </p>
-                  </div>
-                </div>
-              }
-            >
-              <div className="rounded-full bg-zinc-200 p-1 text-zinc-500 transition-colors hover:bg-blue-500 hover:text-white dark:bg-zinc-700 dark:text-zinc-400">
-                <svg
-                  width="14"
-                  height="14"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="3"
-                >
-                  <circle cx="12" cy="12" r="10" />
-                  <line x1="12" y1="16" x2="12" y2="12" />
-                  <line x1="12" y1="8" x2="12.01" y2="8" />
-                </svg>
-              </div>
-            </Tooltip>
-          </div>
-        )}
-
-        {children || (
-          <div className="pointer-events-none flex flex-col items-center justify-center pt-5 pb-6 text-center">
-            <svg
-              className={cn(
-                'mb-2 h-8 w-8 transition-colors',
-                isDragActive ? 'text-blue-500' : 'text-zinc-400 dark:text-zinc-500'
-              )}
-              fill="none"
-              viewBox="0 0 20 16"
-            >
-              <path
-                stroke="currentColor"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth="2"
-                d="M13 13h3a3 3 0 0 0 0-6h-.025A5.56 5.56 0 0 0 16 6.5 5.5 5.5 0 0 0 5.207 5.021C5.137 5.017 5.071 5 5 5a4 4 0 0 0 0 8h2.167M10 15V6m0 0L8 8m2-2 2 2"
-              />
-            </svg>
+          <div className="space-y-1">
             <p
               className={cn(
-                'px-4 text-xs font-medium',
-                isDragActive
-                  ? 'text-blue-600 dark:text-blue-300'
+                'text-xs font-bold tracking-tight uppercase transition-colors',
+                isWarning
+                  ? 'text-amber-700 dark:text-amber-400'
                   : 'text-zinc-500 dark:text-zinc-400'
               )}
             >
-              {isDragActive ? 'Бросайте сюда' : label}
+              {isDragActive ? 'Бросайте файлы' : label}
             </p>
+
+            {isWarning && (
+              <div className="animate-in fade-in slide-in-from-top-1 mt-2 space-y-1">
+                <p className="text-[10px] leading-tight font-medium text-amber-600/80 dark:text-amber-500/60">
+                  {LEGACY_MESSAGES.FIREFOX_STATUS}
+                </p>
+                <p className="text-[10px] leading-tight font-bold text-amber-700 dark:text-amber-400/90">
+                  {LEGACY_MESSAGES.DND_REQUIRED}
+                </p>
+              </div>
+            )}
           </div>
-        )}
-        <input
-          ref={inputRef}
-          type="file"
-          className="hidden"
-          multiple={multiple || directory}
-          accept={accept}
-          onChange={(e) => {
-            if (e.target.files && e.target.files.length > 0) {
-              onScanStarted?.();
-              handleFinalFiles(Array.from(e.target.files));
-              e.target.value = '';
-            }
-          }}
-          {...directoryProps}
-        />
-      </div>
-      {enableWindowDrop && isDragActive && (
-        <div className="pointer-events-none fixed inset-0 z-[100] animate-pulse border-4 border-blue-500/50 bg-blue-500/10" />
+        </div>
       )}
-    </>
+
+      <input
+        ref={inputRef}
+        type="file"
+        className="hidden"
+        multiple={multiple || directory}
+        accept={accept}
+        onChange={(e) => {
+          if (e.target.files && e.target.files.length > 0) {
+            onScanStarted?.();
+            handleFinalFiles(Array.from(e.target.files));
+            e.target.value = '';
+          }
+        }}
+        {...(directory ? getLegacyDirectoryAttributes() : {})}
+      />
+    </div>
   );
 };
 
