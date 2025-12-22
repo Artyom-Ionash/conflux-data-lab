@@ -33,6 +33,52 @@ const isFileAccepted = (file: File, accept: string): boolean => {
   });
 };
 
+// --- Helper: Recursive Entry Scanner ---
+/**
+ * Рекурсивно извлекает файлы и сохраняет информацию о путях.
+ */
+async function scanEntries(entries: FileSystemEntry[]): Promise<File[]> {
+  const files: File[] = [];
+
+  async function readEntry(entry: FileSystemEntry) {
+    if (entry.isFile) {
+      const file = await new Promise<File>((resolve, reject) =>
+        (entry as FileSystemFileEntry).file(resolve, reject)
+      );
+
+      // Восстанавливаем путь.
+      // fullPath в Chrome начинается с "/", убираем его для совместимости с webkitRelativePath
+      const relativePath = entry.fullPath.startsWith('/')
+        ? entry.fullPath.slice(1)
+        : entry.fullPath;
+
+      // Патчим объект файла, так как свойство readonly
+      Object.defineProperty(file, 'webkitRelativePath', {
+        value: relativePath,
+        writable: false,
+        configurable: true,
+        enumerable: true,
+      });
+
+      files.push(file);
+    } else if (entry.isDirectory) {
+      const directoryReader = (entry as FileSystemDirectoryEntry).createReader();
+      const readBatch = async (): Promise<FileSystemEntry[]> => {
+        return new Promise((resolve, reject) => directoryReader.readEntries(resolve, reject));
+      };
+
+      let batch = await readBatch();
+      while (batch.length > 0) {
+        await Promise.all(batch.map((child) => readEntry(child)));
+        batch = await readBatch();
+      }
+    }
+  }
+
+  await Promise.all(entries.map((entry) => readEntry(entry)));
+  return files;
+}
+
 // --- Base Component Props ---
 interface FileDropzoneProps {
   onFilesSelected: (files: File[]) => void;
@@ -60,11 +106,8 @@ export const FileDropzone = ({
   const [isDragActive, setIsDragActive] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Обработка списка файлов с валидацией
-  const processFiles = useCallback(
-    (fileList: FileList | File[]) => {
-      const filesArray = Array.from(fileList);
-      // Если accept="*", пропускаем валидацию
+  const handleFinalFiles = useCallback(
+    (filesArray: File[]) => {
       const validFiles =
         accept === '*' ? filesArray : filesArray.filter((file) => isFileAccepted(file, accept));
 
@@ -73,6 +116,23 @@ export const FileDropzone = ({
       }
     },
     [accept, onFilesSelected]
+  );
+
+  const handleDataTransfer = useCallback(
+    async (dataTransfer: DataTransfer) => {
+      const items = Array.from(dataTransfer.items);
+      const entries = items
+        .map((item) => item.webkitGetAsEntry())
+        .filter((entry): entry is FileSystemEntry => entry !== null);
+
+      if (entries.length > 0) {
+        const allFiles = await scanEntries(entries);
+        handleFinalFiles(allFiles);
+      } else {
+        handleFinalFiles(Array.from(dataTransfer.files));
+      }
+    },
+    [handleFinalFiles]
   );
 
   // --- Global DnD (Window) ---
@@ -94,8 +154,8 @@ export const FileDropzone = ({
     const handleWindowDrop = (e: DragEvent) => {
       e.preventDefault();
       setIsDragActive(false);
-      if (e.dataTransfer?.files && e.dataTransfer.files.length > 0) {
-        processFiles(e.dataTransfer.files);
+      if (e.dataTransfer) {
+        void handleDataTransfer(e.dataTransfer);
       }
     };
 
@@ -108,12 +168,12 @@ export const FileDropzone = ({
       window.removeEventListener('dragleave', handleWindowDragLeave);
       window.removeEventListener('drop', handleWindowDrop);
     };
-  }, [enableWindowDrop, processFiles]);
+  }, [enableWindowDrop, handleDataTransfer]);
 
   // --- Local Handlers ---
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
-      processFiles(e.target.files);
+      handleFinalFiles(Array.from(e.target.files));
     }
     e.target.value = ''; // Сброс value, чтобы можно было выбрать тот же файл повторно
   };
@@ -122,7 +182,7 @@ export const FileDropzone = ({
     inputRef.current?.click();
   };
 
-  // [LEMON] Безопасная типизация нестандартных атрибутов
+  // Безопасная типизация нестандартных атрибутов
   const directoryAttributes = directory
     ? ({
         webkitdirectory: '',
@@ -151,8 +211,8 @@ export const FileDropzone = ({
           e.preventDefault();
           e.stopPropagation();
           setIsDragActive(false);
-          if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-            processFiles(e.dataTransfer.files);
+          if (e.dataTransfer) {
+            void handleDataTransfer(e.dataTransfer);
           }
         }}
         className={cn(
