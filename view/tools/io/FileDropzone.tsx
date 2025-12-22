@@ -198,16 +198,28 @@ export const FileDropzone = ({
             <Tooltip
               side="left"
               content={
-                <div className="space-y-1.5">
-                  <p className="font-bold text-blue-400 uppercase">Совет по производительности</p>
-                  <p>
-                    Выбор папки через диалог заставляет браузер сканировать{' '}
-                    <span className="font-bold text-white">все</span> файлы перед началом работы.
-                  </p>
-                  <p className="border-t border-zinc-700 pt-1.5 opacity-80">
-                    Для мгновенного сканирования больших проектов используйте{' '}
-                    <span className="italic">Drag-and-Drop</span>.
-                  </p>
+                <div className="space-y-2.5">
+                  <div className="space-y-1">
+                    <p className="font-bold tracking-tight text-zinc-300 uppercase">
+                      Совместимость (декабрь 2025)
+                    </p>
+                    <p className="text-[10px] leading-tight text-zinc-400">
+                      В <span className="text-orange-400/90">Firefox</span> выбор папок всё ещё
+                      может быть ограничен. В Chromium и Safari стандарт работает штатно.
+                    </p>
+                  </div>
+
+                  <div className="space-y-1.5 border-t border-zinc-700/50 pt-2">
+                    <p className="font-bold tracking-tight text-blue-400 uppercase">Рекомендация</p>
+                    <p className="leading-snug">
+                      Для гарантированной работы и мгновенного доступа к файлам используйте{' '}
+                      <span className="font-bold text-white italic">Drag-and-Drop</span>.
+                    </p>
+                    <p className="text-[10px] opacity-60">
+                      Это надёжнее и быстрее, так как не заставляет браузер предварительно
+                      сканировать всё содержимое папки перед началом работы.
+                    </p>
+                  </div>
                 </div>
               }
             >
