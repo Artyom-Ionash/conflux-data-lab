@@ -4,8 +4,7 @@ import type { ReactNode } from 'react';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 
 import { filterFileList, scanEntries } from '@/lib/modules/file-system/scanner';
-
-import { cn } from '../../ui/infrastructure/standards';
+import { cn } from '@/view/ui/infrastructure/standards';
 
 // --- Helper: Validate File Type ---
 const isFileAccepted = (file: File, accept: string): boolean => {
@@ -63,12 +62,16 @@ export const FileDropzone = ({
   const [isDragActive, setIsDragActive] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
+  /**
+   * [ЕДИНАЯ ВОРОНКА]
+   * Все файлы из DND и из Диалога проходят через эту функцию.
+   */
   const handleFinalFiles = useCallback(
     (filesArray: File[]) => {
-      // При клике (FileList API) мы не можем остановить системный сканер,
-      // но можем мгновенно отсечь лишнее в JS перед передачей дальше.
+      // Применяем фильтрацию по путям (например, игнорируем node_modules)
       const preFiltered = shouldSkip ? filterFileList(filesArray, shouldSkip) : filesArray;
 
+      // Применяем фильтрацию по типам файлов
       const validFiles =
         accept === '*' ? preFiltered : preFiltered.filter((file) => isFileAccepted(file, accept));
 
@@ -90,9 +93,11 @@ export const FileDropzone = ({
         .filter((entry): entry is FileSystemEntry => entry !== null);
 
       if (entries.length > 0) {
+        // Рекурсивный обход (DND умеет делать early-skip через entries)
         const allFiles = await scanEntries(entries, shouldSkip);
         handleFinalFiles(allFiles);
       } else {
+        // Fallback для старых браузеров
         handleFinalFiles(Array.from(dataTransfer.files));
       }
     },
@@ -205,11 +210,16 @@ export const FileDropzone = ({
           multiple={multiple || directory}
           accept={accept}
           onChange={(e) => {
-            if (e.target.files) {
+            if (e.target.files && e.target.files.length > 0) {
+              // ВАЖНО: Браузер может подвиснуть на секунду при формировании FileList из папки
               onScanStarted?.();
+
+              // Передаем в ту же воронку, что и DND
               handleFinalFiles(Array.from(e.target.files));
+
+              // Очищаем значение, чтобы можно было выбрать ту же папку снова
+              e.target.value = '';
             }
-            e.target.value = '';
           }}
           {...directoryProps}
         />
