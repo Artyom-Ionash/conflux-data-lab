@@ -18,6 +18,7 @@ import { CanvasMovable, useCanvasRef } from '@/view/ui/Canvas';
 import { ControlSection, SectionHeader } from '@/view/ui/ControlSection';
 import { DownloadButton } from '@/view/ui/DownloadButton';
 import { FileDropzone, FileDropzonePlaceholder } from '@/view/ui/FileDropzone';
+import { InfoBadge } from '@/view/ui/InfoBadge';
 import { cn } from '@/view/ui/infrastructure/standards';
 import { SortableList } from '@/view/ui/interaction/SortableList';
 import { Slider } from '@/view/ui/Slider';
@@ -283,11 +284,12 @@ export function VerticalImageAligner() {
                 max={LIMIT_MAX_BROWSER}
               />
             </div>
-            <div className="mt-4 flex justify-between border-t border-zinc-200 pt-3 text-center text-xs font-medium text-zinc-500 dark:border-zinc-700">
-              <span>Итого:</span>
-              <span className="font-mono text-zinc-900 dark:text-zinc-100">
+
+            <div className="mt-4 flex items-center justify-between border-t border-zinc-200 pt-3 dark:border-zinc-700">
+              <span className="text-xs font-medium text-zinc-500">Итого:</span>
+              <InfoBadge>
                 {slotWidth} x {totalHeight} px
-              </span>
+              </InfoBadge>
             </div>
           </ControlSection>
 

@@ -7,9 +7,10 @@ import { type ContextStats } from '@/lib/modules/context-generator/core';
 import { runContextPipeline } from '@/lib/modules/context-generator/engine';
 import { CONTEXT_PRESETS, type PresetKey } from '@/lib/modules/context-generator/rules';
 import { useBundleManager } from '@/lib/modules/context-generator/use-bundle-manager';
-import { cn } from '@/view/ui/infrastructure/standards';
+import { InfoBadge } from '@/view/ui/InfoBadge';
 import { ProcessingOverlay } from '@/view/ui/ProcessingOverlay';
 import { Switch } from '@/view/ui/Switch';
+import { ToggleGroup, ToggleGroupItem } from '@/view/ui/ToggleGroup';
 import { Workbench } from '@/view/ui/Workbench';
 
 import { ResultViewer } from './text/ResultViewer';
@@ -131,25 +132,25 @@ export function ProjectToContext() {
         <label className="text-sm font-bold text-zinc-700 dark:text-zinc-300">
           2. Конфигурация
         </label>
-        <div className="flex flex-wrap gap-2">
+
+        <ToggleGroup
+          type="single"
+          value={selectedPreset}
+          onValueChange={(val) => {
+            if (val) {
+              const key = val as PresetKey;
+              setSelectedPreset(key);
+              setCustomExtensions(CONTEXT_PRESETS[key].textExtensions.join(', '));
+            }
+          }}
+          gridCols={2}
+        >
           {(Object.keys(CONTEXT_PRESETS) as PresetKey[]).map((key) => (
-            <button
-              key={key}
-              onClick={() => {
-                setSelectedPreset(key);
-                setCustomExtensions(CONTEXT_PRESETS[key].textExtensions.join(', '));
-              }}
-              className={cn(
-                'rounded border px-3 py-1.5 text-xs font-medium',
-                selectedPreset === key
-                  ? 'border-blue-300 bg-blue-100 text-blue-800'
-                  : 'border-zinc-200 bg-white text-zinc-600 dark:border-zinc-700 dark:bg-zinc-800'
-              )}
-            >
+            <ToggleGroupItem key={key} value={key}>
               {CONTEXT_PRESETS[key].name}
-            </button>
+            </ToggleGroupItem>
           ))}
-        </div>
+        </ToggleGroup>
 
         <div className="space-y-3">
           <input
@@ -176,22 +177,16 @@ export function ProjectToContext() {
       <button
         onClick={() => void processFiles()}
         disabled={filteredPaths.length === 0 || processing}
-        className={cn(
-          'w-full rounded-lg py-3 font-bold text-white',
-          filteredPaths.length === 0 ? 'bg-zinc-300' : 'bg-blue-600 hover:bg-blue-700'
-        )}
+        className="w-full rounded-lg bg-blue-600 py-3 font-bold text-white transition-opacity hover:opacity-90 disabled:bg-zinc-300 dark:disabled:bg-zinc-800"
       >
         {processing ? 'Сборка...' : 'Сгенерировать'}
       </button>
 
       {stats && (
         <div className="animate-in fade-in slide-in-from-bottom-2 space-y-4 border-t border-zinc-200 pt-4 dark:border-zinc-800">
-          <div className="rounded-lg bg-blue-50 p-3 dark:bg-blue-900/20">
-            <div className="text-[10px] font-bold text-blue-600 uppercase">Токены (Est.)</div>
-            <div className="font-mono text-2xl font-bold text-blue-700 dark:text-blue-200">
-              ~{stats.totalTokens.toLocaleString()}
-            </div>
-          </div>
+          <InfoBadge label="Токены (Est.)" className="w-full justify-between py-2 text-lg">
+            ~{stats.totalTokens.toLocaleString()}
+          </InfoBadge>
         </div>
       )}
     </div>

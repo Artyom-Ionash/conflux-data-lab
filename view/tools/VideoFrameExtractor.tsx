@@ -13,7 +13,8 @@ import { ControlLabel, ControlSection } from '@/view/ui/ControlSection';
 import { DownloadButton } from '@/view/ui/DownloadButton';
 import { FileDropzone, FileDropzonePlaceholder } from '@/view/ui/FileDropzone';
 import { ImageSequencePlayer } from '@/view/ui/ImageSequencePlayer';
-import { cn, getAspectRatio, getAspectRatioStyle } from '@/view/ui/infrastructure/standards';
+import { InfoBadge } from '@/view/ui/InfoBadge';
+import { getAspectRatio, getAspectRatioStyle } from '@/view/ui/infrastructure/standards';
 import { Modal } from '@/view/ui/Modal';
 import { NumberStepper } from '@/view/ui/NumberStepper';
 // --- EXTRACTED COMPONENTS ---
@@ -21,6 +22,7 @@ import { DualHoverPreview } from '@/view/ui/players/DualHoverPreview';
 import { RangeVideoPlayer } from '@/view/ui/players/RangeVideoPlayer';
 import { ProgressBar } from '@/view/ui/ProcessingOverlay';
 import { RangeSlider } from '@/view/ui/RangeSlider';
+import { Separator } from '@/view/ui/Separator';
 import { Switch } from '@/view/ui/Switch';
 import { Workbench } from '@/view/ui/Workbench';
 
@@ -250,7 +252,7 @@ export function VideoFrameExtractor() {
                     <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3">
                       <div className="flex flex-wrap items-center gap-6">
                         <ControlLabel>Диапазон</ControlLabel>
-                        <div className="hidden h-6 w-px bg-zinc-200 sm:block dark:bg-zinc-700"></div>
+                        <Separator />
                         <NumberStepper
                           label="Шаг (сек)"
                           value={state.extractionParams.frameStep}
@@ -262,11 +264,11 @@ export function VideoFrameExtractor() {
                           max={10}
                         />
                       </div>
-                      <div className="ml-auto flex items-center gap-2 rounded bg-black/80 px-3 py-1.5 font-mono text-xs font-bold text-white shadow-sm">
+                      <InfoBadge label="Range">
                         <span>{state.extractionParams.startTime.toFixed(2)}s</span>
-                        <span className="opacity-50">→</span>
+                        <span className="mx-1 opacity-50">→</span>
                         <span>{state.effectiveEnd.toFixed(2)}s</span>
-                      </div>
+                      </InfoBadge>
                     </div>
 
                     <div
@@ -462,7 +464,7 @@ export function VideoFrameExtractor() {
                       }
                       className="gap-2 text-xs font-medium whitespace-nowrap"
                     />
-                    <div className="h-6 w-px bg-zinc-200 dark:bg-zinc-700"></div>
+                    <Separator />
                     <NumberStepper
                       label="Высота"
                       value={spriteOptions.maxHeight}
@@ -471,7 +473,7 @@ export function VideoFrameExtractor() {
                       min={10}
                       max={2000}
                     />
-                    <div className="h-6 w-px bg-zinc-200 dark:bg-zinc-700"></div>
+                    <Separator />
                     <NumberStepper
                       label="Отступ"
                       value={spriteOptions.spacing}
