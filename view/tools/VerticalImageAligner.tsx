@@ -13,6 +13,7 @@ import {
 } from '@/lib/modules/graphics/processing/composition';
 import { WorkbenchCanvas } from '@/view/tools/graphics/WorkbenchCanvas';
 import { TextureDimensionSlider } from '@/view/tools/hardware/TextureDimensionSlider';
+import { ActionButton } from '@/view/ui/ActionButton';
 import { CanvasMovable, useCanvasRef } from '@/view/ui/Canvas';
 import { ControlSection, SectionHeader } from '@/view/ui/ControlSection';
 import { DownloadButton } from '@/view/ui/DownloadButton';
@@ -235,16 +236,16 @@ export function VerticalImageAligner() {
     >
       <span className="w-6 font-mono text-zinc-400">#{index + 1}</span>
       <span className="flex-1 truncate font-medium">{img.name}</span>
-      <button
-        onPointerDown={(e) => e.stopPropagation()}
+      <ActionButton
+        variant="destructive"
         onClick={(e) => {
           e.stopPropagation();
           handleRemoveImage(img.id);
         }}
-        className="rounded p-1.5 text-zinc-400 transition-colors hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-900/30"
+        onPointerDown={(e) => e.stopPropagation()}
       >
         ✕
-      </button>
+      </ActionButton>
     </div>
   );
 
@@ -345,25 +346,26 @@ export function VerticalImageAligner() {
           </ControlSection>
 
           <div className="space-y-1.5">
-            {/* Использование унифицированного заголовка секции */}
             <SectionHeader
               title="Слои"
               actions={
                 <div className="flex gap-1">
-                  <button
+                  <ActionButton
+                    variant="mono"
+                    size="xs"
                     onClick={handleCenterAllX}
                     title="Центрировать по горизонтали"
-                    className="rounded bg-zinc-100 px-2 py-1 font-mono text-[10px] font-bold text-zinc-600 transition-colors hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-700"
                   >
                     |X|
-                  </button>
-                  <button
+                  </ActionButton>
+                  <ActionButton
+                    variant="mono"
+                    size="xs"
                     onClick={handleCenterAllY}
                     title="Центрировать по вертикали"
-                    className="rounded bg-zinc-100 px-2 py-1 font-mono text-[10px] font-bold text-zinc-600 transition-colors hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-700"
                   >
                     ≡Y≡
-                  </button>
+                  </ActionButton>
                 </div>
               }
             />
@@ -418,98 +420,99 @@ export function VerticalImageAligner() {
     <Workbench.Root>
       <Workbench.Sidebar>{sidebarContent}</Workbench.Sidebar>
       <Workbench.Stage>
-        <WorkbenchCanvas
-          ref={workspaceRef}
-          isLoading={isExporting}
-          contentWidth={bounds.width}
-          contentHeight={bounds.height}
-          shadowOverlayOpacity={images.length > 0 ? 0.5 : 0}
-          showTransparencyGrid={true}
-          defaultBackgroundColor={DEFAULT_SETTINGS.bgColor}
-          placeholder={
-            images.length === 0 ? (
-              <FileDropzonePlaceholder
-                onUpload={processFiles}
-                multiple={true}
-                title="Перетащите изображения для склейки"
+        {images.length === 0 ? (
+          <Workbench.EmptyStage>
+            <FileDropzonePlaceholder
+              onUpload={processFiles}
+              multiple={true}
+              title="Перетащите изображения для склейки"
+            />
+          </Workbench.EmptyStage>
+        ) : (
+          <WorkbenchCanvas
+            ref={workspaceRef}
+            isLoading={isExporting}
+            contentWidth={bounds.width}
+            contentHeight={bounds.height}
+            shadowOverlayOpacity={0.5}
+            showTransparencyGrid={true}
+            defaultBackgroundColor={DEFAULT_SETTINGS.bgColor}
+          >
+            {showRedGrid && (
+              <div
+                className="pointer-events-none absolute inset-0 opacity-50"
+                style={{
+                  zIndex: Z_INDEX_GRID_RED,
+                  backgroundImage: `linear-gradient(to right, ${redGridColor} 1px, transparent 1px), linear-gradient(to bottom, ${redGridColor} 1px, transparent 1px)`,
+                  backgroundSize: `${frameStepX}px ${slotHeight}px`,
+                  backgroundPosition: `${redGridOffsetX}px ${redGridOffsetY}px`,
+                }}
               />
-            ) : null
-          }
-        >
-          {showRedGrid && (
-            <div
-              className="pointer-events-none absolute inset-0 opacity-50"
-              style={{
-                zIndex: Z_INDEX_GRID_RED,
-                backgroundImage: `linear-gradient(to right, ${redGridColor} 1px, transparent 1px), linear-gradient(to bottom, ${redGridColor} 1px, transparent 1px)`,
-                backgroundSize: `${frameStepX}px ${slotHeight}px`,
-                backgroundPosition: `${redGridOffsetX}px ${redGridOffsetY}px`,
-              }}
-            />
-          )}
-          {showFrameGrid && (
-            <div
-              className="pointer-events-none absolute inset-0 opacity-80"
-              style={{
-                zIndex: Z_INDEX_GRID_FRAME,
-                backgroundImage: `linear-gradient(to right, ${frameBorderColor} ${GRID_FRAME_DASH}px, transparent ${GRID_FRAME_DASH}px), linear-gradient(to bottom, ${frameBorderColor} ${GRID_FRAME_DASH}px, transparent ${GRID_FRAME_DASH}px)`,
-                backgroundSize: `${frameStepX}px ${slotHeight}px`,
-                backgroundPosition: GRID_FRAME_OFFSET_CSS,
-              }}
-            />
-          )}
+            )}
+            {showFrameGrid && (
+              <div
+                className="pointer-events-none absolute inset-0 opacity-80"
+                style={{
+                  zIndex: Z_INDEX_GRID_FRAME,
+                  backgroundImage: `linear-gradient(to right, ${frameBorderColor} ${GRID_FRAME_DASH}px, transparent ${GRID_FRAME_DASH}px), linear-gradient(to bottom, ${frameBorderColor} ${GRID_FRAME_DASH}px, transparent ${GRID_FRAME_DASH}px)`,
+                  backgroundSize: `${frameStepX}px ${slotHeight}px`,
+                  backgroundPosition: GRID_FRAME_OFFSET_CSS,
+                }}
+              />
+            )}
 
-          {images.map((img, i) => (
-            <div
-              key={img.id}
-              className="pointer-events-none absolute left-0 overflow-hidden border-r border-dashed border-zinc-300/30 transition-colors"
-              style={{
-                top: i * slotHeight,
-                height: slotHeight,
-                width: slotWidth,
-                zIndex: img.isActive ? Z_INDEX_SLOT_ACTIVE : Z_INDEX_SLOT_BASE,
-              }}
-            >
-              <CanvasMovable
-                x={img.offsetX}
-                y={img.offsetY}
-                scale={getScale} // Pass getter from hook
-                onMove={(pos) =>
-                  handleUpdatePosition(img.id, { x: Math.round(pos.x), y: Math.round(pos.y) })
-                }
-                onDragStart={() => handleActivate(img.id)}
-                className={cn('pointer-events-auto', img.isActive && 'ring-1 ring-blue-500')}
+            {images.map((img, i) => (
+              <div
+                key={img.id}
+                className="pointer-events-none absolute left-0 overflow-hidden border-r border-dashed border-zinc-300/30 transition-colors"
+                style={{
+                  top: i * slotHeight,
+                  height: slotHeight,
+                  width: slotWidth,
+                  zIndex: img.isActive ? Z_INDEX_SLOT_ACTIVE : Z_INDEX_SLOT_BASE,
+                }}
               >
-                {() => (
-                  <>
-                    <Image
-                      src={img.url}
-                      alt=""
-                      draggable={false}
-                      width={img.naturalWidth}
-                      height={img.naturalHeight}
-                      unoptimized
-                      className="max-w-none origin-top-left select-none"
-                      style={{
-                        width: img.naturalWidth,
-                        height: img.naturalHeight,
-                        imageRendering: 'inherit',
-                      }}
-                    />
-                    <div
-                      className={cn(
-                        'pointer-events-none absolute top-1 left-1 z-50 rounded bg-black/60 px-1.5 py-0.5 text-[10px] text-white backdrop-blur-sm transition-opacity duration-200 select-none',
-                        img.isActive ? 'opacity-100' : 'opacity-0'
-                      )}
-                    >
-                      {Math.round(img.offsetX)}, {Math.round(img.offsetY)}
-                    </div>
-                  </>
-                )}
-              </CanvasMovable>
-            </div>
-          ))}
-        </WorkbenchCanvas>
+                <CanvasMovable
+                  x={img.offsetX}
+                  y={img.offsetY}
+                  scale={getScale} // Pass getter from hook
+                  onMove={(pos) =>
+                    handleUpdatePosition(img.id, { x: Math.round(pos.x), y: Math.round(pos.y) })
+                  }
+                  onDragStart={() => handleActivate(img.id)}
+                  className={cn('pointer-events-auto', img.isActive && 'ring-1 ring-blue-500')}
+                >
+                  {() => (
+                    <>
+                      <Image
+                        src={img.url}
+                        alt=""
+                        draggable={false}
+                        width={img.naturalWidth}
+                        height={img.naturalHeight}
+                        unoptimized
+                        className="max-w-none origin-top-left select-none"
+                        style={{
+                          width: img.naturalWidth,
+                          height: img.naturalHeight,
+                          imageRendering: 'inherit',
+                        }}
+                      />
+                      <div
+                        className={cn(
+                          'pointer-events-none absolute top-1 left-1 z-50 rounded bg-black/60 px-1.5 py-0.5 text-[10px] text-white backdrop-blur-sm transition-opacity duration-200 select-none',
+                          img.isActive ? 'opacity-100' : 'opacity-0'
+                        )}
+                      >
+                        {Math.round(img.offsetX)}, {Math.round(img.offsetY)}
+                      </div>
+                    </>
+                  )}
+                </CanvasMovable>
+              </div>
+            ))}
+          </WorkbenchCanvas>
+        )}
       </Workbench.Stage>
     </Workbench.Root>
   );

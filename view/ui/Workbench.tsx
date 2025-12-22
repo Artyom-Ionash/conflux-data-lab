@@ -36,10 +36,6 @@ const Sidebar = ({ children, className, ...props }: WorkbenchProps) => (
   </aside>
 );
 
-/**
- * Стандартный заголовок инструмента в сайдбаре.
- * Инкапсулирует навигацию назад и стилистику заголовка.
- */
 const Header = ({ title, className }: { title: string; className?: string }) => (
   <div className={cn('flex flex-col gap-4', className)}>
     <Link
@@ -71,9 +67,19 @@ const Stage = ({ children, className, ...props }: WorkbenchProps) => (
   </main>
 );
 
+/**
+ * Стандартный контейнер для плейсхолдеров, когда данные ещё не загружены.
+ */
+const EmptyStage = ({ children, className }: { children: React.ReactNode; className?: string }) => (
+  <div className={cn('flex h-full w-full items-center justify-center p-8', className)}>
+    <div className="w-full max-w-2xl">{children}</div>
+  </div>
+);
+
 export const Workbench = {
   Root,
   Sidebar,
   Header,
   Stage,
+  EmptyStage,
 };
