@@ -15,12 +15,14 @@ import type {
 } from '@/lib/modules/graphics/processing/background-engine.worker';
 import type { Point } from '@/lib/modules/graphics/processing/imaging';
 import { WorkbenchCanvas } from '@/view/tools/graphics/WorkbenchCanvas';
+import { ActionButton,ActionGroup } from '@/view/ui/ActionGroup';
 import { CanvasMovable, useCanvasRef } from '@/view/ui/Canvas';
 import { ColorInput } from '@/view/ui/ColorInput';
 import { ControlLabel, ControlSection } from '@/view/ui/ControlSection';
 import { DownloadButton } from '@/view/ui/DownloadButton';
 import { FileDropzone, FileDropzonePlaceholder } from '@/view/ui/FileDropzone';
 import { Slider } from '@/view/ui/Slider';
+import { StatusBox } from '@/view/ui/StatusBox';
 import { ToggleGroup, ToggleGroupItem } from '@/view/ui/ToggleGroup';
 import { Workbench } from '@/view/ui/Workbench';
 
@@ -364,7 +366,6 @@ export function MonochromeBackgroundRemover() {
                 onChange={setEdgeBlur}
                 min={0}
                 max={5}
-                step={1}
               />
               <Slider
                 label="Окрашивание (Paint)"
@@ -378,26 +379,24 @@ export function MonochromeBackgroundRemover() {
           </ControlSection>
 
           {processingMode === 'flood-clear' && (
-            <div className="space-y-3 rounded-lg border border-blue-100 bg-blue-50 p-3 dark:border-blue-900/30 dark:bg-blue-900/10">
-              <div className="flex items-center justify-between text-xs font-bold text-blue-800 dark:text-blue-200">
-                <span>Точки: {floodPoints.length}</span>
-              </div>
-              <div className="flex gap-2">
-                <button
+            <StatusBox title={`Точки: ${floodPoints.length}`}>
+              <ActionGroup>
+                <ActionButton
                   onClick={removeLastPoint}
                   disabled={floodPoints.length === 0}
-                  className="flex-1 rounded border border-zinc-200 bg-white py-2 text-xs hover:bg-zinc-50 disabled:opacity-50 dark:border-zinc-700 dark:bg-zinc-800"
+                  className="flex-1"
                 >
                   Отменить
-                </button>
-                <button
+                </ActionButton>
+                <ActionButton
                   onClick={clearAllPoints}
                   disabled={floodPoints.length === 0}
-                  className="flex-1 rounded border border-zinc-200 bg-white py-2 text-xs hover:bg-red-50 hover:text-red-500 disabled:opacity-50 dark:border-zinc-700 dark:bg-zinc-800"
+                  variant="destructive"
+                  className="flex-1"
                 >
                   Сбросить
-                </button>
-              </div>
+                </ActionButton>
+              </ActionGroup>
               <button
                 onClick={handleRunFloodFill}
                 disabled={floodPoints.length === 0 || isProcessing}
@@ -405,7 +404,7 @@ export function MonochromeBackgroundRemover() {
               >
                 {isProcessing ? 'Обработка...' : 'Принудительно обновить'}
               </button>
-            </div>
+            </StatusBox>
           )}
 
           <DownloadButton onDownload={handleDownload} className="w-full" />
@@ -452,16 +451,12 @@ export function MonochromeBackgroundRemover() {
                   key={i}
                   x={pt.x}
                   y={pt.y}
-                  scale={getScale} // Pass getter from hook
+                  scale={getScale}
                   onMove={(pos) => handlePointMove(i, pos)}
                   className="z-20"
                 >
                   {() => (
-                    <div
-                      style={{
-                        transform: 'translate(-50%, -50%)',
-                      }}
-                    >
+                    <div style={{ transform: 'translate(-50%, -50%)' }}>
                       <div className="h-2.5 w-2.5 rounded-full border border-white bg-red-500 shadow-[0_0_2px_rgba(0,0,0,0.8)] transition-all" />
                     </div>
                   )}

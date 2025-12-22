@@ -13,8 +13,9 @@ import {
 } from '@/lib/modules/graphics/processing/composition';
 import { WorkbenchCanvas } from '@/view/tools/graphics/WorkbenchCanvas';
 import { TextureDimensionSlider } from '@/view/tools/hardware/TextureDimensionSlider';
-import { ActionButton } from '@/view/ui/ActionButton';
+import { ActionButton,ActionGroup } from '@/view/ui/ActionGroup';
 import { CanvasMovable, useCanvasRef } from '@/view/ui/Canvas';
+import { OverlayLabel } from '@/view/ui/collections/SpriteFrameList';
 import { ControlSection, SectionHeader } from '@/view/ui/ControlSection';
 import { DownloadButton } from '@/view/ui/DownloadButton';
 import { FileDropzone, FileDropzonePlaceholder } from '@/view/ui/FileDropzone';
@@ -22,6 +23,7 @@ import { InfoBadge } from '@/view/ui/InfoBadge';
 import { cn } from '@/view/ui/infrastructure/standards';
 import { SortableList } from '@/view/ui/interaction/SortableList';
 import { Slider } from '@/view/ui/Slider';
+import { StatusBox } from '@/view/ui/StatusBox';
 import { Switch } from '@/view/ui/Switch';
 import { Workbench } from '@/view/ui/Workbench';
 
@@ -351,7 +353,7 @@ export function VerticalImageAligner() {
             <SectionHeader
               title="Слои"
               actions={
-                <div className="flex gap-1">
+                <ActionGroup attached>
                   <ActionButton
                     variant="mono"
                     size="xs"
@@ -368,7 +370,7 @@ export function VerticalImageAligner() {
                   >
                     ≡Y≡
                   </ActionButton>
-                </div>
+                </ActionGroup>
               }
             />
 
@@ -381,10 +383,7 @@ export function VerticalImageAligner() {
           </div>
 
           {activeImageId && (
-            <div className="rounded-lg border border-yellow-200 bg-yellow-50 p-4 dark:border-yellow-800 dark:bg-yellow-900/20">
-              <p className="mb-3 text-xs font-bold tracking-wide text-yellow-800 uppercase dark:text-yellow-200">
-                Смещение активного слоя
-              </p>
+            <StatusBox variant="warning" title="Смещение активного слоя">
               <Slider
                 label="X (px)"
                 value={Math.round(images.find((i) => i.id === activeImageId)?.offsetX || 0)}
@@ -411,7 +410,7 @@ export function VerticalImageAligner() {
                 max={slotHeight}
                 statusColor="yellow"
               />
-            </div>
+            </StatusBox>
           )}
         </>
       )}
@@ -500,14 +499,9 @@ export function VerticalImageAligner() {
                           imageRendering: 'inherit',
                         }}
                       />
-                      <div
-                        className={cn(
-                          'pointer-events-none absolute top-1 left-1 z-50 rounded bg-black/60 px-1.5 py-0.5 text-[10px] text-white backdrop-blur-sm transition-opacity duration-200 select-none',
-                          img.isActive ? 'opacity-100' : 'opacity-0'
-                        )}
-                      >
+                      <OverlayLabel className={cn(img.isActive ? 'opacity-100' : 'opacity-0')}>
                         {Math.round(img.offsetX)}, {Math.round(img.offsetY)}
-                      </div>
+                      </OverlayLabel>
                     </>
                   )}
                 </CanvasMovable>

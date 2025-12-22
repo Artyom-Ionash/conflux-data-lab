@@ -50,3 +50,28 @@ export function ActionButton({
     </button>
   );
 }
+
+interface ActionGroupProps {
+  children: React.ReactNode;
+  className?: string;
+  attached?: boolean;
+}
+
+/**
+ * Контейнер для группировки кнопок действий (ActionButton).
+ */
+export function ActionGroup({ children, className = '', attached = false }: ActionGroupProps) {
+  return (
+    <div
+      className={cn(
+        'flex items-center',
+        attached ? 'gap-0 shadow-sm' : 'gap-2',
+        attached &&
+          '[&>button]:rounded-none [&>button]:border-r first:[&>button]:rounded-l-md last:[&>button]:rounded-r-md last:[&>button]:border-r-0',
+        className
+      )}
+    >
+      {children}
+    </div>
+  );
+}
