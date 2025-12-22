@@ -3,22 +3,52 @@
 import { useState } from 'react';
 
 import { useCopyToClipboard } from '@/lib/core/hooks/use-copy-to-clipboard';
+import { downloadText } from '@/lib/core/utils/media';
 import { convertJsonToCsv } from '@/lib/modules/converters/json-to-csv';
+import { TextArea } from '@/view/tools/io/Input';
 import { Card } from '@/view/ui/Card';
+import { Workbench } from '@/view/ui/Workbench';
 
 import { ResultViewer } from './io/ResultViewer';
+import { SidebarIO } from './io/SidebarIO';
+
+// Пример данных для демонстрации работы
+const DEFAULT_EXAMPLE = JSON.stringify(
+  [
+    { id: 1, name: 'Engineer', department: 'R&D', active: true },
+    { id: 2, name: 'Designer', department: 'UX', active: true },
+    { id: 3, name: 'Manager', department: 'Sales', active: false },
+  ],
+  null,
+  2
+);
 
 export function JsonToCsvConverter() {
-  const [jsonInput, setJsonInput] = useState('');
-  const [csvOutput, setCsvOutput] = useState('');
+  // Инициализируем инпут дефолтным значением
+  const [jsonInput, setJsonInput] = useState(DEFAULT_EXAMPLE);
+
+  // Ленивая инициализация: сразу конвертируем дефолтный пример,
+  // чтобы пользователь видел результат при первом рендере
+  const [csvOutput, setCsvOutput] = useState(() => {
+    try {
+      return convertJsonToCsv(DEFAULT_EXAMPLE);
+    } catch {
+      return '';
+    }
+  });
+
   const [error, setError] = useState('');
 
   const { isCopied, copy } = useCopyToClipboard();
 
-  const handleConvert = () => {
+  const handleConvert = (input = jsonInput) => {
     try {
       setError('');
-      const result = convertJsonToCsv(jsonInput);
+      if (!input.trim()) {
+        setCsvOutput('');
+        return;
+      }
+      const result = convertJsonToCsv(input);
       setCsvOutput(result);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Ошибка конвертации');
@@ -26,82 +56,95 @@ export function JsonToCsvConverter() {
     }
   };
 
-  const handleClear = () => {
-    setJsonInput('');
-    setCsvOutput('');
-    setError('');
+  const handleFilesSelected = async (files: File[]) => {
+    const file = files[0];
+    if (!file) return;
+
+    try {
+      const text = await file.text();
+      setJsonInput(text);
+      handleConvert(text);
+    } catch (err) {
+      setError('Не удалось прочитать файл');
+    }
   };
 
-  return (
-    <div className="space-y-6">
-      <div className="grid gap-6 md:grid-cols-2">
-        {/* Input */}
-        <Card>
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <label className="text-sm font-medium text-zinc-900 dark:text-zinc-100">
-                JSON Input
-              </label>
-              <button
-                onClick={handleClear}
-                className="text-xs text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200"
-              >
-                Очистить
-              </button>
-            </div>
-            <textarea
-              value={jsonInput}
-              onChange={(e) => setJsonInput(e.target.value)}
-              onBlur={handleConvert}
-              placeholder='[{"name": "John", "age": 30}, {"name": "Jane", "age": 25}]'
-              className="h-64 w-full rounded-md border border-zinc-300 bg-white px-3 py-2 font-mono text-sm dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
-            />
-            {error && (
-              <div className="rounded-md bg-red-50 p-3 text-sm text-red-800 dark:bg-red-900/20 dark:text-red-200">
-                {error}
-              </div>
-            )}
-            <button
-              onClick={handleConvert}
-              className="w-full rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700"
-            >
-              Конвертировать
-            </button>
-          </div>
-        </Card>
+  const handleDownload = () => {
+    if (csvOutput) {
+      downloadText(csvOutput, 'converted.csv');
+    }
+  };
 
-        {/* Output - Используем новый Кристалл */}
-        <ResultViewer
-          title="CSV Output"
-          value={csvOutput}
-          isCopied={isCopied}
-          onCopy={copy}
-          className="h-[400px] md:h-auto"
-        />
-      </div>
+  const sidebarContent = (
+    <div className="flex flex-col gap-6">
+      <Workbench.Header title="JSON → CSV" />
 
-      {/* Example */}
-      <Card title="Пример использования">
-        <div className="space-y-3 text-sm">
-          <div>
-            <p className="mb-1 text-zinc-600 dark:text-zinc-400">JSON:</p>
-            <pre className="rounded-md bg-zinc-100 p-3 font-mono text-xs dark:bg-zinc-800">
-              {`[
-  {"name": "Иван", "age": 30, "city": "Москва"},
-  {"name": "Мария", "age": 25, "city": "СПб"}
-]`}
-            </pre>
-          </div>
-          <div>
-            <p className="mb-1 text-zinc-600 dark:text-zinc-400">CSV:</p>
-            <pre className="rounded-md bg-zinc-100 p-3 font-mono text-xs dark:bg-zinc-800">
-              {`name,age,city
-Иван,30,Москва
-Мария,25,СПб`}
-            </pre>
-          </div>
-        </div>
-      </Card>
+      <SidebarIO
+        onFilesSelected={handleFilesSelected}
+        accept=".json"
+        dropLabel="Загрузить JSON"
+        hasFiles={!!csvOutput}
+        onDownload={handleDownload}
+        downloadLabel="Скачать CSV"
+      />
     </div>
+  );
+
+  return (
+    <Workbench.Root>
+      <Workbench.Sidebar>{sidebarContent}</Workbench.Sidebar>
+      <Workbench.Stage>
+        <Workbench.Content>
+          <div className="flex h-full flex-col gap-4 lg:flex-row">
+            {/* Input Column */}
+            <Card
+              className="flex flex-1 flex-col overflow-hidden"
+              contentClassName="p-0 flex-1 flex flex-col h-full"
+            >
+              <div className="flex items-center justify-between border-b border-zinc-200 bg-zinc-50 px-4 py-2 dark:border-zinc-800 dark:bg-zinc-900">
+                <span className="text-xs font-semibold text-zinc-500 uppercase">Input JSON</span>
+                <button
+                  onClick={() => {
+                    setJsonInput('');
+                    setCsvOutput('');
+                    setError('');
+                  }}
+                  className="text-[10px] font-bold text-zinc-400 uppercase transition-colors hover:text-red-500"
+                >
+                  Очистить
+                </button>
+              </div>
+              <TextArea
+                value={jsonInput}
+                onChange={(e) => {
+                  setJsonInput(e.target.value);
+                  // Очищаем ошибку при вводе
+                  if (error) setError('');
+                }}
+                onBlur={() => handleConvert()}
+                placeholder='[{"name": "John", "age": 30}]'
+                className="flex-1 resize-none border-0 p-4 font-mono text-xs focus:ring-0"
+              />
+              {error && (
+                <div className="bg-red-50 p-3 text-xs font-medium text-red-600 dark:bg-red-900/20 dark:text-red-400">
+                  {error}
+                </div>
+              )}
+            </Card>
+
+            {/* Output Column */}
+            <ResultViewer
+              title="Output CSV"
+              value={csvOutput}
+              isCopied={isCopied}
+              onCopy={copy}
+              onDownload={handleDownload}
+              downloadLabel="Скачать CSV"
+              className="flex-1"
+            />
+          </div>
+        </Workbench.Content>
+      </Workbench.Stage>
+    </Workbench.Root>
   );
 }

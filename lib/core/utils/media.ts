@@ -19,16 +19,39 @@ export function loadImage(src: string): Promise<HTMLImageElement> {
 }
 
 /**
- * Создает невидимую ссылку и инициирует скачивание файла.
+ * Внутренняя утилита для триггера скачивания
  */
-export function downloadDataUrl(dataUrl: string, filename: string): void {
+function triggerDownload(href: string, filename: string): void {
   const a = document.createElement('a');
-  a.href = dataUrl;
+  a.href = href;
   a.download = filename;
-
   document.body.append(a);
   a.click();
   a.remove();
+}
+
+/**
+ * Скачивание Data URL (Base64).
+ */
+export function downloadDataUrl(dataUrl: string, filename: string): void {
+  triggerDownload(dataUrl, filename);
+}
+
+/**
+ * Скачивание Blob объекта.
+ */
+export function downloadBlob(blob: Blob, filename: string): void {
+  const url = URL.createObjectURL(blob);
+  triggerDownload(url, filename);
+  URL.revokeObjectURL(url);
+}
+
+/**
+ * Скачивание простого текста.
+ */
+export function downloadText(content: string, filename: string): void {
+  const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+  downloadBlob(blob, filename);
 }
 
 /**

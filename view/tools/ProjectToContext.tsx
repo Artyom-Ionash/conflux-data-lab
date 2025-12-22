@@ -3,6 +3,7 @@
 import React, { useCallback, useState } from 'react';
 
 import { useCopyToClipboard } from '@/lib/core/hooks/use-copy-to-clipboard';
+import { downloadText } from '@/lib/core/utils/media';
 import { type ContextStats } from '@/lib/modules/context-generator/core';
 import { runContextPipeline } from '@/lib/modules/context-generator/engine';
 import { CONTEXT_PRESETS, type PresetKey } from '@/lib/modules/context-generator/rules';
@@ -121,13 +122,7 @@ export function ProjectToContext() {
 
   const downloadResult = () => {
     if (!result) return;
-    const blob = new Blob([result], { type: 'text/plain' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'project_context.txt';
-    a.click();
-    URL.revokeObjectURL(url);
+    downloadText(result, 'project_context.txt');
   };
 
   const sidebar = (

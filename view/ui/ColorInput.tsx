@@ -1,5 +1,7 @@
 import React from 'react';
 
+import { TRANSPARENCY_PATTERN_CSS } from './infrastructure/standards';
+
 interface ColorInputProps {
   value: string | null;
   onChange: (value: string) => void;
@@ -33,12 +35,11 @@ export function ColorInput({
           onInput={(e) => onChange(e.currentTarget.value)}
         />
 
-        {/* Checkerboard pattern (фон) */}
+        {/* Checkerboard pattern (фон) - используем стандарт */}
         <div
           className="absolute inset-0 z-0 bg-white"
           style={{
-            backgroundImage:
-              'linear-gradient(45deg, #ccc 25%, transparent 25%), linear-gradient(-45deg, #ccc 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #ccc 75%), linear-gradient(-45deg, transparent 75%, #ccc 75%)',
+            backgroundImage: TRANSPARENCY_PATTERN_CSS(),
             backgroundSize: '8px 8px',
             backgroundPosition: '0 0, 0 4px, 4px -4px, -4px 0px',
           }}

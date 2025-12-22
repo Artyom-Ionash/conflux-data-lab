@@ -38,3 +38,13 @@ export function getAspectRatioStyle(
 
   return { aspectRatio: `${widthOrRatio} / ${height}` };
 }
+
+/**
+ * Стандартный CSS-паттерн для отображения прозрачности (шахматная доска).
+ */
+export const TRANSPARENCY_PATTERN_CSS = (color = '#ccc', transparent = 'transparent') => `
+  linear-gradient(45deg, ${color} 25%, ${transparent} 25%),
+  linear-gradient(-45deg, ${color} 25%, ${transparent} 25%),
+  linear-gradient(45deg, ${transparent} 75%, ${color} 75%),
+  linear-gradient(-45deg, ${transparent} 75%, ${color} 75%)
+`;

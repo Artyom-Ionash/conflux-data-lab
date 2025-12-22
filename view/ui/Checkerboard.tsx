@@ -1,5 +1,7 @@
 import React from 'react';
 
+import { TRANSPARENCY_PATTERN_CSS } from './infrastructure/standards';
+
 interface CheckerboardProps {
   children?: React.ReactNode;
   className?: string;
@@ -21,12 +23,7 @@ export function Checkerboard({
       <div
         className="pointer-events-none absolute inset-0 z-0 opacity-20"
         style={{
-          backgroundImage: `
-            linear-gradient(45deg, ${color1} 25%, ${color2} 25%), 
-            linear-gradient(-45deg, ${color1} 25%, ${color2} 25%), 
-            linear-gradient(45deg, ${color2} 75%, ${color1} 75%), 
-            linear-gradient(-45deg, ${color2} 75%, ${color1} 75%)
-          `,
+          backgroundImage: TRANSPARENCY_PATTERN_CSS(color1, color2),
           backgroundSize: `${size}px ${size}px`,
         }}
       />

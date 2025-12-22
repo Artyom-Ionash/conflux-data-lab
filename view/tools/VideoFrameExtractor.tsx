@@ -1,6 +1,7 @@
 'use client';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
+import { downloadDataUrl } from '@/lib/core/utils/media';
 import { generateSpriteSheet } from '@/lib/modules/graphics/processing/sprite-generator';
 import { TEXTURE_LIMITS } from '@/lib/modules/graphics/standards';
 import { useFrameExtractor } from '@/lib/modules/video/use-frame-extractor';
@@ -150,10 +151,7 @@ export function VideoFrameExtractor() {
         spacing: spriteOptions.spacing,
         backgroundColor: spriteOptions.bg,
       });
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = 'spritesheet.png';
-      a.click();
+      downloadDataUrl(url, 'spritesheet.png');
     } catch (e: unknown) {
       alert(e instanceof Error ? e.message : 'Ошибка генерации');
     }
@@ -343,12 +341,7 @@ export function VideoFrameExtractor() {
                 headerActions={
                   diffDataUrl ? (
                     <DownloadButton
-                      onDownload={() => {
-                        const a = document.createElement('a');
-                        a.href = diffDataUrl;
-                        a.download = 'diff.png';
-                        a.click();
-                      }}
+                      onDownload={() => downloadDataUrl(diffDataUrl, 'diff.png')}
                       variant="link"
                     />
                   ) : undefined
