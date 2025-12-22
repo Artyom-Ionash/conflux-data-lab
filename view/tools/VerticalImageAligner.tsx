@@ -14,7 +14,7 @@ import {
 import { WorkbenchCanvas } from '@/view/tools/graphics/WorkbenchCanvas';
 import { TextureDimensionSlider } from '@/view/tools/hardware/TextureDimensionSlider';
 import { CanvasMovable, useCanvasRef } from '@/view/ui/Canvas';
-import { ControlLabel, ControlSection } from '@/view/ui/ControlSection';
+import { ControlSection, SectionHeader } from '@/view/ui/ControlSection';
 import { DownloadButton } from '@/view/ui/DownloadButton';
 import { FileDropzone, FileDropzonePlaceholder } from '@/view/ui/FileDropzone';
 import { cn } from '@/view/ui/infrastructure/standards';
@@ -345,23 +345,28 @@ export function VerticalImageAligner() {
           </ControlSection>
 
           <div className="space-y-1.5">
-            <div className="flex items-center justify-between px-1 pb-1">
-              <ControlLabel>Слои</ControlLabel>
-              <div className="flex gap-2">
-                <button
-                  onClick={handleCenterAllX}
-                  className="rounded p-1 font-mono text-xs font-bold text-zinc-500 transition-colors hover:bg-zinc-100 dark:hover:bg-zinc-700"
-                >
-                  |X|
-                </button>
-                <button
-                  onClick={handleCenterAllY}
-                  className="rounded p-1 font-mono text-xs font-bold text-zinc-500 transition-colors hover:bg-zinc-100 dark:hover:bg-zinc-700"
-                >
-                  ≡Y≡
-                </button>
-              </div>
-            </div>
+            {/* Использование унифицированного заголовка секции */}
+            <SectionHeader
+              title="Слои"
+              actions={
+                <div className="flex gap-1">
+                  <button
+                    onClick={handleCenterAllX}
+                    title="Центрировать по горизонтали"
+                    className="rounded bg-zinc-100 px-2 py-1 font-mono text-[10px] font-bold text-zinc-600 transition-colors hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-700"
+                  >
+                    |X|
+                  </button>
+                  <button
+                    onClick={handleCenterAllY}
+                    title="Центрировать по вертикали"
+                    className="rounded bg-zinc-100 px-2 py-1 font-mono text-[10px] font-bold text-zinc-600 transition-colors hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-700"
+                  >
+                    ≡Y≡
+                  </button>
+                </div>
+              }
+            />
 
             <SortableList
               items={images}
