@@ -1,4 +1,41 @@
+'use client';
+
+import * as TooltipPrimitive from '@radix-ui/react-tooltip';
 import React from 'react';
+
+import { cn } from './infrastructure/standards';
+
+interface TooltipProps {
+  children: React.ReactNode;
+  content: React.ReactNode;
+  className?: string;
+  side?: 'top' | 'right' | 'bottom' | 'left';
+}
+
+export function Tooltip({ children, content, className, side = 'top' }: TooltipProps) {
+  return (
+    <TooltipPrimitive.Provider delayDuration={300}>
+      <TooltipPrimitive.Root>
+        <TooltipPrimitive.Trigger asChild>{children}</TooltipPrimitive.Trigger>
+        <TooltipPrimitive.Portal>
+          <TooltipPrimitive.Content
+            side={side}
+            sideOffset={5}
+            className={cn(
+              'animate-in fade-in zoom-in-95 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 z-[500] max-w-xs',
+              'rounded border border-zinc-700 bg-zinc-900 px-3 py-1.5 shadow-xl backdrop-blur-sm',
+              'text-[11px] leading-relaxed text-zinc-100',
+              className
+            )}
+          >
+            {content}
+            <TooltipPrimitive.Arrow className="fill-zinc-700" />
+          </TooltipPrimitive.Content>
+        </TooltipPrimitive.Portal>
+      </TooltipPrimitive.Root>
+    </TooltipPrimitive.Provider>
+  );
+}
 
 export interface Zone {
   colorClass: string;
@@ -10,7 +47,7 @@ export interface ZoneIndicatorProps {
   displayValue: string;
   max: number;
   zones: Zone[];
-  markerColorClass: string; // Теперь это класс для цветной тени/свечения
+  markerColorClass: string; // Класс для цветной тени/свечения
   label?: string;
   tooltip?: React.ReactNode;
   className?: string;
@@ -28,9 +65,9 @@ export function ZoneIndicator({
 }: ZoneIndicatorProps) {
   const percentage = Math.max(0, Math.min((value / max) * 100, 100));
 
-  return (
-    <div className={`group relative flex flex-col justify-center ${className}`}>
-      {/* Label Row */}
+  // Оборачиваем весь индикатор или только полоску в Tooltip, если он передан
+  const content = (
+    <div className={`relative flex flex-col justify-center ${className}`}>
       {label && (
         <div className="mb-1.5 flex items-end justify-between px-0.5">
           <span className="text-[10px] font-bold tracking-wider text-zinc-400 uppercase">
@@ -69,15 +106,17 @@ export function ZoneIndicator({
           />
         </div>
       </div>
-
-      {/* Tooltip Slot */}
-      {tooltip && (
-        <div className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-2 hidden w-72 -translate-x-1/2 group-hover:block">
-          <div className="animate-in fade-in zoom-in-95 slide-in-from-bottom-2 origin-bottom duration-150">
-            {tooltip}
-          </div>
-        </div>
-      )}
     </div>
   );
+
+  // ПРИМЕНЕНИЕ СЕКАТОРА: Делегируем показ подсказки специализированному компоненту
+  if (tooltip) {
+    return (
+      <Tooltip content={tooltip} side="top">
+        {content}
+      </Tooltip>
+    );
+  }
+
+  return content;
 }

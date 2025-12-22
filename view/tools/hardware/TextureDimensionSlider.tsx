@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 
 import {
   analyzeTextureSize,
@@ -9,6 +9,7 @@ import {
   TEXTURE_ZONES,
 } from '@/lib/modules/graphics/standards';
 import { cn } from '@/view/ui/infrastructure/standards';
+import { Tooltip } from '@/view/ui/ZoneIndicator';
 
 interface TextureDimensionSliderProps {
   label: string;
@@ -25,8 +26,6 @@ export function TextureDimensionSlider({
   max = TEXTURE_LIMITS.MAX_SLIDER,
   disabled = false,
 }: TextureDimensionSliderProps) {
-  const [showTooltip, setShowTooltip] = useState(false);
-
   const { label: statusLabel, icon, message, styles } = analyzeTextureSize(value);
   const isPoT = isPowerOfTwo(value);
   const nearestPoT = getNearestPoT(value || 1);
@@ -39,7 +38,6 @@ export function TextureDimensionSlider({
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = Number(e.target.value);
-    // FIX: unicorn/prefer-number-properties
     if (!Number.isNaN(val)) onChange(Math.min(val, max));
   };
 
@@ -59,20 +57,30 @@ export function TextureDimensionSlider({
           {label}
         </label>
 
-        {/* Status Badge */}
-        <div
-          className={cn(
-            'flex cursor-help items-center gap-1 rounded border px-1.5 py-0.5 text-[10px] font-bold tracking-wider uppercase transition-colors',
-            styles.bg,
-            styles.border,
-            styles.text
-          )}
-          onMouseEnter={() => setShowTooltip(true)}
-          onMouseLeave={() => setShowTooltip(false)}
+        {/* ПРИМЕНЕНИЕ СЕКАТОРА: Замена ручного стейта на универсальный Tooltip */}
+        <Tooltip
+          side="left"
+          content={
+            <div className="space-y-1">
+              <div className="font-medium">{message}</div>
+              <div className="text-[10px] font-bold tracking-wider uppercase opacity-50">
+                Hardware Standards {HARDWARE_STANDARD_YEAR}
+              </div>
+            </div>
+          }
         >
-          <span>{icon}</span>
-          <span>{statusLabel}</span>
-        </div>
+          <div
+            className={cn(
+              'flex cursor-help items-center gap-1 rounded border px-1.5 py-0.5 text-[10px] font-bold tracking-wider uppercase transition-colors',
+              styles.bg,
+              styles.border,
+              styles.text
+            )}
+          >
+            <span>{icon}</span>
+            <span>{statusLabel}</span>
+          </div>
+        </Tooltip>
       </div>
 
       {/* Main Controls Row */}
@@ -104,9 +112,6 @@ export function TextureDimensionSlider({
                 ? 'cursor-default border-green-600 bg-green-600/90 text-white'
                 : 'border-zinc-200 bg-zinc-100 text-zinc-500 hover:border-blue-600 hover:bg-blue-600 hover:text-white dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-400'
             )}
-            title={
-              isPoT ? 'Размер кратен степени двойки (Оптимально)' : `Округлить до ${nearestPoT}px`
-            }
           >
             {isPoT ? '2ⁿ OK' : `2ⁿ → ${nearestPoT}`}
           </button>
@@ -145,18 +150,6 @@ export function TextureDimensionSlider({
           style={{ left: `${percentage}%` }}
         />
       </div>
-
-      {/* Tooltip Overlay */}
-      {showTooltip && (
-        <div className="pointer-events-none absolute top-0 right-0 z-50 mt-7 w-64">
-          <div className="animate-in fade-in zoom-in-95 rounded-lg border border-zinc-200 bg-white p-3 text-xs leading-relaxed text-zinc-800 shadow-xl duration-100 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100">
-            <div className="mb-2 font-medium">{message}</div>
-            <div className="text-[10px] font-bold tracking-wider uppercase opacity-50">
-              Hardware Standards {HARDWARE_STANDARD_YEAR}
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

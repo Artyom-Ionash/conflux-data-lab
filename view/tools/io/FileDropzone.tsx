@@ -5,7 +5,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 
 import { filterFileList, scanEntries } from '@/lib/modules/file-system/scanner';
 import { cn } from '@/view/ui/infrastructure/standards';
-import { Tooltip } from '@/view/ui/Tooltip';
+import { Tooltip } from '@/view/ui/ZoneIndicator';
 
 // --- Helper: Validate File Type ---
 const isFileAccepted = (file: File, accept: string): boolean => {

@@ -24,9 +24,10 @@ export function TextureLimitIndicator({ value, label, className }: TextureLimitI
     colorClass: zone.color,
   }));
 
+  // Содержимое подсказки теперь не содержит логики позиционирования
   const tooltipContent = (
-    <div className="rounded-lg border border-zinc-800 bg-zinc-950 p-3 text-xs leading-relaxed text-zinc-100 shadow-2xl ring-1 ring-white/5">
-      <div className="mb-2 flex items-center gap-2 border-b border-zinc-800/80 pb-2">
+    <div className="space-y-2">
+      <div className="flex items-center gap-2 border-b border-zinc-800 pb-2">
         <div
           className={`h-2 w-2 rounded-full shadow-[0_0_8px_currentColor] ${styles.marker}`}
         ></div>
@@ -34,11 +35,9 @@ export function TextureLimitIndicator({ value, label, className }: TextureLimitI
         <span className="text-zinc-600">•</span>
         <span className="font-mono text-zinc-300">{value}px</span>
       </div>
-      <div className="mb-2 text-zinc-300">{message}</div>
-      <div className="flex items-center justify-between pt-1">
-        <span className="text-[10px] font-semibold tracking-wider uppercase opacity-40">
-          Standards {HARDWARE_STANDARD_YEAR}
-        </span>
+      <div className="text-zinc-300">{message}</div>
+      <div className="pt-1 text-[10px] font-semibold tracking-wider uppercase opacity-40">
+        Standards {HARDWARE_STANDARD_YEAR}
       </div>
     </div>
   );
@@ -50,7 +49,6 @@ export function TextureLimitIndicator({ value, label, className }: TextureLimitI
       max={TEXTURE_LIMITS.MAX_SLIDER}
       zones={uiZones}
       markerColorClass={styles.marker}
-      // FIX: exactOptionalPropertyTypes не разрешает undefined для optional string
       label={label ?? ''}
       tooltip={tooltipContent}
       className={className ?? ''}
