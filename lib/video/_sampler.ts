@@ -3,7 +3,7 @@
  * Низкоуровневый инструмент для дискретного извлечения кадров.
  */
 
-import { waitForVideoFrame } from '@/lib/core/utils/media';
+import { waitForVideoFrame } from '@/core/browser/canvas';
 
 export class VideoFrameSampler {
   private canvas: HTMLCanvasElement;

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 
-import { rgbToHex } from '@/lib/core/utils/colors';
-import { getTopLeftPixelColor, loadImage } from '@/lib/core/utils/media';
+import { getTopLeftPixelColor, loadImage } from '@/core/browser/canvas';
+import { rgbToHex } from '@/core/primitives/colors';
 
 import { useObjectUrl } from './use-object-url';
 

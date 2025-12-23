@@ -1,7 +1,7 @@
 import { pipe } from 'remeda';
 
-import type { RGB } from '@/lib/core/utils/colors';
-import { PIXEL_STRIDE } from '@/lib/core/utils/colors';
+import type { RGB } from '@/core/primitives/colors';
+import { PIXEL_STRIDE } from '@/core/primitives/colors';
 
 import type { Point } from './imaging';
 import {

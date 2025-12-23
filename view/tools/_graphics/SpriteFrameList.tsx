@@ -3,8 +3,8 @@
 import Image from 'next/image';
 import React, { useMemo } from 'react';
 
+import { getAspectRatioStyle } from '@/core/tailwind/utils';
 import { Checkerboard } from '@/view/ui/canvas/Checkerboard';
-import { getAspectRatioStyle } from '@/view/ui/infrastructure/standards';
 import { Indicator } from '@/view/ui/primitive/Indicator';
 import { OverlayLabel } from '@/view/ui/primitive/OverlayLabel';
 import { Typography } from '@/view/ui/primitive/Typography';

@@ -1,14 +1,15 @@
 'use client';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
-import { downloadDataUrl } from '@/lib/core/utils/media';
-import { generateSpriteSheet } from '@/lib/modules/graphics/processing/sprite-generator';
-import { TEXTURE_LIMITS } from '@/lib/modules/graphics/standards';
-import { useFrameExtractor } from '@/lib/modules/video/use-frame-extractor';
+import { downloadDataUrl } from '@/core/browser/canvas';
+import { getAspectRatio } from '@/core/primitives/math';
+import { getAspectRatioStyle } from '@/core/tailwind/utils';
+import { generateSpriteSheet } from '@/lib/graphics/processing/sprite-generator';
+import { TEXTURE_LIMITS } from '@/lib/graphics/standards';
+import { useFrameExtractor } from '@/lib/video/use-frame-extractor';
 import { Card } from '@/view/ui/container/Card';
 import { Modal } from '@/view/ui/container/Modal';
 import { ProgressBar } from '@/view/ui/feedback/ProgressBar';
-import { getAspectRatio, getAspectRatioStyle } from '@/view/ui/infrastructure/standards';
 import { Button } from '@/view/ui/input/Button';
 import { ColorInput } from '@/view/ui/input/ColorInput';
 import { NumberStepper } from '@/view/ui/input/NumberStepper';

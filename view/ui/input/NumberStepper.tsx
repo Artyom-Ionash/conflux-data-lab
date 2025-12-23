@@ -1,6 +1,6 @@
 import React from 'react';
 
-import { cn } from '../infrastructure/standards';
+import { cn } from '../../../core/tailwind/utils';
 
 interface NumberStepperProps {
   value: number;

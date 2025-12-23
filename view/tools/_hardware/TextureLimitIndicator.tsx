@@ -5,7 +5,7 @@ import {
   HARDWARE_STANDARD_YEAR,
   TEXTURE_LIMITS,
   TEXTURE_ZONES,
-} from '@/lib/modules/graphics/standards';
+} from '@/lib/graphics/standards';
 import { ZoneIndicator } from '@/view/ui/feedback/ZoneIndicator';
 
 interface TextureLimitIndicatorProps {

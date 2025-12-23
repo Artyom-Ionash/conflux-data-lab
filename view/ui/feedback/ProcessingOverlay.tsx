@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 
-import { cn } from '../infrastructure/standards';
+import { cn } from '../../../core/tailwind/utils';
 
 interface ProcessingOverlayProps {
   isVisible: boolean;

@@ -3,7 +3,7 @@
 import { cva, type VariantProps } from 'class-variance-authority';
 import React from 'react';
 
-import { cn } from '../infrastructure/standards';
+import { cn } from '../../../core/tailwind/utils';
 
 const statusBoxVariants = cva('rounded-lg border p-4 transition-all duration-300', {
   variants: {

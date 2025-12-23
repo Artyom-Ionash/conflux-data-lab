@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import type { RGB } from '@/lib/core/utils/colors';
+import type { RGB } from '@/core/primitives/colors';
 
 import { applyFloodFillMask, applyMorphologyChoke } from './imaging';
 

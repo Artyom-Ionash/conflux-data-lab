@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
 
 import { FileBundle } from '../file-system/bundle';
-import { createIgnoreManager } from '../file-system/scanner';
 import { CONTEXT_PRESETS, type PresetKey } from './rules';
+import { createIgnoreManager } from './scanner';
 
 interface BundleState {
   bundle: FileBundle | null;

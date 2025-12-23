@@ -1,5 +1,5 @@
-import type { RGB } from '@/lib/core/utils/colors';
-import { getColorDistance, PIXEL_STRIDE } from '@/lib/core/utils/colors';
+import type { RGB } from '@/core/primitives/colors';
+import { getColorDistance, PIXEL_STRIDE } from '@/core/primitives/colors';
 
 // --- Constants ---
 const RGB_MAX = 255;

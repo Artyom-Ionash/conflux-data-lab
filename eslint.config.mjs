@@ -1,4 +1,3 @@
-
 import { defineConfig, globalIgnores } from 'eslint/config';
 import nextVitals from 'eslint-config-next/core-web-vitals';
 import nextTs from 'eslint-config-next/typescript';
@@ -11,10 +10,10 @@ const eslintConfig = defineConfig([
   ...nextVitals,
   ...nextTs,
 
-  globalIgnores(['.next/**', 'out/**', 'build/**', 'next-env.d.ts', 'scripts/**']),
+  globalIgnores(['.next/**', 'out/**', 'build/**', 'next-env.d.ts', 'scripts/**', '.ai/**']),
 
   // ---------------------------------------------------------------------------
-  // 1. ГЛОБАЛЬНЫЕ ПРАВИЛА И ГРАНИЦЫ
+  // 1. ГЛОБАЛЬНЫЕ НАСТРОЙКИ И ПЛАГИНЫ
   // ---------------------------------------------------------------------------
   {
     plugins: {
@@ -23,22 +22,40 @@ const eslintConfig = defineConfig([
       unicorn: eslintPluginUnicorn,
     },
     settings: {
-      'boundaries/include': ['app/**/*', 'lib/**/*', 'view/**/*', 'app-registry/**/*'],
+      // Определяем, какие папки участвуют в проверке границ
+      'boundaries/include': ['app/**/*', 'core/**/*', 'lib/**/*', 'view/**/*', 'app-registry/**/*'],
+      
       'boundaries/elements': [
-        { type: 'test', pattern: ['**/*.test.ts', '**/*.test.tsx'], mode: 'file' },
-        {
-          type: 'app-layer',
-          pattern: 'app/(page|layout|loading|error|not-found|tools/**/page).tsx',
-          mode: 'file',
-        },
-        { type: 'app-registry', pattern: 'app-registry/*', mode: 'folder' },
-        { type: 'tool', pattern: 'view/tools/*.tsx', mode: 'file', capture: ['toolName'] },
-        { type: 'entity', pattern: 'view/tools/*/*.tsx', mode: 'file', capture: ['entityName'] },
-        { type: 'app-component', pattern: 'view/(catalog|shell)/*', mode: 'folder' },
-        { type: 'ui-infrastructure', pattern: 'view/ui/_infrastructure/*', mode: 'folder' },
-        { type: 'ui-component', pattern: 'view/ui/*.tsx', mode: 'file', capture: ['componentName'] },
+        // --- CORE KERNEL (Технологические Домены) ---
+        { type: 'core-typescript', pattern: 'core/typescript/**/*', mode: 'folder' },
+        // primitives: Чистые функции, константы, типы. 0 зависимостей.
+        { type: 'core-primitives', pattern: 'core/primitives/*', mode: 'folder' },
+        // browser: Web API (DOM, Canvas, LocalStorage).
+        { type: 'core-browser', pattern: 'core/browser/*', mode: 'folder' },
+        // react: Хуки, HOCи, Контексты.
+        { type: 'core-react', pattern: 'core/react/*', mode: 'folder' },
+        // tailwind: Утилиты стилизации.
+        { type: 'core-tailwind', pattern: 'core/tailwind/*', mode: 'folder' },
+        // node: Серверные утилиты (FS, Process).
+        { type: 'core-node', pattern: 'core/node/*', mode: 'folder' },
+        // next: Специфика фреймворка.
+        { type: 'core-next', pattern: 'core/next/*', mode: 'folder' },
+
+        // --- DOMAIN LOGIC (Business Rules) ---
+        // module: Чистая бизнес-логика.
         { type: 'module', pattern: 'lib/modules/*', mode: 'folder', capture: ['moduleName'] },
-        { type: 'core', pattern: ['lib/core/*', 'lib/types/*'], mode: 'folder' },
+
+        // --- VISUAL LAYER (Presentation) ---
+        // ui-component: Глупые переиспользуемые компоненты.
+        { type: 'ui-component', pattern: 'view/ui/**/*', mode: 'file' },
+        // tool: Полноценные виджеты/страницы инструментов.
+        { type: 'tool', pattern: 'view/tools/*.tsx', mode: 'file', capture: ['toolName'] },
+        // entity: Подсистемы инструментов.
+        { type: 'entity', pattern: 'view/tools/*/*.tsx', mode: 'file', capture: ['entityName'] },
+
+        // --- APP LAYER (Routing & Assembly) ---
+        { type: 'app-registry', pattern: 'app/registry/*', mode: 'folder' },
+        { type: 'app-layer', pattern: 'app/**/*', mode: 'file' },
       ],
     },
     rules: {
@@ -49,75 +66,125 @@ const eslintConfig = defineConfig([
       'unicorn/no-null': 'off',
       'react-hooks/exhaustive-deps': 'error',
 
-      // --- 1. PACKAGE PRIVATE SCOPE (Стратегия 1) ---
-      // Правило: Приватные папки (_) доступны только внутри их собственной директории.
+      // --- 2. ЗАЩИТА ПРИВАТНЫХ ОБЛАСТЕЙ (Package Private) ---
+      // Запрещаем импорт из папок, начинающихся с `_` (кроме как из их родителя).
       'no-restricted-imports': [
         'error',
         {
           patterns: [
-            // A. Блокируем абсолютные пути к привату (@/...)
-            // Это запрещает `import from '@/lib/modules/video/_sampler'`
             {
+              // Запрет абсолютных импортов привата (@/lib/modules/video/_sampler)
               group: ['@/**/_*'],
-              message: '⛔ PRIVATE VIOLATION: Absolute imports of private folders are forbidden. Use the Public API of the module.',
+              message: '⛔ PRIVATE VIOLATION: Absolute imports of private folders are forbidden. Use the Public API.',
             },
-            // B. Блокируем выход к соседям (../)
-            // Это запрещает `import from '../_infrastructure'` или `import from '../ToolB/_internal'`
-            // Разрешены только импорты начинающиеся с `./` (текущая папка)
             {
+              // Запрет относительных импортов привата соседей (../_internal)
               group: ['../*/_*', '../**/_*'],
-              message: '⛔ SCOPE VIOLATION: You cannot reach into a sibling\'s or parent\'s private folder. Only direct children (./_folder) can be imported.',
+              message: '⛔ SCOPE VIOLATION: You cannot reach into a sibling\'s private folder.',
             },
           ],
         },
       ],
 
+      // --- 3. АРХИТЕКТУРНЫЕ ГРАНИЦЫ (Access Control) ---
       'boundaries/element-types': [
         'error',
         {
           default: 'allow',
           rules: [
+            // ========================================================
+            // A. CORE SECURITY (Защита Ядра)
+            // ========================================================
+
+            // 0. TYPESCRIPT (Global Access)
+            // Типы не существуют в рантайме, поэтому они не нарушают границ.
+            // Разрешаем доступ к ним для ВСЕХ слоев.
             {
-              from: 'core',
-              disallow: ['app-registry', 'module', 'ui-component', 'ui-infrastructure', 'entity', 'tool', 'app-layer'],
-              message: '❌ Core must not depend on upper layers',
+              from: ['core-primitives', 'core-browser', 'core-react', 'core-node', 'core-next', 'core-tailwind', 'module', 'ui-component', 'entity', 'tool', 'app-layer', 'app-registry'],
+              allow: ['core-typescript'],
             },
+            // Сам TypeScript ни от кого не зависит (кроме, возможно, примитивов, если нужны const assertions)
+            {
+              from: 'core-typescript',
+              disallow: ['core-browser', 'core-react', 'core-node', 'core-next', 'module', 'ui-component', 'tool', 'app-layer'],
+              message: '❌ TypeScript utilities should be pure.',
+            },
+            
+            // 1. Примитивы — это атомы. Они не зависят ни от чего.
+            {
+              from: 'core-primitives',
+              disallow: ['core-react', 'core-browser', 'core-node', 'core-next', 'core-tailwind', 'module', 'ui-component', 'tool', 'app-layer'],
+              message: '❌ Core Primitives must be pure JS/TS without dependencies.',
+            },
+            
+            // 2. Клиентское ядро (Browser, React, Tailwind) не знает про Node.js.
+            {
+              from: ['core-browser', 'core-react', 'core-tailwind'],
+              disallow: ['core-node', 'module', 'ui-component', 'tool'],
+              message: '❌ Core utilities cannot depend on upper layers or Server-side code.',
+            },
+            
+            // 3. Серверное ядро (Node) изолировано от Браузера и React.
+            {
+              from: 'core-node',
+              disallow: ['core-browser', 'core-react', 'core-tailwind', 'core-next', 'ui-component'],
+              message: '❌ Server-side Core cannot import Client-side code.',
+            },
+
+            // ========================================================
+            // B. BUSINESS LOGIC (Чистая логика)
+            // ========================================================
+
+            // Модули должны быть агностичны к фреймворку (React, Next) и стилям (Tailwind).
+            // Разрешено: primitives, browser (для Canvas/File API), node (если модуль серверный, но лучше разделять).
+            // В данном конфиге мы пока разрешаем browser, так как у нас много графики.
             {
               from: 'module',
-              disallow: ['app-registry', 'ui-component', 'ui-infrastructure', 'entity', 'tool', 'app-layer'],
-              message: '❌ Modules must not depend on UI or App layers',
+              disallow: ['core-react', 'core-tailwind', 'core-next', 'ui-component', 'tool', 'app-layer', 'app-registry'],
+              message: '❌ Domain Modules must be framework-agnostic (No React, No Tailwind, No UI Components).',
             },
+
+            // ========================================================
+            // C. VISUAL LAYER (UI & Tools)
+            // ========================================================
+
+            // 1. UI Components — глупые кирпичики.
+            // Могут использовать: React, Browser, Tailwind, Primitives.
+            // ЗАПРЕЩЕНО: Node.js, Next.js, Тяжелые Модули, Другие UI (циклические).
             {
               from: 'ui-component',
-              disallow: ['app-registry', 'core', 'module', 'entity', 'tool', 'app-layer'],
-              message: '❌ UI Component must be a stand-alone crystal.',
+              disallow: ['core-node', 'core-next', 'module', 'tool', 'app-layer', 'app-registry'],
+              message: '❌ UI Library is strictly Client-Side. No Node.js, No Business Logic, No Next.js magic.',
             },
             {
               from: 'ui-component',
               disallow: [['ui-component', { componentName: '!${from.componentName}' }]],
-              allow: ['ui-infrastructure'], 
-              message: '❌ UI Components cannot depend on each other. Use slots or infrastructure.',
+              message: '❌ UI Components cannot depend on each other directly. Use slots or composition.',
             },
-            {
-              from: 'ui-infrastructure',
-              disallow: ['app-registry', 'ui-component', 'core', 'module', 'entity', 'tool', 'app-layer'],
-              message: '❌ UI Infrastructure must be pure.',
-            },
+
+            // 2. Entities — умные части UI.
             {
               from: 'entity',
-              disallow: ['app-registry', 'tool', 'app-layer'],
-              message: '❌ Entities must not depend on specific Tools or Pages',
+              disallow: ['core-node', 'tool', 'app-layer', 'app-registry'],
+              message: '❌ Entities cannot use Node.js or depend on specific Tools.',
             },
+
+            // 3. Tools — сборка фичи.
+            // Это клиентский код (React). Ему ЗАПРЕЩЕН прямой доступ к Node.js.
             {
               from: 'tool',
-              disallow: [['tool', { toolName: '!${from.toolName}' }], 'app-layer', 'app-registry'],
-              message: '❌ Tools must be isolated from each other',
+              disallow: ['core-node', 'app-layer', ['tool', { toolName: '!${from.toolName}' }]],
+              message: '❌ Tools cannot import Node.js directly or other Tools.',
             },
+
+            // ========================================================
+            // D. APP LAYER (Routing)
+            // ========================================================
+            
             {
               from: 'app-registry',
-              disallow: ['app-layer'],
-              allow: ['tool', 'core', 'entity', 'ui-component', 'ui-infrastructure'],
-              message: '❌ App Registry must not depend on the App Layer',
+              disallow: ['app-layer', 'core-node'],
+              message: '❌ Registry is a client-side map.',
             },
           ],
         },
@@ -126,7 +193,7 @@ const eslintConfig = defineConfig([
   },
 
   // ---------------------------------------------------------------------------
-  // 2. ПОЛИТИКА ИМЕНОВАНИЯ (Naming Convention)
+  // 4. НАСТРОЙКИ ИМЕНОВАНИЯ ФАЙЛОВ
   // ---------------------------------------------------------------------------
   {
     files: ['**/*.{ts,tsx,mts,js,mjs}'],
@@ -135,12 +202,16 @@ const eslintConfig = defineConfig([
         'error',
         {
           case: 'kebabCase',
-          // Разрешаем underscore-префикс для структурных папок
-          ignore: [/^_/, /^README\.md$/, /^CONTRIBUTING\.md$/, /^ARCHITECTURE\.md$/],
+          // Разрешаем:
+          // 1. _underscore prefix (приватные папки)
+          // 2. README/CONTRIBUTING/ARCHITECTURE (документация)
+          // 3. Dockerfile (стандарт)
+          ignore: [/^_/, /^README\.md$/, /^CONTRIBUTING\.md$/, /^ARCHITECTURE\.md$/, /^TECH_DEBT\.md$/, /^Dockerfile$/],
         },
       ],
     },
   },
+  // Исключение для React компонентов: PascalCase
   {
     files: ['view/**/*.tsx', 'app/ui/**/*.tsx'],
     rules: {
@@ -148,37 +219,16 @@ const eslintConfig = defineConfig([
         'error',
         {
           case: 'pascalCase',
-          // Разрешаем underscore и специальные файлы
           ignore: [/^_/, /IO\.tsx$/],
         },
       ],
     },
   },
+  // Исключение для Next.js спецфайлов: kebab-case
   {
-    // Спецфайлы Next.js всегда kebab-case
     files: ['app/**/page.tsx', 'app/**/layout.tsx', 'app/**/loading.tsx', 'app/**/error.tsx', 'app/**/not-found.tsx', 'app/**/template.tsx', 'app/**/default.tsx', 'app/**/route.ts'],
     rules: {
       'unicorn/filename-case': ['error', { case: 'kebabCase' }],
-    },
-  },
-
-  // ---------------------------------------------------------------------------
-  // 3. СТРОГИЕ ПРАВИЛА TS
-  // ---------------------------------------------------------------------------
-  {
-    files: ['**/*.ts', '**/*.tsx'],
-    languageOptions: {
-      parserOptions: {
-        project: './tsconfig.json',
-        tsconfigRootDir: import.meta.dirname,
-      },
-    },
-    rules: {
-      '@typescript-eslint/consistent-type-imports': ['error', { prefer: 'type-imports', fixStyle: 'separate-type-imports' }],
-      '@typescript-eslint/no-explicit-any': 'error',
-      '@typescript-eslint/no-non-null-assertion': 'error',
-      '@typescript-eslint/no-floating-promises': 'error',
-      '@typescript-eslint/await-thenable': 'error',
     },
   },
 

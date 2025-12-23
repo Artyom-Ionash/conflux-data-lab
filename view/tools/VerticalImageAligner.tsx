@@ -4,18 +4,18 @@ import Image from 'next/image';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { filter, map, pipe } from 'remeda';
 
-import { rgbToHex } from '@/lib/core/utils/colors';
-import { getTopLeftPixelColor, loadImage, revokeObjectURLSafely } from '@/lib/core/utils/media';
+import { getTopLeftPixelColor, loadImage, revokeObjectURLSafely } from '@/core/browser/canvas';
+import { rgbToHex } from '@/core/primitives/colors';
+import { cn } from '@/core/tailwind/utils';
 import {
   bakeVerticalStack,
   calculateCenterOffset,
   type CompositionLayer,
-} from '@/lib/modules/graphics/processing/composition';
+} from '@/lib/graphics/processing/composition';
 import { CanvasMovable, useCanvasRef } from '@/view/ui/canvas/Canvas';
 import { SortableList } from '@/view/ui/canvas/SortableList';
 import { ActionGroup } from '@/view/ui/container/ActionGroup';
 import { StatusBox } from '@/view/ui/container/StatusBox';
-import { cn } from '@/view/ui/infrastructure/standards';
 import { Button } from '@/view/ui/input/Button';
 import { Slider } from '@/view/ui/input/Slider';
 import { Switch } from '@/view/ui/input/Switch';

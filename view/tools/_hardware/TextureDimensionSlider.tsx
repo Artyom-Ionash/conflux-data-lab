@@ -1,5 +1,6 @@
 import React from 'react';
 
+import { cn } from '@/core/tailwind/utils';
 import {
   analyzeTextureSize,
   getNearestPoT,
@@ -7,9 +8,8 @@ import {
   isPowerOfTwo,
   TEXTURE_LIMITS,
   TEXTURE_ZONES,
-} from '@/lib/modules/graphics/standards';
+} from '@/lib/graphics/standards';
 import { Tooltip } from '@/view/ui/feedback/ZoneIndicator';
-import { cn } from '@/view/ui/infrastructure/standards';
 
 interface TextureDimensionSliderProps {
   label: string;

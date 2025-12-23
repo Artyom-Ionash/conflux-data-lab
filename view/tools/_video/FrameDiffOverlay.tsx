@@ -1,8 +1,8 @@
 import Image from 'next/image';
 import { useEffect, useRef, useState } from 'react';
 
-import { areColorsSimilar } from '@/lib/core/utils/colors';
-import { captureToCanvas, getTopLeftPixelColor, loadImage } from '@/lib/core/utils/media';
+import { captureToCanvas, getTopLeftPixelColor, loadImage } from '@/core/browser/canvas';
+import { areColorsSimilar } from '@/core/primitives/colors';
 // import { getCanvasFromImage } from '@/ui/Canvas'; // УДАЛЕНО
 
 interface FrameDiffOverlayProps {

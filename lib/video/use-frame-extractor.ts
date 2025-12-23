@@ -1,15 +1,15 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
-import { useDebounceEffect } from '@/lib/core/hooks/use-debounce-effect';
-import { useObjectUrl } from '@/lib/core/hooks/use-object-url';
-import { downloadDataUrl } from '@/lib/core/utils/media';
+import { downloadDataUrl } from '@/core/browser/canvas';
+import { useDebounceEffect } from '@/core/react/hooks/use-debounce';
+import { useObjectUrl } from '@/core/react/hooks/use-object-url';
 import {
   calculateTimestamps,
   type ExtractedFrame,
   type ExtractionParams,
   runExtractionTask,
-} from '@/lib/modules/video/extraction';
-import { createGif } from '@/lib/modules/video/gif-encoder';
+} from '@/lib/video/extraction';
+import { createGif } from '@/lib/video/gif-encoder';
 
 const DEFAULT_CLIP_DURATION = 0.5;
 const DEFAULT_FRAME_STEP = 0.1;

@@ -11,8 +11,8 @@ import React, {
   useState,
 } from 'react';
 
-import { cn, TRANSPARENCY_PATTERN_CSS } from '@/view/ui/infrastructure/standards';
-import { useElementSize } from '@/view/ui/infrastructure/use-element-size';
+import { useElementSize } from '@/core/react/hooks/use-element-size';
+import { cn, TRANSPARENCY_PATTERN_CSS } from '@/core/tailwind/utils';
 
 // --- CONFIGURATION CONSTANTS ---
 

@@ -1,5 +1,5 @@
 // lib/modules/context-generator/core.ts
-import { formatBytes } from '@/lib/modules/file-system/topology';
+import { formatBytes } from '@/lib/file-system/topology';
 
 import { calculateFileScore } from './_assembly';
 

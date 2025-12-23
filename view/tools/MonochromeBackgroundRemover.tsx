@@ -3,17 +3,17 @@
 import Image from 'next/image';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 
-import { useDebounceEffect } from '@/lib/core/hooks/use-debounce-effect';
-import { useFileMetadata } from '@/lib/core/hooks/use-file-metadata';
-import { useWorker } from '@/lib/core/hooks/use-worker';
-import { hexToRgb, invertHex, rgbToHex } from '@/lib/core/utils/colors';
-import { downloadDataUrl } from '@/lib/core/utils/media';
+import { downloadDataUrl } from '@/core/browser/canvas';
+import { hexToRgb, invertHex, rgbToHex } from '@/core/primitives/colors';
+import { useDebounceEffect } from '@/core/react/hooks/use-debounce';
+import { useFileMetadata } from '@/core/react/hooks/use-file-metadata';
+import { useWorker } from '@/core/react/hooks/use-worker';
 import type {
   ProcessingMode,
   WorkerPayload,
   WorkerResponse,
-} from '@/lib/modules/graphics/processing/background-engine.worker';
-import type { Point } from '@/lib/modules/graphics/processing/imaging';
+} from '@/lib/graphics/processing/background-engine.worker';
+import type { Point } from '@/lib/graphics/processing/imaging';
 import { CanvasMovable, useCanvasRef } from '@/view/ui/canvas/Canvas';
 import { ActionGroup } from '@/view/ui/container/ActionGroup';
 import { StatusBox } from '@/view/ui/container/StatusBox';
@@ -89,9 +89,7 @@ export function MonochromeBackgroundRemover() {
 
   const createWorker = useCallback(
     () =>
-      new Worker(
-        new URL('@/lib/modules/graphics/processing/background-engine.worker.ts', import.meta.url)
-      ),
+      new Worker(new URL('@/lib/graphics/processing/background-engine.worker.ts', import.meta.url)),
     []
   );
 

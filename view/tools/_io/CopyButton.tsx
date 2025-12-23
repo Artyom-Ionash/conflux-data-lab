@@ -2,7 +2,7 @@
 
 import React from 'react';
 
-import { cn } from '@/view/ui/infrastructure/standards';
+import { cn } from '@/core/tailwind/utils';
 import { Button, type ButtonProps } from '@/view/ui/input/Button';
 
 interface CopyButtonProps extends Omit<ButtonProps, 'onClick'> {

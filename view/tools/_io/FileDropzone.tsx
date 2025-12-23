@@ -8,13 +8,9 @@ import {
   type DirectorySupport,
   getLegacyDirectoryAttributes,
   LEGACY_MESSAGES,
-} from '@/lib/modules/file-system/legacy';
-import {
-  filterFileList,
-  scanDirectoryHandle,
-  scanEntries,
-} from '@/lib/modules/file-system/scanner';
-import { cn } from '@/view/ui/infrastructure/standards';
+} from '@/core/browser/legacy';
+import { cn } from '@/core/tailwind/utils';
+import { filterFileList, scanDirectoryHandle, scanEntries } from '@/lib/context-generator/scanner';
 
 interface FileDropzoneProps {
   onFilesSelected: (files: File[]) => void;

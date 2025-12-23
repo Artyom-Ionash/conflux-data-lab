@@ -2,12 +2,12 @@
 
 import React, { useCallback, useState } from 'react';
 
-import { useCopyToClipboard } from '@/lib/core/hooks/use-copy-to-clipboard';
-import { downloadText } from '@/lib/core/utils/media';
-import { type ContextStats } from '@/lib/modules/context-generator/core';
-import { runContextPipeline } from '@/lib/modules/context-generator/engine';
-import { CONTEXT_PRESETS, type PresetKey } from '@/lib/modules/context-generator/rules';
-import { useBundleManager } from '@/lib/modules/context-generator/use-bundle-manager';
+import { downloadText } from '@/core/browser/canvas';
+import { useCopyToClipboard } from '@/core/react/hooks/use-copy';
+import { type ContextStats } from '@/lib/context-generator/core';
+import { runContextPipeline } from '@/lib/context-generator/engine';
+import { CONTEXT_PRESETS, type PresetKey } from '@/lib/context-generator/rules';
+import { useBundleManager } from '@/lib/context-generator/use-bundle-manager';
 import { ProcessingOverlay } from '@/view/ui/feedback/ProcessingOverlay';
 import { Button } from '@/view/ui/input/Button';
 import { Field } from '@/view/ui/input/Field';

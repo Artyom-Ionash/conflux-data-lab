@@ -3,7 +3,7 @@
 import * as Dialog from '@radix-ui/react-dialog';
 import React from 'react';
 
-import { cn } from '../infrastructure/standards';
+import { cn } from '../../../core/tailwind/utils';
 
 interface ModalProps {
   isOpen: boolean;

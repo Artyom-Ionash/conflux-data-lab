@@ -2,7 +2,7 @@
  * Универсальные функции для компоновки и запекания многослойных изображений.
  */
 
-import { downloadDataUrl, loadImage } from '@/lib/core/utils/media';
+import { downloadDataUrl, loadImage } from '@/core/browser/canvas';
 
 export interface CompositionLayer {
   url: string;

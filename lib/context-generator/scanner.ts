@@ -4,7 +4,7 @@
 
 import ignore from 'ignore';
 
-import { LOCAL_CONTEXT_FOLDER, MANDATORY_REPO_FILES } from '../context-generator/rules';
+import { LOCAL_CONTEXT_FOLDER, MANDATORY_REPO_FILES } from './rules';
 
 export interface ScanOptions {
   ignorePatterns?: string[];

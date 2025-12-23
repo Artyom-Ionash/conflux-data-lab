@@ -2,7 +2,7 @@
 
 import React from 'react';
 
-import { cn } from '../infrastructure/standards';
+import { cn } from '../../../core/tailwind/utils';
 
 interface ActionGroupProps {
   children: React.ReactNode;

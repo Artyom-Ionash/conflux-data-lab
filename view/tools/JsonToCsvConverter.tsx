@@ -2,9 +2,9 @@
 
 import { useState } from 'react';
 
-import { useCopyToClipboard } from '@/lib/core/hooks/use-copy-to-clipboard';
-import { downloadText } from '@/lib/core/utils/media';
-import { convertJsonToCsv } from '@/lib/modules/converters/json-to-csv';
+import { downloadText } from '@/core/browser/canvas';
+import { useCopyToClipboard } from '@/core/react/hooks/use-copy';
+import { convertJsonToCsv } from '@/lib/converters/json-to-csv';
 import { Card } from '@/view/ui/container/Card';
 import { Button } from '@/view/ui/input/Button';
 import { TextArea } from '@/view/ui/input/Input';

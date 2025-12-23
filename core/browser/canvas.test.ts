@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { getTopLeftPixelColor,waitForVideoFrame } from './media';
+import { getTopLeftPixelColor, waitForVideoFrame } from './canvas';
 
 // --- TYPE DEFINITIONS FOR JSDOM ENVIRONMENT ---
 interface VideoFrameMetadata {
