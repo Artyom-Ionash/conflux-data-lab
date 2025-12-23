@@ -24,6 +24,18 @@
 - **Strict TypeScript:** Используйте строгую типизацию. Проект настроен на максимальную строгость (`noUncheckedIndexedAccess`).
 - **Imports:** Сортировка импортов происходит автоматически при сохранении.
 
+### Правила Именования (Naming Convention)
+
+Мы следуем строгой семантике файловой системы:
+
+1.  **Папки (Directories):**
+    - Строго **kebab-case**: `view/tools`, `lib/file-system`.
+    - **\_underscore-prefix**: Для структурных/приватных папок (`_ui`, `_registry`, `_graphics`).
+
+2.  **Файлы (Files):**
+    - **PascalCase**: Только для React-компонентов и классов (`Button.tsx`, `ToolCard.tsx`).
+    - **kebab-case**: Для хуков, утилит, конфигов и страниц Next.js (`use-worker.ts`, `page.tsx`, `layout.tsx`).
+
 ### Правила комментирования
 
 1.  **Язык:** Комментарии — на **русском**, код — на **английском**.

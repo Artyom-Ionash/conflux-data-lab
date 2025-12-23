@@ -62,7 +62,7 @@ export function JsonToCsvConverter() {
       const text = await file.text();
       setJsonInput(text);
       handleConvert(text);
-    } catch (err) {
+    } catch {
       setError('Не удалось прочитать файл');
     }
   };
