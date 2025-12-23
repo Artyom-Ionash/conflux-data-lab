@@ -1,16 +1,17 @@
 'use client';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
+import { useCopyToClipboard } from '@/lib/core/hooks/use-copy-to-clipboard'; // Добавил для полноты, хотя тут не используется
 import { downloadDataUrl } from '@/lib/core/utils/media';
 import { generateSpriteSheet } from '@/lib/modules/graphics/processing/sprite-generator';
 import { TEXTURE_LIMITS } from '@/lib/modules/graphics/standards';
 import { useFrameExtractor } from '@/lib/modules/video/use-frame-extractor';
 import { FileDropzone, FileDropzonePlaceholder } from '@/view/tools/io/FileDropzone';
+import { Button } from '@/view/ui/Button';
 import { Card } from '@/view/ui/Card';
 import { MultiScalePreview } from '@/view/ui/collections/MultiScalePreview';
 import { ColorInput } from '@/view/ui/ColorInput';
 import { ControlLabel, ControlSection } from '@/view/ui/ControlSection';
-import { DownloadButton } from '@/view/ui/DownloadButton';
 import { EngineRoom } from '@/view/ui/EngineRoom';
 import { ImageSequencePlayer } from '@/view/ui/ImageSequencePlayer';
 import { InfoBadge } from '@/view/ui/InfoBadge';
@@ -340,10 +341,13 @@ export function VideoFrameExtractor() {
                 title={<ControlLabel>Разница</ControlLabel>}
                 headerActions={
                   diffDataUrl ? (
-                    <DownloadButton
-                      onDownload={() => downloadDataUrl(diffDataUrl, 'diff.png')}
+                    <Button
+                      onClick={() => downloadDataUrl(diffDataUrl ?? '', 'diff.png')}
                       variant="link"
-                    />
+                      size="xs"
+                    >
+                      Скачать
+                    </Button>
                   ) : undefined
                 }
                 contentClassName="p-0"
@@ -387,14 +391,14 @@ export function VideoFrameExtractor() {
                 }
                 headerActions={
                   state.frames.length > 0 && !state.status.isProcessing ? (
-                    <DownloadButton
-                      onDownload={actions.generateAndDownloadGif}
+                    <Button
+                      onClick={actions.generateAndDownloadGif}
                       variant="link"
-                      label={
-                        state.status.currentStep === 'generating' ? 'Кодирование...' : 'Скачать GIF'
-                      }
+                      size="xs"
                       disabled={state.status.isProcessing}
-                    />
+                    >
+                      {state.status.currentStep === 'generating' ? 'Кодирование...' : 'Скачать GIF'}
+                    </Button>
                   ) : undefined
                 }
                 contentClassName="p-0"
@@ -444,12 +448,14 @@ export function VideoFrameExtractor() {
                     <Stack gap={0} className="w-48">
                       <TextureLimitIndicator value={totalSpriteWidth} label="ШИРИНА" />
                     </Stack>
-                    <DownloadButton
-                      onDownload={handleDownloadSpriteSheet}
+                    <Button
+                      onClick={handleDownloadSpriteSheet}
                       variant="link"
-                      label="Скачать PNG"
+                      size="xs"
                       disabled={totalSpriteWidth > MAX_BROWSER_TEXTURE}
-                    />
+                    >
+                      Скачать PNG
+                    </Button>
                   </Group>
                 )
               }

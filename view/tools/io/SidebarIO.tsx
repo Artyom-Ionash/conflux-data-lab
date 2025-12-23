@@ -2,7 +2,7 @@
 
 import React from 'react';
 
-import { DownloadButton } from '@/view/ui/DownloadButton';
+import { Button } from '@/view/ui/Button';
 import { Stack } from '@/view/ui/Layout';
 
 import { FileDropzone } from './FileDropzone';
@@ -31,7 +31,6 @@ interface SidebarIOProps {
 }
 
 /**
- * [КРИСТАЛЛ] SidebarIO
  * Унифицированный узел Ingestion (ввод) и Egestion (вывод).
  */
 export function SidebarIO({
@@ -63,12 +62,17 @@ export function SidebarIO({
 
       {hasFiles && onDownload && (
         <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
-          <DownloadButton
-            onDownload={onDownload}
-            label={isDownloading ? 'Экспорт...' : downloadLabel}
+          <Button
+            onClick={(e) => {
+              e.preventDefault();
+              onDownload();
+            }}
             disabled={isDownloading || downloadDisabled}
             className="w-full shadow-sm"
-          />
+            variant="default"
+          >
+            {isDownloading ? 'Экспорт...' : downloadLabel}
+          </Button>
         </div>
       )}
 

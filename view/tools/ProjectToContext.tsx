@@ -8,6 +8,8 @@ import { type ContextStats } from '@/lib/modules/context-generator/core';
 import { runContextPipeline } from '@/lib/modules/context-generator/engine';
 import { CONTEXT_PRESETS, type PresetKey } from '@/lib/modules/context-generator/rules';
 import { useBundleManager } from '@/lib/modules/context-generator/use-bundle-manager';
+import { Field, TextInput } from '@/view/tools/io/Input';
+import { Button } from '@/view/ui/Button';
 import { InfoBadge } from '@/view/ui/InfoBadge';
 import { Stack } from '@/view/ui/Layout';
 import { ProcessingOverlay } from '@/view/ui/ProcessingOverlay';
@@ -15,7 +17,6 @@ import { Switch } from '@/view/ui/Switch';
 import { ToggleGroup, ToggleGroupItem } from '@/view/ui/ToggleGroup';
 import { Workbench } from '@/view/ui/Workbench';
 
-import { Field, TextInput } from './io/Input';
 import { ResultViewer } from './io/ResultViewer';
 import { SidebarIO } from './io/SidebarIO';
 
@@ -186,15 +187,15 @@ export function ProjectToContext() {
           />
         </Stack>
 
-        {/* Кнопка повторной генерации (Синяя), если пользователь изменил настройки */}
         {filteredPaths.length > 0 && (
-          <button
+          <Button
             onClick={() => void processFiles()}
             disabled={processing}
-            className="w-full rounded-md bg-blue-600 py-2.5 text-xs font-bold tracking-wide text-white uppercase shadow-sm transition-all hover:bg-blue-700 active:scale-95 disabled:opacity-50"
+            variant="default" // FIX: Было 'primary'
+            className="w-full bg-blue-600 font-bold tracking-wide text-white uppercase hover:bg-blue-700 dark:bg-blue-600 dark:hover:bg-blue-500" // Сохраняем синий цвет через className
           >
             {processing ? 'Обновление...' : 'Обновить контекст'}
-          </button>
+          </Button>
         )}
       </Stack>
 

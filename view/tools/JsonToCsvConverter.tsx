@@ -6,7 +6,7 @@ import { useCopyToClipboard } from '@/lib/core/hooks/use-copy-to-clipboard';
 import { downloadText } from '@/lib/core/utils/media';
 import { convertJsonToCsv } from '@/lib/modules/converters/json-to-csv';
 import { TextArea } from '@/view/tools/io/Input';
-import { ActionButton } from '@/view/ui/ActionGroup';
+import { Button } from '@/view/ui/Button'; // Заменили ActionButton
 import { Card } from '@/view/ui/Card';
 import { Stack } from '@/view/ui/Layout';
 import { Workbench } from '@/view/ui/Workbench';
@@ -14,7 +14,6 @@ import { Workbench } from '@/view/ui/Workbench';
 import { ResultViewer } from './io/ResultViewer';
 import { SidebarIO } from './io/SidebarIO';
 
-// Пример данных для демонстрации работы
 const DEFAULT_EXAMPLE = JSON.stringify(
   [
     { id: 1, name: 'Engineer', department: 'R&D', active: true },
@@ -26,11 +25,8 @@ const DEFAULT_EXAMPLE = JSON.stringify(
 );
 
 export function JsonToCsvConverter() {
-  // Инициализируем инпут дефолтным значением
   const [jsonInput, setJsonInput] = useState(DEFAULT_EXAMPLE);
 
-  // Ленивая инициализация: сразу конвертируем дефолтный пример,
-  // чтобы пользователь видел результат при первом рендере
   const [csvOutput, setCsvOutput] = useState(() => {
     try {
       return convertJsonToCsv(DEFAULT_EXAMPLE);
@@ -105,7 +101,8 @@ export function JsonToCsvConverter() {
             >
               <div className="flex items-center justify-between border-b border-zinc-200 bg-zinc-50 px-4 py-2 dark:border-zinc-800 dark:bg-zinc-900">
                 <span className="text-xs font-semibold text-zinc-500 uppercase">Input JSON</span>
-                <ActionButton
+                {/* Замена ActionButton на универсальный Button */}
+                <Button
                   onClick={() => {
                     setJsonInput('');
                     setCsvOutput('');
@@ -115,13 +112,12 @@ export function JsonToCsvConverter() {
                   size="xs"
                 >
                   Очистить
-                </ActionButton>
+                </Button>
               </div>
               <TextArea
                 value={jsonInput}
                 onChange={(e) => {
                   setJsonInput(e.target.value);
-                  // Очищаем ошибку при вводе
                   if (error) setError('');
                 }}
                 onBlur={() => handleConvert()}

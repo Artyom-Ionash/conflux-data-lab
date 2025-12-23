@@ -17,7 +17,8 @@ import type { Point } from '@/lib/modules/graphics/processing/imaging';
 import { WorkbenchCanvas } from '@/view/tools/graphics/WorkbenchCanvas';
 import { FileDropzonePlaceholder } from '@/view/tools/io/FileDropzone';
 import { SidebarIO } from '@/view/tools/io/SidebarIO';
-import { ActionButton, ActionGroup } from '@/view/ui/ActionGroup';
+import { ActionGroup } from '@/view/ui/ActionGroup';
+import { Button } from '@/view/ui/Button';
 import { CanvasMovable, useCanvasRef } from '@/view/ui/Canvas';
 import { ColorInput } from '@/view/ui/ColorInput';
 import { ControlLabel, ControlSection } from '@/view/ui/ControlSection';
@@ -397,29 +398,33 @@ export function MonochromeBackgroundRemover() {
           {processingMode === 'flood-clear' && (
             <StatusBox title={`Точки: ${floodPoints.length}`}>
               <ActionGroup>
-                <ActionButton
+                <Button
                   onClick={removeLastPoint}
                   disabled={floodPoints.length === 0}
                   className="flex-1"
+                  variant="secondary"
+                  size="xs"
                 >
                   Отменить
-                </ActionButton>
-                <ActionButton
+                </Button>
+                <Button
                   onClick={clearAllPoints}
                   disabled={floodPoints.length === 0}
                   variant="destructive"
                   className="flex-1"
+                  size="xs"
                 >
                   Сбросить
-                </ActionButton>
+                </Button>
               </ActionGroup>
-              <button
+              <Button
                 onClick={handleRunFloodFill}
                 disabled={floodPoints.length === 0 || isProcessing}
-                className="w-full rounded bg-blue-600 py-2.5 text-xs font-bold tracking-wide text-white uppercase shadow-sm hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+                variant="default" // Синяя по умолчанию
+                className="mt-2 w-full font-bold tracking-wide uppercase"
               >
                 {isProcessing ? 'Обработка...' : 'Принудительно обновить'}
-              </button>
+              </Button>
             </StatusBox>
           )}
         </Stack>

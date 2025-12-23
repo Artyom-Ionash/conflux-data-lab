@@ -15,7 +15,8 @@ import { WorkbenchCanvas } from '@/view/tools/graphics/WorkbenchCanvas';
 import { TextureDimensionSlider } from '@/view/tools/hardware/TextureDimensionSlider';
 import { FileDropzonePlaceholder } from '@/view/tools/io/FileDropzone';
 import { SidebarIO } from '@/view/tools/io/SidebarIO';
-import { ActionButton, ActionGroup } from '@/view/ui/ActionGroup';
+import { ActionGroup } from '@/view/ui/ActionGroup';
+import { Button } from '@/view/ui/Button';
 import { CanvasMovable, useCanvasRef } from '@/view/ui/Canvas';
 import { ControlSection, SectionHeader } from '@/view/ui/ControlSection';
 import { InfoBadge } from '@/view/ui/InfoBadge';
@@ -239,8 +240,10 @@ export function VerticalImageAligner() {
     >
       <span className="w-6 font-mono text-zinc-400">#{index + 1}</span>
       <span className="flex-1 truncate font-medium">{img.name}</span>
-      <ActionButton
+      <Button
         variant="destructive"
+        size="xs"
+        className="h-6 w-6 p-0"
         onClick={(e) => {
           e.stopPropagation();
           handleRemoveImage(img.id);
@@ -248,7 +251,7 @@ export function VerticalImageAligner() {
         onPointerDown={(e) => e.stopPropagation()}
       >
         ✕
-      </ActionButton>
+      </Button>
     </Group>
   );
 
@@ -352,22 +355,24 @@ export function VerticalImageAligner() {
               title="Слои"
               actions={
                 <ActionGroup attached>
-                  <ActionButton
-                    variant="mono"
+                  <Button
+                    variant="secondary"
                     size="xs"
                     onClick={handleCenterAllX}
                     title="Центрировать по горизонтали"
+                    className="rounded-r-none font-mono text-[10px]"
                   >
                     |X|
-                  </ActionButton>
-                  <ActionButton
-                    variant="mono"
+                  </Button>
+                  <Button
+                    variant="secondary"
                     size="xs"
                     onClick={handleCenterAllY}
                     title="Центрировать по вертикали"
+                    className="rounded-l-none border-l border-zinc-300 font-mono text-[10px] dark:border-zinc-700"
                   >
                     ≡Y≡
-                  </ActionButton>
+                  </Button>
                 </ActionGroup>
               }
             />

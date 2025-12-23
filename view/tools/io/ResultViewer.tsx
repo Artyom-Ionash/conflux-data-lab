@@ -2,9 +2,9 @@
 
 import React from 'react';
 
+import { CopyButton } from '@/view/tools/io/CopyButton';
+import { Button } from '@/view/ui/Button';
 import { Card } from '@/view/ui/Card';
-import { CopyButton } from '@/view/ui/CopyButton';
-import { DownloadButton } from '@/view/ui/DownloadButton';
 import { Group } from '@/view/ui/Layout';
 
 interface ResultViewerProps {
@@ -41,9 +41,31 @@ export function ResultViewer({
       headerActions={
         value ? (
           <Group gap={2}>
-            <CopyButton onCopy={() => onCopy(value)} isCopied={isCopied} variant="subtle" />
+            {/* CopyButton теперь принимает outline как дефолт, что нам и нужно для тулбара */}
+            <CopyButton
+              onCopy={() => onCopy(value)}
+              isCopied={isCopied}
+              variant="outline"
+              size="xs"
+            />
             {onDownload && (
-              <DownloadButton onDownload={onDownload} variant="primary" label={downloadLabel} />
+              <Button onClick={onDownload} variant="default" size="xs">
+                <svg
+                  width="12"
+                  height="12"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v4" />
+                  <polyline points="7 10 12 15 17 10" />
+                  <line x1="12" y1="15" x2="12" y2="3" />
+                </svg>
+                {downloadLabel}
+              </Button>
             )}
           </Group>
         ) : null
