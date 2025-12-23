@@ -2,8 +2,8 @@
 
 import React from 'react';
 
-import { Button, type ButtonProps } from '@/view/ui/Button';
 import { cn } from '@/view/ui/infrastructure/standards';
+import { Button, type ButtonProps } from '@/view/ui/input/Button';
 
 interface CopyButtonProps extends Omit<ButtonProps, 'onClick'> {
   onCopy: () => void;

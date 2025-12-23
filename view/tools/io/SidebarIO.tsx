@@ -2,8 +2,8 @@
 
 import React from 'react';
 
-import { Button } from '@/view/ui/Button';
-import { Stack } from '@/view/ui/Layout';
+import { Button } from '@/view/ui/input/Button';
+import { Stack } from '@/view/ui/layout/Layout';
 
 import { FileDropzone } from './FileDropzone';
 

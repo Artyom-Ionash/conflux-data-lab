@@ -3,7 +3,7 @@
 import React from 'react';
 
 import { cn } from '../../ui/infrastructure/standards';
-import { Typography } from '../../ui/Typography';
+import { Typography } from '../../ui/primitive/Typography';
 
 // --- SUB-COMPONENT: SectionHeader ---
 interface SectionHeaderProps {

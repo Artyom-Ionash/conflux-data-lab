@@ -16,18 +16,18 @@ import { TextureDimensionSlider } from '@/view/tools/hardware/TextureDimensionSl
 import { ControlSection, SectionHeader } from '@/view/tools/io/ControlSection';
 import { FileDropzonePlaceholder } from '@/view/tools/io/FileDropzone';
 import { SidebarIO } from '@/view/tools/io/SidebarIO';
-import { ActionGroup } from '@/view/ui/ActionGroup';
-import { Button } from '@/view/ui/Button';
-import { CanvasMovable, useCanvasRef } from '@/view/ui/Canvas';
-import { Indicator } from '@/view/ui/Indicator'; // Импорт Indicator
+import { CanvasMovable, useCanvasRef } from '@/view/ui/canvas/Canvas';
+import { SortableList } from '@/view/ui/canvas/SortableList';
+import { ActionGroup } from '@/view/ui/container/ActionGroup';
+import { StatusBox } from '@/view/ui/container/StatusBox';
 import { cn } from '@/view/ui/infrastructure/standards';
-import { SortableList } from '@/view/ui/interaction/SortableList';
-import { Group, Stack } from '@/view/ui/Layout';
-import { OverlayLabel } from '@/view/ui/OverlayLabel';
-import { Slider } from '@/view/ui/Slider';
-import { StatusBox } from '@/view/ui/StatusBox';
-import { Switch } from '@/view/ui/Switch';
-import { Workbench } from '@/view/ui/Workbench';
+import { Button } from '@/view/ui/input/Button';
+import { Slider } from '@/view/ui/input/Slider';
+import { Switch } from '@/view/ui/input/Switch';
+import { Group, Stack } from '@/view/ui/layout/Layout';
+import { Workbench } from '@/view/ui/layout/Workbench';
+import { Indicator } from '@/view/ui/primitive/Indicator';
+import { OverlayLabel } from '@/view/ui/primitive/OverlayLabel';
 
 const LIMIT_MAX_BROWSER = 16_384;
 const VIEW_RESET_DELAY = 50;

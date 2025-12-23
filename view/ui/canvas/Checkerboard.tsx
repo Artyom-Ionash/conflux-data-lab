@@ -1,6 +1,6 @@
 import React from 'react';
 
-import { TRANSPARENCY_PATTERN_CSS } from './infrastructure/standards';
+import { TRANSPARENCY_PATTERN_CSS } from '../infrastructure/standards';
 
 interface CheckerboardProps {
   children?: React.ReactNode;

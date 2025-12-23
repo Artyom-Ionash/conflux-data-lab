@@ -3,9 +3,9 @@
 import React from 'react';
 
 import { CopyButton } from '@/view/tools/io/CopyButton';
-import { Button } from '@/view/ui/Button';
-import { Card } from '@/view/ui/Card';
-import { Group } from '@/view/ui/Layout';
+import { Card } from '@/view/ui/container/Card';
+import { Button } from '@/view/ui/input/Button';
+import { Group } from '@/view/ui/layout/Layout';
 
 interface ResultViewerProps {
   title: React.ReactNode;

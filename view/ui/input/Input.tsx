@@ -2,7 +2,7 @@
 
 import React, { forwardRef } from 'react';
 
-import { cn } from './infrastructure/standards';
+import { cn } from '../infrastructure/standards';
 
 // Базовые стили вынесены, чтобы TextInput и TextArea выглядели одинаково
 const inputStyles = cn(

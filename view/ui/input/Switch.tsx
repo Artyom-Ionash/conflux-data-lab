@@ -3,7 +3,7 @@
 import * as SwitchPrimitives from '@radix-ui/react-switch';
 import React from 'react';
 
-import { cn } from './infrastructure/standards';
+import { cn } from '../infrastructure/standards';
 
 interface SwitchProps {
   checked: boolean;

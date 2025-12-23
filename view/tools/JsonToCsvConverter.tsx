@@ -5,11 +5,11 @@ import { useState } from 'react';
 import { useCopyToClipboard } from '@/lib/core/hooks/use-copy-to-clipboard';
 import { downloadText } from '@/lib/core/utils/media';
 import { convertJsonToCsv } from '@/lib/modules/converters/json-to-csv';
-import { Button } from '@/view/ui/Button';
-import { Card } from '@/view/ui/Card';
-import { TextArea } from '@/view/ui/Input';
-import { Stack } from '@/view/ui/Layout';
-import { Workbench } from '@/view/ui/Workbench';
+import { Card } from '@/view/ui/container/Card';
+import { Button } from '@/view/ui/input/Button';
+import { TextArea } from '@/view/ui/input/Input';
+import { Stack } from '@/view/ui/layout/Layout';
+import { Workbench } from '@/view/ui/layout/Workbench';
 
 import { ResultViewer } from './io/ResultViewer';
 import { SidebarIO } from './io/SidebarIO';
