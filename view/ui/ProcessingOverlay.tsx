@@ -4,67 +4,17 @@ import React, { useEffect, useState } from 'react';
 
 import { cn } from './infrastructure/standards';
 
-// --- SUB-COMPONENT: ProgressBar ---
-// Выделен внутри файла для соблюдения правила изоляции UI.
-
-interface ProgressBarProps {
-  progress: number;
-  label?: string;
-  showValue?: boolean;
-  className?: string;
-  variant?: 'blue' | 'green';
-}
-
-export function ProgressBar({
-  progress,
-  label,
-  showValue = true,
-  className = '',
-  variant = 'blue',
-}: ProgressBarProps) {
-  const safeProgress = Math.max(0, Math.min(100, progress));
-
-  const colors = {
-    blue: 'bg-blue-600',
-    green: 'bg-green-600',
-  };
-
-  const textColors = {
-    blue: 'text-blue-700 dark:text-blue-300',
-    green: 'text-green-700 dark:text-green-300',
-  };
-
-  return (
-    <div className={cn('w-full', className)}>
-      {(label || showValue) && (
-        <div className="mb-1.5 flex justify-between text-xs font-semibold">
-          {label && <span className={textColors[variant]}>{label}</span>}
-          {showValue && <span className="font-mono">{Math.round(safeProgress)}%</span>}
-        </div>
-      )}
-      <div className="h-1.5 w-full overflow-hidden rounded-full bg-zinc-200 dark:bg-zinc-800">
-        <div
-          className={cn('h-full transition-all duration-300 ease-out', colors[variant])}
-          style={{ width: `${safeProgress}%` }}
-        />
-      </div>
-    </div>
-  );
-}
-
-// --- MAIN COMPONENT: ProcessingOverlay ---
-
 interface ProcessingOverlayProps {
   isVisible: boolean;
-  progress?: number;
   message?: string;
+  children?: React.ReactNode;
   className?: string;
 }
 
 export function ProcessingOverlay({
   isVisible,
-  progress,
   message,
+  children,
   className = '',
 }: ProcessingOverlayProps) {
   const [shouldRender, setShouldRender] = useState(isVisible);
@@ -95,9 +45,9 @@ export function ProcessingOverlay({
         className
       )}
     >
-      {progress !== undefined ? (
+      {children ? (
         <div className="w-64 max-w-[80%] rounded-lg border border-zinc-200 bg-white/90 p-4 shadow-xl backdrop-blur-sm dark:border-zinc-700 dark:bg-zinc-900/90">
-          <ProgressBar progress={progress} label={message || 'Обработка...'} />
+          {children}
         </div>
       ) : (
         <div className="flex flex-col items-center gap-3 rounded-lg border border-zinc-200 bg-white/90 p-4 shadow-xl backdrop-blur-sm dark:border-zinc-700 dark:bg-zinc-900/90">

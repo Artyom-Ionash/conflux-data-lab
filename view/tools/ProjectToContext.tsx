@@ -8,9 +8,10 @@ import { type ContextStats } from '@/lib/modules/context-generator/core';
 import { runContextPipeline } from '@/lib/modules/context-generator/engine';
 import { CONTEXT_PRESETS, type PresetKey } from '@/lib/modules/context-generator/rules';
 import { useBundleManager } from '@/lib/modules/context-generator/use-bundle-manager';
-import { Field, TextInput } from '@/view/tools/io/Input';
 import { Button } from '@/view/ui/Button';
+import { Field } from '@/view/ui/Field';
 import { Indicator } from '@/view/ui/Indicator';
+import { TextInput } from '@/view/ui/Input';
 import { Stack } from '@/view/ui/Layout';
 import { ProcessingOverlay } from '@/view/ui/ProcessingOverlay';
 import { Switch } from '@/view/ui/Switch';
@@ -170,16 +171,20 @@ export function ProjectToContext() {
         </Field>
 
         <Stack gap={3}>
-          <TextInput
-            value={customExtensions}
-            onChange={(e) => setCustomExtensions(e.target.value)}
-            placeholder="Расширения через запятую"
-          />
-          <TextInput
-            value={customIgnore}
-            onChange={(e) => setCustomIgnore(e.target.value)}
-            placeholder="*.log, temp/ (игнорирование)"
-          />
+          <Field label="Расширения">
+            <TextInput
+              value={customExtensions}
+              onChange={(e) => setCustomExtensions(e.target.value)}
+              placeholder="Расширения через запятую"
+            />
+          </Field>
+          <Field label="Игнорировать">
+            <TextInput
+              value={customIgnore}
+              onChange={(e) => setCustomIgnore(e.target.value)}
+              placeholder="*.log, temp/"
+            />
+          </Field>
           <Switch
             label="Генерировать дерево"
             checked={includeTree}
@@ -191,8 +196,8 @@ export function ProjectToContext() {
           <Button
             onClick={() => void processFiles()}
             disabled={processing}
-            variant="default" // FIX: Было 'primary'
-            className="w-full bg-blue-600 font-bold tracking-wide text-white uppercase hover:bg-blue-700 dark:bg-blue-600 dark:hover:bg-blue-500" // Сохраняем синий цвет через className
+            variant="default"
+            className="w-full bg-blue-600 font-bold tracking-wide text-white uppercase hover:bg-blue-700 dark:bg-blue-600 dark:hover:bg-blue-500"
           >
             {processing ? 'Обновление...' : 'Обновить контекст'}
           </Button>

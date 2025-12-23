@@ -1,14 +1,30 @@
+import { cva, type VariantProps } from 'class-variance-authority';
 import React from 'react';
 
-import { TRANSPARENCY_PATTERN_CSS } from './infrastructure/standards';
+import { cn, TRANSPARENCY_PATTERN_CSS } from './infrastructure/standards';
 
-interface ColorInputProps {
+const containerVariants = cva(
+  'group relative cursor-pointer overflow-hidden rounded-lg border border-zinc-200 shadow-sm transition-transform hover:scale-105 dark:border-zinc-700',
+  {
+    variants: {
+      size: {
+        sm: 'h-6 w-6',
+        md: 'h-8 w-8',
+        lg: 'h-10 w-10',
+      },
+    },
+    defaultVariants: {
+      size: 'md',
+    },
+  }
+);
+
+interface ColorInputProps extends VariantProps<typeof containerVariants> {
   value: string | null;
   onChange: (value: string) => void;
   allowTransparent?: boolean;
   onClear?: () => void;
   className?: string;
-  size?: 'sm' | 'md';
 }
 
 export function ColorInput({
@@ -17,17 +33,13 @@ export function ColorInput({
   allowTransparent = false,
   onClear,
   className = '',
-  size = 'md',
+  size,
 }: ColorInputProps) {
-  const sizeClasses = size === 'sm' ? 'h-6 w-6' : 'h-8 w-8';
-  // Если value === null (прозрачный), показываем белый в инпуте, но прозрачный в превью
   const inputValue = value || '#ffffff';
 
   return (
     <div className={`flex items-center gap-2 ${className}`}>
-      <div
-        className={`group relative ${sizeClasses} cursor-pointer overflow-hidden rounded-lg border border-zinc-200 shadow-sm transition-transform hover:scale-105 dark:border-zinc-700`}
-      >
+      <div className={containerVariants({ size })}>
         <input
           type="color"
           className="absolute inset-0 z-10 h-[150%] w-[150%] -translate-x-1/4 -translate-y-1/4 cursor-pointer opacity-0"
@@ -35,7 +47,7 @@ export function ColorInput({
           onInput={(e) => onChange(e.currentTarget.value)}
         />
 
-        {/* Checkerboard pattern (фон) - используем стандарт */}
+        {/* Checkerboard pattern (фон) */}
         <div
           className="absolute inset-0 z-0 bg-white"
           style={{

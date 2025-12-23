@@ -13,12 +13,12 @@ import {
 } from '@/lib/modules/graphics/processing/composition';
 import { WorkbenchCanvas } from '@/view/tools/graphics/WorkbenchCanvas';
 import { TextureDimensionSlider } from '@/view/tools/hardware/TextureDimensionSlider';
+import { ControlSection, SectionHeader } from '@/view/tools/io/ControlSection';
 import { FileDropzonePlaceholder } from '@/view/tools/io/FileDropzone';
 import { SidebarIO } from '@/view/tools/io/SidebarIO';
 import { ActionGroup } from '@/view/ui/ActionGroup';
 import { Button } from '@/view/ui/Button';
 import { CanvasMovable, useCanvasRef } from '@/view/ui/Canvas';
-import { ControlSection, SectionHeader } from '@/view/ui/ControlSection';
 import { Indicator } from '@/view/ui/Indicator'; // Импорт Indicator
 import { cn } from '@/view/ui/infrastructure/standards';
 import { SortableList } from '@/view/ui/interaction/SortableList';

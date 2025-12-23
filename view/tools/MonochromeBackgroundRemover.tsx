@@ -21,7 +21,6 @@ import { ActionGroup } from '@/view/ui/ActionGroup';
 import { Button } from '@/view/ui/Button';
 import { CanvasMovable, useCanvasRef } from '@/view/ui/Canvas';
 import { ColorInput } from '@/view/ui/ColorInput';
-import { ControlLabel, ControlSection } from '@/view/ui/ControlSection';
 import { EngineRoom } from '@/view/ui/EngineRoom';
 import { Group, Stack } from '@/view/ui/Layout';
 import { Separator } from '@/view/ui/Separator';
@@ -30,6 +29,8 @@ import { StatusBox } from '@/view/ui/StatusBox';
 import { ToggleGroup, ToggleGroupItem } from '@/view/ui/ToggleGroup';
 import { Typography } from '@/view/ui/Typography';
 import { Workbench } from '@/view/ui/Workbench';
+
+import { ControlSection } from './io/ControlSection';
 
 // --- CONSTANTS ---
 const DEBOUNCE_DELAY = 50;
@@ -320,7 +321,9 @@ export function MonochromeBackgroundRemover() {
                 >
                   <ColorInput value={targetColor} onChange={setTargetColor} size="sm" />
                   <Stack gap={0}>
-                    <ControlLabel className="text-[10px]! opacity-70">Цель (Фон)</ControlLabel>
+                    <Typography.Text variant="label" className="opacity-70">
+                      Цель (Фон)
+                    </Typography.Text>
                     <Typography.Text className="font-mono text-xs font-bold uppercase">
                       {targetColor}
                     </Typography.Text>
@@ -336,7 +339,9 @@ export function MonochromeBackgroundRemover() {
                 >
                   <ColorInput value={contourColor} onChange={setContourColor} size="sm" />
                   <Stack gap={0}>
-                    <ControlLabel className="text-[10px]! opacity-70">Контур / Окрас</ControlLabel>
+                    <Typography.Text variant="label" className="opacity-70">
+                      Контур / Окрас
+                    </Typography.Text>
                     <Typography.Text className="font-mono text-xs font-bold uppercase">
                       {contourColor}
                     </Typography.Text>
@@ -365,7 +370,7 @@ export function MonochromeBackgroundRemover() {
             )}
             <Separator className="my-2" />
             <Stack gap={4}>
-              <ControlLabel>Удаление ореолов</ControlLabel>
+              <Typography.Text variant="label">Удаление ореолов</Typography.Text>
               <Slider
                 label="Сжатие (Choke)"
                 value={edgeChoke}

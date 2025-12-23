@@ -1,7 +1,7 @@
 'use client';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
-import { useCopyToClipboard } from '@/lib/core/hooks/use-copy-to-clipboard'; // Добавил для полноты, хотя тут не используется
+import { useCopyToClipboard } from '@/lib/core/hooks/use-copy-to-clipboard';
 import { downloadDataUrl } from '@/lib/core/utils/media';
 import { generateSpriteSheet } from '@/lib/modules/graphics/processing/sprite-generator';
 import { TEXTURE_LIMITS } from '@/lib/modules/graphics/standards';
@@ -11,7 +11,6 @@ import { Button } from '@/view/ui/Button';
 import { Card } from '@/view/ui/Card';
 import { MultiScalePreview } from '@/view/ui/collections/MultiScalePreview';
 import { ColorInput } from '@/view/ui/ColorInput';
-import { ControlLabel, ControlSection } from '@/view/ui/ControlSection';
 import { EngineRoom } from '@/view/ui/EngineRoom';
 import { ImageSequencePlayer } from '@/view/ui/ImageSequencePlayer';
 import { Indicator } from '@/view/ui/Indicator';
@@ -22,7 +21,7 @@ import { NumberStepper } from '@/view/ui/NumberStepper';
 import { OverlayLabel } from '@/view/ui/OverlayLabel';
 import { DualHoverPreview } from '@/view/ui/players/DualHoverPreview';
 import { RangeVideoPlayer } from '@/view/ui/players/RangeVideoPlayer';
-import { ProgressBar } from '@/view/ui/ProcessingOverlay';
+import { ProgressBar } from '@/view/ui/ProgressBar';
 import { RangeSlider } from '@/view/ui/RangeSlider';
 import { Separator } from '@/view/ui/Separator';
 import { Surface } from '@/view/ui/Surface';
@@ -33,6 +32,7 @@ import { Workbench } from '@/view/ui/Workbench';
 import { SpriteFrameList } from './graphics/SpriteFrameList';
 // --- DOMAIN IMPORTS ---
 import { TextureLimitIndicator } from './hardware/TextureLimitIndicator';
+import { ControlSection } from './io/ControlSection';
 import { FrameDiffOverlay } from './video/FrameDiffOverlay';
 
 const DEFAULT_ASPECT_RATIO = 1.77;
@@ -224,7 +224,7 @@ export function VideoFrameExtractor() {
             gap={0}
             className="rounded border border-blue-100 bg-blue-50 p-3 dark:border-blue-800 dark:bg-blue-900/20"
           >
-            <ProgressBar progress={state.status.progress} label="Обработка..." />
+            <ProgressBar value={state.status.progress} label="Обработка..." />
           </Stack>
         )}
       </Stack>
@@ -251,7 +251,7 @@ export function VideoFrameExtractor() {
               <Stack gap={4}>
                 <Group justify="between" wrap>
                   <Group gap={6}>
-                    <ControlLabel>Диапазон</ControlLabel>
+                    <Typography.Text variant="label">Диапазон</Typography.Text>
                     <Separator />
                     <NumberStepper
                       label="Шаг (сек)"
@@ -317,7 +317,7 @@ export function VideoFrameExtractor() {
             <Columns desktop={3} gap={4}>
               <Card
                 className="flex flex-col overflow-hidden shadow-sm"
-                title={<ControlLabel>Исходное видео</ControlLabel>}
+                title={<Typography.Text variant="label">Исходное видео</Typography.Text>}
                 contentClassName="p-0"
               >
                 <Stack className="relative w-full bg-black" style={getAspectRatioStyle(videoRatio)}>
@@ -332,7 +332,7 @@ export function VideoFrameExtractor() {
 
               <Card
                 className="flex flex-col overflow-hidden shadow-sm"
-                title={<ControlLabel>Разница</ControlLabel>}
+                title={<Typography.Text variant="label">Разница</Typography.Text>}
                 headerActions={
                   diffDataUrl ? (
                     <Button
@@ -363,7 +363,7 @@ export function VideoFrameExtractor() {
                 className="flex flex-col overflow-hidden shadow-sm"
                 title={
                   <Group gap={4}>
-                    <ControlLabel>Спрайт</ControlLabel>
+                    <Typography.Text variant="label">Спрайт</Typography.Text>
                     <NumberStepper
                       label="Скорость %"
                       value={currentSpeedPercent}

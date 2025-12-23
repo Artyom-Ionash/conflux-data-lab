@@ -2,26 +2,8 @@
 
 import React from 'react';
 
-import { cn } from './infrastructure/standards';
-
-// --- SUB-COMPONENT: ControlLabel ---
-interface ControlLabelProps {
-  children: React.ReactNode;
-  className?: string;
-}
-
-export function ControlLabel({ children, className = '' }: ControlLabelProps) {
-  return (
-    <div
-      className={cn(
-        'text-[10px] font-bold tracking-wider text-zinc-500 uppercase dark:text-zinc-400',
-        className
-      )}
-    >
-      {children}
-    </div>
-  );
-}
+import { cn } from '../../ui/infrastructure/standards';
+import { Typography } from '../../ui/Typography';
 
 // --- SUB-COMPONENT: SectionHeader ---
 interface SectionHeaderProps {
@@ -36,7 +18,7 @@ interface SectionHeaderProps {
 export function SectionHeader({ title, actions, className = '' }: SectionHeaderProps) {
   return (
     <div className={cn('mb-3 flex items-center justify-between px-0.5', className)}>
-      <ControlLabel>{title}</ControlLabel>
+      <Typography.Text variant="label">{title}</Typography.Text>
       {actions && <div className="flex items-center gap-2">{actions}</div>}
     </div>
   );

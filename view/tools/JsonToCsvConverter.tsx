@@ -5,9 +5,9 @@ import { useState } from 'react';
 import { useCopyToClipboard } from '@/lib/core/hooks/use-copy-to-clipboard';
 import { downloadText } from '@/lib/core/utils/media';
 import { convertJsonToCsv } from '@/lib/modules/converters/json-to-csv';
-import { TextArea } from '@/view/tools/io/Input';
-import { Button } from '@/view/ui/Button'; // Заменили ActionButton
+import { Button } from '@/view/ui/Button';
 import { Card } from '@/view/ui/Card';
+import { TextArea } from '@/view/ui/Input';
 import { Stack } from '@/view/ui/Layout';
 import { Workbench } from '@/view/ui/Workbench';
 
@@ -101,7 +101,6 @@ export function JsonToCsvConverter() {
             >
               <div className="flex items-center justify-between border-b border-zinc-200 bg-zinc-50 px-4 py-2 dark:border-zinc-800 dark:bg-zinc-900">
                 <span className="text-xs font-semibold text-zinc-500 uppercase">Input JSON</span>
-                {/* Замена ActionButton на универсальный Button */}
                 <Button
                   onClick={() => {
                     setJsonInput('');
