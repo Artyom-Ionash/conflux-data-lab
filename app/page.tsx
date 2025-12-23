@@ -1,7 +1,7 @@
 import { Badge } from '@/view/ui/primitive/Badge';
 
-import { categoryLabels, TOOLS_MANIFEST, toolsByCategory } from './_registry/inventory';
-import { ToolGrid } from './_ui/catalog/ToolGrid';
+import { categoryLabels, TOOLS_MANIFEST, toolsByCategory } from './registry/inventory';
+import { ToolGrid } from './ui/catalog/ToolGrid';
 
 export default function Home() {
   const featuredTools = TOOLS_MANIFEST.filter((tool) => tool.featured);

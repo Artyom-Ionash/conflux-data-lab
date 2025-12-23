@@ -3,7 +3,7 @@
  * Технологический процесс извлечения последовательности кадров.
  */
 
-import { VideoFrameSampler } from './sampler';
+import { VideoFrameSampler } from './_sampler';
 
 export interface ExtractionParams {
   startTime: number;

@@ -2,7 +2,7 @@
 
 import React, { forwardRef } from 'react';
 
-import { cn } from '../_infrastructure/standards';
+import { cn } from '../infrastructure/standards';
 
 interface SurfaceBaseProps {
   className?: string;

@@ -2,7 +2,7 @@
 
 import React, { useId } from 'react';
 
-import { cn } from '../_infrastructure/standards';
+import { cn } from '../infrastructure/standards';
 
 interface FieldProps {
   label: React.ReactNode;

@@ -5,11 +5,10 @@ import { downloadDataUrl } from '@/lib/core/utils/media';
 import { generateSpriteSheet } from '@/lib/modules/graphics/processing/sprite-generator';
 import { TEXTURE_LIMITS } from '@/lib/modules/graphics/standards';
 import { useFrameExtractor } from '@/lib/modules/video/use-frame-extractor';
-import { FileDropzone, FileDropzonePlaceholder } from '@/view/tools/_io/FileDropzone';
-import { getAspectRatio, getAspectRatioStyle } from '@/view/ui/_infrastructure/standards';
 import { Card } from '@/view/ui/container/Card';
 import { Modal } from '@/view/ui/container/Modal';
 import { ProgressBar } from '@/view/ui/feedback/ProgressBar';
+import { getAspectRatio, getAspectRatioStyle } from '@/view/ui/infrastructure/standards';
 import { Button } from '@/view/ui/input/Button';
 import { ColorInput } from '@/view/ui/input/ColorInput';
 import { NumberStepper } from '@/view/ui/input/NumberStepper';
@@ -32,6 +31,7 @@ import { SpriteFrameList } from './_graphics/SpriteFrameList';
 // --- DOMAIN IMPORTS ---
 import { TextureLimitIndicator } from './_hardware/TextureLimitIndicator';
 import { ControlSection } from './_io/ControlSection';
+import { FileDropzone, FileDropzonePlaceholder } from './_io/FileDropzone';
 import { FrameDiffOverlay } from './_video/FrameDiffOverlay';
 
 const DEFAULT_ASPECT_RATIO = 1.77;

@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import React from 'react';
 
-import { cn } from '../_infrastructure/standards';
+import { cn } from '../infrastructure/standards';
 
 interface WorkbenchProps extends React.HTMLAttributes<HTMLElement> {
   children: React.ReactNode;

@@ -10,10 +10,10 @@ import React, {
   useState,
 } from 'react';
 
-import { cn } from '@/view/ui/_infrastructure/standards';
 import type { CanvasRef } from '@/view/ui/canvas/Canvas';
 import { Canvas } from '@/view/ui/canvas/Canvas';
 import { ProcessingOverlay } from '@/view/ui/feedback/ProcessingOverlay';
+import { cn } from '@/view/ui/infrastructure/standards';
 import { ColorInput } from '@/view/ui/input/ColorInput';
 
 // --- CONFIG ---

@@ -1,6 +1,6 @@
 import { type FileNode, generateAsciiTree } from '@/lib/modules/file-system/topology';
 
-import { processFileToContext, type RawFile } from './assembly';
+import { processFileToContext, type RawFile } from './_assembly';
 import { type ContextGenerationResult, generateContextOutput } from './core';
 import { type ContextPreset } from './rules';
 

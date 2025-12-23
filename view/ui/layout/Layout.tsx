@@ -3,7 +3,7 @@
 import { cva, type VariantProps } from 'class-variance-authority';
 import React, { forwardRef } from 'react';
 
-import { cn } from '../_infrastructure/standards';
+import { cn } from '../infrastructure/standards';
 
 // --- FLEX SYSTEM (Stack & Group) ---
 

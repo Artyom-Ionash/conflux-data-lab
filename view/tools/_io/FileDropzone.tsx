@@ -14,7 +14,7 @@ import {
   scanDirectoryHandle,
   scanEntries,
 } from '@/lib/modules/file-system/scanner';
-import { cn } from '@/view/ui/_infrastructure/standards';
+import { cn } from '@/view/ui/infrastructure/standards';
 
 interface FileDropzoneProps {
   onFilesSelected: (files: File[]) => void;

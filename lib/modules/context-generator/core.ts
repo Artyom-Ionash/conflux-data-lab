@@ -1,7 +1,7 @@
 // lib/modules/context-generator/core.ts
 import { formatBytes } from '@/lib/modules/file-system/topology';
 
-import { calculateFileScore } from './assembly';
+import { calculateFileScore } from './_assembly';
 
 export interface ProcessedContextFile {
   path: string;

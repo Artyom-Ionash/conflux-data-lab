@@ -2,7 +2,7 @@
 
 import React from 'react';
 
-import { cn } from '../_infrastructure/standards';
+import { cn } from '../infrastructure/standards';
 
 interface OverlayLabelProps {
   children: React.ReactNode;

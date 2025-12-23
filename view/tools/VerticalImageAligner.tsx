@@ -11,16 +11,11 @@ import {
   calculateCenterOffset,
   type CompositionLayer,
 } from '@/lib/modules/graphics/processing/composition';
-import { WorkbenchCanvas } from '@/view/tools/_graphics/WorkbenchCanvas';
-import { TextureDimensionSlider } from '@/view/tools/_hardware/TextureDimensionSlider';
-import { ControlSection, SectionHeader } from '@/view/tools/_io/ControlSection';
-import { FileDropzonePlaceholder } from '@/view/tools/_io/FileDropzone';
-import { SidebarIO } from '@/view/tools/_io/SidebarIO';
-import { cn } from '@/view/ui/_infrastructure/standards';
 import { CanvasMovable, useCanvasRef } from '@/view/ui/canvas/Canvas';
 import { SortableList } from '@/view/ui/canvas/SortableList';
 import { ActionGroup } from '@/view/ui/container/ActionGroup';
 import { StatusBox } from '@/view/ui/container/StatusBox';
+import { cn } from '@/view/ui/infrastructure/standards';
 import { Button } from '@/view/ui/input/Button';
 import { Slider } from '@/view/ui/input/Slider';
 import { Switch } from '@/view/ui/input/Switch';
@@ -28,6 +23,12 @@ import { Group, Stack } from '@/view/ui/layout/Layout';
 import { Workbench } from '@/view/ui/layout/Workbench';
 import { Indicator } from '@/view/ui/primitive/Indicator';
 import { OverlayLabel } from '@/view/ui/primitive/OverlayLabel';
+
+import { WorkbenchCanvas } from './_graphics/WorkbenchCanvas';
+import { TextureDimensionSlider } from './_hardware/TextureDimensionSlider';
+import { ControlSection, SectionHeader } from './_io/ControlSection';
+import { FileDropzonePlaceholder } from './_io/FileDropzone';
+import { SidebarIO } from './_io/SidebarIO';
 
 const LIMIT_MAX_BROWSER = 16_384;
 const VIEW_RESET_DELAY = 50;

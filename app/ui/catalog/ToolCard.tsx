@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { Card } from '@/view/ui/container/Card';
 import { Badge } from '@/view/ui/primitive/Badge';
 
-import type { ToolConfig } from '../../_registry/specifications';
+import type { ToolConfig } from '../../registry/specifications';
 
 interface ToolCardProps {
   tool: ToolConfig;
