@@ -3,7 +3,6 @@ import { useEffect, useRef, useState } from 'react';
 
 import { captureToCanvas, getTopLeftPixelColor, loadImage } from '@/core/browser/canvas';
 import { areColorsSimilar } from '@/core/primitives/colors';
-// import { getCanvasFromImage } from '@/ui/Canvas'; // УДАЛЕНО
 
 interface FrameDiffOverlayProps {
   image1: string | null;

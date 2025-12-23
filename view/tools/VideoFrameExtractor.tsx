@@ -6,7 +6,6 @@ import { getAspectRatio } from '@/core/primitives/math';
 import { getAspectRatioStyle } from '@/core/tailwind/utils';
 import { generateSpriteSheet } from '@/lib/graphics/processing/sprite-generator';
 import { TEXTURE_LIMITS } from '@/lib/graphics/standards';
-import { useFrameExtractor } from '@/lib/video/use-frame-extractor';
 import { Card } from '@/view/ui/container/Card';
 import { Modal } from '@/view/ui/container/Modal';
 import { ProgressBar } from '@/view/ui/feedback/ProgressBar';
@@ -34,6 +33,7 @@ import { TextureLimitIndicator } from './_hardware/TextureLimitIndicator';
 import { ControlSection } from './_io/ControlSection';
 import { FileDropzone, FileDropzonePlaceholder } from './_io/FileDropzone';
 import { FrameDiffOverlay } from './_video/FrameDiffOverlay';
+import { useFrameExtractor } from './_video/use-frame-extractor';
 
 const DEFAULT_ASPECT_RATIO = 1.77;
 const MAX_BROWSER_TEXTURE = TEXTURE_LIMITS.MAX_BROWSER;

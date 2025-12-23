@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { walkSync } from '@/core/node/file-system';
@@ -22,6 +22,7 @@ async function main() {
   const isGodot = rootFiles.includes('project.godot');
   const preset = isGodot ? CONTEXT_PRESETS.godot : CONTEXT_PRESETS.nextjs;
 
+  // eslint-disable-next-line no-console
   console.log(`🔎 Project detected as: ${preset.name}`);
 
   // 2. Настройка игнорирования (читаем .gitignore)
@@ -81,7 +82,7 @@ async function main() {
   // 6. Запись результата
   if (!existsSync(join(rootDir, OUTPUT_DIR))) mkdirSync(join(rootDir, OUTPUT_DIR));
   writeFileSync(join(rootDir, OUTPUT_DIR, OUTPUT_FILENAME), output);
-
+  // eslint-disable-next-line no-console
   console.log(
     `✅ Context: ${stats.fileCount} files, ~${stats.totalTokens.toLocaleString()} tokens${calculateGitDelta(rootDir)}`
   );

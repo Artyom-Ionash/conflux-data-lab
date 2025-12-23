@@ -1,5 +1,6 @@
 // 1. Импортируем ToolConfig вместо Tool
-import type { ToolConfig } from '../../registry/specifications';
+import type { ToolConfig } from '@/app/registry/specifications';
+
 import { ToolCard } from './ToolCard';
 
 interface ToolGridProps {
