@@ -10,7 +10,7 @@ import { CONTEXT_PRESETS, type PresetKey } from '@/lib/modules/context-generator
 import { useBundleManager } from '@/lib/modules/context-generator/use-bundle-manager';
 import { Field, TextInput } from '@/view/tools/io/Input';
 import { Button } from '@/view/ui/Button';
-import { InfoBadge } from '@/view/ui/InfoBadge';
+import { Indicator } from '@/view/ui/Indicator';
 import { Stack } from '@/view/ui/Layout';
 import { ProcessingOverlay } from '@/view/ui/ProcessingOverlay';
 import { Switch } from '@/view/ui/Switch';
@@ -204,9 +204,10 @@ export function ProjectToContext() {
           gap={4}
           className="animate-in fade-in slide-in-from-bottom-2 border-t border-zinc-200 pt-4 dark:border-zinc-800"
         >
-          <InfoBadge label="Токены (Est.)" className="justify-between py-2 text-lg">
+          {/* Использование Indicator вместо InfoBadge/Badge */}
+          <Indicator label="Токены (Est.)" className="justify-between py-2 text-lg">
             ~{stats.totalTokens.toLocaleString()}
-          </InfoBadge>
+          </Indicator>
         </Stack>
       )}
     </Stack>

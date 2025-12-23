@@ -19,7 +19,7 @@ import { ActionGroup } from '@/view/ui/ActionGroup';
 import { Button } from '@/view/ui/Button';
 import { CanvasMovable, useCanvasRef } from '@/view/ui/Canvas';
 import { ControlSection, SectionHeader } from '@/view/ui/ControlSection';
-import { InfoBadge } from '@/view/ui/InfoBadge';
+import { Indicator } from '@/view/ui/Indicator'; // Импорт Indicator
 import { cn } from '@/view/ui/infrastructure/standards';
 import { SortableList } from '@/view/ui/interaction/SortableList';
 import { Group, Stack } from '@/view/ui/Layout';
@@ -292,9 +292,9 @@ export function VerticalImageAligner() {
               className="mt-4 border-t border-zinc-200 pt-3 dark:border-zinc-700"
             >
               <span className="text-xs font-medium text-zinc-500">Итого:</span>
-              <InfoBadge>
+              <Indicator>
                 {slotWidth} x {totalHeight} px
-              </InfoBadge>
+              </Indicator>
             </Group>
           </ControlSection>
 

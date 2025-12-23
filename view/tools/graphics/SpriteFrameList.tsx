@@ -4,7 +4,7 @@ import Image from 'next/image';
 import React, { useMemo } from 'react';
 
 import { Checkerboard } from '@/view/ui/Checkerboard';
-import { InfoBadge } from '@/view/ui/InfoBadge';
+import { Indicator } from '@/view/ui/Indicator';
 import { getAspectRatioStyle } from '@/view/ui/infrastructure/standards';
 import { OverlayLabel } from '@/view/ui/OverlayLabel';
 import { Typography } from '@/view/ui/Typography';
@@ -81,13 +81,9 @@ export function SpriteFrameList({
             <div className="h-full w-full animate-pulse bg-zinc-200 dark:bg-zinc-800" />
           )}
 
-          {/* Метка времени: синхронизирована с Typography */}
+          {/* Метка времени: теперь через Indicator */}
           <div className="absolute bottom-2 left-2 z-20">
-            <InfoBadge>
-              <Typography.Text variant="white" bold size="xs">
-                {frame.time.toFixed(2)}s
-              </Typography.Text>
-            </InfoBadge>
+            <Indicator>{frame.time.toFixed(2)}s</Indicator>
           </div>
 
           {/* Индекс кадра: вынесенный системныйOverlayLabel */}

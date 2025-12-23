@@ -22,11 +22,9 @@ const badgeVariants = cva(
   }
 );
 
-// 2. Наследуем стандартные HTML атрибуты + варианты CVA
 export interface BadgeProps
   extends React.HTMLAttributes<HTMLSpanElement>, VariantProps<typeof badgeVariants> {}
 
 export function Badge({ className, variant, ...props }: BadgeProps) {
-  // cn() склеит базовые стили + вариант + ваш внешний className
   return <span className={cn(badgeVariants({ variant }), className)} {...props} />;
 }

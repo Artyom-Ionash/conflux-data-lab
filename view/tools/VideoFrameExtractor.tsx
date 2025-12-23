@@ -14,7 +14,7 @@ import { ColorInput } from '@/view/ui/ColorInput';
 import { ControlLabel, ControlSection } from '@/view/ui/ControlSection';
 import { EngineRoom } from '@/view/ui/EngineRoom';
 import { ImageSequencePlayer } from '@/view/ui/ImageSequencePlayer';
-import { InfoBadge } from '@/view/ui/InfoBadge';
+import { Indicator } from '@/view/ui/Indicator';
 import { getAspectRatio, getAspectRatioStyle } from '@/view/ui/infrastructure/standards';
 import { Columns, Group, Stack } from '@/view/ui/Layout';
 import { Modal } from '@/view/ui/Modal';
@@ -262,17 +262,11 @@ export function VideoFrameExtractor() {
                       max={10}
                     />
                   </Group>
-                  <InfoBadge label="Range">
-                    <Typography.Text variant="white" bold>
-                      {state.extractionParams.startTime.toFixed(2)}s
-                    </Typography.Text>
-                    <Typography.Text variant="white" className="mx-1 opacity-50">
-                      →
-                    </Typography.Text>
-                    <Typography.Text variant="white" bold>
-                      {state.effectiveEnd.toFixed(2)}s
-                    </Typography.Text>
-                  </InfoBadge>
+                  <Indicator label="Range">
+                    {state.extractionParams.startTime.toFixed(2)}s
+                    <span className="mx-1 opacity-50">→</span>
+                    {state.effectiveEnd.toFixed(2)}s
+                  </Indicator>
                 </Group>
 
                 <Stack
