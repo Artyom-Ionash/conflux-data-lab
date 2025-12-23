@@ -11,16 +11,16 @@ import {
   calculateCenterOffset,
   type CompositionLayer,
 } from '@/lib/modules/graphics/processing/composition';
-import { WorkbenchCanvas } from '@/view/tools/graphics/WorkbenchCanvas';
-import { TextureDimensionSlider } from '@/view/tools/hardware/TextureDimensionSlider';
-import { ControlSection, SectionHeader } from '@/view/tools/io/ControlSection';
-import { FileDropzonePlaceholder } from '@/view/tools/io/FileDropzone';
-import { SidebarIO } from '@/view/tools/io/SidebarIO';
+import { WorkbenchCanvas } from '@/view/tools/_graphics/WorkbenchCanvas';
+import { TextureDimensionSlider } from '@/view/tools/_hardware/TextureDimensionSlider';
+import { ControlSection, SectionHeader } from '@/view/tools/_io/ControlSection';
+import { FileDropzonePlaceholder } from '@/view/tools/_io/FileDropzone';
+import { SidebarIO } from '@/view/tools/_io/SidebarIO';
+import { cn } from '@/view/ui/_infrastructure/standards';
 import { CanvasMovable, useCanvasRef } from '@/view/ui/canvas/Canvas';
 import { SortableList } from '@/view/ui/canvas/SortableList';
 import { ActionGroup } from '@/view/ui/container/ActionGroup';
 import { StatusBox } from '@/view/ui/container/StatusBox';
-import { cn } from '@/view/ui/infrastructure/standards';
 import { Button } from '@/view/ui/input/Button';
 import { Slider } from '@/view/ui/input/Slider';
 import { Switch } from '@/view/ui/input/Switch';

@@ -11,8 +11,8 @@ import { TextArea } from '@/view/ui/input/Input';
 import { Stack } from '@/view/ui/layout/Layout';
 import { Workbench } from '@/view/ui/layout/Workbench';
 
-import { ResultViewer } from './io/ResultViewer';
-import { SidebarIO } from './io/SidebarIO';
+import { ResultViewer } from './_io/ResultViewer';
+import { SidebarIO } from './_io/SidebarIO';
 
 const DEFAULT_EXAMPLE = JSON.stringify(
   [

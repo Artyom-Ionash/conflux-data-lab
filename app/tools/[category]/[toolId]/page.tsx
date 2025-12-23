@@ -1,7 +1,7 @@
 import { notFound } from 'next/navigation';
 
-import { getToolById } from '@/app-registry/inventory';
-import { ToolRegistry } from '@/app-registry/tool-loader';
+import { getToolById } from '@/app/_registry/inventory';
+import { ToolRegistry } from '@/app/_registry/tool-loader';
 
 interface ToolPageProps {
   params: Promise<{

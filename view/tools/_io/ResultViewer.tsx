@@ -2,7 +2,7 @@
 
 import React from 'react';
 
-import { CopyButton } from '@/view/tools/io/CopyButton';
+import { CopyButton } from '@/view/tools/_io/CopyButton';
 import { Card } from '@/view/ui/container/Card';
 import { Button } from '@/view/ui/input/Button';
 import { Group } from '@/view/ui/layout/Layout';

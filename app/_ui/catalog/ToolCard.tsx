@@ -1,8 +1,9 @@
 import Link from 'next/link';
 
-import type { ToolConfig } from '@/app-registry/specifications';
 import { Card } from '@/view/ui/container/Card';
 import { Badge } from '@/view/ui/primitive/Badge';
+
+import type { ToolConfig } from '../../_registry/specifications';
 
 interface ToolCardProps {
   tool: ToolConfig;

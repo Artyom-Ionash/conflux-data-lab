@@ -6,11 +6,11 @@ import { downloadDataUrl } from '@/lib/core/utils/media';
 import { generateSpriteSheet } from '@/lib/modules/graphics/processing/sprite-generator';
 import { TEXTURE_LIMITS } from '@/lib/modules/graphics/standards';
 import { useFrameExtractor } from '@/lib/modules/video/use-frame-extractor';
-import { FileDropzone, FileDropzonePlaceholder } from '@/view/tools/io/FileDropzone';
+import { FileDropzone, FileDropzonePlaceholder } from '@/view/tools/_io/FileDropzone';
+import { getAspectRatio, getAspectRatioStyle } from '@/view/ui/_infrastructure/standards';
 import { Card } from '@/view/ui/container/Card';
 import { Modal } from '@/view/ui/container/Modal';
 import { ProgressBar } from '@/view/ui/feedback/ProgressBar';
-import { getAspectRatio, getAspectRatioStyle } from '@/view/ui/infrastructure/standards';
 import { Button } from '@/view/ui/input/Button';
 import { ColorInput } from '@/view/ui/input/ColorInput';
 import { NumberStepper } from '@/view/ui/input/NumberStepper';
@@ -29,11 +29,11 @@ import { OverlayLabel } from '@/view/ui/primitive/OverlayLabel';
 import { Separator } from '@/view/ui/primitive/Separator';
 import { Typography } from '@/view/ui/primitive/Typography';
 
-import { SpriteFrameList } from './graphics/SpriteFrameList';
+import { SpriteFrameList } from './_graphics/SpriteFrameList';
 // --- DOMAIN IMPORTS ---
-import { TextureLimitIndicator } from './hardware/TextureLimitIndicator';
-import { ControlSection } from './io/ControlSection';
-import { FrameDiffOverlay } from './video/FrameDiffOverlay';
+import { TextureLimitIndicator } from './_hardware/TextureLimitIndicator';
+import { ControlSection } from './_io/ControlSection';
+import { FrameDiffOverlay } from './_video/FrameDiffOverlay';
 
 const DEFAULT_ASPECT_RATIO = 1.77;
 const MAX_BROWSER_TEXTURE = TEXTURE_LIMITS.MAX_BROWSER;

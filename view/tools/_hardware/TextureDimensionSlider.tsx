@@ -8,8 +8,8 @@ import {
   TEXTURE_LIMITS,
   TEXTURE_ZONES,
 } from '@/lib/modules/graphics/standards';
+import { cn } from '@/view/ui/_infrastructure/standards';
 import { Tooltip } from '@/view/ui/feedback/ZoneIndicator';
-import { cn } from '@/view/ui/infrastructure/standards';
 
 interface TextureDimensionSliderProps {
   label: string;

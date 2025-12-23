@@ -2,7 +2,7 @@
 
 import React from 'react';
 
-import { cn } from '../../ui/infrastructure/standards';
+import { cn } from '../../ui/_infrastructure/standards';
 import { Typography } from '../../ui/primitive/Typography';
 
 // --- SUB-COMPONENT: SectionHeader ---

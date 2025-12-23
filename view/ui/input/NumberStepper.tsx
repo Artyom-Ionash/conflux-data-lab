@@ -1,6 +1,6 @@
 import React from 'react';
 
-import { cn } from '../infrastructure/standards';
+import { cn } from '../_infrastructure/standards';
 
 interface NumberStepperProps {
   value: number;

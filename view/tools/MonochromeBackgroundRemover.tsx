@@ -14,9 +14,9 @@ import type {
   WorkerResponse,
 } from '@/lib/modules/graphics/processing/background-engine.worker';
 import type { Point } from '@/lib/modules/graphics/processing/imaging';
-import { WorkbenchCanvas } from '@/view/tools/graphics/WorkbenchCanvas';
-import { FileDropzonePlaceholder } from '@/view/tools/io/FileDropzone';
-import { SidebarIO } from '@/view/tools/io/SidebarIO';
+import { WorkbenchCanvas } from '@/view/tools/_graphics/WorkbenchCanvas';
+import { FileDropzonePlaceholder } from '@/view/tools/_io/FileDropzone';
+import { SidebarIO } from '@/view/tools/_io/SidebarIO';
 import { CanvasMovable, useCanvasRef } from '@/view/ui/canvas/Canvas';
 import { ActionGroup } from '@/view/ui/container/ActionGroup';
 import { StatusBox } from '@/view/ui/container/StatusBox';
@@ -30,7 +30,7 @@ import { Workbench } from '@/view/ui/layout/Workbench';
 import { Separator } from '@/view/ui/primitive/Separator';
 import { Typography } from '@/view/ui/primitive/Typography';
 
-import { ControlSection } from './io/ControlSection';
+import { ControlSection } from './_io/ControlSection';
 
 // --- CONSTANTS ---
 const DEBOUNCE_DELAY = 50;

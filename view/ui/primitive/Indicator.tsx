@@ -3,7 +3,7 @@
 import { cva, type VariantProps } from 'class-variance-authority';
 import React from 'react';
 
-import { cn } from '../infrastructure/standards';
+import { cn } from '../_infrastructure/standards';
 
 const indicatorVariants = cva(
   'inline-flex items-center gap-2 rounded border px-2 py-1 font-mono text-[10px] leading-none shadow-sm transition-colors cursor-default select-none',

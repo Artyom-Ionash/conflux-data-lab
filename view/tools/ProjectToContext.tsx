@@ -18,8 +18,8 @@ import { Stack } from '@/view/ui/layout/Layout';
 import { Workbench } from '@/view/ui/layout/Workbench';
 import { Indicator } from '@/view/ui/primitive/Indicator';
 
-import { ResultViewer } from './io/ResultViewer';
-import { SidebarIO } from './io/SidebarIO';
+import { ResultViewer } from './_io/ResultViewer';
+import { SidebarIO } from './_io/SidebarIO';
 
 export function ProjectToContext() {
   const { filteredPaths, handleFiles, bundle } = useBundleManager();

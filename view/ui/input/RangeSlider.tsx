@@ -3,7 +3,7 @@
 import * as SliderPrimitive from '@radix-ui/react-slider';
 import React, { useRef } from 'react';
 
-import { cn } from '../infrastructure/standards';
+import { cn } from '../_infrastructure/standards';
 
 interface RangeSliderProps {
   min: number;

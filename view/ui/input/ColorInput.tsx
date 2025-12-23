@@ -1,7 +1,7 @@
 import { cva, type VariantProps } from 'class-variance-authority';
 import React from 'react';
 
-import { cn, TRANSPARENCY_PATTERN_CSS } from '../infrastructure/standards';
+import { cn, TRANSPARENCY_PATTERN_CSS } from '../_infrastructure/standards';
 
 const containerVariants = cva(
   'group relative cursor-pointer overflow-hidden rounded-lg border border-zinc-200 shadow-sm transition-transform hover:scale-105 dark:border-zinc-700',

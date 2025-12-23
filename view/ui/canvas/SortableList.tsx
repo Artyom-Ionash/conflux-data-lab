@@ -19,7 +19,7 @@ import {
 import { CSS } from '@dnd-kit/utilities';
 import React, { useId } from 'react';
 
-import { cn } from '@/view/ui/infrastructure/standards';
+import { cn } from '@/view/ui/_infrastructure/standards';
 
 // --- Types ---
 
