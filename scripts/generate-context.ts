@@ -24,7 +24,7 @@ async function main() {
 
   console.log(`🔎 Project detected as: ${preset.name}`);
 
-  // 2. Настройка игнорирования
+  // 2. Настройка игнорирования (читаем .gitignore)
   const ig = createIgnoreManager({
     gitIgnoreContent: existsSync(join(rootDir, '.gitignore'))
       ? readFileSync(join(rootDir, '.gitignore'), 'utf-8')
@@ -32,45 +32,53 @@ async function main() {
     ignorePatterns: preset.hardIgnore,
   });
 
-  const sources: { path: string; name: string; content: string }[] = [];
+  // 3. Предикат фильтрации для генератора
+  // Это функция решает, нужно ли вообще смотреть на файл/папку
+  const shouldIgnore = (relPath: string, isDirectory: boolean) => {
+    const name = relPath.split('/').pop() || '';
 
-  // 3. Обход файловой системы (используем генератор из core/node)
-  for (const entry of walkSync(rootDir)) {
-    // Фильтрация Dot-директорий на верхнем уровне
-    if (entry.name.startsWith('.') && entry.isDirectory) {
-      if (!ALLOWED_DOT_DIRS.includes(entry.name)) {
-        // Мы не можем прервать рекурсию здесь через continue,
-        // так как walkSync уже внутри.
-        // Но walkSync поддерживает shouldIgnore, передадим логику туда?
-        // Для простоты оставим проверку здесь, walkSync всё равно эффективен.
-        continue;
-      }
+    // A. Жесткий бан для .git (даже если он внутри разрешенной .ai)
+    if (name === '.git') return true;
+
+    // B. Проверка по правилам .gitignore
+    if (ig.ignores(relPath)) return true;
+
+    // C. Фильтрация скрытых папок (начинающихся с точки)
+    // Разрешаем только те, что в белом списке (ALLOWED_DOT_DIRS)
+    if (isDirectory && name.startsWith('.') && !ALLOWED_DOT_DIRS.includes(name)) {
+      return true;
     }
 
-    if (ig.ignores(entry.relPath)) continue;
+    return false;
+  };
 
-    if (!entry.isDirectory) {
-      const isLocalAI = entry.relPath.startsWith(LOCAL_CONTEXT_FOLDER + '/');
-      const isText = isTextFile(entry.name, preset.textExtensions);
-      const isSmallEnough = entry.stats.size < MAX_FILE_SIZE_KB * 1024;
+  const sources: { path: string; name: string; content: string }[] = [];
 
-      if ((isText || isLocalAI) && isSmallEnough) {
-        sources.push({
-          path: entry.relPath,
-          name: entry.name,
-          content: readFileSync(entry.path, 'utf-8'),
-        });
-      }
+  // 4. Обход файловой системы
+  // Передаем shouldIgnore в walkSync, чтобы остановить рекурсию в ненужные папки
+  for (const entry of walkSync(rootDir, rootDir, { shouldIgnore })) {
+    if (entry.isDirectory) continue;
+
+    const isLocalAI = entry.relPath.startsWith(LOCAL_CONTEXT_FOLDER + '/');
+    const isText = isTextFile(entry.name, preset.textExtensions);
+    const isSmallEnough = entry.stats.size < MAX_FILE_SIZE_KB * 1024;
+
+    if ((isText || isLocalAI) && isSmallEnough) {
+      sources.push({
+        path: entry.relPath,
+        name: entry.name,
+        content: readFileSync(entry.path, 'utf-8'),
+      });
     }
   }
 
-  // 4. Генерация
+  // 5. Генерация
   const { output, stats } = await runContextPipeline(sources, {
     includeTree: true,
     preset,
   });
 
-  // 5. Запись результата
+  // 6. Запись результата
   if (!existsSync(join(rootDir, OUTPUT_DIR))) mkdirSync(join(rootDir, OUTPUT_DIR));
   writeFileSync(join(rootDir, OUTPUT_DIR, OUTPUT_FILENAME), output);
 
