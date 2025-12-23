@@ -1,11 +1,11 @@
-import { readdirSync, statSync } from 'node:fs';
+import { type Dirent, readdirSync, type Stats, statSync } from 'node:fs';
 import { join } from 'node:path';
 
 export interface FileEntry {
   path: string; // Абсолютный путь
   relPath: string; // Относительный путь (для фильтрации)
   name: string; // Имя файла/папки
-  stats: import('node:fs').Stats;
+  stats: Stats;
   isDirectory: boolean;
 }
 
@@ -27,7 +27,7 @@ export function* walkSync(
   rootDir = dir,
   options: WalkOptions = {}
 ): Generator<FileEntry> {
-  let entries: import('node:fs').Dirent[] = [];
+  let entries: Dirent[] = [];
 
   try {
     entries = readdirSync(dir, { withFileTypes: true });
