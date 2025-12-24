@@ -6,7 +6,6 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { downloadDataUrl } from '@/core/browser/canvas';
 import { hexToRgb, invertHex, rgbToHex } from '@/core/primitives/colors';
 import { useDebounceEffect } from '@/core/react/hooks/use-debounce';
-import { useFileMetadata } from '@/core/react/hooks/use-file-metadata';
 import { useWorker } from '@/core/react/hooks/use-worker';
 import type {
   ProcessingMode,
@@ -14,6 +13,8 @@ import type {
   WorkerResponse,
 } from '@/lib/graphics/processing/background-engine.worker';
 import type { Point } from '@/lib/graphics/processing/imaging';
+// ✅ ИМПОРТ ИЗ БИЗНЕС-СЛОЯ
+import { useImageMetadata } from '@/lib/graphics/use-image-metadata';
 import { CanvasMovable, useCanvasRef } from '@/view/ui/canvas/Canvas';
 import { ActionGroup } from '@/view/ui/container/ActionGroup';
 import { StatusBox } from '@/view/ui/container/StatusBox';
@@ -54,14 +55,14 @@ const DEFAULT_SETTINGS = {
 export function MonochromeBackgroundRemover() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
-  // Используем кристалл метаданных
+  // ✅ ИСПОЛЬЗУЕМ ДОМЕННЫЙ ХУК
   const {
     url: originalUrl,
     width: imgW,
     height: imgH,
     bgColor,
     isLoading: isMetadataLoading,
-  } = useFileMetadata(selectedFile);
+  } = useImageMetadata(selectedFile);
 
   const [targetColor, setTargetColor] = useState(DEFAULT_SETTINGS.targetColor);
   const [contourColor, setContourColor] = useState(DEFAULT_SETTINGS.contourColor);

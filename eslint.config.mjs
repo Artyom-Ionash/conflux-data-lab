@@ -55,35 +55,31 @@ const eslintConfig = defineConfig([
           default: 'disallow',
           message: '❌ ESLint разрешает только зависимости из "белого списка".',
           rules: [
-            { // 1. ОБЩЕЕ
+            { // ОБЩЕЕ
               from: '*', 
               allow: 'primitive'
             },
-            { // 2. REACT
-              from: 'react',
-              allow:  'browser',
-            },
-            { // 3. Бизнес-логика (стремится к Framework-agnostic)
-              from: 'library',
-              allow: 'browser',
-            },
-            { // 4. Собирает простые элементы интерфейса
-              from: 'ui',
-              allow: [ 'react', 'tailwind'],
-            },
-            { // 5. Занимается маршрутизацией в веб-браузере
+            { // Занимается маршрутизацией в веб-браузере
               from: 'router',
               allow: ['registry', 'ui', 'next'],
             },
-            { // 6. Подключает инструменты (декабрь 2025: ESLint не видит динамических импортов)
+            { // Подключает инструменты (декабрь 2025: ESLint не видит динамических импортов)
               from: 'registry',
               allow: 'tool',
             },
-            { // 7. Помогают разработчику
+            { // Собирает простые элементы интерфейса
+              from: 'ui',
+              allow: ['react', 'tailwind'],
+            },
+            { // Бизнес-логика (стремится к Framework-agnostic)
+              from: 'library',
+              allow: ['browser', 'react'],
+            },
+            { // Помогают разработчику
               from: 'script',
               allow: ['node', 'library'],
             },
-            { // 8. Соединяет сложные вещи (стремится к свободе от стилей)
+            { // Соединяет сложные вещи (стремится к свободе от стилей)
               from: ['tool', 'tool-subsystem'],
               allow: ['tool-subsystem', 'react', 'ui', 'library', 'browser', 'tailwind'],
             },
