@@ -4,6 +4,7 @@ import { downloadDataUrl } from '@/core/browser/canvas';
 import { useDebounceEffect } from '@/core/react/hooks/use-debounce';
 import { useObjectUrl } from '@/core/react/hooks/use-object-url';
 import {
+  applySymmetricLoop,
   calculateTimestamps,
   type ExtractedFrame,
   type ExtractionParams,
@@ -68,15 +69,9 @@ export function useFrameExtractor() {
     [extractionParams.endTime, videoDuration]
   );
 
-  // Логика зацикливания перенесена сюда (Pure View Logic)
-  // Это НЕ вызывает перезапуск видео-процессинга
+  // Это гарантированно не требует пересчета кадров, только перестановку ссылок
   const frames = useMemo(() => {
-    if (rawFrames.length < 2) return rawFrames;
-    if (!symmetricLoop) return rawFrames;
-
-    // Создаем зеркальную копию (исключая первый и последний кадр для плавности)
-    const loopBack = rawFrames.slice(1, -1).reverse();
-    return [...rawFrames, ...loopBack];
+    return applySymmetricLoop(rawFrames, symmetricLoop);
   }, [rawFrames, symmetricLoop]);
 
   // --- Handlers (Interception Logic) ---

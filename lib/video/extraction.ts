@@ -43,6 +43,25 @@ export function calculateTimestamps(params: ExtractionParams, duration: number):
 }
 
 /**
+ * Применяет симметричное зацикливание (Ping-Pong Loop) к массиву.
+ * [A, B, C] -> [A, B, C, B]
+ *
+ * @param items Исходный массив
+ * @param enabled Флаг включения
+ * @returns Новый массив с добавленными ссылками на элементы
+ */
+export function applySymmetricLoop<T>(items: T[], enabled: boolean): T[] {
+  if (!enabled || items.length < 3) return items;
+
+  // Берем "середину" (все, кроме первого и последнего)
+  // Для [A, B, C] slice(1, -1) вернет [B]
+  // Для [A, B, C, D] slice(1, -1) вернет [B, C]
+  const middleReversed = items.slice(1, -1).reverse();
+
+  return [...items, ...middleReversed];
+}
+
+/**
  * Основной процесс экстракции.
  */
 export async function runExtractionTask(

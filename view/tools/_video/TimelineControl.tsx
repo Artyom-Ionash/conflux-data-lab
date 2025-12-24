@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useRef } from 'react';
 
 import { getAspectRatioStyle } from '@/core/tailwind/utils';
 import { Card } from '@/view/ui/container/Card';
@@ -9,6 +9,8 @@ import { DualHoverPreview } from '@/view/ui/media/DualHoverPreview';
 import { Indicator } from '@/view/ui/primitive/Indicator';
 import { Separator } from '@/view/ui/primitive/Separator';
 import { Typography } from '@/view/ui/primitive/Typography';
+
+import { useVideoScrubber } from './use-video-scrubber';
 
 interface TimelineControlProps {
   // Data
@@ -45,54 +47,25 @@ export function TimelineControl({
   onTimeChange,
   onStepChange,
 }: TimelineControlProps) {
-  const [hoverPreview, setHoverPreview] = useState<{ activeThumb: 0 | 1; time: number } | null>(
-    null
-  );
-  const [isDragging, setIsDragging] = useState(false);
-  const [isVideoSeeking, setIsVideoSeeking] = useState(false); // Новое состояние
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // Подписка на события поиска (Seek) видео
-  useEffect(() => {
-    const video = hoverVideoRef.current;
-    if (!video) return;
-
-    const onSeeking = () => setIsVideoSeeking(true);
-    const onSeeked = () => setIsVideoSeeking(false);
-
-    video.addEventListener('seeking', onSeeking);
-    video.addEventListener('seeked', onSeeked);
-
-    return () => {
-      video.removeEventListener('seeking', onSeeking);
-      video.removeEventListener('seeked', onSeeked);
-    };
-  }, [hoverVideoRef]);
-
-  const handleSliderHover = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (!duration || isDragging) return;
-    const rect = e.currentTarget.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const percentage = Math.max(0, Math.min(1, x / rect.width));
-    const time = percentage * duration;
-
-    const distToStart = Math.abs(time - startTime);
-    const distToEnd = Math.abs(time - effectiveEnd);
-    const nearestThumb = distToStart < distToEnd ? 0 : 1;
-
-    setHoverPreview({ activeThumb: nearestThumb, time });
-    if (hoverVideoRef.current) hoverVideoRef.current.currentTime = time;
-  };
+  // Вся сложная логика ушла сюда
+  const { hoverPreview, isSeeking, handlers } = useVideoScrubber({
+    videoRef: hoverVideoRef,
+    duration,
+    startTime,
+    endTime: effectiveEnd,
+  });
 
   const handleValueChange = (newValues: number[], thumbIndex?: 0 | 1) => {
     const start = newValues[0] ?? 0;
     const end = newValues[1] ?? 0;
     onTimeChange(start, end);
 
-    if (isDragging && typeof thumbIndex === 'number') {
+    // Синхронизируем превью при перетаскивании
+    if (typeof thumbIndex === 'number') {
       const changedTime = newValues[thumbIndex] ?? 0;
-      setHoverPreview({ activeThumb: thumbIndex, time: changedTime });
-      if (hoverVideoRef.current) hoverVideoRef.current.currentTime = changedTime;
+      handlers.updatePreviewOnDrag(changedTime, thumbIndex);
     }
   };
 
@@ -122,13 +95,10 @@ export function TimelineControl({
           ref={containerRef}
           gap={0}
           className="group relative touch-none py-2"
-          onMouseMove={handleSliderHover}
-          onMouseLeave={() => !isDragging && setHoverPreview(null)}
-          onPointerDown={() => setIsDragging(true)}
-          onPointerUp={() => {
-            setIsDragging(false);
-            setHoverPreview(null);
-          }}
+          onMouseMove={handlers.onMouseMove}
+          onMouseLeave={handlers.onMouseLeave}
+          onPointerDown={handlers.onPointerDown}
+          onPointerUp={handlers.onPointerUp}
         >
           <RangeSlider
             min={0}
@@ -148,7 +118,7 @@ export function TimelineControl({
               videoRef={hoverVideoRef}
               previewStartImage={previewStart}
               previewEndImage={previewEnd}
-              isLoading={isVideoSeeking}
+              isLoading={isSeeking}
               aspectRatioStyle={getAspectRatioStyle(
                 videoDimensions?.width,
                 videoDimensions?.height
