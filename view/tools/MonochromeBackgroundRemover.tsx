@@ -3,9 +3,10 @@
 import Image from 'next/image';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 
-import { downloadDataUrl } from '@/core/browser/canvas';
+import { downloadDataUrl, getTopLeftPixelColor, loadImage } from '@/core/browser/canvas';
 import { hexToRgb, invertHex, rgbToHex } from '@/core/primitives/colors';
 import { useDebounceEffect } from '@/core/react/hooks/use-debounce';
+import { useMediaSession } from '@/core/react/hooks/use-media-session';
 import { useWorker } from '@/core/react/hooks/use-worker';
 import type {
   ProcessingMode,
@@ -13,8 +14,6 @@ import type {
   WorkerResponse,
 } from '@/lib/graphics/processing/background-engine.worker';
 import type { Point } from '@/lib/graphics/processing/imaging';
-// ✅ ИМПОРТ ИЗ БИЗНЕС-СЛОЯ
-import { useImageMetadata } from '@/lib/graphics/use-image-metadata';
 import { CanvasMovable, useCanvasRef } from '@/view/ui/canvas/Canvas';
 import { ActionGroup } from '@/view/ui/container/ActionGroup';
 import { StatusBox } from '@/view/ui/container/StatusBox';
@@ -55,17 +54,24 @@ const DEFAULT_SETTINGS = {
 export function MonochromeBackgroundRemover() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
-  // ✅ ИСПОЛЬЗУЕМ ДОМЕННЫЙ ХУК
-  const {
-    url: originalUrl,
-    width: imgW,
-    height: imgH,
-    bgColor,
-    isLoading: isMetadataLoading,
-  } = useImageMetadata(selectedFile);
+  const session = useMediaSession(selectedFile, 'image');
+  const imgW = session.dimensions?.width;
+  const imgH = session.dimensions?.height;
 
   const [targetColor, setTargetColor] = useState(DEFAULT_SETTINGS.targetColor);
   const [contourColor, setContourColor] = useState(DEFAULT_SETTINGS.contourColor);
+
+  // Логика определения цвета фона (специфична для этого инструмента)
+  useEffect(() => {
+    if (!session.url) return;
+
+    void loadImage(session.url).then((img) => {
+      const { r, g, b } = getTopLeftPixelColor(img);
+      const hex = rgbToHex(r, g, b);
+      setTargetColor(hex);
+      setContourColor(invertHex(hex));
+    });
+  }, [session.url]);
 
   const [tolerances, setTolerances] = useState<Record<ProcessingMode, number>>({
     remove: DEFAULT_SETTINGS.tolerance,
@@ -122,17 +128,9 @@ export function MonochromeBackgroundRemover() {
     onMessage: handleWorkerMessage,
   });
 
-  // Автоматическая инициализация при получении новых метаданных
+  // Отрисовка исходного изображения на канвас
   useEffect(() => {
-    if (!originalUrl || !imgW || !imgH) return;
-
-    // Используем RAF для избежания синхронного каскада рендеров
-    requestAnimationFrame(() => {
-      if (bgColor) {
-        setTargetColor(bgColor);
-        setContourColor(invertHex(bgColor));
-      }
-    });
+    if (!session.url || !imgW || !imgH) return;
 
     if (sourceCanvasRef.current) {
       sourceCanvasRef.current.width = imgW;
@@ -142,18 +140,18 @@ export function MonochromeBackgroundRemover() {
       img.onload = () => {
         ctx?.drawImage(img, 0, 0);
         if (previewCanvasRef.current) {
-          previewCanvasRef.current.width = imgW;
-          previewCanvasRef.current.height = imgH;
+          previewCanvasRef.current.width = img.width;
+          previewCanvasRef.current.height = img.height;
           previewCanvasRef.current.getContext('2d')?.drawImage(img, 0, 0);
         }
-        workspaceRef.current?.resetView(imgW, imgH);
+        workspaceRef.current?.resetView(img.width, img.height);
       };
-      img.src = originalUrl;
+      img.src = session.url;
     }
-  }, [originalUrl, imgW, imgH, bgColor, workspaceRef]);
+  }, [session.url, imgW, imgH, workspaceRef]);
 
   const processImage = useCallback(() => {
-    if (!originalUrl || !sourceCanvasRef.current) return;
+    if (!session.url || !sourceCanvasRef.current) return;
     const sourceCtx = sourceCanvasRef.current.getContext('2d', { willReadFrequently: true });
     if (!sourceCtx) return;
     const width = sourceCanvasRef.current.width;
@@ -182,7 +180,7 @@ export function MonochromeBackgroundRemover() {
     };
     postMessage(payload, [imageData.data.buffer]);
   }, [
-    originalUrl,
+    session.url,
     targetColor,
     contourColor,
     tolerances,
@@ -197,9 +195,9 @@ export function MonochromeBackgroundRemover() {
 
   useDebounceEffect(
     () => {
-      if (originalUrl) void processImage();
+      if (session.url) void processImage();
     },
-    [originalUrl, processImage],
+    [session.url, processImage],
     DEBOUNCE_DELAY
   );
 
@@ -213,9 +211,7 @@ export function MonochromeBackgroundRemover() {
 
   const handleFilesSelected = (files: File[]) => {
     const file = files[0];
-    if (!file) return;
-    setFloodPoints([]);
-    setSelectedFile(file);
+    if (file) setSelectedFile(file);
   };
 
   const handleDownload = () => {
@@ -225,7 +221,7 @@ export function MonochromeBackgroundRemover() {
   };
 
   const getRelativeImageCoords = (clientX: number, clientY: number): Point | null => {
-    if (!workspaceRef.current || !imgW) return null;
+    if (!workspaceRef.current || !imgW || !imgH) return null;
     const world = workspaceRef.current.screenToWorld(clientX, clientY);
     const x = Math.floor(world.x);
     const y = Math.floor(world.y);
@@ -273,12 +269,12 @@ export function MonochromeBackgroundRemover() {
         onFilesSelected={handleFilesSelected}
         accept="image/*"
         dropLabel="Загрузить изображение"
-        hasFiles={!!originalUrl}
+        hasFiles={!!session.url}
         onDownload={handleDownload}
         downloadLabel="Скачать PNG"
       />
 
-      {originalUrl && (
+      {session.url && (
         <Stack gap={6} className="animate-fade-in">
           <ControlSection title="Режим">
             <ToggleGroup
@@ -306,7 +302,7 @@ export function MonochromeBackgroundRemover() {
               <Group gap={3}>
                 <div className="group relative h-8 w-8 flex-shrink-0 cursor-crosshair overflow-hidden rounded border bg-white dark:border-zinc-700">
                   <Image
-                    src={originalUrl}
+                    src={session.url}
                     alt="picker"
                     fill
                     className="object-cover"
@@ -443,13 +439,13 @@ export function MonochromeBackgroundRemover() {
         <div className="relative h-full w-full">
           <WorkbenchCanvas
             ref={workspaceRef}
-            isLoading={isProcessing || isMetadataLoading}
+            isLoading={isProcessing || session.isLoading} // Обновлен флаг загрузки
             contentWidth={imgW}
             contentHeight={imgH}
-            shadowOverlayOpacity={originalUrl ? 0.8 : 0}
+            shadowOverlayOpacity={session.url ? 0.8 : 0}
             showTransparencyGrid={true}
             placeholder={
-              !originalUrl ? (
+              !session.url ? (
                 <FileDropzonePlaceholder onUpload={(files) => handleFilesSelected(files)} />
               ) : null
             }
@@ -467,7 +463,7 @@ export function MonochromeBackgroundRemover() {
                 height: '100%',
                 imageRendering: 'pixelated',
                 cursor: processingMode === 'flood-clear' ? 'crosshair' : 'default',
-                display: originalUrl ? 'block' : 'none',
+                display: session.url ? 'block' : 'none',
               }}
             />
 

@@ -1,5 +1,6 @@
 import React, { useRef } from 'react';
 
+import { useVideoScrubber } from '@/core/react/hooks/use-video-scrubber'; // ✅ NEW PATH
 import { getAspectRatioStyle } from '@/core/tailwind/utils';
 import { Card } from '@/view/ui/container/Card';
 import { NumberStepper } from '@/view/ui/input/NumberStepper';
@@ -9,8 +10,6 @@ import { DualHoverPreview } from '@/view/ui/media/DualHoverPreview';
 import { Indicator } from '@/view/ui/primitive/Indicator';
 import { Separator } from '@/view/ui/primitive/Separator';
 import { Typography } from '@/view/ui/primitive/Typography';
-
-import { useVideoScrubber } from './use-video-scrubber';
 
 interface TimelineControlProps {
   // Data
