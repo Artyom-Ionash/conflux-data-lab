@@ -3,7 +3,8 @@
 import { cva, type VariantProps } from 'class-variance-authority';
 import React, { forwardRef } from 'react';
 
-import { cn } from '../../../core/tailwind/utils';
+import { type ElementProps } from '@/core/react/props';
+import { cn } from '@/core/tailwind/utils';
 
 // --- FLEX SYSTEM (Stack & Group) ---
 
@@ -44,9 +45,8 @@ const flexVariants = cva('flex min-w-0', {
 
 type FlexVariants = VariantProps<typeof flexVariants>;
 
-interface FlexProps extends React.HTMLAttributes<HTMLDivElement>, Omit<FlexVariants, 'direction'> {
-  children: React.ReactNode;
-  /** Отступ между элементами (умножается на 0.25rem, как в Tailwind) */
+interface FlexProps extends ElementProps<HTMLDivElement>, Omit<FlexVariants, 'direction'> {
+  /** Gap between items (Tailwind units if number, CSS value if string) */
   gap?: number | string;
 }
 
@@ -78,7 +78,6 @@ export const Group = forwardRef<HTMLDivElement, FlexProps>(
     {
       children,
       gap = 2,
-      // Group по умолчанию выравнивает по центру
       items = 'center',
       justify = 'start',
       wrap = false,

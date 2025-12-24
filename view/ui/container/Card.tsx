@@ -1,13 +1,11 @@
 import { Slot } from '@radix-ui/react-slot';
 import type { ReactNode } from 'react';
 
-interface CardProps {
-  children: ReactNode;
-  asChild?: boolean;
-  className?: string;
+import { type PolymorphicProps } from '@/core/react/props';
+
+interface CardProps extends Omit<PolymorphicProps<HTMLDivElement>, 'title'> {
   title?: ReactNode;
   headerActions?: ReactNode;
-  /** Дополнительные классы для обертки контента */
   contentClassName?: string;
 }
 
@@ -39,33 +37,21 @@ export function Card({
   title,
   headerActions,
   contentClassName,
+  ...props // Remaining native attributes (id, style, etc.)
 }: CardProps) {
   const Comp = asChild ? Slot : 'div';
   const hasHeader = Boolean(title || headerActions);
   const contentClasses = contentClassName ?? (hasHeader ? 'px-5 py-4' : 'p-6');
 
-  // Если asChild=true, мы рендерим Slot, который передает пропсы единственному ребенку.
-  // Но нам нужно также отрендерить Header и внутренний padding.
-  // Slot предполагает, что мы передаем *только* ребенка.
-  // ПАТТЕРН: Если мы хотим обернуть Link в Card, Link должен быть корневым элементом.
-  // Значит, Header должен быть *внутри* Link или Link должен быть *внутри* Card?
-  // Обычно Card как ссылка означает, что ВСЯ карточка кликабельна.
-
-  if (asChild) {
-    return (
-      <Comp className={`${baseClasses} ${className}`}>
-        {/* Slot мерджит пропсы (включая className) с ребенком */}
-        {/* Мы ожидаем, что ребенок примет children (контент карточки) */}
-        {children}
-      </Comp>
-    );
-  }
-
-  // Стандартный режим
   return (
-    <div className={`${baseClasses} ${className}`}>
-      {hasHeader && <CardHeader title={title} headerActions={headerActions} />}
-      <div className={contentClasses}>{children}</div>
-    </div>
+    <Comp className={`${baseClasses} ${className}`} {...props}>
+      {/* 
+          If asChild is true, the user is responsible for rendering the header 
+          inside the child component if needed, or we only use Card for styling.
+          Standard mode renders the structure: 
+      */}
+      {!asChild && hasHeader && <CardHeader title={title} headerActions={headerActions} />}
+      <div className={!asChild ? contentClasses : undefined}>{children}</div>
+    </Comp>
   );
 }

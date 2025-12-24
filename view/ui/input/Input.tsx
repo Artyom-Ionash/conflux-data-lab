@@ -2,9 +2,9 @@
 
 import React, { forwardRef } from 'react';
 
-import { cn } from '../../../core/tailwind/utils';
+import { type ElementProps } from '@/core/react/props';
+import { cn } from '@/core/tailwind/utils';
 
-// Базовые стили вынесены
 const inputStyles = cn(
   'w-full rounded-md border border-zinc-200 bg-white px-3 py-2 font-mono text-xs shadow-sm transition-all',
   'placeholder:text-zinc-400 dark:placeholder:text-zinc-600',
@@ -15,7 +15,7 @@ const inputStyles = cn(
 
 const errorStyles = 'border-red-500 focus:border-red-500 focus:ring-red-500/20';
 
-interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
+interface InputProps extends ElementProps<HTMLInputElement> {
   error?: boolean;
 }
 
@@ -28,7 +28,7 @@ export const TextInput = forwardRef<HTMLInputElement, InputProps>(
 );
 TextInput.displayName = 'TextInput';
 
-interface TextAreaProps extends React.TextareaHTMLAttributes<HTMLTextAreaElement> {
+interface TextAreaProps extends ElementProps<HTMLTextAreaElement> {
   error?: boolean;
 }
 

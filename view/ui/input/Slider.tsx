@@ -5,6 +5,8 @@ import { cva, type VariantProps } from 'class-variance-authority';
 import type { ReactNode } from 'react';
 import React from 'react';
 
+import { type ElementProps } from '@/core/react/props';
+
 import { cn } from '../../../core/tailwind/utils';
 
 // --- ОПРЕДЕЛЕНИЕ СТИЛЕЙ ---
@@ -73,7 +75,8 @@ const inputVariants = cva(
 
 // --- КОМПОНЕНТ ---
 
-interface SliderProps extends VariantProps<typeof trackVariants> {
+interface SliderProps
+  extends Omit<ElementProps<HTMLDivElement>, 'onChange'>, VariantProps<typeof trackVariants> {
   value: number;
   onChange: (val: number) => void;
   label: string;
@@ -81,7 +84,6 @@ interface SliderProps extends VariantProps<typeof trackVariants> {
   max?: number;
   step?: number;
   headerRight?: ReactNode;
-  className?: string;
   disabled?: boolean;
 }
 
@@ -92,13 +94,17 @@ export const Slider = ({
   min = 0,
   max = 100,
   step = 1,
-  statusColor, // CVA сам распарсит этот проп
+  statusColor,
   headerRight,
   className = '',
   disabled = false,
+  ...props // Pass remaining HTML attributes (id, style, etc.) to the wrapper
 }: SliderProps) => {
   return (
-    <div className={cn('mb-4 flex flex-col gap-2', disabled && 'opacity-60 grayscale', className)}>
+    <div
+      className={cn('mb-4 flex flex-col gap-2', disabled && 'opacity-60 grayscale', className)}
+      {...props}
+    >
       <div className="flex items-end justify-between">
         <div className="flex items-center gap-2">
           <label className={labelVariants({ statusColor })}>{label}</label>
@@ -124,7 +130,10 @@ export const Slider = ({
         min={min}
         step={step}
         disabled={disabled}
-        onValueChange={(val) => onChange(val[0] ?? value)}
+        onValueChange={(val) => {
+          const next = val[0];
+          if (next !== undefined) onChange(next);
+        }}
       >
         <SliderPrimitive.Track className="relative h-[4px] grow rounded-full bg-zinc-200 dark:bg-zinc-700">
           <SliderPrimitive.Range className={trackVariants({ statusColor })} />

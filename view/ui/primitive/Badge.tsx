@@ -1,7 +1,8 @@
 import { cva, type VariantProps } from 'class-variance-authority';
 import React from 'react';
 
-import { cn } from '../../../core/tailwind/utils';
+import { type ElementProps } from '@/core/react/props';
+import { cn } from '@/core/tailwind/utils';
 
 // 1. Описываем стили декларативно.
 // CVA автоматически генерирует типы для вариантов.
@@ -23,7 +24,7 @@ const badgeVariants = cva(
 );
 
 export interface BadgeProps
-  extends React.HTMLAttributes<HTMLSpanElement>, VariantProps<typeof badgeVariants> {}
+  extends ElementProps<HTMLSpanElement>, VariantProps<typeof badgeVariants> {}
 
 export function Badge({ className, variant, ...props }: BadgeProps) {
   return <span className={cn(badgeVariants({ variant }), className)} {...props} />;
