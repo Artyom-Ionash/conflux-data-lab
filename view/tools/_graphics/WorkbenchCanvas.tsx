@@ -13,13 +13,15 @@ import React, {
 import { cn } from '@/core/tailwind/utils';
 import type { CanvasRef } from '@/view/ui/canvas/Canvas';
 import { Canvas } from '@/view/ui/canvas/Canvas';
+import { Toolbar, ToolbarSeparator } from '@/view/ui/container/Toolbar';
 import { ProcessingOverlay } from '@/view/ui/feedback/ProcessingOverlay';
 import { ColorInput } from '@/view/ui/input/ColorInput';
+import { OverlayLabel } from '@/view/ui/primitive/OverlayLabel';
 
 // --- CONFIG ---
 
 const ANIMATION_CONFIG = {
-  AUTO_CONTRAST_PERIOD_DEFAULT: 5, // секунд
+  AUTO_CONTRAST_PERIOD_DEFAULT: 5,
 };
 
 interface WorkbenchCanvasProps {
@@ -105,8 +107,7 @@ export const WorkbenchCanvas = forwardRef<CanvasRef, WorkbenchCanvasProps>(
 
     return (
       <div className={cn('relative h-full w-full overflow-hidden', className)}>
-        {/* Controls Toolbar */}
-        <div className="absolute top-4 left-1/2 z-30 flex -translate-x-1/2 items-center gap-2 rounded-full border border-zinc-200 bg-white/90 px-3 py-2 shadow-lg backdrop-blur dark:border-zinc-700 dark:bg-zinc-900/90">
+        <Toolbar>
           <div className="mr-2 border-r border-zinc-200 pr-2 dark:border-zinc-700">
             <ColorInput
               value={backgroundColor}
@@ -165,9 +166,8 @@ export const WorkbenchCanvas = forwardRef<CanvasRef, WorkbenchCanvasProps>(
             </div>
           )}
 
-          <div className="mx-1 h-4 w-px bg-zinc-300 dark:bg-zinc-700" />
+          <ToolbarSeparator />
 
-          {/* Zoom Label обновляется напрямую из Canvas для производительности */}
           <span
             ref={zoomLabelRef}
             className="min-w-[3ch] px-1 text-right font-mono text-xs text-zinc-500 select-none dark:text-zinc-400"
@@ -179,11 +179,10 @@ export const WorkbenchCanvas = forwardRef<CanvasRef, WorkbenchCanvasProps>(
             onClick={handleResetView}
             className="rounded px-2 py-1 text-xs font-medium text-zinc-600 transition-colors hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
           >
-            Сброс
+            Сбросить
           </button>
-        </div>
+        </Toolbar>
 
-        {/* Primitive Canvas */}
         <Canvas
           ref={canvasRef}
           zoomLabelRef={zoomLabelRef}
@@ -201,12 +200,11 @@ export const WorkbenchCanvas = forwardRef<CanvasRef, WorkbenchCanvasProps>(
           {children}
         </Canvas>
 
-        {/* Overlays */}
         <ProcessingOverlay isVisible={isLoading} />
 
-        <div className="pointer-events-none absolute bottom-4 left-1/2 z-50 -translate-x-1/2 rounded bg-white/50 px-2 py-1 text-[10px] text-zinc-500 opacity-50 backdrop-blur-sm dark:bg-black/50">
+        <OverlayLabel position="bottom-center" className="opacity-50">
           Средняя кнопка мыши для перемещения
-        </div>
+        </OverlayLabel>
       </div>
     );
   }

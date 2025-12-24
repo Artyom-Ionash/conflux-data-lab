@@ -6,6 +6,8 @@ import { downloadText } from '@/core/browser/canvas';
 import { useCopyToClipboard } from '@/core/react/hooks/use-copy';
 import { convertJsonToCsv } from '@/lib/converters/json-to-csv';
 import { Card } from '@/view/ui/container/Card';
+import { PanelHeader } from '@/view/ui/container/Panel';
+import { Alert } from '@/view/ui/feedback/Alert';
 import { Button } from '@/view/ui/input/Button';
 import { TextArea } from '@/view/ui/input/Input';
 import { Stack } from '@/view/ui/layout/Layout';
@@ -99,20 +101,23 @@ export function JsonToCsvConverter() {
               className="flex flex-1 flex-col overflow-hidden"
               contentClassName="p-0 flex-1 flex flex-col h-full"
             >
-              <div className="flex items-center justify-between border-b border-zinc-200 bg-zinc-50 px-4 py-2 dark:border-zinc-800 dark:bg-zinc-900">
-                <span className="text-xs font-semibold text-zinc-500 uppercase">Input JSON</span>
-                <Button
-                  onClick={() => {
-                    setJsonInput('');
-                    setCsvOutput('');
-                    setError('');
-                  }}
-                  variant="destructive"
-                  size="xs"
-                >
-                  Очистить
-                </Button>
-              </div>
+              <PanelHeader
+                title="Input JSON"
+                action={
+                  <Button
+                    onClick={() => {
+                      setJsonInput('');
+                      setCsvOutput('');
+                      setError('');
+                    }}
+                    variant="destructive"
+                    size="xs"
+                  >
+                    Очистить
+                  </Button>
+                }
+              />
+
               <TextArea
                 value={jsonInput}
                 onChange={(e) => {
@@ -123,11 +128,8 @@ export function JsonToCsvConverter() {
                 placeholder='[{"name": "John", "age": 30}]'
                 className="flex-1 resize-none border-0 p-4 font-mono text-xs focus:ring-0"
               />
-              {error && (
-                <div className="bg-red-50 p-3 text-xs font-medium text-red-600 dark:bg-red-900/20 dark:text-red-400">
-                  {error}
-                </div>
-              )}
+
+              {error && <Alert variant="error">{error}</Alert>}
             </Card>
 
             {/* Output Column */}

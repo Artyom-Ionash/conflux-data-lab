@@ -24,6 +24,7 @@ import { Workbench } from '@/view/ui/layout/Workbench';
 import { Indicator } from '@/view/ui/primitive/Indicator';
 import { OverlayLabel } from '@/view/ui/primitive/OverlayLabel';
 
+import { CanvasGridOverlay } from './_graphics/CanvasGridOverlay';
 import { WorkbenchCanvas } from './_graphics/WorkbenchCanvas';
 import { TextureDimensionSlider } from './_hardware/TextureDimensionSlider';
 import { ControlSection, SectionHeader } from './_io/ControlSection';
@@ -34,7 +35,6 @@ const LIMIT_MAX_BROWSER = 16_384;
 const VIEW_RESET_DELAY = 50;
 const EXPORT_FILENAME = 'aligned-export.png';
 const GRID_FRAME_DASH = 10;
-const GRID_FRAME_OFFSET_CSS = '-5px -5px';
 
 const DEFAULT_SETTINGS = {
   slotSize: 1,
@@ -440,30 +440,28 @@ export function VerticalImageAligner() {
             defaultBackgroundColor={DEFAULT_SETTINGS.bgColor}
           >
             {showRedGrid && (
-              <div
-                className="pointer-events-none absolute inset-0 opacity-50"
-                style={{
-                  // ✅ FIX: Используем CSS-переменную для "Сетки" (Overlays)
-                  zIndex: 'var(--z-overlay)',
-                  backgroundImage: `linear-gradient(to right, #ff0000 1px, transparent 1px), linear-gradient(to bottom, #ff0000 1px, transparent 1px)`,
-                  backgroundSize: `${frameStepX}px ${slotHeight}px`,
-                  backgroundPosition: `${redGridOffsetX}px ${redGridOffsetY}px`,
-                }}
-              />
-            )}
-            {showFrameGrid && (
-              <div
-                className="pointer-events-none absolute inset-0 opacity-80"
-                style={{
-                  // ✅ FIX: Используем CSS-переменную, но чуть выше обычной сетки
-                  zIndex: 'calc(var(--z-overlay) + 1)',
-                  backgroundImage: `linear-gradient(to right, #00ff00 ${GRID_FRAME_DASH}px, transparent ${GRID_FRAME_DASH}px), linear-gradient(to bottom, #00ff00 ${GRID_FRAME_DASH}px, transparent ${GRID_FRAME_DASH}px)`,
-                  backgroundSize: `${frameStepX}px ${slotHeight}px`,
-                  backgroundPosition: GRID_FRAME_OFFSET_CSS,
-                }}
+              <CanvasGridOverlay
+                color="#ff0000"
+                step={frameStepX}
+                slotHeight={slotHeight}
+                offsetX={redGridOffsetX}
+                offsetY={redGridOffsetY}
+                zIndex="var(--z-overlay)"
               />
             )}
 
+            {showFrameGrid && (
+              <CanvasGridOverlay
+                color="#00ff00"
+                step={frameStepX}
+                slotHeight={slotHeight}
+                dash={GRID_FRAME_DASH}
+                opacity={0.8}
+                zIndex="calc(var(--z-overlay) + 1)"
+              />
+            )}
+
+            {/* List logic remains (it uses CanvasMovable which is a UI primitive) */}
             {images.map((img, i) => (
               <div
                 key={img.id}
@@ -472,9 +470,7 @@ export function VerticalImageAligner() {
                   top: i * slotHeight,
                   height: slotHeight,
                   width: slotWidth,
-                  zIndex: img.isActive
-                    ? 'var(--z-dropdown)' // Активный элемент выше (20)
-                    : 'var(--z-sticky)', // Пассивный ниже (10)
+                  zIndex: img.isActive ? 'var(--z-dropdown)' : 'var(--z-sticky)',
                 }}
               >
                 <CanvasMovable

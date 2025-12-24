@@ -6,13 +6,12 @@ import { cn } from '../../../core/tailwind/utils';
 
 interface OverlayLabelProps {
   children: React.ReactNode;
-  position?: 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right';
+  position?: 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right' | 'bottom-center';
   variant?: 'dark' | 'accent';
   className?: string;
 }
 
 /**
-
  * Техническая метка для наложения поверх визуального контента.
  */
 export function OverlayLabel({
@@ -26,6 +25,7 @@ export function OverlayLabel({
     'top-right': 'top-1 right-1',
     'bottom-left': 'bottom-1 left-1',
     'bottom-right': 'bottom-1 right-1',
+    'bottom-center': 'bottom-4 left-1/2 -translate-x-1/2',
   };
 
   const variants = {
