@@ -48,6 +48,11 @@
 
 1.  **Утилита `cn()`:** Всегда используйте `cn()` для условных классов.
 2.  **Варианты:** Используйте `cva` для компонентов с множеством состояний.
+3.  **Кастомные утилиты (Custom Utilities):**
+    Если вы видите часто повторяющийся паттерн (более 3 раз), вынесите его в `core/tailwind/utilities.css`.
+    - **Префикс:** Строго **`fx-`** (Functional Extension).
+      - ✅ `fx-center` (flex items-center justify-center)
+      - ✅ `fx-cover` (absolute inset-0 h-full w-full)
 
 ## ⚡ Практики кодирования
 

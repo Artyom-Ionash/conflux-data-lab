@@ -5,6 +5,10 @@ const stylelintConfig = {
     // Разрешаем писать @import "tailwindcss" (строкой), а не url("...")
     'import-notation': 'string',
 
+    // Отключаем правило вложенности, так как @utility в Tailwind v4 
+    // создает контекст, который Stylelint пока не распознает.
+    'nesting-selector-no-missing-scoping-root': null,
+
     // Разрешаем специфичные директивы Tailwind v4
     'at-rule-no-unknown': [
       true,

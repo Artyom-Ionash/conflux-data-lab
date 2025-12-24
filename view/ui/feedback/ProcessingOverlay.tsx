@@ -38,7 +38,7 @@ export function ProcessingOverlay({
   return (
     <div
       className={cn(
-        'z-overlay absolute inset-0 flex flex-col items-center justify-center gap-3 bg-white/40 transition-all duration-300 ease-in-out dark:bg-black/40',
+        'z-overlay fx-cover fx-col-center gap-3 bg-white/40 transition-all duration-300 ease-in-out dark:bg-black/40',
         isVisible
           ? 'pointer-events-auto opacity-100 backdrop-blur-[1px]'
           : 'pointer-events-none opacity-0 backdrop-blur-none',

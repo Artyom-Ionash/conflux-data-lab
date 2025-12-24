@@ -61,7 +61,7 @@ export function SidebarIO({
       />
 
       {hasFiles && onDownload && (
-        <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
+        <div className="fx-slide-in">
           <Button
             onClick={(e) => {
               e.preventDefault();

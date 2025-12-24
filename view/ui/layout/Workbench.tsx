@@ -30,8 +30,7 @@ const Sidebar = ({ children, className, ...props }: WorkbenchProps) => (
     )}
     {...props}
   >
-    {/* overflow-x-hidden гарантирует, что даже если контент дёрнется, скроллбар не появится. */}
-    <div className="custom-scrollbar flex-1 overflow-x-hidden overflow-y-auto p-5">
+    <div className="fx-scrollbar flex-1 overflow-x-hidden overflow-y-auto p-5">
       <div className="flex flex-col gap-6">{children}</div>
     </div>
   </aside>

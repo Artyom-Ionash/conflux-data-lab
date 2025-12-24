@@ -4,7 +4,7 @@ import React, { forwardRef } from 'react';
 
 import { cn } from '../../../core/tailwind/utils';
 
-// Базовые стили вынесены, чтобы TextInput и TextArea выглядели одинаково
+// Базовые стили вынесены
 const inputStyles = cn(
   'w-full rounded-md border border-zinc-200 bg-white px-3 py-2 font-mono text-xs shadow-sm transition-all',
   'placeholder:text-zinc-400 dark:placeholder:text-zinc-600',
@@ -37,7 +37,7 @@ export const TextArea = forwardRef<HTMLTextAreaElement, TextAreaProps>(
     return (
       <textarea
         ref={ref}
-        className={cn(inputStyles, 'custom-scrollbar resize-none', error && errorStyles, className)}
+        className={cn(inputStyles, 'fx-scrollbar resize-none', error && errorStyles, className)}
         {...props}
       />
     );

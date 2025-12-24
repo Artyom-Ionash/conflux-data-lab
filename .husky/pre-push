@@ -1,6 +1,3 @@
-#!/usr/bin/env sh
-. "$(dirname -- "$0")/_/husky.sh"
-
 echo "🛡️ Final security check before push..."
 
 # Используем run-p для параллельного запуска.

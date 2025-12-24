@@ -8,7 +8,7 @@ interface GridOverlayProps {
   slotHeight: number;
   dash?: number;
   opacity?: number;
-  zIndex?: string; // Поддерживаем нашу Z-систему
+  zIndex?: string;
 }
 
 export function CanvasGridOverlay({
@@ -30,7 +30,7 @@ export function CanvasGridOverlay({
 
   return (
     <div
-      className="pointer-events-none absolute inset-0"
+      className="fx-cover pointer-events-none"
       style={{
         zIndex,
         opacity,
