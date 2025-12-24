@@ -1,165 +1,101 @@
-export interface GodotNode {
+import { TreeRegistry } from '@/core/primitives/topology';
+
+export interface GodotNodeMetadata {
   name: string;
   type: string;
-  parentPath: string | null;
-  properties: Record<string, string>;
-  children: GodotNode[];
   isResource: boolean;
-  fullPath?: string;
 }
 
+/**
+ * Парсер текстовых сцен Godot (.tscn).
+ * Использует TreeRegistry для восстановления иерархии узлов.
+ */
 export class GodotSceneParser {
-  private nodes: GodotNode[] = [];
-  private rootNodes: GodotNode[] = [];
-
   public parse(content: string): string {
-    this.reset();
+    // Корневой узел реестра — технический, он не выводится в render
+    const registry = new TreeRegistry<GodotNodeMetadata>({
+      name: 'Scene',
+      type: 'Root',
+      isResource: false,
+    });
+
     const lines = content.split(/\r?\n/);
 
-    let currentNode: GodotNode | null = null;
-    let sectionType: 'node' | 'resource' | 'other' | null = null;
+    // Карта для восстановления полных путей: ИмяУзла -> ПолныйПуть
+    const nodePathMap = new Map<string, string>();
+    let sceneRootName = '';
 
     lines.forEach((line) => {
       const trimmed = line.trim();
       if (!trimmed) return;
 
-      if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
-        const attrs = this.parseHeaderAttributes(trimmed);
+      if (trimmed.startsWith('[node')) {
+        const name = this.getAttr(trimmed, 'name') || 'Unnamed';
+        const type = this.getAttr(trimmed, 'type') || 'Node';
+        const parent = this.getAttr(trimmed, 'parent');
 
-        if (trimmed.startsWith('[node')) {
-          sectionType = 'node';
-          currentNode = this.createNode(attrs, false);
-          this.nodes.push(currentNode);
-        } else if (trimmed.startsWith('[sub_resource') || trimmed.startsWith('[resource')) {
-          sectionType = 'resource';
-          currentNode = this.createNode(attrs, true);
-          this.nodes.push(currentNode);
+        let fullPath = '';
+
+        if (!parent) {
+          // Первый узел без родителя — это корень сцены
+          sceneRootName = name;
+          fullPath = name;
         } else {
-          sectionType = 'other';
-          currentNode = null;
+          // Определяем имя родителя ('.' ссылается на корень сцены)
+          const parentLookup = parent === '.' ? sceneRootName : parent;
+          const parentPath = nodePathMap.get(parentLookup);
+
+          // Строим путь для реестра: Parent/Child
+          fullPath = parentPath ? `${parentPath}/${name}` : name;
         }
-        return;
-      }
 
-      if (sectionType && currentNode && trimmed.includes('=')) {
-        const eqIndex = trimmed.indexOf('=');
-        const key = trimmed.substring(0, eqIndex).trim();
-        const value = trimmed.substring(eqIndex + 1).trim();
-        currentNode.properties[key] = value;
-      }
-    });
+        // Сохраняем путь для будущих потомков
+        nodePathMap.set(name, fullPath);
 
-    this.buildTree();
-    return this.stringifyTree();
-  }
+        registry.addByPath(fullPath, { name, type, isResource: false }, (n) => ({
+          name: n,
+          type: 'Node',
+          isResource: false,
+        }));
+      } else if (trimmed.startsWith('[sub_resource') || trimmed.startsWith('[resource')) {
+        const id = this.getAttr(trimmed, 'id') || 'res';
+        const type = this.getAttr(trimmed, 'type') || 'Resource';
+        const isSub = trimmed.startsWith('[sub_resource');
 
-  private reset(): void {
-    this.nodes = [];
-    this.rootNodes = [];
-  }
-
-  private parseHeaderAttributes(line: string): Record<string, string> {
-    const content = line.trim().slice(1, -1);
-    const props: Record<string, string> = {};
-    let token = '';
-    let inQuote = false,
-      arrayDepth = 0,
-      funcDepth = 0;
-
-    for (const char of content) {
-      if (char === '"') inQuote = !inQuote;
-      if (char === '[') arrayDepth++;
-      if (char === ']') arrayDepth--;
-      if (char === '(') funcDepth++;
-      if (char === ')') funcDepth--;
-
-      if (char === ' ' && !inQuote && arrayDepth === 0 && funcDepth === 0) {
-        if (token) this.processToken(token, props);
-        token = '';
-      } else {
-        token += char;
-      }
-    }
-    if (token) this.processToken(token, props);
-    return props;
-  }
-
-  private processToken(token: string, props: Record<string, string>): void {
-    const eqIndex = token.indexOf('=');
-    if (eqIndex > 0) {
-      props[token.substring(0, eqIndex)] = token.substring(eqIndex + 1);
-    }
-  }
-
-  private createNode(attrs: Record<string, string>, isResource: boolean): GodotNode {
-    const rawName = isResource ? attrs['id'] : attrs['name'];
-    const name = rawName?.replace(/"/g, '') || 'Unnamed';
-
-    const rawType = attrs['type'];
-    const type = rawType?.replace(/"/g, '') || (isResource ? 'Resource' : 'Node');
-
-    const rawParent = attrs['parent'];
-    const parentPath = rawParent?.replace(/"/g, '') || null;
-
-    return {
-      name,
-      type,
-      parentPath,
-      properties: {},
-      children: [],
-      isResource,
-    };
-  }
-
-  private buildTree(): void {
-    const nodeMap = new Map<string, GodotNode>();
-    const sceneNodes = this.nodes.filter((n) => !n.isResource);
-
-    // 1. Identify the Scene Root (node with no parent)
-    const root = sceneNodes.find((n) => !n.parentPath);
-    if (root) {
-      root.fullPath = '.';
-      this.rootNodes.push(root);
-      nodeMap.set('.', root);
-    }
-
-    // 2. Process children
-    sceneNodes.forEach((node) => {
-      // Skip the root (already handled)
-      if (!node.parentPath) return;
-
-      const parentNode = nodeMap.get(node.parentPath);
-
-      if (parentNode) {
-        parentNode.children.push(node);
-
-        // Construct the path for THIS node so its children can find it
-        const myPath = node.parentPath === '.' ? node.name : `${node.parentPath}/${node.name}`;
-
-        nodeMap.set(myPath, node);
-      } else {
-        // Fallback: orphan node
-        this.rootNodes.push(node);
+        // Ресурсы группируем в виртуальную ветку для порядка
+        registry.addByPath(`Resources/${id}`, { name: id, type, isResource: true }, (n) => ({
+          name: n,
+          type: isSub ? 'SubResource' : 'Resource',
+          isResource: true,
+        }));
       }
     });
 
-    // 3. Add resources at the end
-    this.nodes.filter((n) => n.isResource).forEach((res) => this.rootNodes.push(res));
-  }
-
-  private stringifyTree(): string {
-    const formatNode = (node: GodotNode, depth: number): string => {
+    // Рендерим дерево с использованием вычисленных отступов
+    return registry.render((node, depth) => {
       const indent = '  '.repeat(depth);
-      const typeStr = node.isResource ? `[Res: ${node.type}]` : `[${node.type}]`;
-      let res = `${indent}${node.name} ${typeStr}\n`;
+      const { name, type, isResource } = node.data;
 
-      node.children.forEach((child) => {
-        res += formatNode(child, depth + 1);
-      });
-      return res;
-    };
+      // Если это промежуточный узел (например, папка Resources), просто выводим имя
+      if (!node.isLeaf && !isResource && name === 'Resources') {
+        return `${indent}${name}/\n`;
+      }
 
-    // Join with empty string because formatNode already adds \n
-    return this.rootNodes.map((root) => formatNode(root, 0)).join('');
+      const typeStr = isResource ? `[Res: ${type}]` : `[${type}]`;
+      return `${indent}${name} ${typeStr}\n`;
+    });
+  }
+
+  /**
+   * Извлекает значение атрибута из строки определения узла.
+   */
+  private getAttr(line: string, name: string): string | undefined {
+    // Поиск в кавычках: name="Value"
+    const match = new RegExp(`${name}="([^"]+)"`).exec(line);
+    if (match) return match[1];
+
+    // Поиск без кавычек (для id): id=1
+    const matchNoQuote = new RegExp(`${name}=([^\\s\\]]+)`).exec(line);
+    return matchNoQuote?.[1];
   }
 }
