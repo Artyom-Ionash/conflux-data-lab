@@ -3,4 +3,6 @@
 
 echo "🛡️ Final security check before push..."
 
-npm run type-check && npm test
+# Используем run-p для параллельного запуска.
+# Если любая из команд упадет, push будет отменен.
+npx run-p type-check test
