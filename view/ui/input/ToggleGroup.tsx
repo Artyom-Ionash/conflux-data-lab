@@ -24,8 +24,6 @@ type ToggleGroupItemProps = React.ComponentPropsWithoutRef<typeof ToggleGroupPri
 
 const ToggleGroup = React.forwardRef<HTMLDivElement, ToggleGroupProps>(
   ({ className, children, gridCols, style, ...props }, ref) => {
-    // <-- Убрали onKeyDown отсюда
-
     const baseStyles = 'bg-zinc-100 dark:bg-zinc-800 p-1 rounded-lg gap-1';
     const layoutStyles = gridCols ? 'grid' : 'inline-flex flex-row';
 
@@ -42,7 +40,7 @@ const ToggleGroup = React.forwardRef<HTMLDivElement, ToggleGroupProps>(
         className={cx(baseStyles, layoutStyles, className)}
         style={dynamicStyle}
         loop={true}
-        {...props} // <-- Теперь onKeyDown (если есть) передан здесь
+        {...props}
       >
         {children}
       </ToggleGroupPrimitive.Root>

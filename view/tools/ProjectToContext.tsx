@@ -6,7 +6,7 @@ import { downloadText } from '@/core/browser/canvas';
 import { useCopyToClipboard } from '@/core/react/hooks/use-copy';
 import { type ContextStats } from '@/lib/context-generator/core';
 import { runContextPipeline } from '@/lib/context-generator/engine';
-import { CONTEXT_PRESETS, type PresetKey } from '@/lib/context-generator/rules';
+import { CONTEXT_PRESETS, HEAVY_DIRS, type PresetKey } from '@/lib/context-generator/rules';
 import { useBundleManager } from '@/lib/context-generator/use-bundle-manager';
 import { ProcessingOverlay } from '@/view/ui/feedback/ProcessingOverlay';
 import { Button } from '@/view/ui/input/Button';
@@ -38,9 +38,9 @@ export function ProjectToContext() {
   const [lastGeneratedAt, setLastGeneratedAt] = useState<Date | null>(null);
 
   const shouldSkipScan = useCallback((path: string) => {
+    // Используем централизованный список
     const parts = path.split('/');
-    const heavyFolders = ['node_modules', '.git', '.next', 'out', 'dist', '.godot', '.import'];
-    return parts.some((p) => heavyFolders.includes(p));
+    return parts.some((p) => HEAVY_DIRS.includes(p));
   }, []);
 
   /**
@@ -132,7 +132,7 @@ export function ProjectToContext() {
       <Workbench.Header title="Project to Context" />
 
       {/* 
-          Главная кнопка теперь СКАЧИВАНИЕ (чёрная). 
+          Главная кнопка СКАЧИВАНИЕ (чёрная). 
           Генерация происходит автоматически или по нажатию синей кнопки ниже.
       */}
       <SidebarIO
@@ -209,7 +209,6 @@ export function ProjectToContext() {
           gap={4}
           className="animate-in fade-in slide-in-from-bottom-2 border-t border-zinc-200 pt-4 dark:border-zinc-800"
         >
-          {/* Использование Indicator вместо InfoBadge/Badge */}
           <Indicator label="Токены (Est.)" className="justify-between py-2 text-lg">
             ~{stats.totalTokens.toLocaleString()}
           </Indicator>

@@ -1,10 +1,31 @@
-export const IGNORE_COMMON = [
+/**
+ * Глобальные правила игнорирования и пресеты для генератора контекста.
+ */
+
+// Папки, которые физически тяжело сканировать в браузере (тысячи файлов).
+// Используются для раннего отсечения (Early Exit) в сканерах.
+export const HEAVY_DIRS = [
+  'node_modules',
   '.git',
+  '.next',
+  '.vercel',
+  'out',
+  'dist',
+  'build',
+  'coverage',
+  '.godot',
+  '.import', // Godot imports folder
+  '.gradle',
   '.idea',
   '.vscode',
+  'target', // Rust/Java
+];
+
+// Файлы и папки, которые не несут семантической ценности для LLM.
+export const IGNORE_COMMON = [
+  ...HEAVY_DIRS,
   '.context',
   '.DS_Store',
-  'node_modules',
   'package-lock.json',
   'yarn.lock',
   'pnpm-lock.yaml',
@@ -32,7 +53,6 @@ export interface ContextPreset {
 }
 
 // Используем satisfies вместо явного Record<string, ContextPreset>
-// Это позволяет TS знать, что ключи 'godot' и 'nextjs' точно существуют.
 export const CONTEXT_PRESETS = {
   godot: {
     name: 'Godot 4 (Logic Only)',
@@ -48,13 +68,14 @@ export const CONTEXT_PRESETS = {
       '.md',
       '.py',
     ],
-    hardIgnore: [...IGNORE_COMMON, '.godot', '.import', 'builds', '*.uid', '*.import'],
+    // Используем Set для дедупликации, если IGNORE_COMMON пересечется с уникальными
+    hardIgnore: [...new Set([...IGNORE_COMMON, 'builds', '*.uid', '*.import'])],
     treeOnly: ['addons/'],
   },
   nextjs: {
     name: 'Next.js / React',
     textExtensions: ['.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs', '.css', '.json', '.md', '.yaml'],
-    hardIgnore: [...IGNORE_COMMON, '.next', 'out', 'dist', 'coverage', '.vercel'],
+    hardIgnore: [...IGNORE_COMMON],
     treeOnly: ['public/'],
   },
 } satisfies Record<string, ContextPreset>;
