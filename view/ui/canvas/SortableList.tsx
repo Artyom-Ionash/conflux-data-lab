@@ -30,7 +30,6 @@ interface Identifiable {
 interface SortableListProps<T extends Identifiable> {
   items: T[];
   onReorder: (items: T[]) => void;
-  // FIX: Замена any на React.HTMLAttributes<HTMLElement>
   renderItem: (
     item: T,
     index: number,
@@ -45,7 +44,6 @@ interface SortableListProps<T extends Identifiable> {
 
 interface SortableItemWrapperProps {
   id: UniqueIdentifier;
-  // FIX: Замена any на React.HTMLAttributes<HTMLElement>
   children: (isDragging: boolean, props: React.HTMLAttributes<HTMLElement>) => React.ReactNode;
   className?: string | undefined;
 }
@@ -58,15 +56,14 @@ function SortableItemWrapper({ id, children, className }: SortableItemWrapperPro
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
-    zIndex: isDragging ? 50 : 'auto',
+    zIndex: isDragging ? 'var(--z-overlay)' : 'auto',
     position: 'relative' as const,
   };
-
   // attributes + listeners формируют props для div-а или другого HTML элемента
   const dragProps = { ...attributes, ...listeners } as React.HTMLAttributes<HTMLElement>;
 
   return (
-    <div ref={setNodeRef} style={style} className={cn(className, isDragging && 'z-50')}>
+    <div ref={setNodeRef} style={style} className={cn(className, isDragging && 'z-overlay')}>
       {children(isDragging, dragProps)}
     </div>
   );
