@@ -199,7 +199,6 @@ export function VideoFrameExtractor() {
               }
             />
 
-            {/* 2. Monitoring Grid */}
             <MonitorDashboard
               videoSrc={state.videoSrc}
               startTime={state.extractionParams.startTime}
@@ -251,10 +250,9 @@ export function VideoFrameExtractor() {
                 <Group gap={4} wrap>
                   <Switch
                     label="Loop"
-                    checked={state.extractionParams.symmetricLoop}
-                    onCheckedChange={(c) =>
-                      actions.setExtractionParams((p) => ({ ...p, symmetricLoop: c }))
-                    }
+                    // Обновленный доступ к состоянию
+                    checked={state.symmetricLoop}
+                    onCheckedChange={(c) => actions.setSymmetricLoop(c)}
                   />
                   <Separator />
                   <NumberStepper

@@ -31,13 +31,15 @@ export function useFrameExtractor() {
   );
 
   // --- Params ---
-  // Renamed internal setter to avoid confusion
+  // 1. Capture Params (Влияют на тяжелый процесс извлечения)
   const [extractionParams, _setExtractionParams] = useState<ExtractionParams>({
     startTime: 0,
     endTime: 0,
     frameStep: 1,
-    symmetricLoop: false,
   });
+
+  // 2. Post-Process Params (Мгновенное влияние на отображение)
+  const [symmetricLoop, setSymmetricLoop] = useState(false);
 
   const [gifParams, setGifParams] = useState({
     fps: DEFAULT_FPS,
@@ -66,12 +68,16 @@ export function useFrameExtractor() {
     [extractionParams.endTime, videoDuration]
   );
 
+  // Логика зацикливания перенесена сюда (Pure View Logic)
+  // Это НЕ вызывает перезапуск видео-процессинга
   const frames = useMemo(() => {
     if (rawFrames.length < 2) return rawFrames;
-    if (!extractionParams.symmetricLoop) return rawFrames;
+    if (!symmetricLoop) return rawFrames;
+
+    // Создаем зеркальную копию (исключая первый и последний кадр для плавности)
     const loopBack = rawFrames.slice(1, -1).reverse();
     return [...rawFrames, ...loopBack];
-  }, [rawFrames, extractionParams.symmetricLoop]);
+  }, [rawFrames, symmetricLoop]);
 
   // --- Handlers (Interception Logic) ---
 
@@ -148,6 +154,8 @@ export function useFrameExtractor() {
     }
   }, [videoSrc, extractionParams]);
 
+  // Debounce только для тяжелых параметров.
+  // symmetricLoop здесь нет, поэтому он не триггерит этот эффект.
   useDebounceEffect(
     () => {
       if (videoSrc) void runExtraction();
@@ -180,16 +188,15 @@ export function useFrameExtractor() {
       setVideoDimensions({ width: tempVideo.videoWidth, height: tempVideo.videoHeight });
 
       const safeStartTime = Math.max(0, duration - DEFAULT_CLIP_DURATION);
-      const initialParams = {
+
+      _setExtractionParams({
         startTime: safeStartTime,
         endTime: duration,
         frameStep: DEFAULT_FRAME_STEP,
-        symmetricLoop: true,
-      };
-      // Use internal setter to skip auto-fps logic on init if needed, or public to trigger it
-      _setExtractionParams(initialParams);
+      });
 
-      // Init FPS based on default step
+      setSymmetricLoop(true); // Default to loop enabled
+
       const calculatedFps = Math.round(1 / DEFAULT_FRAME_STEP);
       setGifParams((p) => ({ ...p, fps: calculatedFps }));
 
@@ -243,6 +250,7 @@ export function useFrameExtractor() {
       videoDuration,
       videoDimensions,
       extractionParams,
+      symmetricLoop,
       frames,
       gifParams,
       status,
@@ -251,6 +259,7 @@ export function useFrameExtractor() {
     },
     actions: {
       setExtractionParams,
+      setSymmetricLoop,
       setGifParams,
       handleFilesSelected,
       generateAndDownloadGif,

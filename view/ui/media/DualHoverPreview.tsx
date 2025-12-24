@@ -12,6 +12,7 @@ interface DualHoverPreviewProps {
   previewStartImage: string | null;
   previewEndImage: string | null;
   aspectRatioStyle: React.CSSProperties;
+  isLoading?: boolean;
 }
 
 export function DualHoverPreview({
@@ -24,6 +25,7 @@ export function DualHoverPreview({
   previewStartImage,
   previewEndImage,
   aspectRatioStyle,
+  isLoading = false,
 }: DualHoverPreviewProps) {
   const renderFrame = (
     isActive: boolean,
@@ -58,6 +60,12 @@ export function DualHoverPreview({
               muted
               playsInline
             />
+            {/* Loading Indicator */}
+            {isLoading && (
+              <div className="absolute inset-0 flex items-center justify-center bg-black/40 backdrop-blur-[1px]">
+                <div className="h-6 w-6 animate-spin rounded-full border-2 border-white/20 border-t-white" />
+              </div>
+            )}
           </div>
         )}
       </div>

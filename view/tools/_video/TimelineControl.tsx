@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 
 import { getAspectRatioStyle } from '@/core/tailwind/utils';
 import { Card } from '@/view/ui/container/Card';
@@ -49,7 +49,25 @@ export function TimelineControl({
     null
   );
   const [isDragging, setIsDragging] = useState(false);
+  const [isVideoSeeking, setIsVideoSeeking] = useState(false); // Новое состояние
   const containerRef = useRef<HTMLDivElement>(null);
+
+  // Подписка на события поиска (Seek) видео
+  useEffect(() => {
+    const video = hoverVideoRef.current;
+    if (!video) return;
+
+    const onSeeking = () => setIsVideoSeeking(true);
+    const onSeeked = () => setIsVideoSeeking(false);
+
+    video.addEventListener('seeking', onSeeking);
+    video.addEventListener('seeked', onSeeked);
+
+    return () => {
+      video.removeEventListener('seeking', onSeeking);
+      video.removeEventListener('seeked', onSeeked);
+    };
+  }, [hoverVideoRef]);
 
   const handleSliderHover = (e: React.MouseEvent<HTMLDivElement>) => {
     if (!duration || isDragging) return;
@@ -130,6 +148,7 @@ export function TimelineControl({
               videoRef={hoverVideoRef}
               previewStartImage={previewStart}
               previewEndImage={previewEnd}
+              isLoading={isVideoSeeking}
               aspectRatioStyle={getAspectRatioStyle(
                 videoDimensions?.width,
                 videoDimensions?.height

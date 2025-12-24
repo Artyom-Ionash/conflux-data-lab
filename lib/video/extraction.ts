@@ -1,5 +1,4 @@
 /**
- * [КРИСТАЛЛ] Extraction Process
  * Технологический процесс извлечения последовательности кадров.
  */
 
@@ -9,7 +8,6 @@ export interface ExtractionParams {
   startTime: number;
   endTime: number;
   frameStep: number;
-  symmetricLoop: boolean;
 }
 
 export interface ExtractedFrame {
@@ -25,24 +23,23 @@ interface ExtractionOptions {
 
 /**
  * Рассчитывает массив временных меток для извлечения.
+ * Генерирует СТРОГО линейную последовательность.
  */
 export function calculateTimestamps(params: ExtractionParams, duration: number): number[] {
-  const { startTime, endTime, frameStep, symmetricLoop } = params;
+  const { startTime, endTime, frameStep } = params;
   const effectiveEnd = Math.min(endTime, duration);
+
+  // Защита от бесконечного цикла
+  if (frameStep <= 0) return [startTime];
+
   const numberOfSteps = Math.floor((effectiveEnd - startTime) / frameStep);
 
-  const forward: number[] = [];
+  const timestamps: number[] = [];
   for (let i = 0; i <= numberOfSteps; i++) {
-    forward.push(startTime + i * frameStep);
+    timestamps.push(startTime + i * frameStep);
   }
 
-  if (!symmetricLoop || forward.length < 2) {
-    return forward;
-  }
-
-  // Создаем обратный путь, исключая первый и последний кадры для плавности цикла
-  const backward = [...forward].slice(1, -1).reverse();
-  return [...forward, ...backward];
+  return timestamps;
 }
 
 /**
@@ -59,7 +56,6 @@ export async function runExtractionTask(
   const total = timestamps.length;
 
   for (let i = 0; i < total; i++) {
-    // Проверка сигнала отмены
     if (options.signal?.aborted) {
       throw new Error('Extraction Aborted');
     }
