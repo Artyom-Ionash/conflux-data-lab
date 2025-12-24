@@ -70,7 +70,7 @@ export function DualHoverPreview({
   );
 
   return (
-    <div className="pointer-events-none absolute top-full left-1/2 z-[100] mt-6 w-[98vw] max-w-[1600px] -translate-x-1/2">
+    <div className="z-tooltip pointer-events-none absolute top-full left-1/2 mt-6 w-[98vw] max-w-[1600px] -translate-x-1/2">
       <div className="grid grid-cols-2 gap-6 rounded-2xl border border-white/10 bg-zinc-950/95 p-6 shadow-2xl backdrop-blur-md">
         {renderFrame(
           activeThumb === 0,

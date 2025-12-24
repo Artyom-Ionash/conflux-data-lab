@@ -7,8 +7,7 @@ import { Workbench } from './Workbench';
 describe('Workbench (Industrial Layout)', () => {
   // 1. Проверка режима "Overlay Mode"
   // Мы должны убедиться, что верстак вырывается из потока документа
-  // и перекрывает всё (fixed + z-100).
-  it('Root enforces Overlay Mode (fixed positioning & high z-index)', () => {
+  it('Root enforces Overlay Mode (fixed positioning & base z-index)', () => {
     const { container } = render(
       <Workbench.Root>
         <div>Content</div>
@@ -20,12 +19,10 @@ describe('Workbench (Industrial Layout)', () => {
     // Проверяем наличие критических классов для перекрытия
     expect(rootElement).toHaveClass('fixed');
     expect(rootElement).toHaveClass('inset-0');
-    expect(rootElement).toHaveClass('z-[100]');
+    expect(rootElement).toHaveClass('z-base');
   });
 
   // 2. Проверка изоляции скролла
-  // Это самый важный тест для твоего вопроса.
-  // Мы убрали это из globals.css, поэтому оно ОБЯЗАНО быть здесь.
   it('Root enforces Scroll Isolation (overscroll-none)', () => {
     const { container } = render(
       <Workbench.Root>
