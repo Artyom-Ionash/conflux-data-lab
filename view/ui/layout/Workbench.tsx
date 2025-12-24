@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import React from 'react';
 
-import { cn } from '../../../core/tailwind/utils';
+import { cn } from '@/core/tailwind/utils';
 
 interface WorkbenchProps extends React.HTMLAttributes<HTMLElement> {
   children: React.ReactNode;
@@ -13,7 +13,7 @@ interface WorkbenchProps extends React.HTMLAttributes<HTMLElement> {
 const Root = ({ children, className, ...props }: WorkbenchProps) => (
   <div
     className={cn(
-      'fixed inset-0 z-[100] flex overflow-hidden overscroll-none bg-zinc-50 dark:bg-zinc-950',
+      'z-base fixed inset-0 flex overflow-hidden overscroll-none bg-zinc-50 dark:bg-zinc-950',
       className
     )}
     {...props}
@@ -25,7 +25,7 @@ const Root = ({ children, className, ...props }: WorkbenchProps) => (
 const Sidebar = ({ children, className, ...props }: WorkbenchProps) => (
   <aside
     className={cn(
-      'z-20 flex w-80 flex-shrink-0 flex-col border-r border-zinc-200 bg-white shadow-xl dark:border-zinc-800 dark:bg-zinc-900',
+      'z-workbench-sidebar flex w-80 flex-shrink-0 flex-col border-r border-zinc-200 bg-white shadow-xl dark:border-zinc-800 dark:bg-zinc-900',
       className
     )}
     {...props}
@@ -60,7 +60,7 @@ const Header = ({ title, className }: { title: string; className?: string }) => 
 
 const Stage = ({ children, className, ...props }: WorkbenchProps) => (
   <main
-    className={cn('relative z-10 flex-1 overflow-hidden overscroll-none', className)}
+    className={cn('z-base relative flex-1 overflow-hidden overscroll-none', className)}
     {...props}
   >
     {children}

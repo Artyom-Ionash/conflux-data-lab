@@ -35,10 +35,6 @@ const VIEW_RESET_DELAY = 50;
 const EXPORT_FILENAME = 'aligned-export.png';
 const GRID_FRAME_DASH = 10;
 const GRID_FRAME_OFFSET_CSS = '-5px -5px';
-const Z_INDEX_SLOT_BASE = 10;
-const Z_INDEX_SLOT_ACTIVE = 30;
-const Z_INDEX_GRID_RED = 50;
-const Z_INDEX_GRID_FRAME = 60;
 
 const DEFAULT_SETTINGS = {
   slotSize: 1,
@@ -447,7 +443,8 @@ export function VerticalImageAligner() {
               <div
                 className="pointer-events-none absolute inset-0 opacity-50"
                 style={{
-                  zIndex: Z_INDEX_GRID_RED,
+                  // ✅ FIX: Используем CSS-переменную для "Сетки" (Overlays)
+                  zIndex: 'var(--z-overlay)',
                   backgroundImage: `linear-gradient(to right, #ff0000 1px, transparent 1px), linear-gradient(to bottom, #ff0000 1px, transparent 1px)`,
                   backgroundSize: `${frameStepX}px ${slotHeight}px`,
                   backgroundPosition: `${redGridOffsetX}px ${redGridOffsetY}px`,
@@ -458,7 +455,8 @@ export function VerticalImageAligner() {
               <div
                 className="pointer-events-none absolute inset-0 opacity-80"
                 style={{
-                  zIndex: Z_INDEX_GRID_FRAME,
+                  // ✅ FIX: Используем CSS-переменную, но чуть выше обычной сетки
+                  zIndex: 'calc(var(--z-overlay) + 1)',
                   backgroundImage: `linear-gradient(to right, #00ff00 ${GRID_FRAME_DASH}px, transparent ${GRID_FRAME_DASH}px), linear-gradient(to bottom, #00ff00 ${GRID_FRAME_DASH}px, transparent ${GRID_FRAME_DASH}px)`,
                   backgroundSize: `${frameStepX}px ${slotHeight}px`,
                   backgroundPosition: GRID_FRAME_OFFSET_CSS,
@@ -474,7 +472,9 @@ export function VerticalImageAligner() {
                   top: i * slotHeight,
                   height: slotHeight,
                   width: slotWidth,
-                  zIndex: img.isActive ? Z_INDEX_SLOT_ACTIVE : Z_INDEX_SLOT_BASE,
+                  zIndex: img.isActive
+                    ? 'var(--z-dropdown)' // Активный элемент выше (20)
+                    : 'var(--z-sticky)', // Пассивный ниже (10)
                 }}
               >
                 <CanvasMovable

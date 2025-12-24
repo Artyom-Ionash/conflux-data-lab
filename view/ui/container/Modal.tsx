@@ -3,7 +3,7 @@
 import * as Dialog from '@radix-ui/react-dialog';
 import React from 'react';
 
-import { cn } from '../../../core/tailwind/utils';
+import { cn } from '@/core/tailwind/utils';
 
 interface ModalProps {
   isOpen: boolean;
@@ -11,7 +11,7 @@ interface ModalProps {
   title?: React.ReactNode;
   children: React.ReactNode;
   headerActions?: React.ReactNode;
-  className?: string; // Для кастомных размеров контента
+  className?: string; // Для настраиваемых размеров контента
 }
 
 export function Modal({
@@ -26,10 +26,9 @@ export function Modal({
     <Dialog.Root open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <Dialog.Portal>
         {/* Overlay: затемнение фона с анимацией */}
-        <Dialog.Overlay className="data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 fixed inset-0 z-[200] bg-black/90 backdrop-blur-sm" />
-
-        {/* Content Wrapper: центрирование */}
-        <div className="fixed inset-0 z-[210] flex items-center justify-center p-4">
+        <Dialog.Overlay className="data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 z-overlay fixed inset-0 bg-black/90 backdrop-blur-sm" />
+        {/* Это гарантирует, что модалка всегда выше оверлея, но ниже тостов/тултипов (100+) */}
+        <div className="z-modal fixed inset-0 flex items-center justify-center p-4">
           <Dialog.Content
             className={cn(
               'data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-top-[48%] flex max-h-[95vh] w-full flex-col overflow-hidden rounded-2xl border border-zinc-700 bg-zinc-900 shadow-2xl outline-none',

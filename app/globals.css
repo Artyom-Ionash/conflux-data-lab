@@ -1,15 +1,17 @@
 @import 'tailwindcss';
 
+/* --- CORE SYSTEM INJECTION --- */
+
+/* 1. Physics (Topology) */
+@import '../core/tailwind/layers.css';
+
+/* 2. Aesthetics (Tokens) */
+@import '../core/tailwind/tokens.css';
+
+/* --- RUNTIME CONTEXT --- */
 :root {
   --background: #fff;
   --foreground: #171717;
-}
-
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -19,6 +21,7 @@
   }
 }
 
+/* --- BROWSER RESET --- */
 body {
   background: var(--background);
   color: var(--foreground);
