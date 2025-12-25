@@ -3,7 +3,7 @@ import { join } from 'node:path';
 
 import { walkSync } from '@/core/node/file-system';
 import { calculateGitDelta } from '@/core/node/git';
-import { runContextPipeline } from '@/lib/context-generator/_pipeline';
+import { runContextPipeline } from '@/lib/context-generator/pipeline';
 import { CONTEXT_PRESETS, LOCAL_CONTEXT_FOLDER } from '@/lib/context-generator/rules';
 import { isTextFile } from '@/lib/file-system/analyzers';
 import { createIgnoreManager } from '@/lib/file-system/ignore';

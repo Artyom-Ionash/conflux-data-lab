@@ -59,7 +59,7 @@ export function ProjectToContext() {
   // --- MAIN TASK ---
   // Signature: first arg is scope { signal, setProgress }
   const processingTask = useTask<ContextGenerationResult, [FileBundle, string[], PresetKey]>(
-    async ({ signal, setProgress }, activeBundle, paths, presetKey) => {
+    async ({ signal, setProgress }, activeBundle, paths) => {
       if (signal.aborted) throw new Error('Aborted');
 
       // 1. Фильтрация списка файлов (Main Thread - быстро)

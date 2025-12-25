@@ -24,24 +24,24 @@ const eslintConfig = defineConfig([
       
       'boundaries/elements': [
         // --- 1. CORE KERNEL ---
-        { type: 'typescript', pattern: 'core/typescript/**', mode: 'file' },
-        { type: 'primitive', pattern: 'core/primitives/**', mode: 'file' },
-        { type: 'browser', pattern: 'core/browser/**', mode: 'file' },
-        { type: 'react', pattern: 'core/react/**', mode: 'file' },
-        { type: 'tailwind', pattern: 'core/tailwind/**', mode: 'file' },
-        { type: 'next', pattern: 'core/next/**', mode: 'file' },
-        { type: 'node', pattern: 'core/node/**', mode: 'file' },
+        { type: 'core-typescript', pattern: 'core/typescript/**', mode: 'file' },
+        { type: 'core-primitives', pattern: 'core/primitives/**', mode: 'file' },
+        { type: 'core-browser', pattern: 'core/browser/**', mode: 'file' },
+        { type: 'core-react', pattern: 'core/react/**', mode: 'file' },
+        { type: 'core-tailwind', pattern: 'core/tailwind/**', mode: 'file' },
+        { type: 'core-next', pattern: 'core/next/**', mode: 'file' },
+        { type: 'core-node', pattern: 'core/node/**', mode: 'file' },
 
         // --- 2. BUSINESS LOGIC ---
-        { type: 'library', pattern: 'lib/**', mode: 'file' },
-        { type: 'script', pattern: 'scripts/**', mode: 'file' },
+        { type: 'lib', pattern: 'lib', mode: 'folder' },
+        { type: 'scripts', pattern: 'scripts/**', mode: 'file' },
 
         // --- 3. VIEW LAYER ---
         { type: 'ui', pattern: 'view/ui/**', mode: 'file' },
         
         // --- 4. ROUTER LAYER ---
         { type: 'registry', pattern: 'app/registry/tool-loader.tsx', mode: 'file' },
-        { type: 'router', pattern: 'app/**', mode: 'file' },
+        { type: 'app', pattern: 'app/**', mode: 'file' },
         
         // --- 5. SYNTHESIS LAYER ---
         { type: 'tool', pattern: 'view/tools/*', mode: 'file' },
@@ -55,14 +55,14 @@ const eslintConfig = defineConfig([
           default: 'disallow',
           message: '❌ ESLint разрешает только зависимости из "белого списка".',
           rules: [
-            { from: '*', allow: 'primitive'}, // ОБЩЕЕ
-            { from: 'react', allow: 'browser' }, // React использует веб-браузер
-            { from: 'router', allow: ['registry', 'ui', 'next'] }, // Занимается маршрутизацией в веб-браузере
+            { from: '*', allow: 'core-primitives'}, // ОБЩЕЕ
+            { from: 'core-react', allow: 'core-browser' }, // React использует веб-браузер
+            { from: 'app', allow: ['registry', 'ui', 'core-next'] }, // Занимается маршрутизацией в веб-браузере
             { from: 'registry', allow: 'tool' }, // Подключает инструменты (декабрь 2025: ESLint не видит динамических импортов)
-            { from: 'ui', allow: ['react', 'tailwind'] }, // Собирает простые элементы интерфейса
-            { from: 'library', allow: ['browser', 'react'] }, // Бизнес-логика (стремится к Framework-agnostic)
-            { from: 'script', allow: ['node', 'library'] }, // Помогают разработчику
-            { from: ['tool', 'tool-subsystem'], allow: ['tool-subsystem', 'react', 'ui', 'library', 'browser', 'tailwind'] }, // Соединяет сложные вещи (стремится к свободе от стилей)
+            { from: 'ui', allow: ['core-react', 'core-tailwind'] }, // Собирает простые элементы интерфейса
+            { from: 'lib', allow: ['core-browser', 'core-react'] }, // Бизнес-логика (стремится к Framework-agnostic)
+            { from: 'scripts', allow: ['core-node', 'lib'] }, // Помогают разработчику
+            { from: ['tool', 'tool-subsystem'], allow: ['tool-subsystem', 'core-react', 'ui', 'lib', 'core-browser', 'core-tailwind'] }, // Соединяет сложные вещи (стремится к свободе от стилей)
           ],
         },
       ],
@@ -72,6 +72,20 @@ const eslintConfig = defineConfig([
       'react-hooks/exhaustive-deps': 'error',
       'simple-import-sort/imports': 'error',
       'simple-import-sort/exports': 'error',
+      // Настройка точек входа: запрещаем импорт файлов с нижним подчеркиванием извне модуля
+      'boundaries/entry-point': [
+        'error',
+        {
+          default: 'allow',
+          rules: [
+            {
+              target: '*',
+              disallow: '**/_*', // Запрещаем любые файлы или папки с префиксом _ внутри library
+              message: '❌ Нельзя импортировать приватные части библиотеки.'
+            }
+          ]
+        }
+      ],
     },
   },
 
