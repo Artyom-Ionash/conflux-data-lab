@@ -4,7 +4,7 @@ import { Slot } from '@radix-ui/react-slot';
 import { cva, type VariantProps } from 'class-variance-authority';
 import * as React from 'react';
 
-import { type PolymorphicProps } from '@/core/react/props';
+import { type AsChildProps } from '@/core/react/props';
 import { cn } from '@/core/tailwind/utils';
 
 const buttonVariants = cva(
@@ -40,7 +40,10 @@ const buttonVariants = cva(
 );
 
 export interface ButtonProps
-  extends PolymorphicProps<HTMLButtonElement>, VariantProps<typeof buttonVariants> {}
+  extends
+    React.ButtonHTMLAttributes<HTMLButtonElement>,
+    AsChildProps,
+    VariantProps<typeof buttonVariants> {}
 
 const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
   ({ className, variant, size, asChild = false, ...props }, ref) => {

@@ -4,10 +4,12 @@ import React, { useCallback, useState } from 'react';
 
 import { downloadText } from '@/core/browser/canvas';
 import { useCopyToClipboard } from '@/core/react/hooks/use-copy';
-import { type ContextStats } from '@/lib/context-generator/core';
+import { useTask } from '@/core/react/hooks/use-task';
+import { type ContextGenerationResult } from '@/lib/context-generator/core';
 import { runContextPipeline } from '@/lib/context-generator/engine';
 import { CONTEXT_PRESETS, HEAVY_DIRS, type PresetKey } from '@/lib/context-generator/rules';
 import { useBundleManager } from '@/lib/context-generator/use-bundle-manager';
+import { type FileBundle } from '@/lib/file-system/bundle';
 import { ProcessingOverlay } from '@/view/ui/feedback/ProcessingOverlay';
 import { Button } from '@/view/ui/input/Button';
 import { Field } from '@/view/ui/input/Field';
@@ -32,62 +34,44 @@ export function ProjectToContext() {
   const [customIgnore, setCustomIgnore] = useState<string>('');
   const [includeTree, setIncludeTree] = useState(true);
 
-  const [processing, setProcessing] = useState(false);
-  const [result, setResult] = useState<string | null>(null);
-  const [stats, setStats] = useState<ContextStats | null>(null);
   const [lastGeneratedAt, setLastGeneratedAt] = useState<Date | null>(null);
 
+  // Signature: first arg is scope { signal }
+  const processingTask = useTask<ContextGenerationResult, [FileBundle, string[], PresetKey]>(
+    async ({ signal }, activeBundle, paths, presetKey) => {
+      if (signal.aborted) throw new Error('Aborted');
+
+      // Маленькая пауза для отрисовки индикатора (UI responsiveness)
+      await new Promise((r) => setTimeout(r, 50));
+
+      const textFiles = activeBundle
+        .getItems()
+        .filter((item) => paths.includes(item.path) && item.isText);
+
+      const sources = await Promise.all(
+        textFiles.map(async (f) => ({
+          path: f.path,
+          name: f.name,
+          content: await f.file.text(),
+        }))
+      );
+
+      if (signal.aborted) throw new Error('Aborted');
+
+      const generation = await runContextPipeline(sources, {
+        includeTree,
+        preset: CONTEXT_PRESETS[presetKey],
+      });
+
+      setLastGeneratedAt(new Date());
+      return generation;
+    }
+  );
+
   const shouldSkipScan = useCallback((path: string) => {
-    // Используем централизованный список
     const parts = path.split('/');
     return parts.some((p) => HEAVY_DIRS.includes(p));
   }, []);
-
-  /**
-   * Логика сборки контекста (чтение контента файлов).
-   */
-  const processFiles = useCallback(
-    async (activeBundle = bundle, paths = filteredPaths, presetKey = selectedPreset) => {
-      if (!activeBundle || paths.length === 0) {
-        setProcessing(false);
-        return;
-      }
-
-      setResult(null);
-      setProcessing(true);
-
-      // Маленькая пауза для отрисовки индикатора загрузки
-      await new Promise((r) => setTimeout(r, 50));
-
-      try {
-        const textFiles = activeBundle
-          .getItems()
-          .filter((item) => paths.includes(item.path) && item.isText);
-
-        const sources = await Promise.all(
-          textFiles.map(async (f) => ({
-            path: f.path,
-            name: f.name,
-            content: await f.file.text(),
-          }))
-        );
-
-        const generation = await runContextPipeline(sources, {
-          includeTree,
-          preset: CONTEXT_PRESETS[presetKey],
-        });
-
-        setStats(generation.stats);
-        setResult(generation.output);
-        setLastGeneratedAt(new Date());
-      } catch (err) {
-        console.error('Context Generation Failed:', err);
-      } finally {
-        setProcessing(false);
-      }
-    },
-    [bundle, filteredPaths, includeTree, selectedPreset]
-  );
 
   /**
    * Обработка выбора файлов.
@@ -99,12 +83,10 @@ export function ProjectToContext() {
    * зависнет на проектах с 5000+ файлами.
    */
   const onFilesSelected = async (files: File[]) => {
-    if (files.length === 0) {
-      setProcessing(false);
-      return;
-    }
+    if (files.length === 0) return;
 
     try {
+      // 1. Индексация (Bundle Manager)
       const {
         presetKey,
         visiblePaths,
@@ -114,38 +96,41 @@ export function ProjectToContext() {
       setSelectedPreset(presetKey);
       setCustomExtensions(CONTEXT_PRESETS[presetKey].textExtensions.join(', '));
 
-      // Автоматический запуск генерации
-      void processFiles(newBundle, visiblePaths, presetKey);
+      // 2. Автоматический запуск генерации через таск
+      void processingTask.run(newBundle, visiblePaths, presetKey);
     } catch (err) {
       console.error('File selection failed:', err);
-      setProcessing(false);
+    }
+  };
+
+  const handleManualRun = () => {
+    if (bundle) {
+      void processingTask.run(bundle, filteredPaths, selectedPreset);
     }
   };
 
   const downloadResult = () => {
-    if (!result) return;
-    downloadText(result, 'project_context.txt');
+    if (!processingTask.result?.output) return;
+    downloadText(processingTask.result.output, 'project_context.txt');
   };
 
   const sidebar = (
     <Stack gap={6}>
       <Workbench.Header title="Project to Context" />
 
-      {/* 
-          Главная кнопка СКАЧИВАНИЕ (чёрная). 
-          Генерация происходит автоматически или по нажатию синей кнопки ниже.
-      */}
       <SidebarIO
         onFilesSelected={onFilesSelected}
-        onScanStarted={() => setProcessing(true)}
+        onScanStarted={() => {
+          // Опционально: можно сбросить предыдущий результат визуально, если нужно
+        }}
         shouldSkip={shouldSkipScan}
         directory
         accept="*"
         dropLabel={filteredPaths.length > 0 ? `Файлов: ${filteredPaths.length}` : 'Выбрать папку'}
-        hasFiles={filteredPaths.length > 0 && !!result}
+        hasFiles={filteredPaths.length > 0 && !!processingTask.result}
         onDownload={downloadResult}
         downloadLabel="Скачать .txt"
-        downloadDisabled={processing}
+        downloadDisabled={processingTask.isRunning}
       />
 
       <Stack gap={4}>
@@ -194,23 +179,23 @@ export function ProjectToContext() {
 
         {filteredPaths.length > 0 && (
           <Button
-            onClick={() => void processFiles()}
-            disabled={processing}
+            onClick={handleManualRun}
+            disabled={processingTask.isRunning}
             variant="default"
             className="w-full bg-blue-600 font-bold tracking-wide text-white uppercase hover:bg-blue-700 dark:bg-blue-600 dark:hover:bg-blue-500"
           >
-            {processing ? 'Обновление...' : 'Обновить контекст'}
+            {processingTask.isRunning ? 'Обновление...' : 'Обновить контекст'}
           </Button>
         )}
       </Stack>
 
-      {stats && (
+      {processingTask.result?.stats && (
         <Stack
           gap={4}
           className="animate-in fade-in slide-in-from-bottom-2 border-t border-zinc-200 pt-4 dark:border-zinc-800"
         >
           <Indicator label="Токены (Est.)" className="justify-between py-2 text-lg">
-            ~{stats.totalTokens.toLocaleString()}
+            ~{processingTask.result.stats.totalTokens.toLocaleString()}
           </Indicator>
         </Stack>
       )}
@@ -224,18 +209,23 @@ export function ProjectToContext() {
         <Workbench.Content className="flex flex-col overflow-hidden bg-zinc-50 dark:bg-black/20">
           <ResultViewer
             title={
-              result && !processing
+              processingTask.result && !processingTask.isRunning
                 ? `Результат контекста ${lastGeneratedAt?.toLocaleTimeString()}`
                 : 'Ожидание сборки'
             }
-            value={!processing ? result : null}
+            value={!processingTask.isRunning ? (processingTask.result?.output ?? null) : null}
             isCopied={isCopied}
             onCopy={copy}
             onDownload={downloadResult}
             downloadLabel="Скачать .txt"
-            placeholder={processing ? 'Сборка контекста...' : 'Выберите папку проекта'}
+            placeholder={
+              processingTask.isRunning ? 'Сборка контекста...' : 'Выберите папку проекта'
+            }
           />
-          <ProcessingOverlay isVisible={processing} message="Сборка контекста проекта..." />
+          <ProcessingOverlay
+            isVisible={processingTask.isRunning}
+            message="Сборка контекста проекта..."
+          />
         </Workbench.Content>
       </Workbench.Stage>
     </Workbench.Root>

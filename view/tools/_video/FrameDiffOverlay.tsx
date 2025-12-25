@@ -1,8 +1,9 @@
 import Image from 'next/image';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef } from 'react';
 
 import { captureToCanvas, getTopLeftPixelColor, loadImage } from '@/core/browser/canvas';
 import { areColorsSimilar } from '@/core/primitives/colors';
+import { useTask } from '@/core/react/hooks/use-task';
 
 interface FrameDiffOverlayProps {
   image1: string | null;
@@ -18,92 +19,98 @@ export function FrameDiffOverlay({
   onDataGenerated,
 }: FrameDiffOverlayProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [overlayDataUrl, setOverlayDataUrl] = useState<string | null>(null);
-  const [processingDiff, setProcessingDiff] = useState(false);
 
-  useEffect(() => {
-    if (!image1 || !image2) {
-      setOverlayDataUrl(null);
-      if (onDataGenerated) onDataGenerated(null);
-      return;
+  // Автоматически отменяет предыдущий расчет при смене аргументов (быстрый скроллинг)
+  const diffTask = useTask<string | null, [string, string]>(async ({ signal }, src1, src2) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return null;
+
+    const [firstImg, lastImg] = await Promise.all([loadImage(src1), loadImage(src2)]);
+
+    if (signal.aborted) throw new Error('Aborted');
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return null;
+
+    // 1. Setup
+    canvas.width = firstImg.width;
+    canvas.height = firstImg.height;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    const bg = getTopLeftPixelColor(firstImg);
+
+    // 2. Capture Data
+    const { ctx: ctx1 } = captureToCanvas(firstImg);
+    const { ctx: ctx2 } = captureToCanvas(lastImg);
+    const firstData = ctx1.getImageData(0, 0, canvas.width, canvas.height).data;
+    const lastData = ctx2.getImageData(0, 0, canvas.width, canvas.height).data;
+    const resultImageData = ctx.createImageData(canvas.width, canvas.height);
+    const threshold = 30;
+
+    // 3. Process Pixels
+    for (let i = 0; i < firstData.length; i += 4) {
+      const firstIsBg = areColorsSimilar(
+        firstData[i] ?? 0,
+        firstData[i + 1] ?? 0,
+        firstData[i + 2] ?? 0,
+        bg.r,
+        bg.g,
+        bg.b,
+        threshold
+      );
+      const lastIsBg = areColorsSimilar(
+        lastData[i] ?? 0,
+        lastData[i + 1] ?? 0,
+        lastData[i + 2] ?? 0,
+        bg.r,
+        bg.g,
+        bg.b,
+        threshold
+      );
+
+      if (firstIsBg && lastIsBg) {
+        resultImageData.data[i + 3] = 0;
+      } else if (!firstIsBg && lastIsBg) {
+        // Исчезнувший (Красный)
+        resultImageData.data[i] = 255;
+        resultImageData.data[i + 3] = 200;
+      } else if (firstIsBg && !lastIsBg) {
+        // Появившийся (Синий)
+        resultImageData.data[i + 2] = 255;
+        resultImageData.data[i + 1] = 100; // Немного зеленого для красоты
+        resultImageData.data[i + 3] = 200;
+      } else {
+        // Изменившийся (Фиолетовый)
+        resultImageData.data[i] = 200;
+        resultImageData.data[i + 1] = 50;
+        resultImageData.data[i + 2] = 255;
+        resultImageData.data[i + 3] = 220;
+      }
     }
 
-    const processFrames = async () => {
-      setProcessingDiff(true);
-      try {
-        const canvas = canvasRef.current;
-        const ctx = canvas?.getContext('2d');
-        if (!ctx || !canvas) return;
+    ctx.putImageData(resultImageData, 0, 0);
+    return canvas.toDataURL('image/png');
+  });
 
-        const [firstImg, lastImg] = await Promise.all([loadImage(image1), loadImage(image2)]);
+  // Effect Trigger
+  useEffect(() => {
+    if (image1 && image2) {
+      void diffTask.run(image1, image2);
+    } else {
+      diffTask.reset();
+      onDataGenerated?.(null);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [image1, image2]);
 
-        // 1. Получаем эталонный цвет фона (верхний левый пиксель)
-        const bg = getTopLeftPixelColor(firstImg);
+  // Sync parent callback with result
+  useEffect(() => {
+    if (diffTask.status === 'success') {
+      onDataGenerated?.(diffTask.result);
+    }
+  }, [diffTask.status, diffTask.result, onDataGenerated]);
 
-        // 2. Настройка основного холста
-        canvas.width = firstImg.width;
-        canvas.height = firstImg.height;
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-        // 3. Получение полных данных
-        // Используем утилиту из media.ts
-        const { ctx: ctx1 } = captureToCanvas(firstImg);
-        const { ctx: ctx2 } = captureToCanvas(lastImg);
-
-        const firstImageData = ctx1.getImageData(0, 0, canvas.width, canvas.height);
-        const lastImageData = ctx2.getImageData(0, 0, canvas.width, canvas.height);
-
-        const resultImageData = ctx.createImageData(canvas.width, canvas.height);
-        const threshold = 30;
-
-        for (let i = 0; i < firstImageData.data.length; i += 4) {
-          // ИСПОЛЬЗУЕМ БЕЗОПАСНЫЙ ДОСТУП ВМЕСТО !
-          // TypeScript в строгом режиме считает array[i] возможным undefined
-          const firstR = firstImageData.data[i] ?? 0;
-          const firstG = firstImageData.data[i + 1] ?? 0;
-          const firstB = firstImageData.data[i + 2] ?? 0;
-
-          const lastR = lastImageData.data[i] ?? 0;
-          const lastG = lastImageData.data[i + 1] ?? 0;
-          const lastB = lastImageData.data[i + 2] ?? 0;
-
-          const firstIsBg = areColorsSimilar(firstR, firstG, firstB, bg.r, bg.g, bg.b, threshold);
-          const lastIsBg = areColorsSimilar(lastR, lastG, lastB, bg.r, bg.g, bg.b, threshold);
-
-          if (firstIsBg && lastIsBg) {
-            resultImageData.data[i + 3] = 0;
-          } else if (!firstIsBg && lastIsBg) {
-            // Исчезнувший (Красный)
-            resultImageData.data[i] = 255;
-            resultImageData.data[i + 3] = 200;
-          } else if (firstIsBg && !lastIsBg) {
-            // Появившийся (Синий)
-            resultImageData.data[i + 2] = 255;
-            resultImageData.data[i + 1] = 100; // Немного зеленого для красоты
-            resultImageData.data[i + 3] = 200;
-          } else {
-            // Изменившийся (Фиолетовый)
-            resultImageData.data[i] = 200;
-            resultImageData.data[i + 1] = 50;
-            resultImageData.data[i + 2] = 255;
-            resultImageData.data[i + 3] = 220;
-          }
-        }
-
-        ctx.putImageData(resultImageData, 0, 0);
-        const url = canvas.toDataURL('image/png');
-        setOverlayDataUrl(url);
-        if (onDataGenerated) onDataGenerated(url);
-      } catch (error) {
-        console.error('Error processing diff:', error);
-      } finally {
-        setProcessingDiff(false);
-      }
-    };
-    void processFrames();
-  }, [image1, image2, onDataGenerated]);
-
-  const isLoading = processingDiff || isProcessing;
+  const overlayDataUrl = diffTask.result;
+  const isLoading = diffTask.isRunning || isProcessing;
 
   if (!image1 || !image2) {
     return (

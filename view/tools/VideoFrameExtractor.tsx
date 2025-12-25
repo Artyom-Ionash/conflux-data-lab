@@ -308,7 +308,7 @@ export function VideoFrameExtractor() {
           className="h-[92vh] w-[96vw] max-w-[1920px]"
         >
           <MultiScalePreview
-            frames={state.frames.map((f) => f.dataUrl)}
+            frames={state.frames.map((f) => f?.dataUrl ?? null)}
             fps={state.gifParams.fps}
           />
         </Modal>

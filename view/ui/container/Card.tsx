@@ -42,16 +42,20 @@ export function Card({
   const Comp = asChild ? Slot : 'div';
   const hasHeader = Boolean(title || headerActions);
   const contentClasses = contentClassName ?? (hasHeader ? 'px-5 py-4' : 'p-6');
+  const finalClassName = `${baseClasses} ${className}`;
+
+  if (asChild) {
+    return (
+      <Comp className={finalClassName} {...props}>
+        {children}
+      </Comp>
+    );
+  }
 
   return (
-    <Comp className={`${baseClasses} ${className}`} {...props}>
-      {/* 
-          If asChild is true, the user is responsible for rendering the header 
-          inside the child component if needed, or we only use Card for styling.
-          Standard mode renders the structure: 
-      */}
-      {!asChild && hasHeader && <CardHeader title={title} headerActions={headerActions} />}
-      <div className={!asChild ? contentClasses : undefined}>{children}</div>
-    </Comp>
+    <div className={finalClassName} {...props}>
+      {hasHeader && <CardHeader title={title} headerActions={headerActions} />}
+      <div className={contentClasses}>{children}</div>
+    </div>
   );
 }

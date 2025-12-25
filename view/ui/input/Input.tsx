@@ -2,7 +2,6 @@
 
 import React, { forwardRef } from 'react';
 
-import { type ElementProps } from '@/core/react/props';
 import { cn } from '@/core/tailwind/utils';
 
 const inputStyles = cn(
@@ -15,7 +14,7 @@ const inputStyles = cn(
 
 const errorStyles = 'border-red-500 focus:border-red-500 focus:ring-red-500/20';
 
-interface InputProps extends ElementProps<HTMLInputElement> {
+interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
   error?: boolean;
 }
 
@@ -28,7 +27,7 @@ export const TextInput = forwardRef<HTMLInputElement, InputProps>(
 );
 TextInput.displayName = 'TextInput';
 
-interface TextAreaProps extends ElementProps<HTMLTextAreaElement> {
+interface TextAreaProps extends React.TextareaHTMLAttributes<HTMLTextAreaElement> {
   error?: boolean;
 }
 
