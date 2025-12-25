@@ -1,15 +1,20 @@
 'use client';
 
 import React, { useCallback, useState } from 'react';
+import { chunk } from 'remeda';
 
 import { downloadText } from '@/core/browser/canvas';
 import { useCopyToClipboard } from '@/core/react/hooks/use-copy';
 import { useTask } from '@/core/react/hooks/use-task';
-import { type ContextGenerationResult } from '@/lib/context-generator/core';
-import { runContextPipeline } from '@/lib/context-generator/engine';
-import { CONTEXT_PRESETS, HEAVY_DIRS, type PresetKey } from '@/lib/context-generator/rules';
+import { useWorkerPool } from '@/core/react/hooks/use-worker-pool';
+import { type ContextGenerationResult, generateContextOutput } from '@/lib/context-generator/core';
+import type {
+  ProcessingPayload,
+  ProcessingResponse,
+} from '@/lib/context-generator/processing.worker';
 import { useBundleManager } from '@/lib/context-generator/use-bundle-manager';
 import { type FileBundle } from '@/lib/file-system/bundle';
+import { generateAsciiTree } from '@/lib/file-system/topology';
 import { ProcessingOverlay } from '@/view/ui/feedback/ProcessingOverlay';
 import { Button } from '@/view/ui/input/Button';
 import { Field } from '@/view/ui/input/Field';
@@ -20,8 +25,12 @@ import { Stack } from '@/view/ui/layout/Layout';
 import { Workbench } from '@/view/ui/layout/Workbench';
 import { Indicator } from '@/view/ui/primitive/Indicator';
 
+import { CONTEXT_PRESETS, HEAVY_DIRS, type PresetKey } from '../../lib/context-generator/rules';
 import { ResultViewer } from './_io/ResultViewer';
 import { SidebarIO } from './_io/SidebarIO';
+
+// Размер пачки файлов на один воркер
+const BATCH_SIZE = 50;
 
 export function ProjectToContext() {
   const { filteredPaths, handleFiles, bundle } = useBundleManager();
@@ -36,34 +45,79 @@ export function ProjectToContext() {
 
   const [lastGeneratedAt, setLastGeneratedAt] = useState<Date | null>(null);
 
-  // Signature: first arg is scope { signal }
+  // --- WORKER POOL ---
+  const createWorker = useCallback(
+    () => new Worker(new URL('@/lib/context-generator/processing.worker.ts', import.meta.url)),
+    []
+  );
+
+  const { runTask: runWorkerTask } = useWorkerPool<ProcessingPayload, ProcessingResponse>({
+    workerFactory: createWorker,
+    // Pool size определяется автоматически (hardwareConcurrency - 1)
+  });
+
+  // --- MAIN TASK ---
+  // Signature: first arg is scope { signal, setProgress }
   const processingTask = useTask<ContextGenerationResult, [FileBundle, string[], PresetKey]>(
-    async ({ signal }, activeBundle, paths, presetKey) => {
+    async ({ signal, setProgress }, activeBundle, paths, presetKey) => {
       if (signal.aborted) throw new Error('Aborted');
 
-      // Маленькая пауза для отрисовки индикатора (UI responsiveness)
-      await new Promise((r) => setTimeout(r, 50));
-
-      const textFiles = activeBundle
+      // 1. Фильтрация списка файлов (Main Thread - быстро)
+      const textNodes = activeBundle
         .getItems()
         .filter((item) => paths.includes(item.path) && item.isText);
 
-      const sources = await Promise.all(
-        textFiles.map(async (f) => ({
-          path: f.path,
-          name: f.name,
-          content: await f.file.text(),
-        }))
-      );
+      // 2. Подготовка чанков (Map Phase)
+      const fileBatches = chunk(textNodes, BATCH_SIZE);
+      const totalBatches = fileBatches.length;
+      let completedBatches = 0;
+
+      // 3. Параллельная обработка (Worker Pool)
+      const chunkPromises = fileBatches.map(async (batch) => {
+        // Извлекаем сырые File объекты для передачи в воркер
+        const files = batch.map((node) => node.file);
+
+        // Отправляем в пул
+        const response = await runWorkerTask({ files });
+
+        if (response.error) throw new Error(response.error);
+
+        completedBatches++;
+        setProgress(Math.round((completedBatches / totalBatches) * 90)); // До 90% прогресса
+
+        return response.results;
+      });
+
+      // Ждем завершения всех воркеров
+      const resultsNested = await Promise.all(chunkPromises);
 
       if (signal.aborted) throw new Error('Aborted');
 
-      const generation = await runContextPipeline(sources, {
-        includeTree,
-        preset: CONTEXT_PRESETS[presetKey],
-      });
+      // 4. Сборка результатов (Reduce Phase)
+      // Flatten массива массивов + Mapping типов
+      const processedFiles = resultsNested.flat().map((file) => ({
+        ...file,
+        size: file.cleanedSize, // FIX: Маппинг cleanedSize -> size
+      }));
+
+      // 5. Финальная сборка строки (Main Thread)
+      let treeString = '';
+      if (includeTree) {
+        // Собираем ноды для дерева
+        const treeNodes = activeBundle.getItems().map((item) => ({
+          path: item.path,
+          name: item.name,
+          size: item.size,
+          isText: item.isText,
+        }));
+
+        treeString = generateAsciiTree(treeNodes);
+      }
+
+      const generation = generateContextOutput(processedFiles, treeString);
 
       setLastGeneratedAt(new Date());
+      setProgress(100);
       return generation;
     }
   );
@@ -120,9 +174,7 @@ export function ProjectToContext() {
 
       <SidebarIO
         onFilesSelected={onFilesSelected}
-        onScanStarted={() => {
-          // Опционально: можно сбросить предыдущий результат визуально, если нужно
-        }}
+        onScanStarted={() => {}}
         shouldSkip={shouldSkipScan}
         directory
         accept="*"
@@ -224,7 +276,7 @@ export function ProjectToContext() {
           />
           <ProcessingOverlay
             isVisible={processingTask.isRunning}
-            message="Сборка контекста проекта..."
+            message={`Обработка (${processingTask.progress}%)...`}
           />
         </Workbench.Content>
       </Workbench.Stage>

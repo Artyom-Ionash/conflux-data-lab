@@ -10,7 +10,7 @@ import {
   LEGACY_MESSAGES,
 } from '@/core/browser/legacy';
 import { cn } from '@/core/tailwind/utils';
-import { filterFileList, scanDirectoryHandle, scanEntries } from '@/lib/context-generator/scanner';
+import { filterFileList, scanDirectoryHandle, scanEntries } from '@/lib/context-generator/_scanner';
 
 interface FileDropzoneProps {
   onFilesSelected: (files: File[]) => void;

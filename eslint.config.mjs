@@ -55,34 +55,14 @@ const eslintConfig = defineConfig([
           default: 'disallow',
           message: '❌ ESLint разрешает только зависимости из "белого списка".',
           rules: [
-            { // ОБЩЕЕ
-              from: '*', 
-              allow: 'primitive'
-            },
-            { // Занимается маршрутизацией в веб-браузере
-              from: 'router',
-              allow: ['registry', 'ui', 'next'],
-            },
-            { // Подключает инструменты (декабрь 2025: ESLint не видит динамических импортов)
-              from: 'registry',
-              allow: 'tool',
-            },
-            { // Собирает простые элементы интерфейса
-              from: 'ui',
-              allow: ['react', 'tailwind'],
-            },
-            { // Бизнес-логика (стремится к Framework-agnostic)
-              from: 'library',
-              allow: ['browser', 'react'],
-            },
-            { // Помогают разработчику
-              from: 'script',
-              allow: ['node', 'library'],
-            },
-            { // Соединяет сложные вещи (стремится к свободе от стилей)
-              from: ['tool', 'tool-subsystem'],
-              allow: ['tool-subsystem', 'react', 'ui', 'library', 'browser', 'tailwind'],
-            },
+            { from: '*', allow: 'primitive'}, // ОБЩЕЕ
+            { from: 'react', allow: 'browser' }, // React использует веб-браузер
+            { from: 'router', allow: ['registry', 'ui', 'next'] }, // Занимается маршрутизацией в веб-браузере
+            { from: 'registry', allow: 'tool' }, // Подключает инструменты (декабрь 2025: ESLint не видит динамических импортов)
+            { from: 'ui', allow: ['react', 'tailwind'] }, // Собирает простые элементы интерфейса
+            { from: 'library', allow: ['browser', 'react'] }, // Бизнес-логика (стремится к Framework-agnostic)
+            { from: 'script', allow: ['node', 'library'] }, // Помогают разработчику
+            { from: ['tool', 'tool-subsystem'], allow: ['tool-subsystem', 'react', 'ui', 'library', 'browser', 'tailwind'] }, // Соединяет сложные вещи (стремится к свободе от стилей)
           ],
         },
       ],
