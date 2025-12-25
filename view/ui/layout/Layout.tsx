@@ -136,6 +136,44 @@ interface ColumnsProps extends React.HTMLAttributes<HTMLDivElement> {
   gap?: number;
 }
 
+interface GridProps extends React.HTMLAttributes<HTMLDivElement> {
+  children: React.ReactNode;
+  /** Количество колонок (cols-N) */
+  cols?: number | string;
+  /** Отступ (gap-N) */
+  gap?: number;
+  /** Растягивание элементов */
+  items?: 'start' | 'center' | 'end' | 'stretch';
+}
+
+/**
+ * Обертка над CSS Grid.
+ */
+export const Grid = forwardRef<HTMLDivElement, GridProps>(
+  ({ children, cols = 1, gap = 4, items, className, style, ...props }, ref) => {
+    // Если cols передано числом, используем стандартный класс, иначе произвольное значение
+    const gridTemplateColumns = typeof cols === 'number' ? `repeat(${cols}, minmax(0, 1fr))` : cols;
+
+    return (
+      <div
+        ref={ref}
+        className={cn('grid', items && `items-${items}`, className)}
+        style={{
+          gap: `${gap * 0.25}rem`,
+          gridTemplateColumns,
+          ...style,
+        }}
+        {...props}
+      >
+        {children}
+      </div>
+    );
+  }
+);
+Grid.displayName = 'Grid';
+
+// TODO: Columns можно оставить для обратной совместимости или заменить на Grid
+
 /**
  * Адаптивная сетка.
  * Использует классы Tailwind для стандартов (1-3 колонки) и inline-styles для нестандарта.

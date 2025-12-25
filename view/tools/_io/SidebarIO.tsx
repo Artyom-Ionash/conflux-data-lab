@@ -3,6 +3,7 @@
 import React from 'react';
 
 import { Button } from '@/view/ui/input/Button';
+import { Box } from '@/view/ui/layout/Box';
 import { Stack } from '@/view/ui/layout/Layout';
 
 import { FileDropzone } from './FileDropzone';
@@ -61,7 +62,7 @@ export function SidebarIO({
       />
 
       {hasFiles && onDownload && (
-        <div className="fx-slide-in">
+        <Box className="fx-slide-in border-t border-zinc-200 pt-4 dark:border-zinc-800">
           <Button
             onClick={(e) => {
               e.preventDefault();
@@ -73,7 +74,7 @@ export function SidebarIO({
           >
             {isDownloading ? 'Экспорт...' : downloadLabel}
           </Button>
-        </div>
+        </Box>
       )}
 
       {children}
