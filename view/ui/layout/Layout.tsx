@@ -103,42 +103,11 @@ export const Group = forwardRef<HTMLDivElement, FlexProps>(
 );
 Group.displayName = 'Group';
 
-// --- GRID SYSTEM (Columns) ---
-
-// ОПТИМИЗАЦИЯ: Оставляем только то, что используется в проекте.
-// 1 - дефолт
-// 2 - используется в ToolGrid (нативно, но полезно иметь здесь)
-// 3 - используется в VideoFrameExtractor
-// Все остальное (4, 5, 12...) пойдет через inline-style fallback.
-const GRID_COLS: Record<number, string> = {
-  1: 'grid-cols-1',
-  2: 'grid-cols-2',
-  3: 'grid-cols-3',
-};
-
-const MD_GRID_COLS: Record<number, string> = {
-  1: 'md:grid-cols-1',
-  2: 'md:grid-cols-2',
-  3: 'md:grid-cols-3',
-};
-
-const LG_GRID_COLS: Record<number, string> = {
-  1: 'lg:grid-cols-1',
-  2: 'lg:grid-cols-2',
-  3: 'lg:grid-cols-3',
-};
-
-interface ColumnsProps extends React.HTMLAttributes<HTMLDivElement> {
-  children: React.ReactNode;
-  count?: number;
-  tablet?: number;
-  desktop?: number;
-  gap?: number;
-}
+// --- GRID SYSTEM ---
 
 interface GridProps extends React.HTMLAttributes<HTMLDivElement> {
   children: React.ReactNode;
-  /** Количество колонок (cols-N) */
+  /** Количество колонок (cols-N). Если не указано, используется className или auto-flow */
   cols?: number | string;
   /** Отступ (gap-N) */
   gap?: number;
@@ -148,11 +117,19 @@ interface GridProps extends React.HTMLAttributes<HTMLDivElement> {
 
 /**
  * Обертка над CSS Grid.
+ * Для адаптивности используйте className (например: "grid-cols-1 lg:grid-cols-3")
+ * и не передавайте проп `cols`.
  */
 export const Grid = forwardRef<HTMLDivElement, GridProps>(
-  ({ children, cols = 1, gap = 4, items, className, style, ...props }, ref) => {
-    // Если cols передано числом, используем стандартный класс, иначе произвольное значение
-    const gridTemplateColumns = typeof cols === 'number' ? `repeat(${cols}, minmax(0, 1fr))` : cols;
+  ({ children, cols, gap = 4, items, className, style, ...props }, ref) => {
+    // Генерируем инлайн-стиль только если cols передан явно.
+    // Это позволяет классам Tailwind (lg:grid-cols-N) работать без конфликтов.
+    const gridTemplateColumns =
+      cols !== undefined
+        ? typeof cols === 'number'
+          ? `repeat(${cols}, minmax(0, 1fr))`
+          : cols
+        : undefined;
 
     return (
       <div
@@ -171,42 +148,3 @@ export const Grid = forwardRef<HTMLDivElement, GridProps>(
   }
 );
 Grid.displayName = 'Grid';
-
-// TODO: Columns можно оставить для обратной совместимости или заменить на Grid
-
-/**
- * Адаптивная сетка.
- * Использует классы Tailwind для стандартов (1-3 колонки) и inline-styles для нестандарта.
- */
-export const Columns = forwardRef<HTMLDivElement, ColumnsProps>(
-  ({ children, count = 1, tablet, desktop, gap = 4, className, style, ...props }, ref) => {
-    // 1. Пытаемся найти класс в мапе
-    const baseClass = GRID_COLS[count];
-    const tabletClass = tablet ? MD_GRID_COLS[tablet] : '';
-    const desktopClass = desktop ? LG_GRID_COLS[desktop] : '';
-
-    // 2. Базовые стили
-    const dynamicStyle: React.CSSProperties = {
-      gap: `${gap * 0.25}rem`,
-      ...style,
-    };
-
-    // 3. Fallback: Если класса нет (например count=4), генерируем inline стиль
-    // Это избавляет от необходимости раздувать мапу GRID_COLS
-    if (!baseClass) {
-      dynamicStyle.gridTemplateColumns = `repeat(${count}, minmax(0, 1fr))`;
-    }
-
-    return (
-      <div
-        ref={ref}
-        className={cn('grid w-full', baseClass || '', tabletClass, desktopClass, className)}
-        style={dynamicStyle}
-        {...props}
-      >
-        {children}
-      </div>
-    );
-  }
-);
-Columns.displayName = 'Columns';

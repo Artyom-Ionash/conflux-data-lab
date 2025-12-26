@@ -7,7 +7,7 @@ import { Card } from '@/view/ui/container/Card';
 import { Button } from '@/view/ui/input/Button';
 import { NumberStepper } from '@/view/ui/input/NumberStepper';
 import { AspectRatio } from '@/view/ui/layout/AspectRatio';
-import { Columns, Group, Stack } from '@/view/ui/layout/Layout';
+import { Grid, Group, Stack } from '@/view/ui/layout/Layout';
 import { ImageSequencePlayer } from '@/view/ui/media/ImageSequencePlayer';
 import { RangeVideoPlayer } from '@/view/ui/media/RangeVideoPlayer';
 import { OverlayLabel } from '@/view/ui/primitive/OverlayLabel';
@@ -85,7 +85,7 @@ export function MonitorDashboard({
   );
 
   return (
-    <Columns desktop={3} gap={4}>
+    <Grid className="grid-cols-1 lg:grid-cols-3" gap={4}>
       <Card
         className="flex flex-col overflow-hidden shadow-sm"
         title={<Typography.Text variant="label">Исходное видео</Typography.Text>}
@@ -182,6 +182,6 @@ export function MonitorDashboard({
           </Stack>
         </AspectRatio>
       </Card>
-    </Columns>
+    </Grid>
   );
 }
