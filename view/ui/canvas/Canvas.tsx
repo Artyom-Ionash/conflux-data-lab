@@ -126,7 +126,6 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(
   ) => {
     // 1. Инициализация хука размеров
     const [resizeRef, containerSize] = useElementSize<HTMLDivElement>();
-
     const containerRef = useRef<HTMLDivElement>(null);
     const contentRef = useRef<HTMLDivElement>(null);
 
@@ -339,6 +338,7 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(
           transitionDuration: `${ANIMATION_CONFIG.DEFAULT_DURATION}ms`,
         }}
       >
+        {/* BACKGROUND GRID */}
         <div
           className={cn(
             'pointer-events-none absolute inset-0 transition-opacity ease-in-out',
@@ -348,18 +348,20 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(
             transitionDuration: `${ANIMATION_CONFIG.DEFAULT_DURATION}ms`,
             backgroundImage: GRID_CSS_PATTERN,
             backgroundSize: `${GRID_SIZE}px ${GRID_SIZE}px`,
-            zIndex: 0,
+            zIndex: 'var(--z-canvas-bg)',
           }}
         />
 
         <div
           ref={contentRef}
-          className="absolute top-0 left-0 z-10 origin-top-left"
+          className="absolute top-0 left-0 origin-top-left"
           style={{
             transform: `translate3d(${initialScale ?? 1}px, 0px, 0) scale(${initialScale ?? 1})`,
             backfaceVisibility: 'hidden',
+            zIndex: 'var(--z-canvas-content)',
           }}
         >
+          {/* SHADOW OVERLAY */}
           {hasDimensions && (shadowOverlayOpacity ?? 0) > 0 && (
             <div
               className="pointer-events-none absolute top-0 left-0"
@@ -367,7 +369,7 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(
                 width: contentWidth,
                 height: contentHeight,
                 boxShadow: `0 0 0 ${OVERLAY_SPREAD_SIZE}px rgba(0,0,0,${shadowOverlayOpacity})`,
-                zIndex: 0,
+                zIndex: 'var(--z-canvas-overlay)', // Это тень ПОВЕРХ
               }}
             />
           )}
@@ -378,7 +380,7 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(
               width: hasDimensions ? contentWidth : undefined,
               height: hasDimensions ? contentHeight : undefined,
               overflow: hasDimensions ? 'hidden' : 'visible',
-              zIndex: 1,
+              zIndex: 1, // Локальный контекст контента
             }}
           >
             {hasDimensions && showTransparencyGrid && (
@@ -403,7 +405,10 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(
         </div>
 
         {placeholder && (
-          <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center">
+          <div
+            className="pointer-events-none absolute inset-0 flex items-center justify-center"
+            style={{ zIndex: 'var(--z-canvas-ui)' }}
+          >
             <div className="pointer-events-auto h-full w-full">{placeholder}</div>
           </div>
         )}

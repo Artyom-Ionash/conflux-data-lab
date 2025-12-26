@@ -2,31 +2,50 @@
   /* 
     --- VERTICAL TOPOLOGY (Z-Axis) --- 
     Структурные слои приложения.
-    Не зависят от визуальной темы.
+    Используем "Стратификацию" с большими интервалами, чтобы избежать коллизий.
   */
 
-  /* Component Stack (Внутренняя логика элементов) */
-  --z-below: -1; /* Для подложек */
-  --z-content: 1; /* Основной контент */
-  --z-decorator: 10; /* Иконки, индикаторы, бейджи поверх контента */
-  --z-interaction: 20; /* Элементы управления, появляющиеся при ховере */
+  /* LEVEL -1: Deep Storage */
+  --z-deep: -999; /* EngineRoom, скрытые элементы */
+  --z-below: -1; /* Подложки */
 
-  /* Context Local (0-49) */
+  /* LEVEL 0: Local Context (0-9) */
+
+  /* Внутренности компонентов */
   --z-base: 0;
-  --z-sticky: 10;
-  --z-dropdown: 20;
+  --z-content: 1;
+  --z-decorator: 5;
 
-  /* Shell Structure (50-99) */
-  --z-workbench-sidebar: 30;
-  --z-workbench-header: 40;
+  /* LEVEL 1: Canvas/Scene Context (10-99) */
 
-  /* Global Overlays (100-199) */
-  --z-overlay: 50;
-  --z-modal: 60;
-  --z-popover: 70;
+  /* Сложная графика требует своей внутренней иерархии */
+  --z-canvas-bg: 10;
+  --z-canvas-grid: 11;
+  --z-canvas-content: 20;
+  --z-canvas-overlay: 30; /* Рамки, тени выделения */
+  --z-canvas-ui: 40; /* Элементы управления внутри канваса (OverlayLabel) */
 
-  /* System Critical (200+) */
-  --z-toast: 100;
-  --z-tooltip: 110;
-  --z-cursor: 999;
+  /* LEVEL 2: Local UI Overlays (100-199) */
+
+  /* Всплывающие элементы внутри страницы, но ПОД меню */
+  --z-sticky: 100;
+  --z-dropdown: 150;
+
+  /* LEVEL 3: Shell Structure (200-499) */
+
+  /* Каркас приложения */
+  --z-workbench-sidebar: 200;
+  --z-workbench-header: 300;
+
+  /* LEVEL 4: Global Overlays (500-999) */
+
+  /* Перекрывают всё приложение */
+  --z-overlay: 500; /* Dimmer */
+  --z-modal: 600;
+  --z-popover: 700;
+  --z-toast: 800;
+
+  /* LEVEL 5: System Critical (1000+) */
+  --z-tooltip: 1000;
+  --z-cursor: 9999;
 }

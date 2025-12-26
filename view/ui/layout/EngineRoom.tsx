@@ -13,7 +13,8 @@ import React from 'react';
 export function EngineRoom({ children }: { children: React.ReactNode }) {
   return (
     <div
-      className="pointer-events-none fixed top-0 left-0 -z-50 h-px w-px overflow-hidden opacity-0"
+      className="pointer-events-none fixed top-0 left-0 h-px w-px overflow-hidden opacity-0"
+      style={{ zIndex: 'var(--z-deep)' }}
       aria-hidden="true"
     >
       {children}
