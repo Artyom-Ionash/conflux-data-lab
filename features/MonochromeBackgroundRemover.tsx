@@ -6,6 +6,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { downloadDataUrl, getTopLeftPixelColor, loadImage } from '@/core/browser/canvas';
 import { hexToRgb, invertHex, rgbToHex } from '@/core/primitives/colors';
 import { useDebounceEffect } from '@/core/react/hooks/use-debounce';
+import { useHistory } from '@/core/react/hooks/use-history';
 import { useMediaSession } from '@/core/react/hooks/use-media-session';
 import { useWorker } from '@/core/react/hooks/use-worker';
 import type {
@@ -29,6 +30,7 @@ import { EngineRoom } from '@/ui/layout/EngineRoom';
 import { Group, Stack } from '@/ui/layout/Layout';
 import { Surface } from '@/ui/layout/Surface';
 import { Workbench } from '@/ui/layout/Workbench';
+import { Icon } from '@/ui/primitive/Icon';
 import { Separator } from '@/ui/primitive/Separator';
 import { Typography } from '@/ui/primitive/Typography';
 
@@ -87,9 +89,34 @@ export function MonochromeBackgroundRemover() {
   const [edgeBlur, setEdgeBlur] = useState(DEFAULT_SETTINGS.edgeBlur);
   const [edgePaint, setEdgePaint] = useState(DEFAULT_SETTINGS.edgePaint);
 
-  const [floodPoints, setFloodPoints] = useState<Point[]>([]);
-  const [manualTrigger, setManualTrigger] = useState(0);
+  // --- STATE MANAGEMENT UPDATE: History ---
+  const {
+    state: floodPoints,
+    set: setFloodPoints,
+    undo,
+    redo,
+    canUndo,
+    canRedo,
+    reset: resetFloodPoints,
+  } = useHistory<Point[]>([]);
 
+  // Hotkeys for Undo/Redo
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'z') {
+        e.preventDefault();
+        if (e.shiftKey) {
+          redo();
+        } else {
+          undo();
+        }
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [undo, redo]);
+
+  const [manualTrigger, setManualTrigger] = useState(0);
   const [isProcessing, setIsProcessing] = useState(false);
 
   const { ref: workspaceRef, getScale } = useCanvasRef();
@@ -235,17 +262,21 @@ export function MonochromeBackgroundRemover() {
     if (e.button !== MOUSE_BUTTON_LEFT) return;
     if (processingMode === 'flood-clear') {
       const coords = getRelativeImageCoords(e.clientX, e.clientY);
-      if (coords) setFloodPoints((prev) => [...prev, coords]);
+      // Добавляем новую точку в историю (push)
+      if (coords) setFloodPoints((prev) => [...prev, coords], 'push');
     }
   };
 
-  const handlePointMove = useCallback((index: number, newPos: { x: number; y: number }) => {
-    setFloodPoints((prev) => {
-      const next = [...prev];
-      if (next[index]) next[index] = newPos;
-      return next;
-    });
-  }, []);
+  const handlePointMove = useCallback(
+    (index: number, newPos: { x: number; y: number }) => {
+      setFloodPoints((prev) => {
+        const next = [...prev];
+        if (next[index]) next[index] = newPos;
+        return next;
+      }, 'replace'); // Используем 'replace', чтобы не забивать историю движениями мыши
+    },
+    [setFloodPoints]
+  );
 
   const handleEyedropper = (e: React.MouseEvent) => {
     if (!sourceCanvasRef.current) return;
@@ -258,15 +289,13 @@ export function MonochromeBackgroundRemover() {
     }
   };
 
-  const removeLastPoint = () => setFloodPoints((prev) => prev.slice(0, -1));
-  const clearAllPoints = () => setFloodPoints([]);
+  const clearAllPoints = () => resetFloodPoints([]);
   const handleRunFloodFill = () => setManualTrigger((prev) => prev + 1);
 
   const sidebarContent = (
     <Stack gap={6} className="pb-4">
       <Workbench.Header title="MonoRemover" />
 
-      {/* Единый узел ввода-вывода */}
       <SidebarIO
         onFilesSelected={handleFilesSelected}
         accept="image/*"
@@ -401,13 +430,24 @@ export function MonochromeBackgroundRemover() {
             <StatusBox title={`Точки: ${floodPoints.length}`}>
               <ActionGroup>
                 <Button
-                  onClick={removeLastPoint}
-                  disabled={floodPoints.length === 0}
+                  onClick={undo}
+                  disabled={!canUndo}
                   className="flex-1"
                   variant="secondary"
                   size="xs"
+                  title="Отменить (Ctrl+Z)"
                 >
-                  Отменить
+                  <Icon.ArrowLeft className="h-3 w-3" />
+                </Button>
+                <Button
+                  onClick={redo}
+                  disabled={!canRedo}
+                  className="flex-1"
+                  variant="secondary"
+                  size="xs"
+                  title="Повторить (Ctrl+Shift+Z)"
+                >
+                  <Icon.ArrowLeft className="h-3 w-3 rotate-180" />
                 </Button>
                 <Button
                   onClick={clearAllPoints}
@@ -416,13 +456,13 @@ export function MonochromeBackgroundRemover() {
                   className="flex-1"
                   size="xs"
                 >
-                  Сбросить
+                  <Icon.Trash className="h-3 w-3" />
                 </Button>
               </ActionGroup>
               <Button
                 onClick={handleRunFloodFill}
                 disabled={floodPoints.length === 0 || isProcessing}
-                variant="default" // Синяя по умолчанию
+                variant="default"
                 className="mt-2 w-full font-bold tracking-wide uppercase"
               >
                 {isProcessing ? 'Обработка...' : 'Принудительно обновить'}
