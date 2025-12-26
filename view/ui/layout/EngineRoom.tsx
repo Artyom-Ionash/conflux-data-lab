@@ -2,21 +2,21 @@
 
 import React from 'react';
 
+import { cn } from '@/core/tailwind/utils';
+
+interface EngineRoomProps {
+  children: React.ReactNode;
+  className?: string;
+}
+
 /**
- * Контейнер для "внутренних органов" инструментов (скрытых видео, канвасов).
- * Исключает технические теги из визуальной структуры JSX.
- *
- * ВАЖНО: Используется техника "Visual Hiding" вместо display: none.
- * Видео и Canvas должны присутствовать в Render Tree (иметь размеры),
- * чтобы работать API типа requestVideoFrameCallback.
+ * Семантический контейнер для "внутренних органов" инструментов.
+ * Скрывает технические элементы (video, canvas refs) из визуального потока,
+ * но оставляет их в DOM для API доступа.
  */
-export function EngineRoom({ children }: { children: React.ReactNode }) {
+export function EngineRoom({ children, className }: EngineRoomProps) {
   return (
-    <div
-      className="pointer-events-none fixed top-0 left-0 h-px w-px overflow-hidden opacity-0"
-      style={{ zIndex: 'var(--z-deep)' }}
-      aria-hidden="true"
-    >
+    <div className={cn('fx-engine-room', className)} aria-hidden="true">
       {children}
     </div>
   );

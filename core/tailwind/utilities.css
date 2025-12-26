@@ -52,7 +52,7 @@
 
 /* Animations (Entry) */
 
-/* FIX: Заменили @apply отсутствующих классов на нативный CSS keyframes */
+/* Заменили @apply отсутствующих классов на нативный CSS keyframes */
 @utility fx-slide-in {
   animation: fx-slide-in-keyframes 0.3s ease-out forwards;
 }
@@ -71,4 +71,11 @@
 
 @utility fx-spin-slow {
   @apply animate-spin duration-[3s];
+}
+
+/* Technical / Hidden Layers */
+@utility fx-engine-room {
+  @apply pointer-events-none fixed top-0 left-0 h-px w-px overflow-hidden opacity-0;
+
+  z-index: var(--z-deep);
 }

@@ -78,9 +78,7 @@ export interface CanvasRef {
   resetView: (width?: number, height?: number) => void;
   getTransform: () => CanvasTransform;
   screenToWorld: (clientX: number, clientY: number) => Point;
-  // Backward compatibility signatures
   getBackgroundColor: () => string | null;
-  setBackgroundColor: (color: string | null) => void;
 }
 
 interface CanvasProps {
@@ -248,9 +246,6 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(
         return { x: worldX, y: worldY };
       },
       getBackgroundColor: () => backgroundColor,
-      setBackgroundColor: () => {
-        console.warn('Canvas: setBackgroundColor is deprecated. Use props instead.');
-      },
     }));
 
     const handleWheel = (e: React.WheelEvent) => {
