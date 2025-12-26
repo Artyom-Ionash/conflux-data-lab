@@ -17,18 +17,18 @@
 
 2.  **`core/browser/`** (Client Only)
     - **Что это:** "Сахар" и адаптеры над Web API (DOM, Canvas, LocalStorage, File API, Navigator).
-    - **Где использовать:** UI Components, Tools.
+    - **Где использовать:** UI Components, Features.
     - **Запрещено:** Server Actions, Node Scripts.
 
 3.  **`core/react/`** (Client Only)
     - **Что это:** Утилиты, специфичные для экосистемы React (Hooks, Contexts, HOCs).
-    - **Где использовать:** UI Components, Tools.
+    - **Где использовать:** UI Components, Features.
     - **Запрещено:** В чистых бизнес-модулях (`lib/`), на сервере.
 
 4.  **`core/node/`** (Server Only)
     - **Что это:** Безопасные обертки над Node.js API (FileSystem, Streams, Child Process).
     - **Где использовать:** Scripts, Server Actions, API Routes.
-    - **Строго запрещено:** В любом клиентском коде (UI, Tools). Линтер заблокирует сборку при нарушении.
+    - **Строго запрещено:** В любом клиентском коде (UI, Features). Линтер заблокирует сборку при нарушении.
 
 5.  **`core/next/`** (Framework Specific)
     - **Что это:** Конфигурации и утилиты Next.js (Fonts, Navigation, Metadata).
@@ -44,25 +44,30 @@
 
 Мы используем жесткие правила линтера (`eslint-plugin-boundaries`) для предотвращения запутывания зависимостей.
 
-### 1. Feature / Tool Layer (`view/tools/`)
+### 1. Feature Layer (`features/`)
 
-- **Назначение:** Полноценные виджеты инструментов. Сборка компонентов и логики в готовое решение.
-- **Структура**: Файлы компонентов, лежащие на одном уровне.
+- **Назначение:** Полноценные инструменты. Сборка компонентов и логики в готовое решение.
+- **Структура**: Файлы компонентов, лежащие в корне или подпапках.
 - **Правила:**
   - Инструменты изолированы друг от друга.
-  - Собирают UI из `view/ui/` и логику из `lib/`.
+  - Собирают UI из `ui/` и логику из `lib/`.
   - Могут использовать `core/react/` и `core/browser/`.
-  - Политика **Zero HTML:**: В этом слое ЗАПРЕЩЕНО использование базовых HTML-тегов для верстки.
+  - **Политика Zero HTML:** В этом слое ЗАПРЕЩЕНО использование базовых HTML-тегов для верстки. Вся верстка должна идти через компоненты `ui/layout/` (Box, Stack, Group).
 
-### 2. Entity Layer (`view/tools/*/`)
+### 2. Entity Subsystems (`features/_*/`)
 
-- **Назначение:** Подсистемы инструментов.
-- **Структура:** Группируются по доменам в подпапках (`_hardware/`, `_video/`).
-- **Правила:** Может использовать `view/ui/` и `lib/`.
+- **Назначение:** Подсистемы инструментов (локальные сущности).
+- **Структура:** Группируются по доменам в подпапках с префиксом `_` (`features/_hardware/`, `features/_video/`).
+- **Правила:** Может использовать `ui/` и `lib/`.
 
-### 3. UI Library (`view/ui/`)
+### 3. UI Library (`ui/`)
 
 - **Назначение:** Внутренняя дизайн-система ("глупые" компоненты).
+- **Структура:**
+  - `ui/primitive/` — Атомы (Icon, Badge, Typography).
+  - `ui/input/` — Элементы ввода (Button, Slider).
+  - `ui/layout/` — Примитивы верстки (Stack, Group, Box, Modal).
+  - `ui/canvas/` — Специализированные компоненты для работы с Canvas.
 - **Правила:**
   - Здесь живут ВСЕ базовые HTML-теги и стили Tailwind. Компоненты этого слоя — единственные владельцы `<div>`, `<span>` и т.д.
   - Компоненты агностичны к бизнесу.
@@ -70,14 +75,14 @@
   - Разрешено использовать `core/react/`, `core/browser/`, `core/tailwind/`.
   - Зависимости: Только `Radix UI`, `Tailwind` и утилиты из `core/`.
 
-### 4. Domain Logic (`lib/*/`)
+### 4. Domain Logic (`lib/`)
 
-- **Назначение:** Основная бизнес-логика, сгруппированная по домена (Graphics, FileSystem, Video).
+- **Назначение:** Основная бизнес-логика, сгруппированная по доменам (Graphics, FileSystem, Video).
 - **Зависимости:** Могут использовать `core/primitives/`. Использование `core/browser/` (например, Canvas) допустимо, но должно быть изолировано.
 
 ### 5. App Registry Layer (`app/registry/`)
 
-- **Назначение:** Связующий узел (Dynamic Imports).
+- **Назначение:** Связующий узел (Dynamic Imports, Inventory).
 - **Правила:** Единственное место, знающее обо всех инструментах сразу.
 
 ---
@@ -104,14 +109,14 @@
 **Поток данных:**
 `Feature Implementation` → `Domain Component` → (`Shared UI` + `Business Logic`)
 
-1.  **Feature Implementation (`view/tools/[ToolName].tsx`):**
+1.  **Feature Implementation (`features/[ToolName].tsx`):**
     Исходная точка входа. Может содержать смешанную логику и верстку до момента рефакторинга.
-2.  **Domain Component (`view/tools/_[domain]/`):**
+2.  **Domain Component (`features/_[domain]/`):**
     _Слой "Сущности" или Smart Component_.
     - **Роль:** Контроллер. Связывает данные (Store/Logic) с отображением.
-    - **Импортирует:** `view/ui/` и `lib/`.
+    - **Импортирует:** `ui/` и `lib/`.
 3.  **Atomic Elements (Результат декомпозиции):**
-    - **A. Shared UI (`view/ui/`):** _Presentational Component_. Отвечает только за внешний вид и интерактивность. Полностью агностичен к данным.
+    - **A. Shared UI (`ui/`):** _Presentational Component_. Отвечает только за внешний вид и интерактивность. Полностью агностичен к данным.
     - **B. Business Logic (`lib/`):** Отвечают за обработку данных. Запрещен JSX/React.
 
 ---
@@ -140,10 +145,10 @@
 
 Добавление инструмента стандартизировано:
 
-1.  **Конфигурация:** Метаданные в `lib/core/registry/config.ts`.
-2.  **Типы:** Определения типов в `lib/core/registry/types.ts`.
-3.  **Реализация:** Компонент в `view/tools/[ToolName].tsx` (например, `view/tools/VideoFrameExtractor.tsx`).
-4.  **Регистрация:** Lazy-loading через `dynamic import` в `view/shell/registry/tool-loader.tsx`.
+1.  **Конфигурация:** Метаданные в `app/registry/specifications.ts`.
+2.  **Инвентарь:** Добавление в список в `app/registry/inventory.ts`.
+3.  **Реализация:** Компонент в `features/[ToolName].tsx`.
+4.  **Регистрация:** Lazy-loading через `dynamic import` в `app/registry/tool-loader.tsx`.
 
 ---
 

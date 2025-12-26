@@ -23,7 +23,7 @@ const eslintConfig = defineConfig([
       'boundaries/include': ['**/*.ts', '**/*.tsx', '**/*.js', '**/*.jsx'],
       
       'boundaries/elements': [
-        // --- 1. CORE KERNEL ---
+        // --- 1. CORE KERNEL (Нижний слой, без зависимостей) ---
         { type: 'core-typescript', pattern: 'core/typescript/**', mode: 'file' },
         { type: 'core-primitives', pattern: 'core/primitives/**', mode: 'file' },
         { type: 'core-browser', pattern: 'core/browser/**', mode: 'file' },
@@ -32,47 +32,43 @@ const eslintConfig = defineConfig([
         { type: 'core-next', pattern: 'core/next/**', mode: 'file' },
         { type: 'core-node', pattern: 'core/node/**', mode: 'file' },
 
-        // --- 2. BUSINESS LOGIC ---
-        { type: 'lib', pattern: 'lib', mode: 'folder' },
-        { type: 'scripts', pattern: 'scripts/**', mode: 'file' },
+        // --- 2. APP LAYER (Маршрутизация и глобальные настройки) ---
+        { type: 'app', pattern: 'app', mode: 'folder' },
+        
+        // --- 3. UI LAYER (Дизайн-система) ---
+        { type: 'ui', pattern: 'ui/**', mode: 'file' },
 
-        // --- 3. VIEW LAYER ---
-        { type: 'ui', pattern: 'view/ui/**', mode: 'file' },
-        
-        // --- 4. ROUTER LAYER ---
-        { type: 'registry', pattern: 'app/registry/tool-loader.tsx', mode: 'file' },
-        { type: 'app', pattern: 'app/**', mode: 'file' },
-        
-        // --- 5. SYNTHESIS LAYER ---
-        { type: 'tool', pattern: 'view/tools/*', mode: 'file' },
-        { type: 'tool-subsystem', pattern: 'view/tools/**/*', mode: 'file' },
+        // --- 4. BUSINESS LOGIC (Чистая логика) ---
+        { type: 'lib', pattern: 'lib', mode: 'folder' },
+
+        // --- 5. FEATURES (Инструменты) ---
+        { type: 'feature', pattern: 'features/*', mode: 'file' },
+        { type: 'feature-subsystem', pattern: 'features/**/*', mode: 'file' },
+
+        // --- 6. DEV LAYER (Разработка) ---
+        { type: 'scripts', pattern: 'scripts/**', mode: 'file' },
       ],
     },
     rules: {
+      // Иерархия импортов (Белый список)
       'boundaries/element-types': [
         'error',
         {
           default: 'disallow',
-          message: '❌ ESLint разрешает только зависимости из "белого списка".',
           rules: [
-            { from: '*', allow: 'core-primitives'}, // ОБЩЕЕ
-            { from: 'core-react', allow: 'core-browser' }, // React использует веб-браузер
-            { from: 'app', allow: ['registry', 'ui', 'core-next'] }, // Занимается маршрутизацией в веб-браузере
-            { from: 'registry', allow: 'tool' }, // Подключает инструменты (декабрь 2025: ESLint не видит динамических импортов)
-            { from: 'ui', allow: ['core-react', 'core-tailwind'] }, // Собирает простые элементы интерфейса
-            { from: 'lib', allow: ['core-browser', 'core-react'] }, // Бизнес-логика (стремится к Framework-agnostic)
-            { from: 'scripts', allow: ['core-node', 'lib'] }, // Помогают разработчику
-            { from: ['tool', 'tool-subsystem'], allow: ['tool-subsystem', 'core-react', 'ui', 'lib', 'core-browser'] }, // Соединяет сложные вещи (стремится к свободе от стилей)
+            { from: '*', allow: 'core-primitives' },
+            { from: 'core-react', allow: 'core-browser' },
+            { from: 'ui', allow: ['core-react', 'core-tailwind'] },
+            { from: 'lib', allow: ['core-browser', 'core-react', 'core-typescript'] },
+            { from: 'feature', allow: ['ui', 'lib', 'core-react', 'core-browser', 'feature-subsystem'] },
+            { from: 'feature-subsystem', allow: ['ui', 'lib', 'core-react', 'core-browser'] },
+            { from: 'app', allow: ['ui', 'core-next', 'feature'] },
+            { from: 'scripts', allow: ['core-node', 'lib'] },
           ],
         },
       ],
-      'boundaries/entry-point': 'error',
-      eqeqeq: ['error', 'always'],
-      'no-console': ['warn', { allow: ['warn', 'error'] }],
-      'react-hooks/exhaustive-deps': 'error',
-      'simple-import-sort/imports': 'error',
-      'simple-import-sort/exports': 'error',
-      // Настройка точек входа: запрещаем импорт файлов с нижним подчеркиванием извне модуля
+
+      // Защита приватных файлов и точек входа
       'boundaries/entry-point': [
         'error',
         {
@@ -80,16 +76,20 @@ const eslintConfig = defineConfig([
           rules: [
             {
               target: '*',
-              disallow: '**/_*', // Запрещаем любые файлы или папки с префиксом _ внутри library
-              message: '❌ Нельзя импортировать приватные части библиотеки.'
+              disallow: '**/_*', // Запрещаем импорт из любых папок с нижним подчеркиванием (_io, _components)
             }
           ]
         }
       ],
+      eqeqeq: ['error', 'always'],
+      'no-console': ['warn', { allow: ['warn', 'error'] }],
+      'react-hooks/exhaustive-deps': 'error',
+      'simple-import-sort/imports': 'error',
+      'simple-import-sort/exports': 'error',
     },
   },
 
-  // Правила именования (PascalCase для View, kebab-case для остальных)
+  // Правила именования файлов
   {
     files: ['**/*.{ts,tsx,mts,js,mjs}'],
     rules: {
@@ -97,18 +97,17 @@ const eslintConfig = defineConfig([
         'error',
         {
           case: 'kebabCase',
-          // Разрешаем:
+           // Разрешаем:
           // 1. _underscore prefix (приватные папки)
-          // 2. README/CONTRIBUTING/ARCHITECTURE (документация)
-          // 3. Dockerfile (стандарт)
-          ignore: [/^_/, /^README\.md$/, /^CONTRIBUTING\.md$/, /^ARCHITECTURE\.md$/, /^TECH_DEBT\.md$/, /^Dockerfile$/],
+          // 2. Dockerfile (стандарт)
+          ignore: [/^_/, /^Dockerfile$/],
         },
       ],
     },
   },
-  // Исключение для React компонентов: PascalCase
+  // PascalCase для компонентов (UI и Features)
   {
-    files: ['view/**/*.tsx', 'app/ui/**/*.tsx'],
+    files: ['ui/**/*.tsx', 'features/**/*.tsx', 'app/_ui/**/*.tsx'],
     rules: {
       'unicorn/filename-case': [
         'error',

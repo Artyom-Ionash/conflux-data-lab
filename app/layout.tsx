@@ -4,8 +4,8 @@ import type { Metadata } from 'next';
 
 import { geistMono, geistSans } from '@/core/next/fonts';
 
-import { Footer } from './ui/shell/Footer';
-import { Header } from './ui/shell/Header';
+import { Footer } from './_ui/shell/Footer';
+import { Header } from './_ui/shell/Header';
 
 export const metadata: Metadata = {
   title: 'Conflux Data Lab | Портфолио инструментов для обработки данных',
