@@ -28,7 +28,7 @@ import { Workbench } from '@/ui/layout/Workbench';
 import { Icon } from '@/ui/primitive/Icon';
 import { Indicator } from '@/ui/primitive/Indicator';
 import { OverlayLabel } from '@/ui/primitive/OverlayLabel';
-import { Typography } from '@/ui/primitive/Typography'; // NEW IMPORT
+import { Typography } from '@/ui/primitive/Typography';
 
 import { TextureDimensionSlider } from './_hardware/TextureDimensionSlider';
 import { FileDropzonePlaceholder } from './_io/FileDropzone';
@@ -441,27 +441,11 @@ export function VerticalImageAligner() {
             showTransparencyGrid={true}
             defaultBackgroundColor={bgColor}
           >
-            {showRedGrid && (
-              <GridOverlay
-                color="#ff0000"
-                stepX={frameStepX}
-                stepY={slotHeight}
-                offsetX={redGridOffsetX}
-                offsetY={redGridOffsetY}
-              />
-            )}
-
-            {showFrameGrid && (
-              <GridOverlay
-                color="#00ff00"
-                stepX={frameStepX}
-                stepY={slotHeight}
-                dash={GRID_FRAME_DASH}
-                opacity={0.8}
-                className="z-[calc(var(--z-overlay)+1)]"
-              />
-            )}
-
+            {/* 
+              1. Слой изображений (КОНТЕНТ).
+              Используем стандартные слои Canvas.
+              Это помещает изображения "вглубь", позволяя интерфейсным сеткам быть сверху.
+            */}
             {images.map((img, i) => (
               <CanvasLayer
                 key={img.id}
@@ -470,6 +454,9 @@ export function VerticalImageAligner() {
                   top: i * slotHeight,
                   height: slotHeight,
                   width: slotWidth,
+                  // z-canvas-content - для фона
+                  // z-canvas-overlay - для активного элемента
+                  zIndex: img.isActive ? 'var(--z-canvas-overlay)' : 'var(--z-canvas-content)',
                 }}
               >
                 <CanvasMovable
@@ -510,6 +497,33 @@ export function VerticalImageAligner() {
                 </CanvasMovable>
               </CanvasLayer>
             ))}
+
+            {/* 
+              2. Слой линеек.
+              Используем z-canvas-ui, что гарантирует положение ПОВЕРХ любого контента.
+              !z-[...] необходим, так как GridOverlay имеет инлайн-стиль по умолчанию.
+            */}
+            {showRedGrid && (
+              <GridOverlay
+                color="#ff0000"
+                stepX={frameStepX}
+                stepY={slotHeight}
+                offsetX={redGridOffsetX}
+                offsetY={redGridOffsetY}
+                className="!z-[var(--z-canvas-ui)]"
+              />
+            )}
+
+            {showFrameGrid && (
+              <GridOverlay
+                color="#00ff00"
+                stepX={frameStepX}
+                stepY={slotHeight}
+                dash={GRID_FRAME_DASH}
+                opacity={0.8}
+                className="!z-[var(--z-canvas-ui)]"
+              />
+            )}
           </WorkbenchFrame>
         )}
       </Workbench.Stage>

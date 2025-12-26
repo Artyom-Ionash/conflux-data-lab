@@ -70,6 +70,13 @@
       - ✅ `fx-center` (flex items-center justify-center)
       - ✅ `fx-cover` (absolute inset-0 h-full w-full)
 
+4.  **Топология Z-Index (Слои):**
+    Используйте семантические переменные из `core/tailwind/layers.css`:
+    - **Контент:** `z-base` (0), `z-content` (1).
+    - **Canvas:** `z-canvas-bg`, `z-canvas-content`, `z-canvas-ui` (HUD).
+    - **UI Shell:** `z-sticky` (100), `z-workbench-sidebar` (200).
+    - **Overlays:** `z-overlay` (500), `z-modal` (600), `z-tooltip` (1000).
+
 ## ⚡ Практики кодирования
 
 Для поддержания чистоты кодовой базы:
