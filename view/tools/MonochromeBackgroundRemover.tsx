@@ -26,6 +26,7 @@ import { ToggleGroup, ToggleGroupItem } from '@/view/ui/input/ToggleGroup';
 import { EngineRoom } from '@/view/ui/layout/EngineRoom';
 import { Group, Stack } from '@/view/ui/layout/Layout';
 import { Workbench } from '@/view/ui/layout/Workbench';
+import { Icon } from '@/view/ui/primitive/Icon';
 import { Separator } from '@/view/ui/primitive/Separator';
 import { Typography } from '@/view/ui/primitive/Typography';
 
@@ -443,6 +444,7 @@ export function MonochromeBackgroundRemover() {
             accept="image/*"
             title="Загрузите изображение"
             subTitle="Для изображений с одноцветным фоном"
+            icon={<Icon.UploadCloud className="h-10 w-10 text-blue-500/80 dark:text-blue-400/80" />}
           />
         ) : (
           <div className="relative h-full w-full">

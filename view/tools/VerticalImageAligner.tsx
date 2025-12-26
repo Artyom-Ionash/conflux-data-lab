@@ -23,6 +23,7 @@ import { Slider } from '@/view/ui/input/Slider';
 import { Switch } from '@/view/ui/input/Switch';
 import { Group, Stack } from '@/view/ui/layout/Layout';
 import { Workbench } from '@/view/ui/layout/Workbench';
+import { Icon } from '@/view/ui/primitive/Icon';
 import { Indicator } from '@/view/ui/primitive/Indicator';
 import { OverlayLabel } from '@/view/ui/primitive/OverlayLabel';
 
@@ -242,19 +243,7 @@ export function VerticalImageAligner() {
         }}
         onPointerDown={(e) => e.stopPropagation()}
       >
-        <svg
-          width="14"
-          height="14"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        >
-          <path d="M18 6 6 18" />
-          <path d="m6 6 12 12" />
-        </svg>
+        <Icon.Trash className="h-3.5 w-3.5" />
       </Button>
     </Card>
   );

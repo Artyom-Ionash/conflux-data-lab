@@ -2,6 +2,8 @@
 
 import { useEffect, useRef, useState } from 'react';
 
+import { Icon } from '@/view/ui/primitive/Icon';
+
 interface RangeVideoPlayerProps {
   src: string | null;
   startTime: number;
@@ -115,13 +117,9 @@ export function RangeVideoPlayer({
       >
         <div className="rounded-full bg-black/50 p-3 text-white backdrop-blur-sm">
           {isPlaying ? (
-            <svg className="h-6 w-6" fill="currentColor" viewBox="0 0 24 24">
-              <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" />
-            </svg>
+            <Icon.Pause className="h-6 w-6" />
           ) : (
-            <svg className="h-6 w-6 translate-x-0.5" fill="currentColor" viewBox="0 0 24 24">
-              <path d="M8 5v14l11-7z" />
-            </svg>
+            <Icon.Play className="h-6 w-6 translate-x-0.5" />
           )}
         </div>
       </div>

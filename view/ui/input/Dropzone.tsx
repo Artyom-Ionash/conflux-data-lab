@@ -3,6 +3,7 @@
 import React, { forwardRef } from 'react';
 
 import { cn } from '@/core/tailwind/utils';
+import { Icon } from '@/view/ui/primitive/Icon';
 
 export interface DropzoneVisualProps extends React.HTMLAttributes<HTMLDivElement> {
   isDragActive?: boolean;
@@ -33,22 +34,12 @@ export const DropzoneVisual = forwardRef<HTMLDivElement, DropzoneVisualProps>(
         {children || (
           <div className="pointer-events-none flex flex-col items-center justify-center px-6 py-7 text-center">
             {icon || (
-              <svg
+              <Icon.UploadCloud
                 className={cn(
                   'mb-3 h-9 w-9 transition-colors duration-300',
                   isDragActive ? 'text-blue-500' : isWarning ? 'text-amber-500/70' : 'text-zinc-400'
                 )}
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth="1.5"
-                  d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
-                />
-              </svg>
+              />
             )}
 
             <div className="space-y-1">

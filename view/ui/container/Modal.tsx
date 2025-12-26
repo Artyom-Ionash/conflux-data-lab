@@ -4,6 +4,7 @@ import * as Dialog from '@radix-ui/react-dialog';
 import React from 'react';
 
 import { cn } from '@/core/tailwind/utils';
+import { Icon } from '@/view/ui/primitive/Icon';
 
 interface ModalProps {
   isOpen: boolean;
@@ -47,14 +48,7 @@ export function Modal({
                     className="rounded-lg p-2 text-zinc-400 transition-colors hover:bg-zinc-800 hover:text-white focus:ring-2 focus:ring-blue-500 focus:outline-none"
                     aria-label="Close"
                   >
-                    <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M6 18L18 6M6 6l12 12"
-                      />
-                    </svg>
+                    <Icon.Close className="h-6 w-6" />
                   </button>
                 </Dialog.Close>
               </div>

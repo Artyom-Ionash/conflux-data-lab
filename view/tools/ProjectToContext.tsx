@@ -23,6 +23,7 @@ import { Switch } from '@/view/ui/input/Switch';
 import { ToggleGroup, ToggleGroupItem } from '@/view/ui/input/ToggleGroup';
 import { Stack } from '@/view/ui/layout/Layout';
 import { Workbench } from '@/view/ui/layout/Workbench';
+import { Icon } from '@/view/ui/primitive/Icon';
 import { Indicator } from '@/view/ui/primitive/Indicator';
 
 import { CONTEXT_PRESETS, HEAVY_DIRS, type PresetKey } from '../../lib/context-generator/rules';
@@ -255,21 +256,7 @@ export function ProjectToContext() {
     </Stack>
   );
 
-  const FolderIcon = (
-    <svg
-      className="h-10 w-10 text-zinc-400 dark:text-zinc-500"
-      fill="none"
-      viewBox="0 0 24 24"
-      stroke="currentColor"
-      strokeWidth="1.5"
-    >
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"
-      />
-    </svg>
-  );
+  const FolderIcon = <Icon.Folder className="h-10 w-10 text-zinc-400 dark:text-zinc-500" />;
 
   return (
     <Workbench.Root>

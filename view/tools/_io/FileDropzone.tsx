@@ -12,6 +12,7 @@ import {
 import { filterFileList, scanDirectoryHandle, scanEntries } from '@/lib/context-generator/scanner';
 import { DropzoneVisual } from '@/view/ui/input/Dropzone';
 import { Workbench } from '@/view/ui/layout/Workbench';
+import { Icon } from '@/view/ui/primitive/Icon';
 
 interface FileDropzoneProps {
   onFilesSelected: (files: File[]) => void;
@@ -159,6 +160,11 @@ export const FileDropzone = ({
         label={label}
         subLabel={renderSubLabel()}
         className={className}
+        icon={
+          !isDragActive && !isWarning ? (
+            <Icon.UploadCloud className="mb-3 h-9 w-9 text-zinc-400" />
+          ) : undefined
+        }
       >
         {children}
       </DropzoneVisual>
@@ -209,19 +215,7 @@ export const FileDropzonePlaceholder = ({
   icon,
 }: PlaceholderProps) => {
   const DefaultIcon = (
-    <svg
-      className="h-10 w-10 text-blue-500/80 dark:text-blue-400/80"
-      fill="none"
-      viewBox="0 0 24 24"
-      stroke="currentColor"
-      strokeWidth="1.5"
-    >
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
-      />
-    </svg>
+    <Icon.UploadCloud className="h-10 w-10 text-blue-500/80 dark:text-blue-400/80" />
   );
 
   return (

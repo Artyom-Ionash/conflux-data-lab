@@ -1,7 +1,8 @@
 import { cva, type VariantProps } from 'class-variance-authority';
 import React from 'react';
 
-import { TRANSPARENCY_PATTERN_CSS } from '../../../core/tailwind/utils';
+import { TRANSPARENCY_PATTERN_CSS } from '@/core/tailwind/utils';
+import { Icon } from '@/view/ui/primitive/Icon';
 
 const containerVariants = cva(
   'group relative cursor-pointer overflow-hidden rounded-lg border border-zinc-200 shadow-sm transition-transform hover:scale-105 dark:border-zinc-700',
@@ -70,19 +71,7 @@ export function ColorInput({
           className="flex h-5 w-5 items-center justify-center rounded-full text-zinc-400 transition-colors hover:bg-zinc-100 hover:text-red-500 dark:hover:bg-zinc-800"
           title="Сбросить на прозрачный"
         >
-          <svg
-            width="12"
-            height="12"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="3"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
-            <line x1="18" y1="6" x2="6" y2="18"></line>
-            <line x1="6" y1="6" x2="18" y2="18"></line>
-          </svg>
+          <Icon.Crosshair className="h-3 w-3" />
         </button>
       )}
     </div>

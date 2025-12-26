@@ -5,6 +5,7 @@ import React from 'react';
 
 import { cn } from '@/core/tailwind/utils';
 import { Button } from '@/view/ui/input/Button';
+import { Icon } from '@/view/ui/primitive/Icon';
 
 interface WorkbenchProps extends React.HTMLAttributes<HTMLElement> {
   children: React.ReactNode;
@@ -43,16 +44,7 @@ const Header = ({ title, className }: { title: string; className?: string }) => 
       href="/"
       className="inline-flex items-center gap-2 text-sm font-medium text-zinc-500 transition-colors hover:text-zinc-900 dark:hover:text-zinc-200"
     >
-      <svg
-        width="14"
-        height="14"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2"
-      >
-        <path d="M19 12H5M12 19l-7-7 7-7" />
-      </svg>
+      <Icon.ArrowLeft className="h-3.5 w-3.5" />
       <span>На главную</span>
     </Link>
     <h2 className="text-xl font-bold tracking-tight">{title}</h2>
@@ -105,21 +97,7 @@ const EmptyState = ({
       <div className="fx-col-center w-full max-w-md gap-6 text-center">
         {/* Icon Circle */}
         <div className="fx-center h-20 w-20 rounded-2xl bg-zinc-100 shadow-inner ring-1 ring-zinc-200 dark:bg-zinc-800/50 dark:ring-zinc-700">
-          {icon || (
-            <svg
-              className="h-10 w-10 text-zinc-400 dark:text-zinc-500"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              strokeWidth="1.5"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"
-              />
-            </svg>
-          )}
+          {icon || <Icon.Placeholder className="h-10 w-10 text-zinc-400 dark:text-zinc-500" />}
         </div>
 
         {/* Text Content */}

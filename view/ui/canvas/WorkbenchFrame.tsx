@@ -16,6 +16,7 @@ import { Canvas } from '@/view/ui/canvas/Canvas';
 import { Toolbar, ToolbarSeparator } from '@/view/ui/container/Toolbar';
 import { ProcessingOverlay } from '@/view/ui/feedback/ProcessingOverlay';
 import { ColorInput } from '@/view/ui/input/ColorInput';
+import { Icon } from '@/view/ui/primitive/Icon';
 import { OverlayLabel } from '@/view/ui/primitive/OverlayLabel';
 
 const ANIMATION_CONFIG = {
@@ -124,14 +125,7 @@ export const WorkbenchFrame = forwardRef<CanvasRef, WorkbenchFrameProps>(
             )}
             title="Авто-контраст (Мигание темы)"
           >
-            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth="2"
-                d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
-              />
-            </svg>
+            <Icon.AutoContrast className="h-4 w-4" />
           </button>
 
           {isAutoContrast && (
