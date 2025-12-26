@@ -16,7 +16,7 @@ interface DualHoverPreviewProps {
   startTime: number;
   endTime: number;
   videoSrc: string | null;
-  videoRef: RefObject<HTMLVideoElement>;
+  videoRef: RefObject<HTMLVideoElement | null>;
   previewStartImage: string | null;
   previewEndImage: string | null;
   videoDimensions?: { width: number; height: number } | null;

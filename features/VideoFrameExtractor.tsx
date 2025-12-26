@@ -1,8 +1,9 @@
 'use client';
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 
 import { downloadDataUrl } from '@/core/browser/canvas';
 import { getAspectRatio } from '@/core/primitives/math';
+import { useAsyncDerived } from '@/core/react/hooks/use-async-derived';
 import { generateSpriteSheet } from '@/lib/graphics/processing/sprite-generator';
 import { TEXTURE_LIMITS } from '@/lib/graphics/standards';
 import { Modal } from '@/ui/container/Modal';
@@ -28,8 +29,22 @@ import { useFrameExtractor } from './_video/use-frame-extractor';
 
 const MAX_BROWSER_TEXTURE = TEXTURE_LIMITS.MAX_BROWSER;
 
+// --- DOM Helpers ---
+const setVideoTime = (video: HTMLVideoElement, time: number) => {
+  video.currentTime = time;
+};
+
+const setCanvasSize = (canvas: HTMLCanvasElement, width: number, height: number) => {
+  canvas.width = width;
+  canvas.height = height;
+};
+
 export function VideoFrameExtractor() {
   const { refs, state, actions } = useFrameExtractor();
+
+  // FIX: Деструктурируем refs, чтобы избежать ошибки линтера "Cannot access refs during render"
+  // Линтер триггерится на точечную нотацию refs.someRef внутри JSX.
+  const { videoRef, previewVideoRef, hoverVideoRef, canvasRef } = refs;
 
   // --- Local UI State ---
   const [spriteOptions, setSpriteOptions] = useState({
@@ -40,73 +55,93 @@ export function VideoFrameExtractor() {
   const [diffDataUrl, setDiffDataUrl] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
-  // Preview Logic State
-  const [previewFrames, setPreviewFrames] = useState<{ start: string | null; end: string | null }>({
-    start: null,
-    end: null,
-  });
-  const [isPreviewing, setIsPreviewing] = useState(false);
+  // --- PIPELINE: Preview Generation ---
 
-  // --- Preview Generation Effect ---
-  // Это логика "Сущности", она остается здесь или выносится в хук (TODO: Refactor to hook)
-  useEffect(() => {
-    const vid = refs.previewVideoRef.current;
-    const canvas = refs.canvasRef.current;
-    const src = state.videoSrc;
+  // Объект input должен быть стабильным по ссылке
+  // (useMemo для предотвращения бесконечного цикла ре-рендеров).
+  const previewInput = useMemo(() => {
+    if (!state.videoSrc) return null;
+    return {
+      src: state.videoSrc, // Используем как ключ для перезапуска, но не для мутации
+      start: Math.max(0, state.extractionParams.startTime),
+      end: Math.min(state.effectiveEnd, state.videoDuration ?? 0),
+    };
+  }, [state.videoSrc, state.extractionParams.startTime, state.effectiveEnd, state.videoDuration]);
 
-    if (!src || !vid || !canvas || !state.videoDuration) return;
-    if (state.status.isProcessing) return;
+  const previewPipeline = useAsyncDerived(
+    previewInput,
+    async (input, signal) => {
+      // Используем ref.current внутри эффекта - это легально
+      const vid = previewVideoRef.current;
+      const canvas = canvasRef.current;
 
-    if (vid.src !== src) vid.src = src;
-    const ctx = canvas.getContext('2d');
+      if (!vid || !canvas) throw new Error('DOM elements not ready');
 
-    const timer = setTimeout(async () => {
-      setIsPreviewing(true);
-      try {
-        if (vid.readyState < 1)
-          await new Promise<void>((r) => {
-            vid.onloadedmetadata = () => r();
+      // АРХИТЕКТУРНОЕ ИСПРАВЛЕНИЕ:
+      // Мы не устанавливаем vid.src вручную. Это делает React в JSX (декларативно).
+      // Здесь мы просто ждём, когда браузер подхватит изменения и загрузит метаданные.
+
+      // Ждем готовности (Metadata Wait)
+      // Если видео ещё не загрузило метаданные (readyState < 1) или если мы только что сменили src,
+      // нам нужно подождать события.
+      if (vid.readyState < 1 || vid.src !== input.src) {
+        // Если React ещё не успел обновить DOM (редкий кейс, но возможный в микротасках),
+        // или если браузер начал загрузку.
+        await new Promise<void>((resolve, reject) => {
+          // Если src уже верный и данные есть — сразу резолвим
+          if (vid.src === input.src && vid.readyState >= 1) {
+            resolve();
+            return;
+          }
+
+          const onLoaded = () => resolve();
+          const onError = (e: Event) => reject(e);
+
+          vid.addEventListener('loadedmetadata', onLoaded, { once: true });
+          vid.addEventListener('error', onError, { once: true });
+
+          // Если отмена пришла во время ожидания
+          signal.addEventListener('abort', () => {
+            vid.removeEventListener('loadedmetadata', onLoaded);
+            vid.removeEventListener('error', onError);
+            reject(new Error('Aborted'));
           });
-
-        canvas.width = vid.videoWidth;
-        canvas.height = vid.videoHeight;
-
-        const safeStart = Math.max(0, state.extractionParams.startTime);
-
-        // Start Frame
-        vid.currentTime = safeStart;
-        await new Promise<void>((r) => {
-          vid.onseeked = () => r();
         });
-        ctx?.drawImage(vid, 0, 0);
-        const startUrl = canvas.toDataURL('image/png');
-
-        // End Frame
-        vid.currentTime = Math.min(state.effectiveEnd, state.videoDuration ?? 0);
-        await new Promise<void>((r) => {
-          vid.onseeked = () => r();
-        });
-        ctx?.drawImage(vid, 0, 0);
-        const endUrl = canvas.toDataURL('image/png');
-
-        setPreviewFrames({ start: startUrl, end: endUrl });
-      } catch (e) {
-        console.error('Preview failed', e);
-      } finally {
-        setIsPreviewing(false);
       }
-    }, 500);
 
-    return () => clearTimeout(timer);
-  }, [
-    state.videoSrc,
-    state.extractionParams.startTime,
-    state.effectiveEnd,
-    state.videoDuration,
-    state.status.isProcessing,
-    refs.previewVideoRef,
-    refs.canvasRef,
-  ]);
+      // Resize Canvas (через хелпер)
+      setCanvasSize(canvas, vid.videoWidth, vid.videoHeight);
+
+      const ctx = canvas.getContext('2d');
+      if (!ctx) throw new Error('Canvas context failed');
+
+      // Helper for seeking and capturing
+      const capture = async (time: number) => {
+        if (signal.aborted) throw new Error('Aborted');
+
+        // Seek (через хелпер)
+        setVideoTime(vid, time);
+
+        await new Promise<void>((resolve) => {
+          const onSeek = () => resolve();
+          vid.addEventListener('seeked', onSeek, { once: true });
+        });
+
+        ctx.drawImage(vid, 0, 0);
+        return canvas.toDataURL('image/png');
+      };
+
+      // Capture Sequence
+      const startUrl = await capture(input.start);
+      const endUrl = await capture(input.end);
+
+      return { start: startUrl, end: endUrl };
+    },
+    500 // Debounce 500ms
+  );
+
+  const previewFrames = previewPipeline.result ?? { start: null, end: null };
+  const isPreviewing = previewPipeline.status === 'loading';
 
   // --- Helpers ---
   const handleDownloadSpriteSheet = async () => {
@@ -186,7 +221,7 @@ export function VideoFrameExtractor() {
               frameStep={state.extractionParams.frameStep}
               videoSrc={state.videoSrc}
               videoDimensions={state.videoDimensions}
-              hoverVideoRef={refs.hoverVideoRef as React.RefObject<HTMLVideoElement>}
+              hoverVideoRef={hoverVideoRef}
               previewStart={previewFrames.start}
               previewEnd={previewFrames.end}
               error={state.error}
@@ -293,10 +328,13 @@ export function VideoFrameExtractor() {
         )}
 
         <EngineRoom>
-          <Surface.Video ref={refs.videoRef} />
-          <Surface.Video ref={refs.previewVideoRef} />
-          <Surface.Video ref={refs.hoverVideoRef} />
-          <Surface.Canvas ref={refs.canvasRef} />
+          <Surface.Video ref={videoRef} />
+
+          {/* ДЕКЛАРАТИВНАЯ ПРИВЯЗКА SRC */}
+          <Surface.Video ref={previewVideoRef} src={state.videoSrc || undefined} />
+
+          <Surface.Video ref={hoverVideoRef} />
+          <Surface.Canvas ref={canvasRef} />
         </EngineRoom>
 
         <Modal

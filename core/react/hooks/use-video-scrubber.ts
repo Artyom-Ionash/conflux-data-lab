@@ -2,7 +2,8 @@ import type React from 'react';
 import { useEffect, useState } from 'react';
 
 interface UseVideoScrubberProps {
-  videoRef: React.RefObject<HTMLVideoElement>;
+  // Делает хук универсальным.
+  videoRef: React.RefObject<HTMLVideoElement | null>;
   duration: number | null;
   startTime: number;
   endTime: number;

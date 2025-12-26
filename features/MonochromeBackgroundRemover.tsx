@@ -8,6 +8,7 @@ import { hexToRgb, invertHex, rgbToHex } from '@/core/primitives/colors';
 import { useDebounceEffect } from '@/core/react/hooks/use-debounce';
 import { useHistory } from '@/core/react/hooks/use-history';
 import { useMediaSession } from '@/core/react/hooks/use-media-session';
+import { useStateMachine } from '@/core/react/hooks/use-state-machine';
 import { useWorker } from '@/core/react/hooks/use-worker';
 import type {
   ProcessingMode,
@@ -45,6 +46,25 @@ const OFFSET_R = 0;
 const OFFSET_G = 1;
 const OFFSET_B = 2;
 
+// --- STATE MACHINE CONFIG ---
+type InteractionState = 'idle' | 'panning' | 'interacting';
+type InteractionEvent = 'SPACE_DOWN' | 'SPACE_UP' | 'MOUSE_DOWN' | 'MOUSE_UP';
+
+const INTERACTION_CHART = {
+  idle: {
+    SPACE_DOWN: 'panning',
+    MOUSE_DOWN: 'interacting',
+  },
+  panning: {
+    SPACE_UP: 'idle',
+    // Если отпустили мышь во время панорамирования - остаемся в panning, пока нажат пробел
+  },
+  interacting: {
+    MOUSE_UP: 'idle',
+    // Пробел игнорируем, пока рисуем
+  },
+} as const; // as const нужен для типизации литералов
+
 const DEFAULT_SETTINGS = {
   targetColor: '#ffffff',
   contourColor: '#000000',
@@ -62,13 +82,65 @@ export function MonochromeBackgroundRemover() {
   const imgW = session.dimensions?.width;
   const imgH = session.dimensions?.height;
 
+  // --- STATE MACHINES ---
+
+  // 1. History Machine (Undo/Redo)
+  const {
+    state: floodPoints,
+    set: setFloodPoints,
+    undo,
+    redo,
+    canUndo,
+    canRedo,
+    reset: resetFloodPoints,
+  } = useHistory<Point[]>([]);
+
+  // 2. Interaction Machine (Mouse Modes)
+  const { state: interactionState, transition } = useStateMachine<
+    InteractionState,
+    InteractionEvent
+  >('idle', INTERACTION_CHART);
+
+  // Global Key Listener for Interaction Modes & History
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Undo/Redo
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'z') {
+        e.preventDefault();
+        if (e.shiftKey) {
+          redo();
+        } else {
+          undo();
+        }
+      }
+      // Panning Mode
+      if (e.code === 'Space' && !e.repeat) {
+        e.preventDefault(); // Prevent scroll
+        transition('SPACE_DOWN');
+      }
+    };
+
+    const handleKeyUp = (e: KeyboardEvent) => {
+      if (e.code === 'Space') {
+        transition('SPACE_UP');
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('keyup', handleKeyUp);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keyup', handleKeyUp);
+    };
+  }, [undo, redo, transition]);
+
+  // --- PARAMS ---
+
   const [targetColor, setTargetColor] = useState(DEFAULT_SETTINGS.targetColor);
   const [contourColor, setContourColor] = useState(DEFAULT_SETTINGS.contourColor);
 
-  // Логика определения цвета фона (специфична для этого инструмента)
   useEffect(() => {
     if (!session.url) return;
-
     void loadImage(session.url).then((img) => {
       const { r, g, b } = getTopLeftPixelColor(img);
       const hex = rgbToHex(r, g, b);
@@ -88,33 +160,6 @@ export function MonochromeBackgroundRemover() {
   const [edgeChoke, setEdgeChoke] = useState(DEFAULT_SETTINGS.edgeChoke);
   const [edgeBlur, setEdgeBlur] = useState(DEFAULT_SETTINGS.edgeBlur);
   const [edgePaint, setEdgePaint] = useState(DEFAULT_SETTINGS.edgePaint);
-
-  // --- STATE MANAGEMENT UPDATE: History ---
-  const {
-    state: floodPoints,
-    set: setFloodPoints,
-    undo,
-    redo,
-    canUndo,
-    canRedo,
-    reset: resetFloodPoints,
-  } = useHistory<Point[]>([]);
-
-  // Hotkeys for Undo/Redo
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'z') {
-        e.preventDefault();
-        if (e.shiftKey) {
-          redo();
-        } else {
-          undo();
-        }
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [undo, redo]);
 
   const [manualTrigger, setManualTrigger] = useState(0);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -157,7 +202,7 @@ export function MonochromeBackgroundRemover() {
     onMessage: handleWorkerMessage,
   });
 
-  // Отрисовка исходного изображения на канвас
+  // Init Source Canvas
   useEffect(() => {
     if (!session.url || !imgW || !imgH) return;
 
@@ -179,6 +224,7 @@ export function MonochromeBackgroundRemover() {
     }
   }, [session.url, imgW, imgH, workspaceRef]);
 
+  // Main Pipeline Trigger
   const processImage = useCallback(() => {
     if (!session.url || !sourceCanvasRef.current) return;
     const sourceCtx = sourceCanvasRef.current.getContext('2d', { willReadFrequently: true });
@@ -258,13 +304,25 @@ export function MonochromeBackgroundRemover() {
     return null;
   };
 
+  // --- MOUSE HANDLERS (Delegated to State Machine implicitly) ---
+
   const handleImagePointerDown = (e: React.PointerEvent) => {
+    // Если мы в режиме панорамирования (Space), то Canvas сам обработает драг.
+    // Нам нужно блокировать рисование.
+    if (interactionState === 'panning') return;
+
     if (e.button !== MOUSE_BUTTON_LEFT) return;
+
+    transition('MOUSE_DOWN');
+
     if (processingMode === 'flood-clear') {
       const coords = getRelativeImageCoords(e.clientX, e.clientY);
-      // Добавляем новую точку в историю (push)
       if (coords) setFloodPoints((prev) => [...prev, coords], 'push');
     }
+  };
+
+  const handleImagePointerUp = () => {
+    transition('MOUSE_UP');
   };
 
   const handlePointMove = useCallback(
@@ -273,7 +331,7 @@ export function MonochromeBackgroundRemover() {
         const next = [...prev];
         if (next[index]) next[index] = newPos;
         return next;
-      }, 'replace'); // Используем 'replace', чтобы не забивать историю движениями мыши
+      }, 'replace');
     },
     [setFloodPoints]
   );
@@ -291,6 +349,13 @@ export function MonochromeBackgroundRemover() {
 
   const clearAllPoints = () => resetFloodPoints([]);
   const handleRunFloodFill = () => setManualTrigger((prev) => prev + 1);
+
+  // Cursor logic based on state machine
+  const getCursor = () => {
+    if (interactionState === 'panning') return 'grab';
+    if (processingMode === 'flood-clear') return 'crosshair';
+    return 'default';
+  };
 
   const sidebarContent = (
     <Stack gap={6} className="pb-4">
@@ -503,11 +568,13 @@ export function MonochromeBackgroundRemover() {
               <Surface.Canvas
                 ref={previewCanvasRef}
                 onPointerDown={handleImagePointerDown}
+                onPointerUp={handleImagePointerUp}
+                onPointerLeave={handleImagePointerUp}
                 rendering="pixelated"
                 style={{
                   width: '100%',
                   height: '100%',
-                  cursor: processingMode === 'flood-clear' ? 'crosshair' : 'default',
+                  cursor: getCursor(),
                   display: session.url ? 'block' : 'none',
                 }}
               />

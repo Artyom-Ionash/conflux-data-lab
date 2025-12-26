@@ -21,7 +21,7 @@ interface TimelineControlProps {
   videoDimensions: { width: number; height: number } | null;
 
   // Resources
-  hoverVideoRef: React.RefObject<HTMLVideoElement>;
+  hoverVideoRef: React.RefObject<HTMLVideoElement | null>;
   previewStart: string | null;
   previewEnd: string | null;
   error?: string | null;
