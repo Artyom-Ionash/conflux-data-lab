@@ -46,6 +46,13 @@ const OFFSET_R = 0;
 const OFFSET_G = 1;
 const OFFSET_B = 2;
 
+// --- TYPE GUARDS ---
+const VALID_MODES: ProcessingMode[] = ['remove', 'keep', 'flood-clear'];
+
+function isProcessingMode(value: string): value is ProcessingMode {
+  return VALID_MODES.includes(value as ProcessingMode);
+}
+
 // --- STATE MACHINE CONFIG ---
 type InteractionState = 'idle' | 'panning' | 'interacting';
 type InteractionEvent = 'SPACE_DOWN' | 'SPACE_UP' | 'MOUSE_DOWN' | 'MOUSE_UP';
@@ -378,7 +385,7 @@ export function MonochromeBackgroundRemover() {
               value={processingMode}
               gridCols={2}
               onValueChange={(val) => {
-                if (val) setProcessingMode(val as ProcessingMode);
+                if (val && isProcessingMode(val)) setProcessingMode(val);
               }}
             >
               <ToggleGroupItem value="remove">Убрать цвет</ToggleGroupItem>

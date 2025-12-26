@@ -1,3 +1,5 @@
+/// <reference lib="webworker" />
+
 import type { ContextFile } from './_assembly';
 import { processFileToContext } from './_assembly';
 
@@ -11,6 +13,9 @@ export interface ProcessingResponse {
   results: ContextFile[];
   error?: string;
 }
+
+// FIX: Строгая типизация глобальной области воркера
+declare const self: DedicatedWorkerGlobalScope;
 
 self.onmessage = async (e: MessageEvent<ProcessingPayload>) => {
   try {
@@ -32,11 +37,9 @@ self.onmessage = async (e: MessageEvent<ProcessingPayload>) => {
       })
     );
 
-    const ctx = self as unknown as Worker;
-    ctx.postMessage({ results });
+    self.postMessage({ results });
   } catch (error) {
-    const ctx = self as unknown as Worker;
-    ctx.postMessage({
+    self.postMessage({
       results: [],
       error: error instanceof Error ? error.message : 'Worker processing failed',
     });

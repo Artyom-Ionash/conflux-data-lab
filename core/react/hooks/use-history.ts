@@ -9,15 +9,23 @@ import { useCallback, useReducer } from 'react';
 type StateUpdater<S> = S | ((prevState: S) => S);
 
 /**
+ * Type Guard для различения функционального обновления.
+ *
+ * NOTE: Здесь скрыто неизбежное архитектурное допущение React:
+ * Если S является функцией, React не может отличить S от (S => S).
+ * Конвенция: любая функция считается Updater-ом.
+ */
+function isUpdater<S>(value: StateUpdater<S>): value is (prevState: S) => S {
+  return typeof value === 'function';
+}
+
+/**
  * Утилита для разрешения функционального обновления.
  * Проверяет, является ли значение функцией, и если да — вызывает её.
  */
 function resolveValue<S>(val: StateUpdater<S>, current: S): S {
-  if (typeof val === 'function') {
-    // TS не может на 100% гарантировать, что S — это не сама по себе функция.
-    // Но для стейт-менеджеров это стандартный компромисс.
-    const func = val as (prevState: S) => S;
-    return func(current);
+  if (isUpdater(val)) {
+    return val(current);
   }
   return val;
 }
@@ -51,14 +59,13 @@ function historyReducer<T>(state: HistoryState<T>, action: HistoryAction<T>): Hi
 
       return {
         past: newPast,
-        present: previous, // Здесь TS точно знает, что previous — это T
+        present: previous,
         future: [present, ...future],
       };
     }
 
     case 'REDO': {
       const next = future.at(0);
-
       if (next === undefined) return state;
 
       const newFuture = future.slice(1);

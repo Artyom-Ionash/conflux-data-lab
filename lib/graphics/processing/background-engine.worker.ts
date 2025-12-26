@@ -1,3 +1,5 @@
+/// <reference lib="webworker" />
+
 import { pipe } from 'remeda';
 
 import type { RGB } from '@/core/primitives/colors';
@@ -38,6 +40,8 @@ export interface WorkerResponse {
   processedData: Uint8ClampedArray;
   error?: string;
 }
+
+declare const self: DedicatedWorkerGlobalScope;
 
 // --- Worker Logic ---
 
@@ -110,17 +114,14 @@ self.onmessage = (e: MessageEvent<WorkerPayload>) => {
     // Merge Alpha into Output
     const OFFSET_A = 3;
     for (let i = 0, idx = 0; i < imageData.length; i += PIXEL_STRIDE, idx++) {
-      // FIX: Замена ! на безопасный фоллбэк (255 - полная непрозрачность)
       imageData[i + OFFSET_A] = alphaChannel[idx] ?? 255;
     }
 
     // --- 4. Transfer ---
-    const ctx = self as unknown as Worker;
-    ctx.postMessage({ processedData: imageData }, [imageData.buffer]);
+    self.postMessage({ processedData: imageData }, [imageData.buffer]);
   } catch (error) {
     console.error('Worker error:', error);
-    const ctx = self as unknown as Worker;
-    ctx.postMessage({
+    self.postMessage({
       processedData: new Uint8ClampedArray(0),
       error: error instanceof Error ? error.message : 'Unknown worker error',
     });

@@ -31,6 +31,13 @@ import { FileDropzonePlaceholder } from './_io/FileDropzone';
 import { ResultViewer } from './_io/ResultViewer';
 import { SidebarIO } from './_io/SidebarIO';
 
+// --- TYPE GUARDS ---
+const PRESET_KEYS = Object.keys(CONTEXT_PRESETS) as PresetKey[];
+
+function isPresetKey(key: string): key is PresetKey {
+  return PRESET_KEYS.includes(key as PresetKey);
+}
+
 // Размер пачки файлов на один воркер
 const BATCH_SIZE = 50;
 
@@ -196,15 +203,14 @@ export function ProjectToContext() {
             type="single"
             value={selectedPreset}
             onValueChange={(val) => {
-              if (val) {
-                const key = val as PresetKey;
-                setSelectedPreset(key);
-                setCustomExtensions(CONTEXT_PRESETS[key].textExtensions.join(', '));
+              if (val && isPresetKey(val)) {
+                setSelectedPreset(val);
+                setCustomExtensions(CONTEXT_PRESETS[val].textExtensions.join(', '));
               }
             }}
             gridCols={2}
           >
-            {(Object.keys(CONTEXT_PRESETS) as PresetKey[]).map((key) => (
+            {PRESET_KEYS.map((key) => (
               <ToggleGroupItem key={key} value={key}>
                 {CONTEXT_PRESETS[key].name}
               </ToggleGroupItem>

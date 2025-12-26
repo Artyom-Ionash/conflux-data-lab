@@ -64,7 +64,7 @@ function SortableItemWrapper({ id, children, className }: SortableItemWrapperPro
     touchAction: 'none',
   };
 
-  const dragProps = { ...attributes, ...listeners } as React.HTMLAttributes<HTMLElement>;
+  const dragProps = { ...attributes, ...listeners };
 
   return (
     <div ref={setNodeRef} style={style} className={className}>

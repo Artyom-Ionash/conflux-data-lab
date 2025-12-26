@@ -34,7 +34,12 @@ export function RangeSlider({
   const prevValueRef = useRef<[number, number]>(value);
 
   const handleValueChange = (newValues: number[]) => {
-    const next = [newValues[0] ?? min, newValues[1] ?? max] as [number, number];
+    // FIX: Безопасное извлечение значений без приведения типа (as)
+    const v0 = newValues[0];
+    const v1 = newValues[1];
+
+    // Гарантируем кортеж [number, number]. Если undefined - берем min/max
+    const next: [number, number] = [v0 ?? min, v1 ?? max];
     const prev = prevValueRef.current;
 
     let changedIndex: 0 | 1 | undefined;

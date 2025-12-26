@@ -14,6 +14,12 @@ import { DropzoneVisual } from '@/ui/input/Dropzone';
 import { Workbench } from '@/ui/layout/Workbench';
 import { Icon } from '@/ui/primitive/Icon';
 
+// --- Type Guards для Drag-and-Drop API ---
+
+function isFileSystemEntry(entry: unknown): entry is FileSystemEntry {
+  return typeof entry === 'object' && entry !== null && 'isFile' in entry && 'isDirectory' in entry;
+}
+
 interface FileDropzoneProps {
   onFilesSelected: (files: File[]) => void;
   onScanStarted?: (() => void) | undefined;
@@ -85,9 +91,7 @@ export const FileDropzone = ({
     async (dataTransfer: DataTransfer) => {
       onScanStarted?.();
       const items = Array.from(dataTransfer.items);
-      const entries = items
-        .map((item) => item.webkitGetAsEntry())
-        .filter((entry): entry is FileSystemEntry => entry !== null);
+      const entries = items.map((item) => item.webkitGetAsEntry()).filter(isFileSystemEntry);
 
       if (entries.length > 0) {
         const allFiles = await scanEntries(entries, shouldSkip);
