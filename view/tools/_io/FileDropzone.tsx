@@ -5,10 +5,10 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 
 import {
   checkDirectoryPickerSupport,
+  COMPAT_MESSAGES,
   type DirectorySupport,
   getLegacyDirectoryAttributes,
-  LEGACY_MESSAGES,
-} from '@/core/browser/legacy';
+} from '@/core/browser/compat';
 import { filterFileList, scanDirectoryHandle, scanEntries } from '@/lib/context-generator/scanner';
 import { DropzoneVisual } from '@/view/ui/input/Dropzone';
 import { Workbench } from '@/view/ui/layout/Workbench';
@@ -132,10 +132,10 @@ export const FileDropzone = ({
     return (
       <div className="animate-in fade-in slide-in-from-top-1 mt-2 space-y-1">
         <p className="text-[10px] leading-tight font-medium text-amber-600/80 dark:text-amber-500/60">
-          {LEGACY_MESSAGES.FIREFOX_STATUS}
+          {COMPAT_MESSAGES.FIREFOX_STATUS}
         </p>
         <p className="text-[10px] leading-tight font-bold text-amber-700 dark:text-amber-400/90">
-          {LEGACY_MESSAGES.DND_REQUIRED}
+          {COMPAT_MESSAGES.DND_REQUIRED}
         </p>
       </div>
     );
