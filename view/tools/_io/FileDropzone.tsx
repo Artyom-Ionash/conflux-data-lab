@@ -193,6 +193,7 @@ export const FileDropzone = ({
 
 interface PlaceholderProps {
   onUpload: (files: File[]) => void;
+  shouldSkip?: ((path: string) => boolean) | undefined;
   multiple?: boolean | undefined;
   enableWindowDrop?: boolean | undefined;
   className?: string | undefined;
@@ -205,6 +206,7 @@ interface PlaceholderProps {
 
 export const FileDropzonePlaceholder = ({
   onUpload,
+  shouldSkip,
   multiple = false,
   enableWindowDrop = false,
   className = '',
@@ -221,6 +223,7 @@ export const FileDropzonePlaceholder = ({
   return (
     <FileDropzone
       onFilesSelected={onUpload}
+      shouldSkip={shouldSkip}
       multiple={multiple}
       enableWindowDrop={enableWindowDrop}
       accept={accept}

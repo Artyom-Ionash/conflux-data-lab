@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useCallback,useState } from 'react';
 
 import { downloadText } from '@/core/browser/canvas';
 import { useCopyToClipboard } from '@/core/react/hooks/use-copy';
@@ -56,18 +56,30 @@ export function JsonToCsvConverter() {
     }
   };
 
-  const handleFilesSelected = async (files: File[]) => {
+  const handleFilesSelected = useCallback(async (files: File[]) => {
     const file = files[0];
     if (!file) return;
 
     try {
       const text = await file.text();
       setJsonInput(text);
-      handleConvert(text);
+      // Важно: здесь вызываем handleConvert с аргументом, чтобы не зависеть от стейта jsonInput
+      // Но сама функция handleConvert тоже должна быть стабильной или код перенесен сюда.
+      // Проще продублировать логику конвертации или вынести её в чистую функцию за пределы компонента.
+
+      // Лучший вариант - просто вызвать сеттер и конвертацию:
+      try {
+        setError('');
+        const result = convertJsonToCsv(text);
+        setCsvOutput(result);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Ошибка конвертации');
+        setCsvOutput('');
+      }
     } catch {
       setError('Не удалось прочитать файл');
     }
-  };
+  }, []); // Пустой массив зависимостей, так как используем сеттеры
 
   const handleDownload = () => {
     if (csvOutput) {

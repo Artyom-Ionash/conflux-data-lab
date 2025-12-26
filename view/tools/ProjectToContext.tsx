@@ -138,26 +138,29 @@ export function ProjectToContext() {
    * В ней НЕЛЬЗЯ вызывать чтение контента (file.text()), иначе интерфейс
    * зависнет на проектах с 5000+ файлами.
    */
-  const onFilesSelected = async (files: File[]) => {
-    if (files.length === 0) return;
+  const onFilesSelected = useCallback(
+    async (files: File[]) => {
+      if (files.length === 0) return;
 
-    try {
-      // 1. Индексация (Bundle Manager)
-      const {
-        presetKey,
-        visiblePaths,
-        bundle: newBundle,
-      } = await handleFiles(files, customExtensions, customIgnore);
+      try {
+        // 1. Индексация (Bundle Manager)
+        const {
+          presetKey,
+          visiblePaths,
+          bundle: newBundle,
+        } = await handleFiles(files, customExtensions, customIgnore);
 
-      setSelectedPreset(presetKey);
-      setCustomExtensions(CONTEXT_PRESETS[presetKey].textExtensions.join(', '));
+        setSelectedPreset(presetKey);
+        setCustomExtensions(CONTEXT_PRESETS[presetKey].textExtensions.join(', '));
 
-      // 2. Автоматический запуск генерации через таск
-      void processingTask.run(newBundle, visiblePaths, presetKey);
-    } catch (err) {
-      console.error('File selection failed:', err);
-    }
-  };
+        // 2. Автоматический запуск генерации через таск
+        void processingTask.run(newBundle, visiblePaths, presetKey);
+      } catch (err) {
+        console.error('File selection failed:', err);
+      }
+    },
+    [handleFiles, customExtensions, customIgnore, processingTask]
+  );
 
   const handleManualRun = () => {
     if (bundle) {
@@ -287,6 +290,7 @@ export function ProjectToContext() {
           <FileDropzonePlaceholder
             onUpload={onFilesSelected}
             directory={true}
+            shouldSkip={shouldSkipScan} // ПРОИЗВОДИТЕЛЬНОСТЬ: Smart Scan
             title="Выберите папку проекта"
             subTitle="Поддерживаются Next.js, Godot и другие структуры"
             icon={FolderIcon}

@@ -444,7 +444,6 @@ export function MonochromeBackgroundRemover() {
             accept="image/*"
             title="Загрузите изображение"
             subTitle="Для изображений с одноцветным фоном"
-            icon={<Icon.UploadCloud className="h-10 w-10 text-blue-500/80 dark:text-blue-400/80" />}
           />
         ) : (
           <div className="relative h-full w-full">
