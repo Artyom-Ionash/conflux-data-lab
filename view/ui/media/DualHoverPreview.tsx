@@ -2,7 +2,13 @@ import Image from 'next/image';
 import type { RefObject } from 'react';
 import React from 'react';
 
-import { getAspectRatioStyle } from '@/core/tailwind/utils';
+import { getAspectRatio } from '@/core/primitives/math';
+import { Loader } from '@/view/ui/feedback/Loader';
+import { AspectRatio } from '@/view/ui/layout/AspectRatio'; // Используем компонент
+import { Box } from '@/view/ui/layout/Box';
+import { Grid, Stack } from '@/view/ui/layout/Layout';
+import { Overlay } from '@/view/ui/layout/Overlay';
+import { Badge } from '@/view/ui/primitive/Badge';
 
 interface DualHoverPreviewProps {
   activeThumb: 0 | 1;
@@ -29,23 +35,32 @@ export function DualHoverPreview({
   videoDimensions,
   isLoading = false,
 }: DualHoverPreviewProps) {
-  // Вычисляем стиль внутри UI компонента (где это разрешено)
-  const aspectRatioStyle = getAspectRatioStyle(videoDimensions?.width, videoDimensions?.height);
+  // Используем математический примитив для получения числа, а не стиля
+  const ratio = getAspectRatio(videoDimensions?.width, videoDimensions?.height);
 
   const renderFrame = (
     isActive: boolean,
     imageSrc: string | null,
     displayTime: number,
     label: string,
-    colorClass: string,
-    borderColorClass: string
+    badgeVariant: 'info' | 'accent'
   ) => (
-    <div
-      className={`relative flex flex-col items-center gap-2 transition-opacity duration-200 ${isActive ? 'opacity-100' : 'opacity-50 grayscale-[0.5]'}`}
+    <Stack
+      gap={2}
+      items="center"
+      className={`transition-opacity duration-200 ${
+        isActive ? 'opacity-100' : 'opacity-50 grayscale-[0.5]'
+      }`}
     >
-      <div
-        className={`relative w-full overflow-hidden rounded-lg border-4 bg-black shadow-lg transition-all ${isActive ? borderColorClass : 'border-zinc-800'}`}
-        style={aspectRatioStyle}
+      <AspectRatio
+        ratio={ratio}
+        className={`rounded-lg border-4 bg-black shadow-lg transition-all ${
+          isActive
+            ? badgeVariant === 'info'
+              ? 'border-blue-500 shadow-blue-500/20'
+              : 'border-purple-500 shadow-purple-500/20'
+            : 'border-zinc-800'
+        }`}
       >
         {imageSrc && (
           <Image
@@ -57,7 +72,7 @@ export function DualHoverPreview({
           />
         )}
         {isActive && videoSrc && (
-          <div className="absolute inset-0 bg-black">
+          <Box className="fx-cover bg-black">
             <video
               ref={videoRef}
               src={videoSrc}
@@ -65,42 +80,40 @@ export function DualHoverPreview({
               muted
               playsInline
             />
-            {isLoading && (
-              <div className="absolute inset-0 flex items-center justify-center bg-black/40 backdrop-blur-[1px]">
-                <div className="h-6 w-6 animate-spin rounded-full border-2 border-white/20 border-t-white" />
-              </div>
-            )}
-          </div>
+            <Overlay center dim visible={isLoading}>
+              <Loader size="md" className="text-white" />
+            </Overlay>
+          </Box>
         )}
-      </div>
-      <span
-        className={`rounded-full px-3 py-1 font-mono text-xs font-bold shadow-sm ${isActive ? colorClass : 'bg-zinc-800 text-zinc-500'}`}
-      >
+      </AspectRatio>
+      <Badge variant={isActive ? badgeVariant : 'outline'}>
         {label}: {displayTime.toFixed(2)}s
-      </span>
-    </div>
+      </Badge>
+    </Stack>
   );
 
   return (
-    <div className="z-tooltip pointer-events-none absolute top-full left-1/2 mt-6 w-[98vw] max-w-[1600px] -translate-x-1/2">
-      <div className="grid grid-cols-2 gap-6 rounded-2xl border border-white/10 bg-zinc-950/95 p-6 shadow-2xl backdrop-blur-md">
+    <Box className="z-tooltip pointer-events-none absolute top-full left-1/2 mt-6 w-[98vw] max-w-[1600px] -translate-x-1/2">
+      <Grid
+        cols={2}
+        gap={6}
+        className="rounded-2xl border border-white/10 bg-zinc-950/95 p-6 shadow-2xl backdrop-blur-md"
+      >
         {renderFrame(
           activeThumb === 0,
           previewStartImage,
           activeThumb === 0 ? hoverTime : startTime,
           'START',
-          'bg-blue-600 text-white',
-          'border-blue-500 shadow-blue-500/20'
+          'info'
         )}
         {renderFrame(
           activeThumb === 1,
           previewEndImage,
           activeThumb === 1 ? hoverTime : endTime,
           'END',
-          'bg-purple-600 text-white',
-          'border-purple-500 shadow-purple-500/20'
+          'accent'
         )}
-      </div>
-    </div>
+      </Grid>
+    </Box>
   );
 }

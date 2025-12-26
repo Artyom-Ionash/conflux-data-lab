@@ -4,6 +4,7 @@ import React from 'react';
 
 import { Card } from '@/view/ui/container/Card';
 import { Button, CopyButton } from '@/view/ui/input/Button';
+import { TextOutput } from '@/view/ui/input/TextOutput';
 import { Group } from '@/view/ui/layout/Layout';
 import { Icon } from '@/view/ui/primitive/Icon';
 
@@ -57,13 +58,8 @@ export function ResultViewer({
         ) : null
       }
     >
-      <div className="flex min-h-0 flex-1 flex-col">
-        <textarea
-          value={value || ''}
-          readOnly
-          placeholder={placeholder}
-          className="custom-scrollbar w-full flex-1 resize-none border-none bg-white p-4 font-mono text-[11px] leading-relaxed outline-none focus:ring-0 dark:bg-zinc-950"
-        />
+      <div className="flex min-h-0 flex-1 flex-col bg-white dark:bg-zinc-950">
+        <TextOutput value={value || ''} placeholder={placeholder} className="flex-1" />
         {footer && (
           <div className="shrink-0 border-t border-zinc-200 dark:border-zinc-800">{footer}</div>
         )}

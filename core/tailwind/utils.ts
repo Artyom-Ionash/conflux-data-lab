@@ -14,24 +14,6 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 /**
- * Генерирует объект стилей aspectRatio для CSS.
- * Может принимать (width, height) или (ratio).
- */
-export function getAspectRatioStyle(
-  widthOrRatio?: number | null,
-  height?: number | null
-): React.CSSProperties {
-  if (!widthOrRatio) return {};
-
-  // Если передан только один аргумент — считаем его готовым ratio
-  if (height === undefined || height === null) {
-    return { aspectRatio: `${widthOrRatio}` };
-  }
-
-  return { aspectRatio: `${widthOrRatio} / ${height}` };
-}
-
-/**
  * Стандартный CSS-паттерн для отображения прозрачности (шахматная доска).
  */
 export const TRANSPARENCY_PATTERN_CSS = (color = '#ccc', transparent = 'transparent') => `

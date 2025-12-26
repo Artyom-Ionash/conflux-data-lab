@@ -12,6 +12,8 @@ import {
   type CompositionLayer,
 } from '@/lib/graphics/processing/composition';
 import { CanvasMovable, useCanvasRef } from '@/view/ui/canvas/Canvas';
+import { CanvasLayer } from '@/view/ui/canvas/CanvasLayer';
+import { GridOverlay } from '@/view/ui/canvas/GridOverlay';
 import { SortableList } from '@/view/ui/canvas/SortableList';
 import { WorkbenchFrame } from '@/view/ui/canvas/WorkbenchFrame';
 import { ActionGroup } from '@/view/ui/container/ActionGroup';
@@ -26,8 +28,8 @@ import { Workbench } from '@/view/ui/layout/Workbench';
 import { Icon } from '@/view/ui/primitive/Icon';
 import { Indicator } from '@/view/ui/primitive/Indicator';
 import { OverlayLabel } from '@/view/ui/primitive/OverlayLabel';
+import { Typography } from '@/view/ui/primitive/Typography'; // NEW IMPORT
 
-import { CanvasGridOverlay } from './_graphics/CanvasGridOverlay';
 import { TextureDimensionSlider } from './_hardware/TextureDimensionSlider';
 import { FileDropzonePlaceholder } from './_io/FileDropzone';
 import { SidebarIO } from './_io/SidebarIO';
@@ -123,7 +125,6 @@ export function VerticalImageAligner() {
             setSlotHeight(img.height);
             setFrameStepX(img.height);
 
-            // ВОССТАНОВЛЕНИЕ: Забор цвета пикселя 0,0 реактивно
             const { r, g, b } = getTopLeftPixelColor(img);
             setBgColor(rgbToHex(r, g, b));
 
@@ -232,8 +233,10 @@ export function VerticalImageAligner() {
       onClick={() => handleActivate(img.id)}
       contentClassName="p-2.5 flex items-center gap-3"
     >
-      <span className="w-6 shrink-0 font-mono text-xs text-zinc-400">#{index + 1}</span>
-      <span className="min-w-0 flex-1 truncate text-sm font-medium">{img.name}</span>
+      <Typography.Text variant="dimmed" className="w-6 shrink-0 font-mono text-xs">
+        #{index + 1}
+      </Typography.Text>
+      <Typography.Text className="min-w-0 flex-1 truncate font-medium">{img.name}</Typography.Text>
       <Button
         variant="destructive"
         size="xs"
@@ -286,7 +289,9 @@ export function VerticalImageAligner() {
               justify="between"
               className="mt-4 border-t border-zinc-200 pt-3 dark:border-zinc-700"
             >
-              <span className="text-xs font-medium text-zinc-500">Итого:</span>
+              <Typography.Text variant="secondary" className="font-medium">
+                Итого:
+              </Typography.Text>
               <Indicator>
                 {slotWidth} x {totalHeight} px
               </Indicator>
@@ -437,37 +442,34 @@ export function VerticalImageAligner() {
             defaultBackgroundColor={bgColor}
           >
             {showRedGrid && (
-              <CanvasGridOverlay
+              <GridOverlay
                 color="#ff0000"
-                step={frameStepX}
-                slotHeight={slotHeight}
+                stepX={frameStepX}
+                stepY={slotHeight}
                 offsetX={redGridOffsetX}
                 offsetY={redGridOffsetY}
-                zIndex="var(--z-overlay)"
               />
             )}
 
             {showFrameGrid && (
-              <CanvasGridOverlay
+              <GridOverlay
                 color="#00ff00"
-                step={frameStepX}
-                slotHeight={slotHeight}
+                stepX={frameStepX}
+                stepY={slotHeight}
                 dash={GRID_FRAME_DASH}
                 opacity={0.8}
-                zIndex="calc(var(--z-overlay) + 1)"
+                className="z-[calc(var(--z-overlay)+1)]"
               />
             )}
 
-            {/* List logic remains (it uses CanvasMovable which is a UI primitive) */}
             {images.map((img, i) => (
-              <div
+              <CanvasLayer
                 key={img.id}
-                className="pointer-events-none absolute left-0 overflow-hidden border-r border-dashed border-zinc-300/30 transition-colors"
+                isActive={img.isActive}
                 style={{
                   top: i * slotHeight,
                   height: slotHeight,
                   width: slotWidth,
-                  zIndex: img.isActive ? 'var(--z-dropdown)' : 'var(--z-sticky)',
                 }}
               >
                 <CanvasMovable
@@ -478,7 +480,6 @@ export function VerticalImageAligner() {
                     handleUpdatePosition(img.id, { x: Math.round(pos.x), y: Math.round(pos.y) })
                   }
                   onDragStart={() => handleActivate(img.id)}
-                  // Используем data attribute для стилизации выделения
                   className={
                     img.isActive
                       ? 'pointer-events-auto ring-1 ring-blue-500'
@@ -507,7 +508,7 @@ export function VerticalImageAligner() {
                     </>
                   )}
                 </CanvasMovable>
-              </div>
+              </CanvasLayer>
             ))}
           </WorkbenchFrame>
         )}

@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback,useState } from 'react';
+import { useCallback, useState } from 'react';
 
 import { downloadText } from '@/core/browser/canvas';
 import { useCopyToClipboard } from '@/core/react/hooks/use-copy';
@@ -10,7 +10,7 @@ import { PanelHeader } from '@/view/ui/container/Panel';
 import { Alert } from '@/view/ui/feedback/Alert';
 import { Button } from '@/view/ui/input/Button';
 import { TextArea } from '@/view/ui/input/Input';
-import { Stack } from '@/view/ui/layout/Layout';
+import { Grid, Stack } from '@/view/ui/layout/Layout';
 import { Workbench } from '@/view/ui/layout/Workbench';
 
 import { ResultViewer } from './_io/ResultViewer';
@@ -107,7 +107,7 @@ export function JsonToCsvConverter() {
       <Workbench.Sidebar>{sidebarContent}</Workbench.Sidebar>
       <Workbench.Stage>
         <Workbench.Content>
-          <div className="grid h-full grid-cols-1 gap-4 lg:grid-cols-2">
+          <Grid className="h-full grid-cols-1 lg:grid-cols-2" gap={4}>
             {/* Input Column */}
             <Card
               className="flex flex-1 flex-col overflow-hidden"
@@ -154,7 +154,7 @@ export function JsonToCsvConverter() {
               downloadLabel="Скачать CSV"
               className="flex-1"
             />
-          </div>
+          </Grid>
         </Workbench.Content>
       </Workbench.Stage>
     </Workbench.Root>

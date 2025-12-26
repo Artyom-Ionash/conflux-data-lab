@@ -4,10 +4,9 @@ import React from 'react';
 import { type ElementProps } from '@/core/react/props';
 import { cn } from '@/core/tailwind/utils';
 
-// 1. Описываем стили декларативно.
 // CVA автоматически генерирует типы для вариантов.
 const badgeVariants = cva(
-  'inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-zinc-400 focus:ring-offset-2',
+  'inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-bold shadow-sm transition-colors focus:outline-none focus:ring-2 focus:ring-zinc-400 focus:ring-offset-2',
   {
     variants: {
       variant: {
@@ -15,6 +14,9 @@ const badgeVariants = cva(
         primary: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200',
         secondary: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200',
         destructive: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200',
+        accent: 'bg-purple-600 text-white border border-purple-500 shadow-purple-500/20',
+        info: 'bg-blue-600 text-white border border-blue-500 shadow-blue-500/20',
+        outline: 'bg-zinc-800 text-zinc-500 border border-zinc-700 font-mono',
       },
     },
     defaultVariants: {

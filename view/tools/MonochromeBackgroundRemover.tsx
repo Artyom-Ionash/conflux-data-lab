@@ -22,9 +22,12 @@ import { StatusBox } from '@/view/ui/container/StatusBox';
 import { Button } from '@/view/ui/input/Button';
 import { ColorInput } from '@/view/ui/input/ColorInput';
 import { Slider } from '@/view/ui/input/Slider';
+import { Swatch } from '@/view/ui/input/Swatch';
 import { ToggleGroup, ToggleGroupItem } from '@/view/ui/input/ToggleGroup';
+import { Box } from '@/view/ui/layout/Box';
 import { EngineRoom } from '@/view/ui/layout/EngineRoom';
 import { Group, Stack } from '@/view/ui/layout/Layout';
+import { Surface } from '@/view/ui/layout/Surface';
 import { Workbench } from '@/view/ui/layout/Workbench';
 import { Separator } from '@/view/ui/primitive/Separator';
 import { Typography } from '@/view/ui/primitive/Typography';
@@ -32,7 +35,6 @@ import { Typography } from '@/view/ui/primitive/Typography';
 import { FileDropzonePlaceholder } from './_io/FileDropzone';
 import { SidebarIO } from './_io/SidebarIO';
 
-// --- CONSTANTS ---
 const DEBOUNCE_DELAY = 50;
 const MOUSE_BUTTON_LEFT = 0;
 const MAX_RGB_DISTANCE = Math.sqrt(3 * 255 ** 2);
@@ -300,7 +302,7 @@ export function MonochromeBackgroundRemover() {
           <Section>
             <Stack gap={2}>
               <Group gap={3}>
-                <div className="group relative h-8 w-8 flex-shrink-0 cursor-crosshair overflow-hidden rounded border bg-white dark:border-zinc-700">
+                <Swatch variant="interactive">
                   <Image
                     src={session.url}
                     alt="picker"
@@ -309,7 +311,7 @@ export function MonochromeBackgroundRemover() {
                     onClick={handleEyedropper}
                     unoptimized
                   />
-                </div>
+                </Swatch>
                 <Group
                   gap={2}
                   className="flex-1 rounded border bg-zinc-50 p-2 dark:border-zinc-700 dark:bg-zinc-800"
@@ -445,7 +447,7 @@ export function MonochromeBackgroundRemover() {
             subTitle="Для изображений с одноцветным фоном"
           />
         ) : (
-          <div className="relative h-full w-full">
+          <Box className="relative h-full w-full">
             <WorkbenchFrame
               ref={workspaceRef}
               isLoading={isProcessing || session.isLoading}
@@ -455,17 +457,16 @@ export function MonochromeBackgroundRemover() {
               showTransparencyGrid={true}
             >
               <EngineRoom>
-                <canvas ref={sourceCanvasRef} />
+                <Surface.Canvas ref={sourceCanvasRef} />
               </EngineRoom>
 
-              <canvas
+              <Surface.Canvas
                 ref={previewCanvasRef}
-                className="block select-none"
                 onPointerDown={handleImagePointerDown}
+                rendering="pixelated"
                 style={{
                   width: '100%',
                   height: '100%',
-                  imageRendering: 'pixelated',
                   cursor: processingMode === 'flood-clear' ? 'crosshair' : 'default',
                   display: session.url ? 'block' : 'none',
                 }}
@@ -489,7 +490,7 @@ export function MonochromeBackgroundRemover() {
                   </CanvasMovable>
                 ))}
             </WorkbenchFrame>
-          </div>
+          </Box>
         )}
       </Workbench.Stage>
     </Workbench.Root>

@@ -1,25 +1,33 @@
+'use client';
+
 import React from 'react';
+
+import { cn } from '@/core/tailwind/utils';
 
 interface GridOverlayProps {
   color?: string;
-  step: number;
+  stepX: number;
+  stepY: number;
   offsetX?: number;
   offsetY?: number;
-  slotHeight: number;
   dash?: number;
   opacity?: number;
-  zIndex?: string;
+  className?: string;
 }
 
-export function CanvasGridOverlay({
+/**
+ * Накладываемая сетка для Canvas.
+ * Поддерживает смещение и пунктир.
+ */
+export function GridOverlay({
   color = '#00ff00',
-  step,
+  stepX,
+  stepY,
   offsetX = 0,
   offsetY = 0,
-  slotHeight,
   dash,
   opacity = 0.5,
-  zIndex,
+  className,
 }: GridOverlayProps) {
   const gradientStyle = dash
     ? `linear-gradient(to right, ${color} ${dash}px, transparent ${dash}px), linear-gradient(to bottom, ${color} ${dash}px, transparent ${dash}px)`
@@ -30,12 +38,12 @@ export function CanvasGridOverlay({
 
   return (
     <div
-      className="fx-cover pointer-events-none"
+      className={cn('fx-cover pointer-events-none', className)}
       style={{
-        zIndex,
+        zIndex: 'var(--z-canvas-overlay)',
         opacity,
         backgroundImage: gradientStyle,
-        backgroundSize: `${step}px ${slotHeight}px`,
+        backgroundSize: `${stepX}px ${stepY}px`,
         backgroundPosition,
       }}
     />
