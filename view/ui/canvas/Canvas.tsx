@@ -100,7 +100,6 @@ interface CanvasProps {
   contentHeight?: number | undefined;
   shadowOverlayOpacity?: number | undefined;
   showTransparencyGrid?: boolean | undefined;
-  placeholder?: ReactNode | undefined;
 }
 
 // --- MAIN COMPONENT: Canvas ---
@@ -120,7 +119,6 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(
       contentHeight,
       shadowOverlayOpacity = 0,
       showTransparencyGrid = false,
-      placeholder,
     },
     ref
   ) => {
@@ -403,15 +401,6 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(
             <div className="relative z-10 h-full w-full">{children}</div>
           </div>
         </div>
-
-        {placeholder && (
-          <div
-            className="pointer-events-none absolute inset-0 flex items-center justify-center"
-            style={{ zIndex: 'var(--z-canvas-ui)' }}
-          >
-            <div className="pointer-events-auto h-full w-full">{placeholder}</div>
-          </div>
-        )}
       </div>
     );
   }

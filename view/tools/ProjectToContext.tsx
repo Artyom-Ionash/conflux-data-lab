@@ -26,6 +26,7 @@ import { Workbench } from '@/view/ui/layout/Workbench';
 import { Indicator } from '@/view/ui/primitive/Indicator';
 
 import { CONTEXT_PRESETS, HEAVY_DIRS, type PresetKey } from '../../lib/context-generator/rules';
+import { FileDropzonePlaceholder } from './_io/FileDropzone';
 import { ResultViewer } from './_io/ResultViewer';
 import { SidebarIO } from './_io/SidebarIO';
 
@@ -254,31 +255,60 @@ export function ProjectToContext() {
     </Stack>
   );
 
+  const FolderIcon = (
+    <svg
+      className="h-10 w-10 text-zinc-400 dark:text-zinc-500"
+      fill="none"
+      viewBox="0 0 24 24"
+      stroke="currentColor"
+      strokeWidth="1.5"
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"
+      />
+    </svg>
+  );
+
   return (
     <Workbench.Root>
       <Workbench.Sidebar>{sidebar}</Workbench.Sidebar>
       <Workbench.Stage>
-        <Workbench.Content className="flex flex-col overflow-hidden bg-zinc-50 dark:bg-black/20">
-          <ResultViewer
-            title={
-              processingTask.result && !processingTask.isRunning
-                ? `Результат контекста ${lastGeneratedAt?.toLocaleTimeString()}`
-                : 'Ожидание сборки'
-            }
-            value={!processingTask.isRunning ? (processingTask.result?.output ?? null) : null}
-            isCopied={isCopied}
-            onCopy={copy}
-            onDownload={downloadResult}
-            downloadLabel="Скачать .txt"
-            placeholder={
-              processingTask.isRunning ? 'Сборка контекста...' : 'Выберите папку проекта'
-            }
+        {/*
+            UNIFIED EMPTY STATE LOGIC:
+            Показываем результат только если он есть или процесс идёт.
+            Иначе показываем приглашение выбрать папку.
+        */}
+        {processingTask.result || processingTask.isRunning ? (
+          <Workbench.Content className="flex flex-col overflow-hidden bg-zinc-50 dark:bg-black/20">
+            <ResultViewer
+              title={
+                !processingTask.isRunning
+                  ? `Результат контекста ${lastGeneratedAt?.toLocaleTimeString()}`
+                  : 'Сборка контекста...'
+              }
+              value={!processingTask.isRunning ? (processingTask.result?.output ?? null) : null}
+              isCopied={isCopied}
+              onCopy={copy}
+              onDownload={downloadResult}
+              downloadLabel="Скачать .txt"
+              placeholder="Ожидание результатов..."
+            />
+          </Workbench.Content>
+        ) : (
+          <FileDropzonePlaceholder
+            onUpload={onFilesSelected}
+            directory={true}
+            title="Выберите папку проекта"
+            subTitle="Поддерживаются Next.js, Godot и другие структуры"
+            icon={FolderIcon}
           />
-          <ProcessingOverlay
-            isVisible={processingTask.isRunning}
-            message={`Обработка (${processingTask.progress}%)...`}
-          />
-        </Workbench.Content>
+        )}
+        <ProcessingOverlay
+          isVisible={processingTask.isRunning}
+          message={`Обработка (${processingTask.progress}%)...`}
+        />
       </Workbench.Stage>
     </Workbench.Root>
   );

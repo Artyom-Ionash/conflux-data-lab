@@ -4,6 +4,7 @@ import Link from 'next/link';
 import React from 'react';
 
 import { cn } from '@/core/tailwind/utils';
+import { Button } from '@/view/ui/input/Button';
 
 interface WorkbenchProps extends React.HTMLAttributes<HTMLElement> {
   children: React.ReactNode;
@@ -74,14 +75,79 @@ const Content = ({ children, className }: { children: React.ReactNode; className
   <div className={cn('h-full w-full space-y-4 overflow-y-auto p-4', className)}>{children}</div>
 );
 
+// --- EMPTY STATE SYSTEM ---
+
+interface EmptyStateProps {
+  title: string;
+  description?: string;
+  icon?: React.ReactNode;
+  action?: React.ReactNode;
+  onAction?: () => void;
+  actionLabel?: string;
+  className?: string;
+}
+
 /**
- * Стандартный контейнер для плейсхолдеров, когда данные ещё не загружены.
+ * Стандартизированный компонент "Пустое состояние".
+ * Используется когда в инструменте еще нет данных.
  */
-const EmptyStage = ({ children, className }: { children: React.ReactNode; className?: string }) => (
-  <div className={cn('flex h-full w-full items-center justify-center p-8', className)}>
-    <div className="w-full max-w-2xl">{children}</div>
-  </div>
-);
+const EmptyState = ({
+  title,
+  description,
+  icon,
+  action,
+  onAction,
+  actionLabel,
+  className,
+}: EmptyStateProps) => {
+  return (
+    <div className={cn('fx-col-center h-full w-full p-6', className)}>
+      <div className="fx-col-center w-full max-w-md gap-6 text-center">
+        {/* Icon Circle */}
+        <div className="fx-center h-20 w-20 rounded-2xl bg-zinc-100 shadow-inner ring-1 ring-zinc-200 dark:bg-zinc-800/50 dark:ring-zinc-700">
+          {icon || (
+            <svg
+              className="h-10 w-10 text-zinc-400 dark:text-zinc-500"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth="1.5"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"
+              />
+            </svg>
+          )}
+        </div>
+
+        {/* Text Content */}
+        <div className="space-y-2">
+          <h3 className="text-xl font-bold tracking-tight text-zinc-900 dark:text-zinc-100">
+            {title}
+          </h3>
+          {description && (
+            <p className="text-sm leading-relaxed text-zinc-500 dark:text-zinc-400">
+              {description}
+            </p>
+          )}
+        </div>
+
+        {/* Action Area */}
+        {(action || (onAction && actionLabel)) && (
+          <div className="mt-2">
+            {action || (
+              <Button onClick={onAction} size="lg" className="shadow-lg">
+                {actionLabel}
+              </Button>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
 
 export const Workbench = {
   Root,
@@ -89,5 +155,5 @@ export const Workbench = {
   Header,
   Stage,
   Content,
-  EmptyStage,
+  EmptyState,
 };

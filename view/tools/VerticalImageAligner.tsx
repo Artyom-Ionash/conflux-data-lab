@@ -429,13 +429,12 @@ export function VerticalImageAligner() {
       <Workbench.Sidebar>{sidebarContent}</Workbench.Sidebar>
       <Workbench.Stage>
         {images.length === 0 ? (
-          <Workbench.EmptyStage>
-            <FileDropzonePlaceholder
-              onUpload={processFiles}
-              multiple={true}
-              title="Перетащите изображения для склейки"
-            />
-          </Workbench.EmptyStage>
+          <FileDropzonePlaceholder
+            onUpload={processFiles}
+            multiple={true}
+            title="Перетащите сюда изображения"
+            subTitle="Ряды кадров"
+          />
         ) : (
           <WorkbenchFrame
             ref={workspaceRef}

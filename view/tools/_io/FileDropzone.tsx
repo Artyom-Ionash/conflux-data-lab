@@ -11,6 +11,7 @@ import {
 } from '@/core/browser/legacy';
 import { filterFileList, scanDirectoryHandle, scanEntries } from '@/lib/context-generator/scanner';
 import { DropzoneVisual } from '@/view/ui/input/Dropzone';
+import { Workbench } from '@/view/ui/layout/Workbench';
 
 interface FileDropzoneProps {
   onFilesSelected: (files: File[]) => void;
@@ -192,6 +193,8 @@ interface PlaceholderProps {
   title?: string | undefined;
   subTitle?: string | undefined;
   accept?: string | undefined;
+  directory?: boolean | undefined;
+  icon?: React.ReactNode;
 }
 
 export const FileDropzonePlaceholder = ({
@@ -199,30 +202,44 @@ export const FileDropzonePlaceholder = ({
   multiple = false,
   enableWindowDrop = false,
   className = '',
-  title = 'Перетащите изображения сюда',
-  subTitle = 'или кликните для выбора',
+  title = 'Загрузите файлы',
+  subTitle = 'Перетащите сюда или кликните для выбора',
   accept = 'image/*',
-}: PlaceholderProps) => (
-  <FileDropzone
-    onFilesSelected={onUpload}
-    multiple={multiple}
-    enableWindowDrop={enableWindowDrop}
-    accept={accept}
-    className={className} // Классы передаются в DropzoneVisual, который умеет их мержить
-  >
-    <div className="flex flex-col items-center justify-center text-zinc-400">
-      <div className="mb-4 rounded-full bg-zinc-100 p-4 transition-transform group-hover:scale-110 dark:bg-zinc-800">
-        <svg className="h-8 w-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth="2"
-            d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
-          />
-        </svg>
-      </div>
-      <p className="mb-1 text-lg font-medium text-zinc-600 dark:text-zinc-300">{title}</p>
-      <p className="text-sm opacity-60">{subTitle}</p>
-    </div>
-  </FileDropzone>
-);
+  directory = false,
+  icon,
+}: PlaceholderProps) => {
+  const DefaultIcon = (
+    <svg
+      className="h-10 w-10 text-blue-500/80 dark:text-blue-400/80"
+      fill="none"
+      viewBox="0 0 24 24"
+      stroke="currentColor"
+      strokeWidth="1.5"
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
+      />
+    </svg>
+  );
+
+  return (
+    <FileDropzone
+      onFilesSelected={onUpload}
+      multiple={multiple}
+      enableWindowDrop={enableWindowDrop}
+      accept={accept}
+      directory={directory}
+      label=""
+      className={`h-full border-0 bg-transparent hover:bg-transparent dark:bg-transparent ${className}`}
+    >
+      <Workbench.EmptyState
+        icon={icon || DefaultIcon}
+        title={title}
+        description={subTitle}
+        className="pointer-events-none"
+      />
+    </FileDropzone>
+  );
+};

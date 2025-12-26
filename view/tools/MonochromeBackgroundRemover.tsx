@@ -436,56 +436,61 @@ export function MonochromeBackgroundRemover() {
     <Workbench.Root>
       <Workbench.Sidebar>{sidebarContent}</Workbench.Sidebar>
       <Workbench.Stage>
-        <div className="relative h-full w-full">
-          <WorkbenchFrame
-            ref={workspaceRef}
-            isLoading={isProcessing || session.isLoading} // Обновлен флаг загрузки
-            contentWidth={imgW}
-            contentHeight={imgH}
-            shadowOverlayOpacity={session.url ? 0.8 : 0}
-            showTransparencyGrid={true}
-            placeholder={
-              !session.url ? (
-                <FileDropzonePlaceholder onUpload={(files) => handleFilesSelected(files)} />
-              ) : null
-            }
-          >
-            <EngineRoom>
-              <canvas ref={sourceCanvasRef} />
-            </EngineRoom>
+        {!session.url ? (
+          <FileDropzonePlaceholder
+            onUpload={(files) => handleFilesSelected(files)}
+            multiple={false}
+            accept="image/*"
+            title="Загрузите изображение"
+            subTitle="Для изображений с одноцветным фоном"
+          />
+        ) : (
+          <div className="relative h-full w-full">
+            <WorkbenchFrame
+              ref={workspaceRef}
+              isLoading={isProcessing || session.isLoading}
+              contentWidth={imgW}
+              contentHeight={imgH}
+              shadowOverlayOpacity={0.8}
+              showTransparencyGrid={true}
+            >
+              <EngineRoom>
+                <canvas ref={sourceCanvasRef} />
+              </EngineRoom>
 
-            <canvas
-              ref={previewCanvasRef}
-              className="block select-none"
-              onPointerDown={handleImagePointerDown}
-              style={{
-                width: '100%',
-                height: '100%',
-                imageRendering: 'pixelated',
-                cursor: processingMode === 'flood-clear' ? 'crosshair' : 'default',
-                display: session.url ? 'block' : 'none',
-              }}
-            />
+              <canvas
+                ref={previewCanvasRef}
+                className="block select-none"
+                onPointerDown={handleImagePointerDown}
+                style={{
+                  width: '100%',
+                  height: '100%',
+                  imageRendering: 'pixelated',
+                  cursor: processingMode === 'flood-clear' ? 'crosshair' : 'default',
+                  display: session.url ? 'block' : 'none',
+                }}
+              />
 
-            {processingMode === 'flood-clear' &&
-              floodPoints.map((pt, i) => (
-                <CanvasMovable
-                  key={i}
-                  x={pt.x}
-                  y={pt.y}
-                  scale={getScale}
-                  onMove={(pos) => handlePointMove(i, pos)}
-                  className="z-20"
-                >
-                  {() => (
-                    <div style={{ transform: 'translate(-50%, -50%)' }}>
-                      <div className="h-2.5 w-2.5 rounded-full border border-white bg-red-500 shadow-[0_0_2px_rgba(0,0,0,0.8)] transition-all" />
-                    </div>
-                  )}
-                </CanvasMovable>
-              ))}
-          </WorkbenchFrame>
-        </div>
+              {processingMode === 'flood-clear' &&
+                floodPoints.map((pt, i) => (
+                  <CanvasMovable
+                    key={i}
+                    x={pt.x}
+                    y={pt.y}
+                    scale={getScale}
+                    onMove={(pos) => handlePointMove(i, pos)}
+                    className="z-20"
+                  >
+                    {() => (
+                      <div style={{ transform: 'translate(-50%, -50%)' }}>
+                        <div className="h-2.5 w-2.5 rounded-full border border-white bg-red-500 shadow-[0_0_2px_rgba(0,0,0,0.8)] transition-all" />
+                      </div>
+                    )}
+                  </CanvasMovable>
+                ))}
+            </WorkbenchFrame>
+          </div>
+        )}
       </Workbench.Stage>
     </Workbench.Root>
   );

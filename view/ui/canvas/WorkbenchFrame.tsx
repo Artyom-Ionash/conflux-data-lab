@@ -30,7 +30,6 @@ interface WorkbenchFrameProps {
   shadowOverlayOpacity?: number | undefined;
   showTransparencyGrid?: boolean | undefined;
   defaultBackgroundColor?: string | undefined;
-  placeholder?: ReactNode | undefined;
   className?: string | undefined;
   minScale?: number | undefined;
   maxScale?: number | undefined;
@@ -47,7 +46,6 @@ export const WorkbenchFrame = forwardRef<CanvasRef, WorkbenchFrameProps>(
       shadowOverlayOpacity,
       showTransparencyGrid,
       defaultBackgroundColor,
-      placeholder,
       className,
       minScale,
       maxScale,
@@ -179,7 +177,6 @@ export const WorkbenchFrame = forwardRef<CanvasRef, WorkbenchFrameProps>(
           contentHeight={contentHeight}
           shadowOverlayOpacity={shadowOverlayOpacity}
           showTransparencyGrid={showTransparencyGrid}
-          placeholder={placeholder}
           minScale={minScale}
           maxScale={maxScale}
           initialScale={initialScale}

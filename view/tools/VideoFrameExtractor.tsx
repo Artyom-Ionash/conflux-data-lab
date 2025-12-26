@@ -168,14 +168,13 @@ export function VideoFrameExtractor() {
       <Workbench.Sidebar>{sidebarContent}</Workbench.Sidebar>
       <Workbench.Stage>
         {!state.videoSrc ? (
-          <Workbench.EmptyStage>
-            <FileDropzonePlaceholder
-              onUpload={actions.handleFilesSelected}
-              multiple={false}
-              accept="video/*"
-              title="Перетащите видеофайл"
-            />
-          </Workbench.EmptyStage>
+          <FileDropzonePlaceholder
+            onUpload={actions.handleFilesSelected}
+            multiple={false}
+            accept="video/*"
+            title="Загрузите видеофайл"
+            subTitle="Поддерживаются MP4, WEBM, MOV"
+          />
         ) : (
           <Workbench.Content>
             {/* 1. Controls Area */}
