@@ -2,6 +2,8 @@ import Image from 'next/image';
 import type { RefObject } from 'react';
 import React from 'react';
 
+import { getAspectRatioStyle } from '@/core/tailwind/utils';
+
 interface DualHoverPreviewProps {
   activeThumb: 0 | 1;
   hoverTime: number;
@@ -11,7 +13,7 @@ interface DualHoverPreviewProps {
   videoRef: RefObject<HTMLVideoElement>;
   previewStartImage: string | null;
   previewEndImage: string | null;
-  aspectRatioStyle: React.CSSProperties;
+  videoDimensions?: { width: number; height: number } | null;
   isLoading?: boolean;
 }
 
@@ -24,9 +26,12 @@ export function DualHoverPreview({
   videoRef,
   previewStartImage,
   previewEndImage,
-  aspectRatioStyle,
+  videoDimensions,
   isLoading = false,
 }: DualHoverPreviewProps) {
+  // Вычисляем стиль внутри UI компонента (где это разрешено)
+  const aspectRatioStyle = getAspectRatioStyle(videoDimensions?.width, videoDimensions?.height);
+
   const renderFrame = (
     isActive: boolean,
     imageSrc: string | null,
@@ -47,7 +52,7 @@ export function DualHoverPreview({
             src={imageSrc}
             alt={label.toLowerCase()}
             fill
-            unoptimized // Важно для Data URL
+            unoptimized
             className="object-contain"
           />
         )}
@@ -60,7 +65,6 @@ export function DualHoverPreview({
               muted
               playsInline
             />
-            {/* Loading Indicator */}
             {isLoading && (
               <div className="absolute inset-0 flex items-center justify-center bg-black/40 backdrop-blur-[1px]">
                 <div className="h-6 w-6 animate-spin rounded-full border-2 border-white/20 border-t-white" />

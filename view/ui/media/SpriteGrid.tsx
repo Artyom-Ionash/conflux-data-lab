@@ -14,7 +14,7 @@ interface FrameData {
   dataUrl: string | null;
 }
 
-interface SpriteFrameListProps {
+interface SpriteGridProps {
   frames: FrameData[];
   maxHeight: number;
   spacing: number;
@@ -22,17 +22,13 @@ interface SpriteFrameListProps {
   videoAspectRatio: number;
 }
 
-/**
- * Композитный компонент для отображения последовательности извлечённых кадров.
- * Использует Checkerboard для прозрачных фонов и унифицированную типографику.
- */
-export function SpriteFrameList({
+export function SpriteGrid({
   frames,
   maxHeight,
   spacing,
   backgroundColor,
   videoAspectRatio,
-}: SpriteFrameListProps) {
+}: SpriteGridProps) {
   const frameStyle = useMemo(
     () => ({
       ...getAspectRatioStyle(videoAspectRatio),
@@ -57,17 +53,35 @@ export function SpriteFrameList({
   const isTransparent = backgroundColor === 'transparent';
 
   return (
+    // Используем inline-flex, чтобы ширина соответствовала содержимому.
     <div
-      className="flex items-start border border-dashed border-zinc-300 dark:border-zinc-700"
+      className="relative inline-flex items-start overflow-hidden rounded-md border border-dashed border-zinc-300 dark:border-zinc-700"
       style={{
         gap: spacing,
-        backgroundColor: isTransparent ? undefined : backgroundColor,
       }}
     >
-      {frames.map((frame, idx) => (
-        <div key={idx} className="group relative shrink-0 overflow-hidden" style={frameStyle}>
-          {isTransparent && <Checkerboard size={8} className="absolute inset-0" />}
+      {/* 1. Слой фона (Единый, лежит под всей сеткой) */}
+      <div className="z-below absolute inset-0">
+        {isTransparent ? (
+          <Checkerboard
+            className="h-full w-full"
+            size={16}
+            baseColor="bg-white dark:bg-zinc-900"
+            color1="#e4e4e7" // zinc-200
+            color2="transparent"
+          />
+        ) : (
+          <div className="h-full w-full transition-colors" style={{ backgroundColor }} />
+        )}
+      </div>
 
+      {/* 2. Слой контента (Кадры) */}
+      {frames.map((frame, idx) => (
+        <div
+          key={idx}
+          className="group z-content relative shrink-0 overflow-hidden shadow-sm transition-shadow hover:shadow-md"
+          style={frameStyle}
+        >
           {frame.dataUrl ? (
             <Image
               src={frame.dataUrl}
@@ -75,19 +89,20 @@ export function SpriteFrameList({
               width={calculatedWidth}
               height={maxHeight}
               unoptimized
-              className="relative z-10 h-full w-full object-contain shadow-sm"
+              className="h-full w-full object-contain"
             />
           ) : (
             <div className="h-full w-full animate-pulse bg-zinc-200 dark:bg-zinc-800" />
           )}
 
-          {/* Метка времени: теперь через Indicator */}
-          <div className="absolute bottom-2 left-2 z-20">
+          <div className="z-interaction absolute bottom-2 left-2 opacity-0 transition-opacity group-hover:opacity-100">
             <Indicator>{frame.time.toFixed(2)}s</Indicator>
           </div>
 
-          {/* Индекс кадра: вынесенный системныйOverlayLabel */}
-          <OverlayLabel position="top-right" className="opacity-0 group-hover:opacity-100">
+          <OverlayLabel
+            position="top-right"
+            className="z-interaction opacity-0 group-hover:opacity-100"
+          >
             #{idx + 1}
           </OverlayLabel>
         </div>

@@ -15,7 +15,9 @@ import type {
 } from '@/lib/graphics/processing/background-engine.worker';
 import type { Point } from '@/lib/graphics/processing/imaging';
 import { CanvasMovable, useCanvasRef } from '@/view/ui/canvas/Canvas';
+import { WorkbenchFrame } from '@/view/ui/canvas/WorkbenchFrame';
 import { ActionGroup } from '@/view/ui/container/ActionGroup';
+import { Section } from '@/view/ui/container/Section';
 import { StatusBox } from '@/view/ui/container/StatusBox';
 import { Button } from '@/view/ui/input/Button';
 import { ColorInput } from '@/view/ui/input/ColorInput';
@@ -27,8 +29,6 @@ import { Workbench } from '@/view/ui/layout/Workbench';
 import { Separator } from '@/view/ui/primitive/Separator';
 import { Typography } from '@/view/ui/primitive/Typography';
 
-import { WorkbenchCanvas } from './_graphics/WorkbenchCanvas';
-import { ControlSection } from './_io/ControlSection';
 import { FileDropzonePlaceholder } from './_io/FileDropzone';
 import { SidebarIO } from './_io/SidebarIO';
 
@@ -276,7 +276,7 @@ export function MonochromeBackgroundRemover() {
 
       {session.url && (
         <Stack gap={6} className="animate-fade-in">
-          <ControlSection title="Режим">
+          <Section title="Режим">
             <ToggleGroup
               type="single"
               value={processingMode}
@@ -295,9 +295,9 @@ export function MonochromeBackgroundRemover() {
                 Заливка невидимостью
               </ToggleGroupItem>
             </ToggleGroup>
-          </ControlSection>
+          </Section>
 
-          <ControlSection>
+          <Section>
             <Stack gap={2}>
               <Group gap={3}>
                 <div className="group relative h-8 w-8 flex-shrink-0 cursor-crosshair overflow-hidden rounded border bg-white dark:border-zinc-700">
@@ -344,9 +344,9 @@ export function MonochromeBackgroundRemover() {
                 </Group>
               </Group>
             </Stack>
-          </ControlSection>
+          </Section>
 
-          <ControlSection>
+          <Section>
             <Slider
               label="Допуск (%)"
               value={tolerances[processingMode] ?? 0}
@@ -393,7 +393,7 @@ export function MonochromeBackgroundRemover() {
                 className="mb-0"
               />
             </Stack>
-          </ControlSection>
+          </Section>
 
           {processingMode === 'flood-clear' && (
             <StatusBox title={`Точки: ${floodPoints.length}`}>
@@ -437,7 +437,7 @@ export function MonochromeBackgroundRemover() {
       <Workbench.Sidebar>{sidebarContent}</Workbench.Sidebar>
       <Workbench.Stage>
         <div className="relative h-full w-full">
-          <WorkbenchCanvas
+          <WorkbenchFrame
             ref={workspaceRef}
             isLoading={isProcessing || session.isLoading} // Обновлен флаг загрузки
             contentWidth={imgW}
@@ -484,7 +484,7 @@ export function MonochromeBackgroundRemover() {
                   )}
                 </CanvasMovable>
               ))}
-          </WorkbenchCanvas>
+          </WorkbenchFrame>
         </div>
       </Workbench.Stage>
     </Workbench.Root>

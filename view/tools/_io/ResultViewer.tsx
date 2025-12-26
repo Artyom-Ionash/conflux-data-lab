@@ -3,10 +3,8 @@
 import React from 'react';
 
 import { Card } from '@/view/ui/container/Card';
-import { Button } from '@/view/ui/input/Button';
+import { Button, CopyButton } from '@/view/ui/input/Button';
 import { Group } from '@/view/ui/layout/Layout';
-
-import { CopyButton } from './CopyButton';
 
 interface ResultViewerProps {
   title: React.ReactNode;
@@ -42,7 +40,6 @@ export function ResultViewer({
       headerActions={
         value ? (
           <Group gap={2}>
-            {/* CopyButton теперь принимает outline как дефолт, что нам и нужно для тулбара */}
             <CopyButton
               onCopy={() => onCopy(value)}
               isCopied={isCopied}

@@ -1,8 +1,8 @@
-@import 'tailwindcss';
-
 /* 
   --- CONFLUX UTILITIES (Prefix: fx-) ---
   Микро-паттерны для часто используемых комбинаций.
+  Tailwind v4 автоматически распознает директивы @utility,
+  если файл импортирован после @import "tailwindcss".
 */
 
 /* Layout Shortcuts */
@@ -51,8 +51,22 @@
 }
 
 /* Animations (Entry) */
+
+/* FIX: Заменили @apply отсутствующих классов на нативный CSS keyframes */
 @utility fx-slide-in {
-  @apply animate-in fade-in slide-in-from-bottom-2 duration-300 ease-out;
+  animation: fx-slide-in-keyframes 0.3s ease-out forwards;
+}
+
+@keyframes fx-slide-in-keyframes {
+  from {
+    opacity: 0;
+    transform: translateY(0.5rem);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 @utility fx-spin-slow {

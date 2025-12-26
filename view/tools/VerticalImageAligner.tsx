@@ -6,7 +6,6 @@ import { filter, map, pipe } from 'remeda';
 
 import { getTopLeftPixelColor, loadImage, revokeObjectURLSafely } from '@/core/browser/canvas';
 import { rgbToHex } from '@/core/primitives/colors';
-import { cn } from '@/core/tailwind/utils';
 import {
   bakeVerticalStack,
   calculateCenterOffset,
@@ -14,7 +13,10 @@ import {
 } from '@/lib/graphics/processing/composition';
 import { CanvasMovable, useCanvasRef } from '@/view/ui/canvas/Canvas';
 import { SortableList } from '@/view/ui/canvas/SortableList';
+import { WorkbenchFrame } from '@/view/ui/canvas/WorkbenchFrame';
 import { ActionGroup } from '@/view/ui/container/ActionGroup';
+import { Card } from '@/view/ui/container/Card';
+import { Section, SectionHeader } from '@/view/ui/container/Section';
 import { StatusBox } from '@/view/ui/container/StatusBox';
 import { Button } from '@/view/ui/input/Button';
 import { Slider } from '@/view/ui/input/Slider';
@@ -25,9 +27,7 @@ import { Indicator } from '@/view/ui/primitive/Indicator';
 import { OverlayLabel } from '@/view/ui/primitive/OverlayLabel';
 
 import { CanvasGridOverlay } from './_graphics/CanvasGridOverlay';
-import { WorkbenchCanvas } from './_graphics/WorkbenchCanvas';
 import { TextureDimensionSlider } from './_hardware/TextureDimensionSlider';
-import { ControlSection, SectionHeader } from './_io/ControlSection';
 import { FileDropzonePlaceholder } from './_io/FileDropzone';
 import { SidebarIO } from './_io/SidebarIO';
 
@@ -124,7 +124,6 @@ export function VerticalImageAligner() {
             // ВОССТАНОВЛЕНИЕ: Забор цвета пикселя 0,0
             const { r, g, b } = getTopLeftPixelColor(img);
             workspaceRef.current?.setBackgroundColor(rgbToHex(r, g, b));
-
             setTimeout(() => {
               workspaceRef.current?.resetView(img.width, img.height);
             }, VIEW_RESET_DELAY);
@@ -216,40 +215,48 @@ export function VerticalImageAligner() {
     }
   }, [images, slotHeight, slotWidth, totalHeight, workspaceRef]);
 
-  // --- Render Props ---
-
   const renderSortableItem = (
     img: AlignImage,
     index: number,
     isDragging: boolean,
     dragProps: React.HTMLAttributes<HTMLElement>
   ) => (
-    <Group
+    <Card
       {...dragProps}
-      className={cn(
-        'cursor-grab rounded-md border p-2.5 text-sm transition-colors select-none active:cursor-grabbing',
-        img.isActive
-          ? 'border-blue-200 bg-blue-50 text-blue-800 shadow-sm dark:border-blue-800 dark:bg-blue-900/30 dark:text-blue-100'
-          : 'border-zinc-200 bg-white hover:border-zinc-300 dark:border-zinc-700 dark:bg-zinc-800',
-        isDragging && 'opacity-50'
-      )}
+      variant="default"
+      active={img.isActive}
+      className={`cursor-grab select-none active:cursor-grabbing ${isDragging ? 'opacity-50' : ''}`}
       onClick={() => handleActivate(img.id)}
+      contentClassName="p-2.5 flex items-center gap-3"
     >
-      <span className="w-6 font-mono text-zinc-400">#{index + 1}</span>
-      <span className="flex-1 truncate font-medium">{img.name}</span>
+      <span className="w-6 shrink-0 font-mono text-xs text-zinc-400">#{index + 1}</span>
+      <span className="min-w-0 flex-1 truncate text-sm font-medium">{img.name}</span>
       <Button
         variant="destructive"
         size="xs"
-        className="h-6 w-6 p-0"
+        className="h-6 w-6 shrink-0 p-0"
+        title="Удалить"
         onClick={(e) => {
           e.stopPropagation();
           handleRemoveImage(img.id);
         }}
         onPointerDown={(e) => e.stopPropagation()}
       >
-        ✕
+        <svg
+          width="14"
+          height="14"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <path d="M18 6 6 18" />
+          <path d="m6 6 12 12" />
+        </svg>
       </Button>
-    </Group>
+    </Card>
   );
 
   const sidebarContent = (
@@ -268,7 +275,7 @@ export function VerticalImageAligner() {
 
       {images.length > 0 && (
         <>
-          <ControlSection title="Размеры слота">
+          <Section title="Размеры слота">
             <Stack gap={6}>
               <TextureDimensionSlider
                 label="Ширина"
@@ -293,9 +300,9 @@ export function VerticalImageAligner() {
                 {slotWidth} x {totalHeight} px
               </Indicator>
             </Group>
-          </ControlSection>
+          </Section>
 
-          <ControlSection title="Сетки">
+          <Section title="Сетки">
             <Stack gap={4}>
               <Stack gap={3}>
                 <Switch
@@ -345,7 +352,7 @@ export function VerticalImageAligner() {
                 )}
               </Stack>
             </Stack>
-          </ControlSection>
+          </Section>
 
           <Stack gap={1.5}>
             <SectionHeader
@@ -430,7 +437,7 @@ export function VerticalImageAligner() {
             />
           </Workbench.EmptyStage>
         ) : (
-          <WorkbenchCanvas
+          <WorkbenchFrame
             ref={workspaceRef}
             isLoading={isExporting}
             contentWidth={bounds.width}
@@ -481,7 +488,12 @@ export function VerticalImageAligner() {
                     handleUpdatePosition(img.id, { x: Math.round(pos.x), y: Math.round(pos.y) })
                   }
                   onDragStart={() => handleActivate(img.id)}
-                  className={cn('pointer-events-auto', img.isActive && 'ring-1 ring-blue-500')}
+                  // Используем data attribute для стилизации выделения
+                  className={
+                    img.isActive
+                      ? 'pointer-events-auto ring-1 ring-blue-500'
+                      : 'pointer-events-auto'
+                  }
                 >
                   {() => (
                     <>
@@ -499,7 +511,7 @@ export function VerticalImageAligner() {
                           imageRendering: 'inherit',
                         }}
                       />
-                      <OverlayLabel className={cn(img.isActive ? 'opacity-100' : 'opacity-0')}>
+                      <OverlayLabel className={img.isActive ? 'opacity-100' : 'opacity-0'}>
                         {Math.round(img.offsetX)}, {Math.round(img.offsetY)}
                       </OverlayLabel>
                     </>
@@ -507,7 +519,7 @@ export function VerticalImageAligner() {
                 </CanvasMovable>
               </div>
             ))}
-          </WorkbenchCanvas>
+          </WorkbenchFrame>
         )}
       </Workbench.Stage>
     </Workbench.Root>

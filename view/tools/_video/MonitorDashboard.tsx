@@ -2,11 +2,11 @@ import React, { useCallback, useMemo } from 'react';
 
 import { downloadDataUrl } from '@/core/browser/canvas';
 import { getAspectRatio } from '@/core/primitives/math';
-import { getAspectRatioStyle } from '@/core/tailwind/utils';
 import type { ExtractedFrame } from '@/lib/video/extraction';
 import { Card } from '@/view/ui/container/Card';
 import { Button } from '@/view/ui/input/Button';
 import { NumberStepper } from '@/view/ui/input/NumberStepper';
+import { AspectRatio } from '@/view/ui/layout/AspectRatio';
 import { Columns, Group, Stack } from '@/view/ui/layout/Layout';
 import { ImageSequencePlayer } from '@/view/ui/media/ImageSequencePlayer';
 import { RangeVideoPlayer } from '@/view/ui/media/RangeVideoPlayer';
@@ -31,7 +31,6 @@ interface MonitorDashboardProps {
   captureFps: number;
   isProcessing: boolean;
 
-  // Callbacks
   onDiffGenerated: (url: string | null) => void;
   onGifFpsChange: (fps: number) => void;
   onDownloadGif: () => void;
@@ -61,7 +60,6 @@ export function MonitorDashboard({
     [videoDimensions]
   );
 
-  const aspectRatioStyle = getAspectRatioStyle(videoRatio);
   const currentSpeedPercent = Math.round((gifFps / captureFps) * 100);
 
   const handleDrawOverlay = useCallback(
@@ -88,23 +86,21 @@ export function MonitorDashboard({
 
   return (
     <Columns desktop={3} gap={4}>
-      {/* 1. SOURCE VIDEO */}
       <Card
         className="flex flex-col overflow-hidden shadow-sm"
         title={<Typography.Text variant="label">Исходное видео</Typography.Text>}
         contentClassName="p-0"
       >
-        <Stack className="relative w-full bg-black" style={aspectRatioStyle}>
+        <AspectRatio ratio={videoRatio} className="bg-black">
           <RangeVideoPlayer
             src={videoSrc}
             startTime={startTime}
             endTime={endTime}
             className="absolute inset-0"
           />
-        </Stack>
+        </AspectRatio>
       </Card>
 
-      {/* 2. DIFFERENCE */}
       <Card
         className="flex flex-col overflow-hidden shadow-sm"
         title={<Typography.Text variant="label">Разница</Typography.Text>}
@@ -121,17 +117,16 @@ export function MonitorDashboard({
         }
         contentClassName="p-0"
       >
-        <Stack className="relative w-full bg-zinc-100 dark:bg-zinc-950" style={aspectRatioStyle}>
+        <AspectRatio ratio={videoRatio} className="bg-zinc-100 dark:bg-zinc-950">
           <FrameDiffOverlay
             image1={previewStart}
             image2={previewEnd}
             isProcessing={isDiffProcessing}
             onDataGenerated={onDiffGenerated}
           />
-        </Stack>
+        </AspectRatio>
       </Card>
 
-      {/* 3. SPRITE PREVIEW */}
       <Card
         className="flex flex-col overflow-hidden shadow-sm"
         title={
@@ -160,30 +155,32 @@ export function MonitorDashboard({
         }
         contentClassName="p-0"
       >
-        <Stack
-          className="group relative w-full cursor-pointer bg-zinc-100 dark:bg-zinc-950"
-          style={aspectRatioStyle}
-          onClick={onOpenScaleModal}
-        >
-          {frames.length > 0 || isProcessing ? (
-            <>
-              <ImageSequencePlayer
-                images={frames.map((f) => f.dataUrl)}
-                fps={gifFps}
-                width={videoDimensions?.width || 300}
-                height={videoDimensions?.height || 200}
-                onDrawOverlay={handleDrawOverlay}
-              />
-              <OverlayLabel position="bottom-right" className="opacity-0 group-hover:opacity-100">
-                Масштабы ⤢
-              </OverlayLabel>
-            </>
-          ) : (
-            <Typography.Text variant="dimmed" align="center" className="py-20">
-              Нет кадров
-            </Typography.Text>
-          )}
-        </Stack>
+        <AspectRatio ratio={videoRatio} className="bg-zinc-100 dark:bg-zinc-950">
+          <Stack
+            className="group relative h-full w-full cursor-pointer"
+            gap={0}
+            onClick={onOpenScaleModal}
+          >
+            {frames.length > 0 || isProcessing ? (
+              <>
+                <ImageSequencePlayer
+                  images={frames.map((f) => f.dataUrl)}
+                  fps={gifFps}
+                  width={videoDimensions?.width || 300}
+                  height={videoDimensions?.height || 200}
+                  onDrawOverlay={handleDrawOverlay}
+                />
+                <OverlayLabel position="bottom-right" className="opacity-0 group-hover:opacity-100">
+                  Масштабы ⤢
+                </OverlayLabel>
+              </>
+            ) : (
+              <Typography.Text variant="dimmed" align="center" className="py-20">
+                Нет кадров
+              </Typography.Text>
+            )}
+          </Stack>
+        </AspectRatio>
       </Card>
     </Columns>
   );

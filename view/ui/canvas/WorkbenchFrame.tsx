@@ -18,13 +18,11 @@ import { ProcessingOverlay } from '@/view/ui/feedback/ProcessingOverlay';
 import { ColorInput } from '@/view/ui/input/ColorInput';
 import { OverlayLabel } from '@/view/ui/primitive/OverlayLabel';
 
-// --- CONFIG ---
-
 const ANIMATION_CONFIG = {
   AUTO_CONTRAST_PERIOD_DEFAULT: 5,
 };
 
-interface WorkbenchCanvasProps {
+interface WorkbenchFrameProps {
   children: ReactNode;
   isLoading?: boolean | undefined;
   contentWidth?: number | undefined;
@@ -39,12 +37,7 @@ interface WorkbenchCanvasProps {
   initialScale?: number | undefined;
 }
 
-/**
- * "Умная" обертка над примитивом Canvas.
- * Содержит тулбар, управление темой, фоном и оверлей загрузки.
- * Реализует стандартный UX "Верстака" для всех графических инструментов.
- */
-export const WorkbenchCanvas = forwardRef<CanvasRef, WorkbenchCanvasProps>(
+export const WorkbenchFrame = forwardRef<CanvasRef, WorkbenchFrameProps>(
   (
     {
       children,
@@ -62,7 +55,6 @@ export const WorkbenchCanvas = forwardRef<CanvasRef, WorkbenchCanvasProps>(
     },
     ref
   ) => {
-    // --- State ---
     const [theme, setTheme] = useState<'light' | 'dark'>('dark');
     const [isAutoContrast, setIsAutoContrast] = useState(false);
     const [autoContrastPeriod, setAutoContrastPeriod] = useState(
@@ -72,13 +64,9 @@ export const WorkbenchCanvas = forwardRef<CanvasRef, WorkbenchCanvasProps>(
       defaultBackgroundColor || null
     );
 
-    // --- Refs ---
     const canvasRef = useRef<CanvasRef>(null);
     const zoomLabelRef = useRef<HTMLSpanElement>(null);
 
-    // --- Logic ---
-
-    // Forwarding ref methods to the inner Canvas
     useImperativeHandle(ref, () => ({
       resetView: (w, h) => canvasRef.current?.resetView(w, h),
       getTransform: () => canvasRef.current?.getTransform() || { scale: 1, x: 0, y: 0 },
@@ -91,7 +79,6 @@ export const WorkbenchCanvas = forwardRef<CanvasRef, WorkbenchCanvasProps>(
       canvasRef.current?.resetView();
     }, []);
 
-    // Auto-contrast logic
     useEffect(() => {
       let interval: NodeJS.Timeout;
       if (isAutoContrast) {
@@ -210,4 +197,4 @@ export const WorkbenchCanvas = forwardRef<CanvasRef, WorkbenchCanvasProps>(
   }
 );
 
-WorkbenchCanvas.displayName = 'WorkbenchCanvas';
+WorkbenchFrame.displayName = 'WorkbenchFrame';

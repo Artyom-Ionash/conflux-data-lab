@@ -2,19 +2,15 @@
 
 import React from 'react';
 
-import { cn } from '../../../core/tailwind/utils';
-import { Typography } from '../../ui/primitive/Typography';
+import { cn } from '@/core/tailwind/utils';
+import { Typography } from '@/view/ui/primitive/Typography';
 
-// --- SUB-COMPONENT: SectionHeader ---
-interface SectionHeaderProps {
+export interface SectionHeaderProps {
   title: React.ReactNode;
   actions?: React.ReactNode;
   className?: string;
 }
 
-/**
- * Унифицированный заголовок для секций сайдбара с поддержкой кнопок действий.
- */
 export function SectionHeader({ title, actions, className = '' }: SectionHeaderProps) {
   return (
     <div className={cn('mb-3 flex items-center justify-between px-0.5', className)}>
@@ -24,24 +20,28 @@ export function SectionHeader({ title, actions, className = '' }: SectionHeaderP
   );
 }
 
-// --- MAIN COMPONENT: ControlSection ---
-interface ControlSectionProps {
+interface SectionProps {
   title?: string;
   children: React.ReactNode;
   className?: string;
   headerRight?: React.ReactNode;
+  variant?: 'default' | 'ghost';
 }
 
-export function ControlSection({
+export function Section({
   title,
   children,
   className = '',
   headerRight,
-}: ControlSectionProps) {
+  variant = 'default',
+}: SectionProps) {
   return (
     <div
       className={cn(
-        'rounded-lg border border-zinc-200 bg-zinc-50 p-4 dark:border-zinc-700 dark:bg-zinc-800',
+        'rounded-lg',
+        variant === 'default' &&
+          'border border-zinc-200 bg-zinc-50 p-4 dark:border-zinc-700 dark:bg-zinc-800',
+        variant === 'ghost' && 'border-0 bg-transparent p-0',
         className
       )}
     >
@@ -49,7 +49,10 @@ export function ControlSection({
         <SectionHeader
           title={title}
           actions={headerRight}
-          className="mb-3 border-b border-zinc-200 pb-2 dark:border-zinc-700"
+          className={cn(
+            'mb-3',
+            variant === 'default' && 'border-b border-zinc-200 pb-2 dark:border-zinc-700'
+          )}
         />
       ) : null}
       <div className="space-y-3">{children}</div>

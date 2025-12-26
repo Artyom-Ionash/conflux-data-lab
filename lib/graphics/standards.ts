@@ -7,6 +7,9 @@ export const TEXTURE_LIMITS = {
   MAX_SLIDER: 20_000,
 } as const;
 
+// Цвета зон можно оставить здесь как константы конфигурации,
+// так как они описывают бизнес-логику "зон опасности", а не стиль кнопки.
+// Но лучше использовать семантические имена.
 export const TEXTURE_ZONES = [
   { percent: 20.48, color: 'from-green-600 to-green-500' }, // Safe
   { percent: 20.48, color: 'from-yellow-500 to-yellow-400' }, // Warning
@@ -31,13 +34,6 @@ export function analyzeTextureSize(dimension: number) {
       label: 'CRITICAL',
       icon: '⛔',
       message: `Превышен лимит браузера (${TEXTURE_LIMITS.MAX_BROWSER}px). Экспорт невозможен.`,
-      styles: {
-        slider: 'accent-red-500',
-        text: 'text-red-400',
-        border: 'border-red-800',
-        bg: 'bg-red-900/20',
-        marker: 'bg-red-500',
-      },
     };
   }
   if (dimension > TEXTURE_LIMITS.SAFE_PC) {
@@ -46,13 +42,6 @@ export function analyzeTextureSize(dimension: number) {
       label: 'DANGER',
       icon: '☢️',
       message: `Только для мощных ПК (> ${TEXTURE_LIMITS.SAFE_PC}px).`,
-      styles: {
-        slider: 'accent-orange-500',
-        text: 'text-orange-400',
-        border: 'border-orange-800',
-        bg: 'bg-orange-900/20',
-        marker: 'bg-orange-500',
-      },
     };
   }
   if (dimension > TEXTURE_LIMITS.SAFE_MOBILE) {
@@ -61,13 +50,6 @@ export function analyzeTextureSize(dimension: number) {
       label: 'WARNING',
       icon: '⚠️',
       message: `Риск вылетов на мобильных (> ${TEXTURE_LIMITS.SAFE_MOBILE}px).`,
-      styles: {
-        slider: 'accent-yellow-500',
-        text: 'text-yellow-400',
-        border: 'border-yellow-800',
-        bg: 'bg-yellow-900/20',
-        marker: 'bg-yellow-500',
-      },
     };
   }
   return {
@@ -75,12 +57,5 @@ export function analyzeTextureSize(dimension: number) {
     label: 'SAFE',
     icon: '✅',
     message: 'Безопасно для всех платформ.',
-    styles: {
-      slider: 'accent-green-500',
-      text: 'text-green-400',
-      border: 'border-green-800',
-      bg: 'bg-green-900/20',
-      marker: 'bg-green-500',
-    },
   };
 }

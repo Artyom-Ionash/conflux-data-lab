@@ -6,6 +6,7 @@ import { getAspectRatio } from '@/core/primitives/math';
 import { generateSpriteSheet } from '@/lib/graphics/processing/sprite-generator';
 import { TEXTURE_LIMITS } from '@/lib/graphics/standards';
 import { Modal } from '@/view/ui/container/Modal';
+import { Section } from '@/view/ui/container/Section';
 import { ProgressBar } from '@/view/ui/feedback/ProgressBar';
 import { Button } from '@/view/ui/input/Button';
 import { ColorInput } from '@/view/ui/input/ColorInput';
@@ -16,11 +17,10 @@ import { Group, Stack } from '@/view/ui/layout/Layout';
 import { Surface } from '@/view/ui/layout/Surface';
 import { Workbench } from '@/view/ui/layout/Workbench';
 import { MultiScalePreview } from '@/view/ui/media/MultiScalePreview';
+import { SpriteGrid } from '@/view/ui/media/SpriteGrid';
 import { Separator } from '@/view/ui/primitive/Separator';
 
-import { SpriteFrameList } from './_graphics/SpriteFrameList';
 import { TextureLimitIndicator } from './_hardware/TextureLimitIndicator';
-import { ControlSection } from './_io/ControlSection';
 import { FileDropzone, FileDropzonePlaceholder } from './_io/FileDropzone';
 import { MonitorDashboard } from './_video/MonitorDashboard';
 import { TimelineControl } from './_video/TimelineControl';
@@ -219,7 +219,7 @@ export function VideoFrameExtractor() {
             />
 
             {/* 3. Output Configuration */}
-            <ControlSection
+            <Section
               title="Спрайт-лист"
               className="shadow-sm"
               headerRight={
@@ -250,7 +250,6 @@ export function VideoFrameExtractor() {
                 <Group gap={4} wrap>
                   <Switch
                     label="Loop"
-                    // Обновленный доступ к состоянию
                     checked={state.symmetricLoop}
                     onCheckedChange={(c) => actions.setSymmetricLoop(c)}
                   />
@@ -282,7 +281,7 @@ export function VideoFrameExtractor() {
                 </Group>
               )}
               <Stack className="custom-scrollbar overflow-x-auto rounded-lg bg-zinc-100 p-4 dark:bg-zinc-950">
-                <SpriteFrameList
+                <SpriteGrid
                   frames={state.frames}
                   maxHeight={spriteOptions.maxHeight}
                   spacing={spriteOptions.spacing}
@@ -290,7 +289,7 @@ export function VideoFrameExtractor() {
                   videoAspectRatio={videoRatio || 1.77}
                 />
               </Stack>
-            </ControlSection>
+            </Section>
           </Workbench.Content>
         )}
 

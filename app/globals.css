@@ -1,9 +1,9 @@
 @import 'tailwindcss';
 
 /* --- CORE SYSTEM INJECTION --- */
-@import '@/core/tailwind/layers.css'; /* Z-Index Topology */
-@import '@/core/tailwind/tokens.css'; /* Design Tokens */
-@import '@/core/tailwind/utilities.css'; /* Micro-patterns */
+@import '../core/tailwind/layers.css'; /* Z-Index Topology */
+@import '../core/tailwind/tokens.css'; /* Design Tokens */
+@import '../core/tailwind/utilities.css'; /* Micro-patterns */
 
 /* --- RUNTIME CONTEXT --- */
 :root {

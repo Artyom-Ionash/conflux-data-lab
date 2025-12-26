@@ -62,7 +62,7 @@ const eslintConfig = defineConfig([
             { from: 'ui', allow: ['core-react', 'core-tailwind'] }, // Собирает простые элементы интерфейса
             { from: 'lib', allow: ['core-browser', 'core-react'] }, // Бизнес-логика (стремится к Framework-agnostic)
             { from: 'scripts', allow: ['core-node', 'lib'] }, // Помогают разработчику
-            { from: ['tool', 'tool-subsystem'], allow: ['tool-subsystem', 'core-react', 'ui', 'lib', 'core-browser', 'core-tailwind'] }, // Соединяет сложные вещи (стремится к свободе от стилей)
+            { from: ['tool', 'tool-subsystem'], allow: ['tool-subsystem', 'core-react', 'ui', 'lib', 'core-browser'] }, // Соединяет сложные вещи (стремится к свободе от стилей)
           ],
         },
       ],

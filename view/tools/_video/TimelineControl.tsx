@@ -1,7 +1,6 @@
 import React, { useRef } from 'react';
 
-import { useVideoScrubber } from '@/core/react/hooks/use-video-scrubber'; // ✅ NEW PATH
-import { getAspectRatioStyle } from '@/core/tailwind/utils';
+import { useVideoScrubber } from '@/core/react/hooks/use-video-scrubber';
 import { Card } from '@/view/ui/container/Card';
 import { NumberStepper } from '@/view/ui/input/NumberStepper';
 import { RangeSlider } from '@/view/ui/input/RangeSlider';
@@ -118,10 +117,7 @@ export function TimelineControl({
               previewStartImage={previewStart}
               previewEndImage={previewEnd}
               isLoading={isSeeking}
-              aspectRatioStyle={getAspectRatioStyle(
-                videoDimensions?.width,
-                videoDimensions?.height
-              )}
+              videoDimensions={videoDimensions}
             />
           )}
         </Stack>
