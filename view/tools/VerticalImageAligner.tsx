@@ -77,6 +77,7 @@ export function VerticalImageAligner() {
   const [redGridOffsetX, setRedGridOffsetX] = useState(0);
   const [redGridOffsetY, setRedGridOffsetY] = useState(0);
   const [isExporting, setIsExporting] = useState(false);
+  const [bgColor, setBgColor] = useState(DEFAULT_SETTINGS.bgColor);
 
   const { ref: workspaceRef, getScale } = useCanvasRef();
 
@@ -122,9 +123,10 @@ export function VerticalImageAligner() {
             setSlotHeight(img.height);
             setFrameStepX(img.height);
 
-            // ВОССТАНОВЛЕНИЕ: Забор цвета пикселя 0,0
+            // ВОССТАНОВЛЕНИЕ: Забор цвета пикселя 0,0 реактивно
             const { r, g, b } = getTopLeftPixelColor(img);
-            workspaceRef.current?.setBackgroundColor(rgbToHex(r, g, b));
+            setBgColor(rgbToHex(r, g, b));
+
             setTimeout(() => {
               workspaceRef.current?.resetView(img.width, img.height);
             }, VIEW_RESET_DELAY);
@@ -432,7 +434,7 @@ export function VerticalImageAligner() {
             contentHeight={bounds.height}
             shadowOverlayOpacity={0.5}
             showTransparencyGrid={true}
-            defaultBackgroundColor={DEFAULT_SETTINGS.bgColor}
+            defaultBackgroundColor={bgColor}
           >
             {showRedGrid && (
               <CanvasGridOverlay

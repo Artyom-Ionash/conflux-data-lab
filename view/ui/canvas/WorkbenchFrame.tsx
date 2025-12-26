@@ -59,9 +59,19 @@ export const WorkbenchFrame = forwardRef<CanvasRef, WorkbenchFrameProps>(
     const [autoContrastPeriod, setAutoContrastPeriod] = useState(
       ANIMATION_CONFIG.AUTO_CONTRAST_PERIOD_DEFAULT
     );
+
     const [backgroundColor, setBackgroundColor] = useState<string | null>(
       defaultBackgroundColor || null
     );
+
+    // "State Update During Render" вместо useEffect:
+    // позволяет обновить локальный стейт при изменении пропса БЕЗ каскадного рендера эффектов.
+    const [prevDefaultColor, setPrevDefaultColor] = useState(defaultBackgroundColor);
+
+    if (defaultBackgroundColor !== undefined && defaultBackgroundColor !== prevDefaultColor) {
+      setPrevDefaultColor(defaultBackgroundColor);
+      setBackgroundColor(defaultBackgroundColor);
+    }
 
     const canvasRef = useRef<CanvasRef>(null);
     const zoomLabelRef = useRef<HTMLSpanElement>(null);
@@ -71,7 +81,6 @@ export const WorkbenchFrame = forwardRef<CanvasRef, WorkbenchFrameProps>(
       getTransform: () => canvasRef.current?.getTransform() || { scale: 1, x: 0, y: 0 },
       screenToWorld: (x, y) => canvasRef.current?.screenToWorld(x, y) || { x: 0, y: 0 },
       getBackgroundColor: () => backgroundColor,
-      setBackgroundColor: (color) => setBackgroundColor(color),
     }));
 
     const handleResetView = useCallback(() => {
