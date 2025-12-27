@@ -9,6 +9,8 @@ import {
   TEXTURE_ZONES,
 } from '@/lib/graphics/standards';
 import { DimensionInput } from '@/ui/input/DimensionInput';
+import { Stack } from '@/ui/layout/Layout';
+import { Typography } from '@/ui/primitive/Typography';
 
 interface TextureDimensionSliderProps {
   label: string;
@@ -32,12 +34,14 @@ export function TextureDimensionSlider({
 
   // 2. Подготовка контента
   const tooltipContent = (
-    <div className="space-y-1">
-      <div className="font-medium">{analysis.message}</div>
-      <div className="text-[10px] font-bold tracking-wider uppercase opacity-50">
+    <Stack gap={1}>
+      <Typography.Text variant="default" weight="medium">
+        {analysis.message}
+      </Typography.Text>
+      <Typography.Text variant="label" className="opacity-50">
         Hardware Standards {HARDWARE_STANDARD_YEAR}
-      </div>
-    </div>
+      </Typography.Text>
+    </Stack>
   );
 
   // 3. Рендер через UI компонент (Pure UI)

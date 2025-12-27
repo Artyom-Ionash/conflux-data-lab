@@ -6,9 +6,11 @@ import { areColorsSimilar } from '@/core/primitives/colors';
 import { useTask } from '@/core/react/hooks/use-task';
 import { Loader } from '@/ui/feedback/Loader';
 import { Box } from '@/ui/layout/Box';
-import { Group } from '@/ui/layout/Layout'; // Импортируем Group
+import { Group } from '@/ui/layout/Layout';
 import { Overlay } from '@/ui/layout/Overlay';
-import { LegendItem } from '@/ui/primitive/Legend'; // Импортируем LegendItem
+import { Surface } from '@/ui/layout/Surface';
+import { LegendItem } from '@/ui/primitive/Legend';
+import { Typography } from '@/ui/primitive/Typography';
 
 interface FrameDiffOverlayProps {
   image1: string | null;
@@ -81,7 +83,7 @@ export function FrameDiffOverlay({
       } else if (firstIsBg && !lastIsBg) {
         // Появившийся (Синий)
         resultImageData.data[i + 2] = 255;
-        resultImageData.data[i + 1] = 100; // Немного зеленого для красоты
+        resultImageData.data[i + 1] = 100;
         resultImageData.data[i + 3] = 200;
       } else {
         // Изменившийся (Фиолетовый)
@@ -119,15 +121,17 @@ export function FrameDiffOverlay({
 
   if (!image1 || !image2) {
     return (
-      <div className="fx-center h-full w-full bg-zinc-100 dark:bg-zinc-800">
-        <p className="text-[10px] text-zinc-400">Нет данных</p>
-      </div>
+      <Box center className="h-full w-full bg-zinc-100 dark:bg-zinc-800">
+        <Typography.Text size="xs" variant="dimmed">
+          Нет данных
+        </Typography.Text>
+      </Box>
     );
   }
 
   return (
     <Box className="group relative h-full w-full bg-zinc-100 dark:bg-zinc-950">
-      <canvas ref={canvasRef} className="hidden" />
+      <Surface.Canvas ref={canvasRef} className="hidden" />
       {overlayDataUrl && (
         <Image
           src={overlayDataUrl}

@@ -84,7 +84,7 @@ export function TimelineControl({
             />
           </Group>
           <Indicator label="Range">
-            {startTime.toFixed(2)}s<span className="mx-1 opacity-50">→</span>
+            {startTime.toFixed(2)}s<Typography.Text className="mx-1 opacity-50">→</Typography.Text>
             {effectiveEnd.toFixed(2)}s
           </Indicator>
         </Group>

@@ -5,7 +5,8 @@ import React from 'react';
 import { Card } from '@/ui/container/Card';
 import { Button, CopyButton } from '@/ui/input/Button';
 import { TextOutput } from '@/ui/input/TextOutput';
-import { Group } from '@/ui/layout/Layout';
+import { Box } from '@/ui/layout/Box';
+import { Group, Stack } from '@/ui/layout/Layout';
 import { Icon } from '@/ui/primitive/Icon';
 
 interface ResultViewerProps {
@@ -58,12 +59,12 @@ export function ResultViewer({
         ) : null
       }
     >
-      <div className="flex min-h-0 flex-1 flex-col bg-white dark:bg-zinc-950">
+      <Stack gap={0} className="min-h-0 flex-1 bg-white dark:bg-zinc-950">
         <TextOutput value={value || ''} placeholder={placeholder} className="flex-1" />
         {footer && (
-          <div className="shrink-0 border-t border-zinc-200 dark:border-zinc-800">{footer}</div>
+          <Box className="shrink-0 border-t border-zinc-200 dark:border-zinc-800">{footer}</Box>
         )}
-      </div>
+      </Stack>
     </Card>
   );
 }

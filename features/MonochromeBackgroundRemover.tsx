@@ -437,7 +437,7 @@ export function MonochromeBackgroundRemover() {
               </Group>
 
               <Group gap={3}>
-                <div className="h-8 w-8 flex-shrink-0" />
+                <Box className="h-8 w-8 shrink-0" />
                 <Group
                   gap={2}
                   className="flex-1 rounded border bg-zinc-50 p-2 dark:border-zinc-700 dark:bg-zinc-800"
@@ -604,9 +604,9 @@ export function MonochromeBackgroundRemover() {
                     className="z-20"
                   >
                     {() => (
-                      <div style={{ transform: 'translate(-50%, -50%)' }}>
-                        <div className="h-2.5 w-2.5 rounded-full border border-white bg-red-500 shadow-[0_0_2px_rgba(0,0,0,0.8)] transition-all" />
-                      </div>
+                      <Box style={{ transform: 'translate(-50%, -50%)' }}>
+                        <Box className="h-2.5 w-2.5 rounded-full border border-white bg-red-500 shadow-[0_0_2px_rgba(0,0,0,0.8)] transition-all" />
+                      </Box>
                     )}
                   </CanvasMovable>
                 ))}

@@ -12,8 +12,11 @@ import {
 import { isInstanceOf } from '@/core/primitives/guards';
 import { filterFileList, scanDirectoryHandle, scanEntries } from '@/lib/context-generator/scanner';
 import { DropzoneVisual } from '@/ui/input/Dropzone';
+import { HiddenInput } from '@/ui/input/Input';
+import { Stack } from '@/ui/layout/Layout';
 import { Workbench } from '@/ui/layout/Workbench';
 import { Icon } from '@/ui/primitive/Icon';
+import { Typography } from '@/ui/primitive/Typography';
 
 // --- Type Guards & Interfaces ---
 
@@ -152,14 +155,18 @@ export const FileDropzone = ({
   const renderSubLabel = () => {
     if (!isWarning) return null;
     return (
-      <div className="animate-in fade-in slide-in-from-top-1 mt-2 space-y-1">
-        <p className="text-[10px] leading-tight font-medium text-amber-600/80 dark:text-amber-500/60">
+      <Stack gap={1} className="animate-in fade-in slide-in-from-top-1 mt-2">
+        <Typography.Text
+          size="xs"
+          weight="medium"
+          className="text-amber-600/80 dark:text-amber-500/60"
+        >
           {COMPAT_MESSAGES.FIREFOX_STATUS}
-        </p>
-        <p className="text-[10px] leading-tight font-bold text-amber-700 dark:text-amber-400/90">
+        </Typography.Text>
+        <Typography.Text size="xs" weight="bold" className="text-amber-700 dark:text-amber-400/90">
           {COMPAT_MESSAGES.DND_REQUIRED}
-        </p>
-      </div>
+        </Typography.Text>
+      </Stack>
     );
   };
 
@@ -191,10 +198,9 @@ export const FileDropzone = ({
         {children}
       </DropzoneVisual>
 
-      <input
+      <HiddenInput
         ref={inputRef}
         type="file"
-        className="hidden"
         multiple={multiple || directory}
         accept={accept}
         onChange={(e) => {

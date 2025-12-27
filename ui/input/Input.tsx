@@ -43,3 +43,14 @@ export const TextArea = forwardRef<HTMLTextAreaElement, TextAreaProps>(
   }
 );
 TextArea.displayName = 'TextArea';
+
+/**
+ * Обертка для скрытых инпутов (например, file upload)
+ */
+export const HiddenInput = forwardRef<
+  HTMLInputElement,
+  React.InputHTMLAttributes<HTMLInputElement>
+>((props, ref) => {
+  return <input ref={ref} className="hidden" {...props} />;
+});
+HiddenInput.displayName = 'HiddenInput';

@@ -8,6 +8,9 @@ import {
   type TextureStatus,
 } from '@/lib/graphics/standards';
 import { ZoneIndicator } from '@/ui/feedback/ZoneIndicator';
+import { Box } from '@/ui/layout/Box';
+import { Group, Stack } from '@/ui/layout/Layout';
+import { Typography } from '@/ui/primitive/Typography';
 
 interface TextureLimitIndicatorProps {
   value: number;
@@ -43,22 +46,26 @@ export function TextureLimitIndicator({ value, label, className }: TextureLimitI
   }));
 
   const tooltipContent = (
-    <div className="space-y-2">
-      <div className="flex items-center gap-2 border-b border-zinc-800 pb-2">
-        <div
+    <Stack gap={2}>
+      <Group gap={2} className="border-b border-zinc-800 pb-2">
+        <Box
           className={`h-2 w-2 rounded-full shadow-[0_0_8px_currentColor] ${STATUS_MARKER_COLORS[status]}`}
-        ></div>
-        <span className={`font-bold tracking-wide ${STATUS_TEXT_COLORS[status]}`}>
+        />
+        <Typography.Text
+          variant="default"
+          weight="bold"
+          className={`tracking-wide ${STATUS_TEXT_COLORS[status]}`}
+        >
           {statusLabel}
-        </span>
-        <span className="text-zinc-600">•</span>
-        <span className="font-mono text-zinc-300">{value}px</span>
-      </div>
-      <div className="text-zinc-300">{message}</div>
-      <div className="pt-1 text-[10px] font-semibold tracking-wider uppercase opacity-40">
+        </Typography.Text>
+        <Typography.Text variant="dimmed">•</Typography.Text>
+        <Typography.Text className="font-mono text-zinc-300">{value}px</Typography.Text>
+      </Group>
+      <Typography.Text className="text-zinc-300">{message}</Typography.Text>
+      <Typography.Text variant="label" className="pt-1 opacity-40">
         Standards {HARDWARE_STANDARD_YEAR}
-      </div>
-    </div>
+      </Typography.Text>
+    </Stack>
   );
 
   return (
