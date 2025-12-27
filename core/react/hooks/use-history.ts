@@ -1,5 +1,7 @@
 import { useCallback, useReducer } from 'react';
 
+import { isFunction } from '@/core/primitives/guards';
+
 // --- 1. Типы и Утилиты ---
 
 /**
@@ -9,22 +11,11 @@ import { useCallback, useReducer } from 'react';
 type StateUpdater<S> = S | ((prevState: S) => S);
 
 /**
- * Type Guard для различения функционального обновления.
- *
- * NOTE: Здесь скрыто неизбежное архитектурное допущение React:
- * Если S является функцией, React не может отличить S от (S => S).
- * Конвенция: любая функция считается Updater-ом.
- */
-function isUpdater<S>(value: StateUpdater<S>): value is (prevState: S) => S {
-  return typeof value === 'function';
-}
-
-/**
  * Утилита для разрешения функционального обновления.
  * Проверяет, является ли значение функцией, и если да — вызывает её.
  */
 function resolveValue<S>(val: StateUpdater<S>, current: S): S {
-  if (isUpdater(val)) {
+  if (isFunction<(prevState: S) => S>(val)) {
     return val(current);
   }
   return val;

@@ -1,5 +1,7 @@
 import { pipe } from 'remeda';
 
+import { isArrayOf, isObject } from '@/core/primitives/guards';
+
 // --- Helpers (Pure Functions) ---
 
 const parseJson = (input: string): unknown => {
@@ -7,20 +9,17 @@ const parseJson = (input: string): unknown => {
   return JSON.parse(input);
 };
 
-// Полная валидация структуры вместо приведения типов
+// Полная валидация структуры с использованием Core Guards
 const validateArray = (data: unknown): Record<string, unknown>[] => {
   if (!Array.isArray(data)) {
     throw new Error('JSON должен быть массивом (Array)');
   }
 
-  // Проверяем, что все элементы массива - объекты
-  const isValid = data.every((item) => typeof item === 'object' && item !== null);
-
-  if (!isValid) {
+  if (!isArrayOf(data, isObject)) {
     throw new Error('Все элементы массива должны быть объектами');
   }
 
-  return data as Record<string, unknown>[];
+  return data;
 };
 
 const escapeCsvValue = (value: unknown): string => {
@@ -39,7 +38,6 @@ const generateCsvString = (data: Record<string, unknown>[]): string => {
 
   // Берем заголовки из первого объекта (можно улучшить, собрав ключи со всех объектов)
   const headers = Object.keys(data[0] || {});
-
   const headerRow = headers.join(',');
 
   const bodyRows = data.map((row) =>

@@ -4,6 +4,7 @@ import React, { useCallback, useState } from 'react';
 import { chunk } from 'remeda';
 
 import { downloadText } from '@/core/browser/canvas';
+import { isOneOf } from '@/core/primitives/guards'; // <--- NEW
 import { useCopyToClipboard } from '@/core/react/hooks/use-copy';
 import { useTask } from '@/core/react/hooks/use-task';
 import { useWorkerPool } from '@/core/react/hooks/use-worker-pool';
@@ -31,12 +32,8 @@ import { FileDropzonePlaceholder } from './_io/FileDropzone';
 import { ResultViewer } from './_io/ResultViewer';
 import { SidebarIO } from './_io/SidebarIO';
 
-// --- TYPE GUARDS ---
+// --- CONSTANTS ---
 const PRESET_KEYS = Object.keys(CONTEXT_PRESETS) as PresetKey[];
-
-function isPresetKey(key: string): key is PresetKey {
-  return PRESET_KEYS.includes(key as PresetKey);
-}
 
 // Размер пачки файлов на один воркер
 const BATCH_SIZE = 50;
@@ -92,12 +89,11 @@ export function ProjectToContext() {
         if (response.error) throw new Error(response.error);
 
         completedBatches++;
-        setProgress(Math.round((completedBatches / totalBatches) * 90)); // До 90% прогресса
+        setProgress(Math.round((completedBatches / totalBatches) * 90));
 
         return response.results;
       });
 
-      // Ждем завершения всех воркеров
       const resultsNested = await Promise.all(chunkPromises);
 
       if (signal.aborted) throw new Error('Aborted');
@@ -106,7 +102,7 @@ export function ProjectToContext() {
       // Flatten массива массивов + Mapping типов
       const processedFiles = resultsNested.flat().map((file) => ({
         ...file,
-        size: file.cleanedSize, // FIX: Маппинг cleanedSize -> size
+        size: file.cleanedSize,
       }));
 
       // 5. Финальная сборка строки (Main Thread)
@@ -203,7 +199,7 @@ export function ProjectToContext() {
             type="single"
             value={selectedPreset}
             onValueChange={(val) => {
-              if (val && isPresetKey(val)) {
+              if (val && isOneOf(val, PRESET_KEYS)) {
                 setSelectedPreset(val);
                 setCustomExtensions(CONTEXT_PRESETS[val].textExtensions.join(', '));
               }

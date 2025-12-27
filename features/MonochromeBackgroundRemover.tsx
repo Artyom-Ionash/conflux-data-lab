@@ -5,6 +5,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 
 import { downloadDataUrl, getTopLeftPixelColor, loadImage } from '@/core/browser/canvas';
 import { hexToRgb, invertHex, rgbToHex } from '@/core/primitives/colors';
+import { isOneOf } from '@/core/primitives/guards'; // <--- NEW
 import { useDebounceEffect } from '@/core/react/hooks/use-debounce';
 import { useHistory } from '@/core/react/hooks/use-history';
 import { useMediaSession } from '@/core/react/hooks/use-media-session';
@@ -46,12 +47,8 @@ const OFFSET_R = 0;
 const OFFSET_G = 1;
 const OFFSET_B = 2;
 
-// --- TYPE GUARDS ---
-const VALID_MODES: ProcessingMode[] = ['remove', 'keep', 'flood-clear'];
-
-function isProcessingMode(value: string): value is ProcessingMode {
-  return VALID_MODES.includes(value as ProcessingMode);
-}
+// --- CONSTANTS ---
+const VALID_MODES = ['remove', 'keep', 'flood-clear'] as const;
 
 // --- STATE MACHINE CONFIG ---
 type InteractionState = 'idle' | 'panning' | 'interacting';
@@ -385,7 +382,7 @@ export function MonochromeBackgroundRemover() {
               value={processingMode}
               gridCols={2}
               onValueChange={(val) => {
-                if (val && isProcessingMode(val)) setProcessingMode(val);
+                if (val && isOneOf(val, VALID_MODES)) setProcessingMode(val);
               }}
             >
               <ToggleGroupItem value="remove">Убрать цвет</ToggleGroupItem>

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { downloadDataUrl } from '@/core/browser/canvas';
+import { isFunction } from '@/core/primitives/guards'; // <--- NEW
 import { useDebounceEffect } from '@/core/react/hooks/use-debounce';
 import { useMediaSession } from '@/core/react/hooks/use-media-session';
 import { useTask } from '@/core/react/hooks/use-task';
@@ -179,7 +180,11 @@ export function useFrameExtractor() {
 
   const setExtractionParams = useCallback(
     (update: ExtractionParams | ((prev: ExtractionParams) => ExtractionParams)) => {
-      const next = typeof update === 'function' ? update(extractionParams) : update;
+      // Используем универсальный Guard вместо typeof
+      const next = isFunction<(prev: ExtractionParams) => ExtractionParams>(update)
+        ? update(extractionParams)
+        : update;
+
       if (next.frameStep !== extractionParams.frameStep && next.frameStep > 0) {
         setGifParams((g) => ({
           ...g,
