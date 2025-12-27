@@ -135,6 +135,41 @@ const eslintConfig = defineConfig([
       '@typescript-eslint/await-thenable': 'error',
     },
   },
+
+  // --- ПОЛИТИКА "ZERO-AS" (ЗАПРЕТ TYPE ASSERTIONS) ---
+  // Применяется глобально ко всем TS файлам.
+  // Запрещает `data as Type`, разрешает `data as const`.
+  {
+    files: ['**/*.{ts,tsx}'], // Глобальный скоуп
+    ignores: [
+      // --- SAFE ZONES (Где приведение типов необходимо) ---
+      
+      // 1. CORE: Здесь создаются сами Type Guards.
+      'core/primitives/guards.ts', 
+      
+      // 2. TESTS: В тестах (включая UI-тесты) часто нужны моки.
+      // FIX: Добавлена поддержка .tsx для тестов компонентов (например, Workbench.test.tsx)
+      '**/*.test.{ts,tsx}', 
+      '**/*.spec.{ts,tsx}',
+    ],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        {
+          // Запрещаем 'as Type'.
+          // Исключение: 'as const' (typeAnnotation.typeName.name === 'const')
+          selector: "TSAsExpression:not([typeAnnotation.typeName.name='const'])",
+          // message:
+          //   '⛔ UNSAFE CAST DETECTED.\nИспользование "as Type" запрещено, так как это скрывает ошибки типов.\n\n✅ Решение:\n1. Используйте Type Guard (isDefined, isObject) из "@/core/primitives/guards".\n2. Используйте валидацию (Zod) для внешних данных.\n3. Если это библиотека, создайте безопасную обертку в "core/".',
+        },
+        {
+          // Запрещаем старый синтаксис <Type>variable
+          selector: 'TSTypeAssertion',
+          message: 'Использование <Type>assertion запрещено. Используйте безопасные методы.',
+        },
+      ],
+    },
+  },
   
   eslintConfigPrettier,
 ]);

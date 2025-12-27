@@ -5,7 +5,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 
 import { downloadDataUrl, getTopLeftPixelColor, loadImage } from '@/core/browser/canvas';
 import { hexToRgb, invertHex, rgbToHex } from '@/core/primitives/colors';
-import { isOneOf } from '@/core/primitives/guards'; // <--- NEW
+import { isOneOf } from '@/core/primitives/guards';
 import { useDebounceEffect } from '@/core/react/hooks/use-debounce';
 import { useHistory } from '@/core/react/hooks/use-history';
 import { useMediaSession } from '@/core/react/hooks/use-media-session';
@@ -187,16 +187,26 @@ export function MonochromeBackgroundRemover() {
     }
     if (previewCanvasRef.current && processedData) {
       const ctx = previewCanvasRef.current.getContext('2d');
-      const imgData = new ImageData(
-        new Uint8ClampedArray(
-          processedData.buffer as ArrayBuffer,
+
+      // FIX: ImageData строго требует ArrayBuffer, но processedData типизирован как ArrayBufferLike.
+      // Мы используем Type Guard (instanceof), чтобы доказать TS, что это безопасный ArrayBuffer.
+      // Это позволяет избежать "as unknown" и копирования данных.
+      const buffer = processedData.buffer;
+
+      if (buffer instanceof ArrayBuffer) {
+        const strictView = new Uint8ClampedArray(
+          buffer,
           processedData.byteOffset,
           processedData.length
-        ),
-        previewCanvasRef.current.width,
-        previewCanvasRef.current.height
-      );
-      ctx?.putImageData(imgData, 0, 0);
+        );
+
+        const imgData = new ImageData(
+          strictView,
+          previewCanvasRef.current.width,
+          previewCanvasRef.current.height
+        );
+        ctx?.putImageData(imgData, 0, 0);
+      }
     }
     setIsProcessing(false);
   }, []);

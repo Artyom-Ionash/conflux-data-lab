@@ -4,7 +4,7 @@ import React, { useCallback, useState } from 'react';
 import { chunk } from 'remeda';
 
 import { downloadText } from '@/core/browser/canvas';
-import { isOneOf } from '@/core/primitives/guards'; // <--- NEW
+import { isOneOf } from '@/core/primitives/guards';
 import { useCopyToClipboard } from '@/core/react/hooks/use-copy';
 import { useTask } from '@/core/react/hooks/use-task';
 import { useWorkerPool } from '@/core/react/hooks/use-worker-pool';
@@ -32,8 +32,9 @@ import { FileDropzonePlaceholder } from './_io/FileDropzone';
 import { ResultViewer } from './_io/ResultViewer';
 import { SidebarIO } from './_io/SidebarIO';
 
-// --- CONSTANTS ---
-const PRESET_KEYS = Object.keys(CONTEXT_PRESETS) as PresetKey[];
+const PRESET_KEYS = Object.keys(CONTEXT_PRESETS).filter((k): k is PresetKey =>
+  Object.prototype.hasOwnProperty.call(CONTEXT_PRESETS, k)
+);
 
 // Размер пачки файлов на один воркер
 const BATCH_SIZE = 50;

@@ -1,8 +1,9 @@
 /**
- * Утилиты для работы с медиа-контентом (Изображения, Файлы).
+ * Утилиты для работы с медиа-контентом.
  */
 
 import type { RGB } from '@/core/primitives/colors';
+import { isObject } from '@/core/primitives/guards';
 
 /**
  * Асинхронно загружает изображение и возвращает HTMLImageElement.
@@ -127,6 +128,15 @@ export function waitForVideoFrame(video: HTMLVideoElement): Promise<void> {
 }
 
 /**
+ * Проверяет наличие размеров у объекта (для VideoFrame или ImageBitmap).
+ */
+function hasDimensions(source: unknown): source is { width: number; height: number } {
+  return (
+    isObject(source) && typeof source['width'] === 'number' && typeof source['height'] === 'number'
+  );
+}
+
+/**
  * Создает закадровый холст (Offscreen Canvas) и "запекает" в него текущее состояние источника.
  * Название отражает универсальность: работает с Image, Video, Canvas и VideoFrame.
  */
@@ -140,6 +150,7 @@ export function captureToCanvas(
   let targetWidth = width;
   let targetHeight = height;
 
+  // Если размеры не переданы, пытаемся извлечь их из источника
   if (!targetWidth || !targetHeight) {
     if (source instanceof HTMLVideoElement) {
       targetWidth = source.videoWidth;
@@ -150,9 +161,10 @@ export function captureToCanvas(
     } else if (source instanceof HTMLCanvasElement) {
       targetWidth = source.width;
       targetHeight = source.height;
-    } else if ('width' in source && typeof source.width === 'number') {
+    } else if (hasDimensions(source)) {
+      // TS Narrowing
       targetWidth = source.width;
-      targetHeight = source.height as number;
+      targetHeight = source.height;
     }
   }
 

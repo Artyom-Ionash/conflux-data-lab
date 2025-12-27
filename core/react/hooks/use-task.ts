@@ -4,10 +4,10 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 export type TaskStatus = 'idle' | 'running' | 'success' | 'error';
 
-export interface TaskState<T, E = Error> {
+export interface TaskState<T> {
   status: TaskStatus;
   result: T | null;
-  error: E | null;
+  error: Error | null;
   progress: number;
 }
 
@@ -26,10 +26,10 @@ export interface TaskScope {
  * 3. Race Protection: гарантирует, что только последний вызов обновит стейт.
  * 4. Dependency Injection: signal и setProgress приходят аргументами.
  */
-export function useTask<T, Args extends unknown[], E = Error>(
+export function useTask<T, Args extends unknown[]>(
   taskFn: (scope: TaskScope, ...args: Args) => Promise<T>
 ) {
-  const [state, setState] = useState<TaskState<T, E>>({
+  const [state, setState] = useState<TaskState<T>>({
     status: 'idle',
     result: null,
     error: null,
@@ -93,10 +93,13 @@ export function useTask<T, Args extends unknown[], E = Error>(
 
         // Обновляем ошибку только если это актуальный контроллер
         if (abortControllerRef.current === controller) {
+          // Нормализация ошибки до стандартного Error
+          const normalizedError = err instanceof Error ? err : new Error(String(err));
+
           setState({
             status: 'error',
             result: null,
-            error: err as E,
+            error: normalizedError,
             progress: 0,
           });
         }

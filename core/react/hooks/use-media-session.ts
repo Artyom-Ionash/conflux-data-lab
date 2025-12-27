@@ -54,51 +54,52 @@ export function useMediaSession(file: File | null, type: 'video' | 'image') {
       }
     });
 
-    const element = type === 'video' ? document.createElement('video') : new Image();
-    element.src = url;
+    // Разделение логики для строгой типизации
+    let cleanup: () => void = () => {};
 
-    const onLoaded = () => {
-      if (!active) return;
-
-      let dims: MediaDimensions;
-
-      if (type === 'video') {
-        const v = element as HTMLVideoElement;
-        dims = { width: v.videoWidth, height: v.videoHeight, duration: v.duration };
-      } else {
-        const i = element as HTMLImageElement;
-        dims = { width: i.naturalWidth, height: i.naturalHeight };
-      }
-
-      setState({ url, dimensions: dims, isLoading: false, error: null });
+    const handleSuccess = (dims: MediaDimensions) => {
+      if (active) setState({ url, dimensions: dims, isLoading: false, error: null });
     };
 
-    const onError = () => {
-      if (!active) return;
-      setState((s) => ({ ...s, isLoading: false, error: `Failed to load ${type}` }));
+    const handleError = () => {
+      if (active) setState((s) => ({ ...s, isLoading: false, error: `Failed to load ${type}` }));
     };
 
     if (type === 'video') {
-      const v = element as HTMLVideoElement;
-      v.onloadedmetadata = onLoaded;
-      v.onerror = onError;
-      // Для видео важно сразу начать загрузку метаданных, так как нет автоплея
-      v.load();
+      const video = document.createElement('video');
+      video.src = url;
+
+      const onLoaded = () => {
+        handleSuccess({
+          width: video.videoWidth,
+          height: video.videoHeight,
+          duration: video.duration,
+        });
+      };
+
+      video.onloadedmetadata = onLoaded;
+      video.onerror = handleError;
+      video.load();
+
+      cleanup = () => {
+        video.pause();
+        video.src = '';
+        video.load();
+      };
     } else {
-      const i = element as HTMLImageElement;
-      i.onload = onLoaded;
-      i.onerror = onError;
+      const img = new Image();
+      img.src = url;
+
+      img.onload = () => {
+        handleSuccess({ width: img.naturalWidth, height: img.naturalHeight });
+      };
+      img.onerror = handleError;
     }
 
     return () => {
       active = false;
-      cancelAnimationFrame(loadingRafId); // Очищаем таймер при размонтировании
-      if (type === 'video') {
-        const v = element as HTMLVideoElement;
-        v.pause();
-        v.src = '';
-        v.load();
-      }
+      cancelAnimationFrame(loadingRafId);
+      cleanup();
     };
   }, [file, url, type]);
 

@@ -14,10 +14,18 @@ import { DropzoneVisual } from '@/ui/input/Dropzone';
 import { Workbench } from '@/ui/layout/Workbench';
 import { Icon } from '@/ui/primitive/Icon';
 
-// --- Type Guards для Drag-and-Drop API ---
+// --- Type Guards & Interfaces ---
+
+interface WebkitDataTransferItem extends DataTransferItem {
+  webkitGetAsEntry(): FileSystemEntry | null;
+}
 
 function isFileSystemEntry(entry: unknown): entry is FileSystemEntry {
   return typeof entry === 'object' && entry !== null && 'isFile' in entry && 'isDirectory' in entry;
+}
+
+function hasWebkitGetAsEntry(item: DataTransferItem): item is WebkitDataTransferItem {
+  return 'webkitGetAsEntry' in item;
 }
 
 interface FileDropzoneProps {
@@ -48,7 +56,6 @@ export const FileDropzone = ({
   const [isDragActive, setIsDragActive] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // --- HYDRATION FIX ---
   const [support, setSupport] = useState<DirectorySupport>({
     isSupported: true,
     isFirefox: false,
@@ -74,7 +81,7 @@ export const FileDropzone = ({
   const handleClick = async () => {
     if (directory && support.isSupported) {
       try {
-        // @ts-expect-error - TS modern API
+        // @ts-expect-error - TS modern API missing in types
         const dirHandle = await window.showDirectoryPicker();
         onScanStarted?.();
         const files = await scanDirectoryHandle(dirHandle, shouldSkip);
@@ -91,7 +98,14 @@ export const FileDropzone = ({
     async (dataTransfer: DataTransfer) => {
       onScanStarted?.();
       const items = Array.from(dataTransfer.items);
-      const entries = items.map((item) => item.webkitGetAsEntry()).filter(isFileSystemEntry);
+      const entries = items
+        .map((item) => {
+          if (hasWebkitGetAsEntry(item)) {
+            return item.webkitGetAsEntry();
+          }
+          return null;
+        })
+        .filter(isFileSystemEntry);
 
       if (entries.length > 0) {
         const allFiles = await scanEntries(entries, shouldSkip);
@@ -111,7 +125,11 @@ export const FileDropzone = ({
     };
     const handleLeave = (e: DragEvent) => {
       e.preventDefault();
-      if (e.relatedTarget === null || (e.relatedTarget as HTMLElement).nodeName === 'HTML') {
+      // nodeName 'HTML' указывает на выход курсора за пределы окна.
+      if (
+        e.relatedTarget === null ||
+        (e.relatedTarget instanceof HTMLElement && e.relatedTarget.nodeName === 'HTML')
+      ) {
         setIsDragActive(false);
       }
     };
@@ -130,7 +148,6 @@ export const FileDropzone = ({
     };
   }, [enableWindowDrop, handleDataTransfer]);
 
-  // Warning Sub-label rendering logic
   const renderSubLabel = () => {
     if (!isWarning) return null;
     return (
@@ -173,7 +190,6 @@ export const FileDropzone = ({
         {children}
       </DropzoneVisual>
 
-      {/* Input вынесен наружу, чтобы не считаться за children внутри DropzoneVisual */}
       <input
         ref={inputRef}
         type="file"
@@ -192,8 +208,6 @@ export const FileDropzone = ({
     </>
   );
 };
-
-// --- Specialized Component ---
 
 interface PlaceholderProps {
   onUpload: (files: File[]) => void;

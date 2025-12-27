@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { downloadDataUrl } from '@/core/browser/canvas';
-import { isFunction } from '@/core/primitives/guards'; // <--- NEW
+import { isFunction } from '@/core/primitives/guards';
 import { useDebounceEffect } from '@/core/react/hooks/use-debounce';
 import { useMediaSession } from '@/core/react/hooks/use-media-session';
 import { useTask } from '@/core/react/hooks/use-task';
@@ -24,6 +24,11 @@ export interface ExtractorStatus {
   progress: number;
 }
 
+interface GifParams {
+  fps: number;
+  dataUrl: string | null;
+}
+
 export function useFrameExtractor() {
   // --- 1. Resources ---
   const [videoFile, setVideoFile] = useState<File | null>(null);
@@ -37,9 +42,10 @@ export function useFrameExtractor() {
   });
 
   const [symmetricLoop, setSymmetricLoop] = useState(false);
-  const [gifParams, setGifParams] = useState({
+
+  const [gifParams, setGifParams] = useState<GifParams>({
     fps: DEFAULT_FPS,
-    dataUrl: null as string | null,
+    dataUrl: null,
   });
 
   // --- 3. State ---
@@ -57,7 +63,7 @@ export function useFrameExtractor() {
   const extractionTask = useTask<void, [HTMLVideoElement]>(
     // Используем деструктуризацию scope, чтобы получить setProgress внутри функции
     async ({ signal, setProgress }, videoEl) => {
-      // 1. Sync Source safely (без '!')
+      // 1. Sync Source safely
       if (session.url && videoEl.src !== session.url) {
         videoEl.src = session.url;
       }
@@ -180,7 +186,6 @@ export function useFrameExtractor() {
 
   const setExtractionParams = useCallback(
     (update: ExtractionParams | ((prev: ExtractionParams) => ExtractionParams)) => {
-      // Используем универсальный Guard вместо typeof
       const next = isFunction<(prev: ExtractionParams) => ExtractionParams>(update)
         ? update(extractionParams)
         : update;

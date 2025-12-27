@@ -29,18 +29,20 @@ export function checkDirectoryPickerSupport(): DirectorySupport {
   };
 }
 
+interface WebkitInputProps extends React.InputHTMLAttributes<HTMLInputElement> {
+  webkitdirectory?: string;
+  directory?: string;
+}
+
 /**
  * Атрибуты для старого способа выбора папок через <input>.
  * Используется как fallback для браузеров без showDirectoryPicker.
  */
-export function getLegacyDirectoryAttributes(): React.InputHTMLAttributes<HTMLInputElement> & {
-  webkitdirectory?: string;
-  directory?: string;
-} {
+export function getLegacyDirectoryAttributes(): WebkitInputProps {
   return {
     webkitdirectory: '',
     directory: '',
-  } as React.InputHTMLAttributes<HTMLInputElement>;
+  };
 }
 
 /**

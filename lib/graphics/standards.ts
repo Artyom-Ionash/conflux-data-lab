@@ -27,10 +27,17 @@ export function getNearestPoT(x: number): number {
   return Math.pow(2, Math.round(Math.log(x) / Math.log(2)));
 }
 
-export function analyzeTextureSize(dimension: number) {
+interface AnalysisResult {
+  status: TextureStatus;
+  label: string;
+  icon: string;
+  message: string;
+}
+
+export function analyzeTextureSize(dimension: number): AnalysisResult {
   if (dimension > TEXTURE_LIMITS.MAX_BROWSER) {
     return {
-      status: 'critical' as TextureStatus,
+      status: 'critical',
       label: 'CRITICAL',
       icon: '⛔',
       message: `Превышен лимит браузера (${TEXTURE_LIMITS.MAX_BROWSER}px). Экспорт невозможен.`,
@@ -38,7 +45,7 @@ export function analyzeTextureSize(dimension: number) {
   }
   if (dimension > TEXTURE_LIMITS.SAFE_PC) {
     return {
-      status: 'danger' as TextureStatus,
+      status: 'danger',
       label: 'DANGER',
       icon: '☢️',
       message: `Только для мощных ПК (> ${TEXTURE_LIMITS.SAFE_PC}px).`,
@@ -46,14 +53,14 @@ export function analyzeTextureSize(dimension: number) {
   }
   if (dimension > TEXTURE_LIMITS.SAFE_MOBILE) {
     return {
-      status: 'warning' as TextureStatus,
+      status: 'warning',
       label: 'WARNING',
       icon: '⚠️',
       message: `Риск вылетов на мобильных (> ${TEXTURE_LIMITS.SAFE_MOBILE}px).`,
     };
   }
   return {
-    status: 'safe' as TextureStatus,
+    status: 'safe',
     label: 'SAFE',
     icon: '✅',
     message: 'Безопасно для всех платформ.',

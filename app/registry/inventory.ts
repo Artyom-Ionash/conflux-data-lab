@@ -16,7 +16,7 @@ export const TOOLS_MANIFEST: ToolConfig[] = [
     id: 'video-frame-extractor',
     name: 'Video Frame Extractor',
     description: 'Extract frames from video, create spritesheets and analyze differences.',
-    category: 'sprites', // Обновлена категория
+    category: 'sprites',
     tags: ['video', 'frames', 'spritesheet', 'gif'],
     featured: true,
   },
@@ -24,14 +24,14 @@ export const TOOLS_MANIFEST: ToolConfig[] = [
     id: 'vertical-image-aligner',
     name: 'Vertical Image Aligner',
     description: 'Stack images vertically with equal width scaling.',
-    category: 'sprites', // Обновлена категория
+    category: 'sprites',
     tags: ['image', 'align', 'spritesheet'],
   },
   {
     id: 'monochrome-background-remover',
     name: 'Monochrome Remover',
     description: 'Remove background from monochrome images using luminance.',
-    category: 'sprites', // Обновлена категория
+    category: 'sprites',
     tags: ['image', 'transparent', 'spritesheet'],
   },
 
@@ -54,17 +54,14 @@ export const TOOLS_MANIFEST: ToolConfig[] = [
   },
 ];
 
-export const toolsByCategory = TOOLS_MANIFEST.reduce(
-  (acc, tool) => {
-    const category = tool.category;
-    if (!acc[category]) {
-      acc[category] = [];
-    }
-    acc[category].push(tool);
-    return acc;
-  },
-  {} as Record<string, ToolConfig[]>
-);
+export const toolsByCategory = TOOLS_MANIFEST.reduce<Record<string, ToolConfig[]>>((acc, tool) => {
+  const category = tool.category;
+  if (!acc[category]) {
+    acc[category] = [];
+  }
+  acc[category].push(tool);
+  return acc;
+}, {});
 
 export function getToolById(id: string): ToolConfig | undefined {
   return TOOLS_MANIFEST.find((tool) => tool.id === id);
