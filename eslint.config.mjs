@@ -156,43 +156,34 @@ const eslintConfig = defineConfig([
       'no-restricted-syntax': [
         'error',
         {
-          // Запрещаем 'as Type'.
-          // Исключение: 'as const' (typeAnnotation.typeName.name === 'const')
           selector: "TSAsExpression:not([typeAnnotation.typeName.name='const'])",
-          // message:
-          //   '⛔ UNSAFE CAST DETECTED.\nИспользование "as Type" запрещено, так как это скрывает ошибки типов.\n\n✅ Решение:\n1. Используйте Type Guard (isDefined, isObject) из "@/core/primitives/guards".\n2. Используйте валидацию (Zod) для внешних данных.\n3. Если это библиотека, создайте безопасную обертку в "core/".',
+          message:
+            '⛔ UNSAFE CAST. Использование "as Type" скрывает ошибки.\nREAD: docs/CONTRIBUTING.md:51:1',
         },
         {
-          // Запрещаем старый синтаксис <Type>variable
           selector: 'TSTypeAssertion',
-          message: 'Использование <Type>assertion запрещено. Используйте безопасные методы.',
+          message: '⛔ LEGACY CAST. Используйте Type Guards.\nREAD: docs/CONTRIBUTING.md:51:1',
         },
       ],
     },
   },
-  // --- ПОЛИТИКА "ZERO-HTML" (Features, Libs, Core) ---
-  // Запрещает использование стандартных HTML тегов (div, span, img) в слоях бизнес-логики и ядра.
-  // Разрешает: React Components (PascalCase) и Fragment (<>).
+  // --- POLICY: UI ISOLATION ---
+  // Верстка только в ui/
   {
     files: ['**/*.tsx'],
-    // Можно добавить исключения, если есть специфические файлы, где HTML необходим
     ignores: [
-      'ui/**',
-      'app/**',
-      'core/browser/**',
+      'ui/**', 
+      'app/**', 
+      'core/browser/**', 
       'core/react/**',
     ], 
     rules: {
       'no-restricted-syntax': [
         'error',
         {
-          // AST Селектор: 
-          // 1. Ищем открывающий тег JSX.
-          // 2. Проверяем имя тега.
-          // 3. Если имя начинается с маленькой буквы (a-z) -> это HTML тег.
           selector: "JSXOpeningElement > JSXIdentifier[name=/^[a-z]/]",
-          // message:
-          //   "⛔ RAW HTML DETECTED.\nВ этом слое запрещено использовать сырой HTML (div, span, button...).\n✅ Используйте компоненты дизайн-системы из '@/ui/':\n- ui/layout (Box, Stack, Group)\n- ui/primitive (Typography, Icon)\n- ui/input (Button, Input)",
+          message:
+            "⛔ RAW HTML. Верстка должна быть в 'ui/'.\nREAD: docs/CONTRIBUTING.md:62:1",
         },
       ],
     },
