@@ -8,9 +8,9 @@ import {
   TEXTURE_LIMITS,
   TEXTURE_ZONES,
 } from '@/lib/graphics/standards';
-import { DimensionInput } from '@/ui/input/DimensionInput';
-import { Stack } from '@/ui/layout/Layout';
-import { Typography } from '@/ui/primitive/Typography';
+import { Stack } from '@/ui/atoms/layout/Layout';
+import { Typography } from '@/ui/atoms/primitive/Typography';
+import { DimensionInput } from '@/ui/molecules/input/DimensionInput';
 
 interface TextureDimensionSliderProps {
   label: string;

@@ -1,0 +1,48 @@
+'use client';
+
+import React from 'react';
+
+import { cn } from '@/core/tailwind/utils';
+
+interface OverlayLabelProps {
+  children: React.ReactNode;
+  position?: 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right' | 'bottom-center';
+  variant?: 'dark' | 'accent';
+  className?: string;
+}
+
+/**
+ * Техническая метка для наложения поверх визуального контента.
+ */
+export function OverlayLabel({
+  children,
+  position = 'top-left',
+  variant = 'dark',
+  className = '',
+}: OverlayLabelProps) {
+  const positions = {
+    'top-left': 'top-1 left-1',
+    'top-right': 'top-1 right-1',
+    'bottom-left': 'bottom-1 left-1',
+    'bottom-right': 'bottom-1 right-1',
+    'bottom-center': 'bottom-4 left-1/2 -translate-x-1/2',
+  };
+
+  const variants = {
+    dark: 'bg-black/60 text-white',
+    accent: 'bg-blue-600 text-white',
+  };
+
+  return (
+    <div
+      className={cn(
+        'pointer-events-none absolute z-(--z-canvas-ui) rounded px-1.5 py-0.5 font-mono text-[10px] font-bold shadow-sm backdrop-blur-sm transition-opacity duration-200 select-none', // Заменено z-20 на семантический слой
+        positions[position],
+        variants[variant],
+        className
+      )}
+    >
+      {children}
+    </div>
+  );
+}

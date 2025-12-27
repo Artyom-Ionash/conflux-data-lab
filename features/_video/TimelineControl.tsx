@@ -1,14 +1,14 @@
 import React, { useRef } from 'react';
 
 import { useVideoScrubber } from '@/core/react/hooks/use-video-scrubber';
-import { Card } from '@/ui/container/Card';
-import { NumberStepper } from '@/ui/input/NumberStepper';
-import { RangeSlider } from '@/ui/input/RangeSlider';
-import { Group, Stack } from '@/ui/layout/Layout';
-import { DualHoverPreview } from '@/ui/media/DualHoverPreview';
-import { Indicator } from '@/ui/primitive/Indicator';
-import { Separator } from '@/ui/primitive/Separator';
-import { Typography } from '@/ui/primitive/Typography';
+import { Card } from '@/ui/atoms/container/Card';
+import { NumberStepper } from '@/ui/atoms/input/NumberStepper';
+import { RangeSlider } from '@/ui/atoms/input/RangeSlider';
+import { Group, Stack } from '@/ui/atoms/layout/Layout';
+import { Indicator } from '@/ui/atoms/primitive/Indicator';
+import { Separator } from '@/ui/atoms/primitive/Separator';
+import { Typography } from '@/ui/atoms/primitive/Typography';
+import { DualHoverPreview } from '@/ui/molecules/media/DualHoverPreview';
 
 interface TimelineControlProps {
   // Data

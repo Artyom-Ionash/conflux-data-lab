@@ -16,20 +16,20 @@ import type {
 import { useBundleManager } from '@/lib/context-generator/use-bundle-manager';
 import { type FileBundle } from '@/lib/file-system/bundle';
 import { generateAsciiTree } from '@/lib/file-system/topology';
-import { ProcessingOverlay } from '@/ui/feedback/ProcessingOverlay';
-import { Button } from '@/ui/input/Button';
-import { Field } from '@/ui/input/Field';
-import { TextInput } from '@/ui/input/Input';
-import { Switch } from '@/ui/input/Switch';
-import { ToggleGroup, ToggleGroupItem } from '@/ui/input/ToggleGroup';
-import { Stack } from '@/ui/layout/Layout';
-import { Workbench } from '@/ui/layout/Workbench';
-import { Icon } from '@/ui/primitive/Icon';
-import { Indicator } from '@/ui/primitive/Indicator';
+import { Field } from '@/ui/atoms/input/Field';
+import { TextInput } from '@/ui/atoms/input/Input';
+import { Switch } from '@/ui/atoms/input/Switch';
+import { ToggleGroup, ToggleGroupItem } from '@/ui/atoms/input/ToggleGroup';
+import { Stack } from '@/ui/atoms/layout/Layout';
+import { Icon } from '@/ui/atoms/primitive/Icon';
+import { Indicator } from '@/ui/atoms/primitive/Indicator';
+import { ResultViewer } from '@/ui/molecules/display/ResultViewer';
+import { ProcessingOverlay } from '@/ui/molecules/feedback/ProcessingOverlay';
+import { Button } from '@/ui/molecules/input/Button';
+import { Workbench } from '@/ui/molecules/layout/Workbench';
 
 import { CONTEXT_PRESETS, HEAVY_DIRS, type PresetKey } from '../lib/context-generator/rules';
 import { FileDropzonePlaceholder } from './_io/FileDropzone';
-import { ResultViewer } from './_io/ResultViewer';
 import { SidebarIO } from './_io/SidebarIO';
 
 const PRESET_KEYS = Object.keys(CONTEXT_PRESETS).filter((k): k is PresetKey =>

@@ -3,15 +3,15 @@ import React, { useCallback, useMemo } from 'react';
 import { downloadDataUrl } from '@/core/browser/canvas';
 import { getAspectRatio } from '@/core/primitives/math';
 import type { ExtractedFrame } from '@/lib/video/extraction';
-import { Card } from '@/ui/container/Card';
-import { Button } from '@/ui/input/Button';
-import { NumberStepper } from '@/ui/input/NumberStepper';
-import { AspectRatio } from '@/ui/layout/AspectRatio';
-import { Grid, Group, Stack } from '@/ui/layout/Layout';
-import { ImageSequencePlayer } from '@/ui/media/ImageSequencePlayer';
-import { RangeVideoPlayer } from '@/ui/media/RangeVideoPlayer';
-import { OverlayLabel } from '@/ui/primitive/OverlayLabel';
-import { Typography } from '@/ui/primitive/Typography';
+import { NumberStepper } from '@/ui/atoms/input/NumberStepper';
+import { Box } from '@/ui/atoms/layout/Box';
+import { Grid, Group, Stack } from '@/ui/atoms/layout/Layout';
+import { ImageSequencePlayer } from '@/ui/atoms/media/ImageSequencePlayer';
+import { OverlayLabel } from '@/ui/atoms/primitive/OverlayLabel';
+import { Typography } from '@/ui/atoms/primitive/Typography';
+import { Button } from '@/ui/molecules/input/Button';
+import { MediaCard } from '@/ui/molecules/media/MediaCard';
+import { RangeVideoPlayer } from '@/ui/molecules/media/RangeVideoPlayer';
 
 import { FrameDiffOverlay } from './FrameDiffOverlay';
 
@@ -62,12 +62,18 @@ export function MonitorDashboard({
 
   const currentSpeedPercent = Math.round((gifFps / captureFps) * 100);
 
+  // Стабилизируем массив URL, чтобы плеер не перезагружался на каждом тике таймера
+  const imageUrls = useMemo(() => frames.map((f) => f.dataUrl), [frames]);
+
   const handleDrawOverlay = useCallback(
     (ctx: CanvasRenderingContext2D, index: number, w: number, h: number) => {
       const frame = frames[index];
       if (!frame) return;
+
       const timeText = `${frame.time.toFixed(2)}s`;
       const fontSize = Math.max(14, Math.floor(w * 0.05));
+
+      ctx.save(); // Сохраняем состояние контекста
       ctx.font = `bold ${fontSize}px monospace`;
 
       const margin = Math.max(8, w * 0.03);
@@ -80,31 +86,28 @@ export function MonitorDashboard({
 
       ctx.fillStyle = 'white';
       ctx.fillText(timeText, x, y);
+      ctx.restore(); // Восстанавливаем состояние
     },
     [frames]
   );
 
   return (
     <Grid className="grid-cols-1 lg:grid-cols-3" gap={4}>
-      <Card
-        className="flex flex-col overflow-hidden shadow-sm"
-        title={<Typography.Text variant="label">Исходное видео</Typography.Text>}
-        contentClassName="p-0"
-      >
-        <AspectRatio ratio={videoRatio} className="bg-black">
-          <RangeVideoPlayer
-            src={videoSrc}
-            startTime={startTime}
-            endTime={endTime}
-            className="absolute inset-0"
-          />
-        </AspectRatio>
-      </Card>
+      {/* 1. Исходное видео */}
+      <MediaCard title="Исходное видео" ratio={videoRatio}>
+        <RangeVideoPlayer
+          src={videoSrc}
+          startTime={startTime}
+          endTime={endTime}
+          className="absolute inset-0"
+        />
+      </MediaCard>
 
-      <Card
-        className="flex flex-col overflow-hidden shadow-sm"
-        title={<Typography.Text variant="label">Разница</Typography.Text>}
-        headerActions={
+      {/* 2. Разница */}
+      <MediaCard
+        title="Разница"
+        ratio={videoRatio}
+        actions={
           diffDataUrl ? (
             <Button
               onClick={() => downloadDataUrl(diffDataUrl ?? '', 'diff.png')}
@@ -115,23 +118,23 @@ export function MonitorDashboard({
             </Button>
           ) : undefined
         }
-        contentClassName="p-0"
       >
-        <AspectRatio ratio={videoRatio} className="bg-zinc-100 dark:bg-zinc-950">
+        <Box className="relative h-full w-full bg-zinc-100 dark:bg-zinc-950">
           <FrameDiffOverlay
             image1={previewStart}
             image2={previewEnd}
             isProcessing={isDiffProcessing}
             onDataGenerated={onDiffGenerated}
           />
-        </AspectRatio>
-      </Card>
+        </Box>
+      </MediaCard>
 
-      <Card
-        className="flex flex-col overflow-hidden shadow-sm"
-        title={
+      {/* 3. Спрайт / GIF */}
+      <MediaCard
+        title="Спрайт"
+        ratio={videoRatio}
+        actions={
           <Group gap={4}>
-            <Typography.Text variant="label">Спрайт</Typography.Text>
             <NumberStepper
               label="Скорость %"
               value={currentSpeedPercent}
@@ -143,19 +146,15 @@ export function MonitorDashboard({
               max={500}
               step={10}
             />
-            <NumberStepper label="FPS" value={gifFps} onChange={() => {}} disabled />
+            {frames.length > 0 && !isProcessing && (
+              <Button onClick={onDownloadGif} variant="link" size="xs" disabled={isProcessing}>
+                Скачать GIF
+              </Button>
+            )}
           </Group>
         }
-        headerActions={
-          frames.length > 0 && !isProcessing ? (
-            <Button onClick={onDownloadGif} variant="link" size="xs" disabled={isProcessing}>
-              Скачать GIF
-            </Button>
-          ) : undefined
-        }
-        contentClassName="p-0"
       >
-        <AspectRatio ratio={videoRatio} className="bg-zinc-100 dark:bg-zinc-950">
+        <Box className="relative h-full w-full bg-zinc-100 dark:bg-zinc-950">
           <Stack
             className="group relative h-full w-full cursor-pointer"
             gap={0}
@@ -164,7 +163,7 @@ export function MonitorDashboard({
             {frames.length > 0 || isProcessing ? (
               <>
                 <ImageSequencePlayer
-                  images={frames.map((f) => f.dataUrl)}
+                  images={imageUrls}
                   fps={gifFps}
                   width={videoDimensions?.width || 300}
                   height={videoDimensions?.height || 200}
@@ -180,8 +179,8 @@ export function MonitorDashboard({
               </Typography.Text>
             )}
           </Stack>
-        </AspectRatio>
-      </Card>
+        </Box>
+      </MediaCard>
     </Grid>
   );
 }

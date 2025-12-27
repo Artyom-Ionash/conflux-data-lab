@@ -7,10 +7,10 @@ import {
   TEXTURE_ZONES,
   type TextureStatus,
 } from '@/lib/graphics/standards';
-import { ZoneIndicator } from '@/ui/feedback/ZoneIndicator';
-import { Box } from '@/ui/layout/Box';
-import { Group, Stack } from '@/ui/layout/Layout';
-import { Typography } from '@/ui/primitive/Typography';
+import { ZoneIndicator } from '@/ui/atoms/feedback/ZoneIndicator';
+import { Box } from '@/ui/atoms/layout/Box';
+import { Group, Stack } from '@/ui/atoms/layout/Layout';
+import { Typography } from '@/ui/atoms/primitive/Typography';
 
 interface TextureLimitIndicatorProps {
   value: number;

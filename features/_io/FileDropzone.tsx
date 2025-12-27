@@ -11,12 +11,12 @@ import {
 } from '@/core/browser/compat';
 import { isInstanceOf } from '@/core/primitives/guards';
 import { filterFileList, scanDirectoryHandle, scanEntries } from '@/lib/context-generator/scanner';
-import { DropzoneVisual } from '@/ui/input/Dropzone';
-import { HiddenInput } from '@/ui/input/Input';
-import { Stack } from '@/ui/layout/Layout';
-import { Workbench } from '@/ui/layout/Workbench';
-import { Icon } from '@/ui/primitive/Icon';
-import { Typography } from '@/ui/primitive/Typography';
+import { HiddenInput } from '@/ui/atoms/input/Input';
+import { Stack } from '@/ui/atoms/layout/Layout';
+import { Icon } from '@/ui/atoms/primitive/Icon';
+import { Typography } from '@/ui/atoms/primitive/Typography';
+import { DropzoneVisual } from '@/ui/molecules/input/Dropzone';
+import { Workbench } from '@/ui/molecules/layout/Workbench';
 
 // --- Type Guards & Interfaces ---
 

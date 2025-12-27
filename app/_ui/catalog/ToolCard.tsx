@@ -1,8 +1,8 @@
 import Link from 'next/link';
 
 import type { ToolConfig } from '@/app/registry/specifications';
-import { Card } from '@/ui/container/Card';
-import { Badge } from '@/ui/primitive/Badge';
+import { Card } from '@/ui/atoms/container/Card';
+import { Badge } from '@/ui/atoms/primitive/Badge';
 
 interface ToolCardProps {
   tool: ToolConfig;

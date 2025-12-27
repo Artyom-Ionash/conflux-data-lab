@@ -11,24 +11,23 @@ import {
   calculateCenterOffset,
   type CompositionLayer,
 } from '@/lib/graphics/processing/composition';
-import { CanvasMovable, useCanvasRef } from '@/ui/canvas/Canvas';
-import { CanvasLayer } from '@/ui/canvas/CanvasLayer';
-import { GridOverlay } from '@/ui/canvas/GridOverlay';
-import { SortableList } from '@/ui/canvas/SortableList';
-import { WorkbenchFrame } from '@/ui/canvas/WorkbenchFrame';
-import { ActionGroup } from '@/ui/container/ActionGroup';
-import { Card } from '@/ui/container/Card';
-import { Section, SectionHeader } from '@/ui/container/Section';
-import { StatusBox } from '@/ui/container/StatusBox';
-import { Button } from '@/ui/input/Button';
-import { Slider } from '@/ui/input/Slider';
-import { Switch } from '@/ui/input/Switch';
-import { Group, Stack } from '@/ui/layout/Layout';
-import { Workbench } from '@/ui/layout/Workbench';
-import { Icon } from '@/ui/primitive/Icon';
-import { Indicator } from '@/ui/primitive/Indicator';
-import { OverlayLabel } from '@/ui/primitive/OverlayLabel';
-import { Typography } from '@/ui/primitive/Typography';
+import { CanvasMovable, useCanvasRef } from '@/ui/atoms/canvas/Canvas';
+import { CanvasLayer } from '@/ui/atoms/canvas/CanvasLayer';
+import { GridOverlay } from '@/ui/atoms/canvas/GridOverlay';
+import { SortableList } from '@/ui/atoms/canvas/SortableList';
+import { ActionGroup } from '@/ui/atoms/container/ActionGroup';
+import { StatusBox } from '@/ui/atoms/container/StatusBox';
+import { Slider } from '@/ui/atoms/input/Slider';
+import { Switch } from '@/ui/atoms/input/Switch';
+import { Group, Stack } from '@/ui/atoms/layout/Layout';
+import { Indicator } from '@/ui/atoms/primitive/Indicator';
+import { OverlayLabel } from '@/ui/atoms/primitive/OverlayLabel';
+import { Typography } from '@/ui/atoms/primitive/Typography';
+import { WorkbenchFrame } from '@/ui/molecules/canvas/WorkbenchFrame';
+import { Section, SectionHeader } from '@/ui/molecules/container/Section';
+import { LayerListItem } from '@/ui/molecules/display/LayerListItem';
+import { Button } from '@/ui/molecules/input/Button';
+import { Workbench } from '@/ui/molecules/layout/Workbench';
 
 import { TextureDimensionSlider } from './_hardware/TextureDimensionSlider';
 import { FileDropzonePlaceholder } from './_io/FileDropzone';
@@ -63,12 +62,10 @@ export function VerticalImageAligner() {
   const [images, setImages] = useState<AlignImage[]>([]);
   const imagesRef = useRef(images);
 
-  // Sync ref for cleanup
   useEffect(() => {
     imagesRef.current = images;
   }, [images]);
 
-  // Clean up object URLs on unmount
   useEffect(() => () => imagesRef.current.forEach((img) => revokeObjectURLSafely(img.url)), []);
 
   const [slotHeight, setSlotHeight] = useState(DEFAULT_SETTINGS.slotSize);
@@ -219,38 +216,25 @@ export function VerticalImageAligner() {
     }
   }, [images, slotHeight, slotWidth, totalHeight, workspaceRef]);
 
+  // Выносим рендер айтема в отдельную функцию, но используем новый компонент
   const renderSortableItem = (
     img: AlignImage,
     index: number,
     isDragging: boolean,
     dragProps: React.HTMLAttributes<HTMLElement>
   ) => (
-    <Card
+    <LayerListItem
       {...dragProps}
-      variant="default"
-      active={img.isActive}
-      className={`cursor-grab select-none active:cursor-grabbing ${isDragging ? 'opacity-50' : ''}`}
-      onClick={() => handleActivate(img.id)}
-      contentClassName="p-2.5 flex items-center gap-3"
-    >
-      <Typography.Text variant="dimmed" className="w-6 shrink-0 font-mono text-xs">
-        #{index + 1}
-      </Typography.Text>
-      <Typography.Text className="min-w-0 flex-1 truncate font-medium">{img.name}</Typography.Text>
-      <Button
-        variant="destructive"
-        size="xs"
-        className="h-6 w-6 shrink-0 p-0"
-        title="Удалить"
-        onClick={(e) => {
-          e.stopPropagation();
-          handleRemoveImage(img.id);
-        }}
-        onPointerDown={(e) => e.stopPropagation()}
-      >
-        <Icon.Trash className="h-3.5 w-3.5" />
-      </Button>
-    </Card>
+      index={index}
+      name={img.name}
+      isActive={img.isActive}
+      isDragging={isDragging}
+      onActivate={() => handleActivate(img.id)}
+      onRemove={(e) => {
+        e.stopPropagation();
+        handleRemoveImage(img.id);
+      }}
+    />
   );
 
   const sidebarContent = (
@@ -441,11 +425,6 @@ export function VerticalImageAligner() {
             showTransparencyGrid={true}
             defaultBackgroundColor={bgColor}
           >
-            {/* 
-              1. Слой изображений (КОНТЕНТ).
-              Используем стандартные слои Canvas.
-              Это помещает изображения "вглубь", позволяя интерфейсным сеткам быть сверху.
-            */}
             {images.map((img, i) => (
               <CanvasLayer
                 key={img.id}
@@ -454,8 +433,6 @@ export function VerticalImageAligner() {
                   top: i * slotHeight,
                   height: slotHeight,
                   width: slotWidth,
-                  // z-canvas-content - для фона
-                  // z-canvas-overlay - для активного элемента
                   zIndex: img.isActive ? 'var(--z-canvas-overlay)' : 'var(--z-canvas-content)',
                 }}
               >
@@ -498,11 +475,6 @@ export function VerticalImageAligner() {
               </CanvasLayer>
             ))}
 
-            {/* 
-              2. Слой линеек.
-              Используем z-canvas-ui, что гарантирует положение ПОВЕРХ любого контента.
-              z-[...] необходим, так как GridOverlay имеет инлайн-стиль по умолчанию.
-            */}
             {showRedGrid && (
               <GridOverlay
                 color="#ff0000"

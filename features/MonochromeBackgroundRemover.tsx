@@ -17,24 +17,25 @@ import type {
   WorkerResponse,
 } from '@/lib/graphics/processing/background-engine.worker';
 import type { Point } from '@/lib/graphics/processing/imaging';
-import { CanvasMovable, useCanvasRef } from '@/ui/canvas/Canvas';
-import { WorkbenchFrame } from '@/ui/canvas/WorkbenchFrame';
-import { ActionGroup } from '@/ui/container/ActionGroup';
-import { Section } from '@/ui/container/Section';
-import { StatusBox } from '@/ui/container/StatusBox';
-import { Button } from '@/ui/input/Button';
-import { ColorInput } from '@/ui/input/ColorInput';
-import { Slider } from '@/ui/input/Slider';
-import { Swatch } from '@/ui/input/Swatch';
-import { ToggleGroup, ToggleGroupItem } from '@/ui/input/ToggleGroup';
-import { Box } from '@/ui/layout/Box';
-import { EngineRoom } from '@/ui/layout/EngineRoom';
-import { Group, Stack } from '@/ui/layout/Layout';
-import { Surface } from '@/ui/layout/Surface';
-import { Workbench } from '@/ui/layout/Workbench';
-import { Icon } from '@/ui/primitive/Icon';
-import { Separator } from '@/ui/primitive/Separator';
-import { Typography } from '@/ui/primitive/Typography';
+import { CanvasMovable, useCanvasRef } from '@/ui/atoms/canvas/Canvas';
+import { ActionGroup } from '@/ui/atoms/container/ActionGroup';
+import { StatusBox } from '@/ui/atoms/container/StatusBox';
+import { Slider } from '@/ui/atoms/input/Slider';
+import { Swatch } from '@/ui/atoms/input/Swatch';
+import { ToggleGroup, ToggleGroupItem } from '@/ui/atoms/input/ToggleGroup';
+import { Box } from '@/ui/atoms/layout/Box';
+import { EngineRoom } from '@/ui/atoms/layout/EngineRoom';
+import { Stack } from '@/ui/atoms/layout/Layout';
+import { Surface } from '@/ui/atoms/layout/Surface';
+import { Icon } from '@/ui/atoms/primitive/Icon';
+import { Separator } from '@/ui/atoms/primitive/Separator';
+import { Typography } from '@/ui/atoms/primitive/Typography';
+import { WorkbenchFrame } from '@/ui/molecules/canvas/WorkbenchFrame';
+import { Section } from '@/ui/molecules/container/Section';
+import { Button } from '@/ui/molecules/input/Button';
+import { ColorInput } from '@/ui/molecules/input/ColorInput';
+import { PropertyRow } from '@/ui/molecules/input/PropertyRow';
+import { Workbench } from '@/ui/molecules/layout/Workbench';
 
 import { FileDropzonePlaceholder } from './_io/FileDropzone';
 import { SidebarIO } from './_io/SidebarIO';
@@ -61,13 +62,11 @@ const INTERACTION_CHART = {
   },
   panning: {
     SPACE_UP: 'idle',
-    // Если отпустили мышь во время панорамирования - остаемся в panning, пока нажат пробел
   },
   interacting: {
     MOUSE_UP: 'idle',
-    // Пробел игнорируем, пока рисуем
   },
-} as const; // as const нужен для типизации литералов
+} as const;
 
 const DEFAULT_SETTINGS = {
   targetColor: '#ffffff',
@@ -87,8 +86,6 @@ export function MonochromeBackgroundRemover() {
   const imgH = session.dimensions?.height;
 
   // --- STATE MACHINES ---
-
-  // 1. History Machine (Undo/Redo)
   const {
     state: floodPoints,
     set: setFloodPoints,
@@ -99,16 +96,13 @@ export function MonochromeBackgroundRemover() {
     reset: resetFloodPoints,
   } = useHistory<Point[]>([]);
 
-  // 2. Interaction Machine (Mouse Modes)
   const { state: interactionState, transition } = useStateMachine<
     InteractionState,
     InteractionEvent
   >('idle', INTERACTION_CHART);
 
-  // Global Key Listener for Interaction Modes & History
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Undo/Redo
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'z') {
         e.preventDefault();
         if (e.shiftKey) {
@@ -117,9 +111,8 @@ export function MonochromeBackgroundRemover() {
           undo();
         }
       }
-      // Panning Mode
       if (e.code === 'Space' && !e.repeat) {
-        e.preventDefault(); // Prevent scroll
+        e.preventDefault();
         transition('SPACE_DOWN');
       }
     };
@@ -139,7 +132,6 @@ export function MonochromeBackgroundRemover() {
   }, [undo, redo, transition]);
 
   // --- PARAMS ---
-
   const [targetColor, setTargetColor] = useState(DEFAULT_SETTINGS.targetColor);
   const [contourColor, setContourColor] = useState(DEFAULT_SETTINGS.contourColor);
 
@@ -187,10 +179,6 @@ export function MonochromeBackgroundRemover() {
     }
     if (previewCanvasRef.current && processedData) {
       const ctx = previewCanvasRef.current.getContext('2d');
-
-      // FIX: ImageData строго требует ArrayBuffer, но processedData типизирован как ArrayBufferLike.
-      // Мы используем Type Guard (instanceof), чтобы доказать TS, что это безопасный ArrayBuffer.
-      // Это позволяет избежать "as unknown" и копирования данных.
       const buffer = processedData.buffer;
 
       if (isInstanceOf(buffer, ArrayBuffer)) {
@@ -216,7 +204,6 @@ export function MonochromeBackgroundRemover() {
     onMessage: handleWorkerMessage,
   });
 
-  // Init Source Canvas
   useEffect(() => {
     if (!session.url || !imgW || !imgH) return;
 
@@ -238,7 +225,6 @@ export function MonochromeBackgroundRemover() {
     }
   }, [session.url, imgW, imgH, workspaceRef]);
 
-  // Main Pipeline Trigger
   const processImage = useCallback(() => {
     if (!session.url || !sourceCanvasRef.current) return;
     const sourceCtx = sourceCanvasRef.current.getContext('2d', { willReadFrequently: true });
@@ -318,17 +304,10 @@ export function MonochromeBackgroundRemover() {
     return null;
   };
 
-  // --- MOUSE HANDLERS (Delegated to State Machine implicitly) ---
-
   const handleImagePointerDown = (e: React.PointerEvent) => {
-    // Если мы в режиме панорамирования (Space), то Canvas сам обработает драг.
-    // Нам нужно блокировать рисование.
     if (interactionState === 'panning') return;
-
     if (e.button !== MOUSE_BUTTON_LEFT) return;
-
     transition('MOUSE_DOWN');
-
     if (processingMode === 'flood-clear') {
       const coords = getRelativeImageCoords(e.clientX, e.clientY);
       if (coords) setFloodPoints((prev) => [...prev, coords], 'push');
@@ -364,7 +343,6 @@ export function MonochromeBackgroundRemover() {
   const clearAllPoints = () => resetFloodPoints([]);
   const handleRunFloodFill = () => setManualTrigger((prev) => prev + 1);
 
-  // Cursor logic based on state machine
   const getCursor = () => {
     if (interactionState === 'panning') return 'grab';
     if (processingMode === 'flood-clear') return 'crosshair';
@@ -409,50 +387,34 @@ export function MonochromeBackgroundRemover() {
 
           <Section>
             <Stack gap={2}>
-              <Group gap={3}>
-                <Swatch variant="interactive">
-                  <Image
-                    src={session.url}
-                    alt="picker"
-                    fill
-                    className="object-cover"
-                    onClick={handleEyedropper}
-                    unoptimized
-                  />
-                </Swatch>
-                <Group
-                  gap={2}
-                  className="flex-1 rounded border bg-zinc-50 p-2 dark:border-zinc-700 dark:bg-zinc-800"
-                >
-                  <ColorInput value={targetColor} onChange={setTargetColor} size="sm" />
-                  <Stack gap={0}>
-                    <Typography.Text variant="label" className="opacity-70">
-                      Цель (Фон)
-                    </Typography.Text>
-                    <Typography.Text className="font-mono text-xs font-bold uppercase">
-                      {targetColor}
-                    </Typography.Text>
-                  </Stack>
-                </Group>
-              </Group>
+              {/* Uses UI Component */}
+              <PropertyRow
+                label="Цель (Фон)"
+                valueDisplay={targetColor}
+                control={<ColorInput value={targetColor} onChange={setTargetColor} size="sm" />}
+                preview={
+                  <Swatch variant="interactive">
+                    <Image
+                      src={session.url}
+                      alt="picker"
+                      fill
+                      className="object-cover"
+                      onClick={handleEyedropper}
+                      unoptimized
+                    />
+                  </Swatch>
+                }
+              />
 
-              <Group gap={3}>
-                <Box className="h-8 w-8 shrink-0" />
-                <Group
-                  gap={2}
-                  className="flex-1 rounded border bg-zinc-50 p-2 dark:border-zinc-700 dark:bg-zinc-800"
-                >
-                  <ColorInput value={contourColor} onChange={setContourColor} size="sm" />
-                  <Stack gap={0}>
-                    <Typography.Text variant="label" className="opacity-70">
-                      Контур / Окрас
-                    </Typography.Text>
-                    <Typography.Text className="font-mono text-xs font-bold uppercase">
-                      {contourColor}
-                    </Typography.Text>
-                  </Stack>
-                </Group>
-              </Group>
+              {/* Скрываем контурный цвет в режиме заливки, так как мы теперь используем цель */}
+              {processingMode !== 'flood-clear' && (
+                <PropertyRow
+                  label="Контур / Окрас"
+                  valueDisplay={contourColor}
+                  control={<ColorInput value={contourColor} onChange={setContourColor} size="sm" />}
+                  preview={<Box className="h-8 w-8 shrink-0" />}
+                />
+              )}
             </Stack>
           </Section>
 
@@ -493,6 +455,9 @@ export function MonochromeBackgroundRemover() {
                 max={5}
                 className="mb-0"
               />
+              {/* Окрашивание доступно только если есть ContourColor (т.е. не в режиме заливки), 
+                  либо если мы добавим ручной выбор цвета окраса для заливки. 
+                  Пока оставляем окрашивание всегда, оно будет использовать contourColor (скрытый или явный) */}
               <Slider
                 label="Окрашивание (Paint)"
                 value={edgePaint}

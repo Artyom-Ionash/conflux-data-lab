@@ -12,6 +12,7 @@ const eslintConfig = defineConfig([
 
   globalIgnores(['.next/**', 'out/**', 'build/**', 'next-env.d.ts', '.ai/**']),
 
+  // 1. MAIN CONFIGURATION (Plugins & Boundaries)
   {
     plugins: {
       'simple-import-sort': simpleImportSort,
@@ -19,38 +20,31 @@ const eslintConfig = defineConfig([
       unicorn: eslintPluginUnicorn,
     },
     settings: {
-      // Расширяем область видимости, чтобы линтер видел всё дерево
       'boundaries/include': ['**/*.ts', '**/*.tsx', '**/*.js', '**/*.jsx'],
       
       'boundaries/elements': [
-        // --- 1. CORE KERNEL (Нижний слой, без зависимостей) ---
-        { type: 'core-typescript', pattern: 'core/typescript/**', mode: 'file' },
+        // --- CORE ---
         { type: 'core-primitives', pattern: 'core/primitives/**', mode: 'file' },
         { type: 'core-browser', pattern: 'core/browser/**', mode: 'file' },
         { type: 'core-react', pattern: 'core/react/**', mode: 'file' },
         { type: 'core-tailwind', pattern: 'core/tailwind/**', mode: 'file' },
         { type: 'core-next', pattern: 'core/next/**', mode: 'file' },
         { type: 'core-node', pattern: 'core/node/**', mode: 'file' },
+        { type: 'core-typescript', pattern: 'core/typescript/**', mode: 'file' },
 
-        // --- 2. APP LAYER (Маршрутизация и глобальные настройки) ---
-        { type: 'app', pattern: 'app', mode: 'folder' },
-        
-        // --- 3. UI LAYER (Дизайн-система) ---
-        { type: 'ui', pattern: 'ui/**', mode: 'file' },
+        // --- UI HIERARCHY ---
+        { type: 'ui-atom', pattern: 'ui/atoms/**/*', mode: 'file' },
+        { type: 'ui-molecule', pattern: 'ui/molecules/**/*', mode: 'file' },
 
-        // --- 4. BUSINESS LOGIC (Чистая логика) ---
+        // --- APP LOGIC ---
         { type: 'lib', pattern: 'lib', mode: 'folder' },
-
-        // --- 5. FEATURES (Инструменты) ---
         { type: 'feature', pattern: 'features/*', mode: 'file' },
         { type: 'feature-subsystem', pattern: 'features/**/*', mode: 'file' },
-
-        // --- 6. DEV LAYER (Разработка) ---
+        { type: 'app', pattern: 'app', mode: 'folder' },
         { type: 'scripts', pattern: 'scripts/**', mode: 'file' },
       ],
     },
     rules: {
-      // Иерархия импортов (Белый список)
       'boundaries/element-types': [
         'error',
         {
@@ -58,17 +52,28 @@ const eslintConfig = defineConfig([
           rules: [
             { from: '*', allow: 'core-primitives' },
             { from: 'core-react', allow: 'core-browser' },
-            { from: 'ui', allow: ['core-react', 'core-tailwind'] },
+            { 
+              from: 'ui-atom', 
+              allow: ['core-react', 'core-tailwind', 'core-browser'] 
+            },
+            { 
+              from: 'ui-molecule', 
+              allow: ['core-react', 'core-tailwind', 'core-browser', 'ui-atom', 'ui-molecule'] 
+            },
             { from: 'lib', allow: ['core-browser', 'core-react', 'core-typescript'] },
-            { from: 'feature', allow: ['ui', 'lib', 'core-react', 'core-browser', 'feature-subsystem'] },
-            { from: 'feature-subsystem', allow: ['ui', 'lib', 'core-react', 'core-browser'] },
-            { from: 'app', allow: ['ui', 'core-next', 'feature'] },
+            { 
+              from: 'feature', 
+              allow: ['ui-atom', 'ui-molecule', 'lib', 'core-react', 'core-browser', 'feature-subsystem'] 
+            },
+            { 
+              from: 'feature-subsystem', 
+              allow: [ 'ui-atom', 'ui-molecule', 'lib', 'core-react', 'core-browser'] 
+            },
+            { from: 'app', allow: ['ui-atom', 'core-next', 'feature'] },
             { from: 'scripts', allow: ['core-node', 'lib'] },
           ],
         },
       ],
-
-      // Защита приватных файлов и точек входа
       'boundaries/entry-point': [
         'error',
         {
@@ -88,8 +93,8 @@ const eslintConfig = defineConfig([
       'simple-import-sort/exports': 'error',
     },
   },
-
-  // Правила именования файлов
+  
+  // 2. NAMING CONVENTIONS
   {
     files: ['**/*.{ts,tsx,mts,js,mjs}'],
     rules: {
@@ -118,7 +123,8 @@ const eslintConfig = defineConfig([
       ],
     },
   },
-  // СТРОГИЕ ПРАВИЛА TS
+
+  // 3. STRICT TYPESCRIPT
   {
     files: ['**/*.ts', '**/*.tsx'],
     languageOptions: {
@@ -136,54 +142,45 @@ const eslintConfig = defineConfig([
     },
   },
 
-  // --- ПОЛИТИКА "ZERO-AS" (ЗАПРЕТ TYPE ASSERTIONS) ---
-  // Применяется глобально ко всем TS файлам.
-  // Запрещает `data as Type`, разрешает `data as const`.
+  // 4. GLOBAL INTEGRITY POLICIES (Types & Styling)
+  // Применяется ко всем TS/TSX файлам проекта
   {
-    files: ['**/*.{ts,tsx}'], // Глобальный скоуп
-    ignores: [
-      // --- SAFE ZONES (Где приведение типов необходимо) ---
-
-      // 1. CORE: Здесь создаются сами Type Guards.
-      'core/primitives/guards.ts', 
-
-      // 2. TESTS: В тестах (включая UI-тесты) часто нужны моки.
-      // FIX: Добавлена поддержка .tsx для тестов компонентов (например, Workbench.test.tsx)
-      '**/*.test.{ts,tsx}', 
-      '**/*.spec.{ts,tsx}',
-    ],
+    files: ['**/*.{ts,tsx}'],
+    ignores: ['core/primitives/guards.ts', '**/*.test.{ts,tsx}', '**/*.spec.{ts,tsx}'],
     rules: {
       'no-restricted-syntax': [
         'error',
+        // [Policy] Type Integrity
         {
           selector: "TSAsExpression:not([typeAnnotation.typeName.name='const'])",
-          message:
-            '⛔ UNSAFE CAST. Использование "as Type" скрывает ошибки.\nREAD: docs/CONTRIBUTING.md:51:1',
+          message: '⛔ UNSAFE CAST. Использование "as Type" скрывает ошибки.\nREAD: docs/CONTRIBUTING.md:62:1',
         },
         {
           selector: 'TSTypeAssertion',
-          message: '⛔ LEGACY CAST. Используйте Type Guards.\nREAD: docs/CONTRIBUTING.md:51:1',
+          message: '⛔ LEGACY CAST. Используйте Type Guards.\nREAD: docs/CONTRIBUTING.md:62:1',
+        },
+        // [Policy] Z-Index Topology (НОВОЕ ПРАВИЛО)
+        {
+          // Запрещаем все числовые z-классы, кроме z-auto и z--.
+          selector: "JSXAttribute[name.name='className'] Literal[value=/z-(?!(auto|--))\\d+/]",
+          message: '⛔ MAGIC Z-INDEX. Используйте семантические слои: z-(--z-content), z-(--z-overlay) из layers.css.',
         },
       ],
     },
   },
-  // --- POLICY: UI ISOLATION ---
-  // Верстка только в ui/
+
+  // 5. UI ISOLATION POLICY (Architectural)
+  // Запрещает HTML-теги везде, кроме папки UI.
+  // Это правило должно быть в отдельном блоке, так как у него есть специфичный ignores: ['ui/**'].
   {
     files: ['**/*.tsx'],
-    ignores: [
-      'ui/**', 
-      'app/**', 
-      'core/browser/**', 
-      'core/react/**',
-    ], 
+    ignores: ['ui/**', 'app/**', 'core/browser/**', 'core/react/**'], 
     rules: {
       'no-restricted-syntax': [
         'error',
         {
           selector: "JSXOpeningElement > JSXIdentifier[name=/^[a-z]/]",
-          message:
-            "⛔ RAW HTML. Верстка должна быть в 'ui/'.\nREAD: docs/CONTRIBUTING.md:62:1",
+          message: "⛔ RAW HTML. Верстка должна быть в 'ui/'.\nREAD: docs/CONTRIBUTING.md:62:1",
         },
       ],
     },

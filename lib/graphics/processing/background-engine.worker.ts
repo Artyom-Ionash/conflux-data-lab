@@ -50,17 +50,17 @@ self.onmessage = (e: MessageEvent<WorkerPayload>) => {
     const { imageData, width, height, mode, settings } = e.data;
 
     // --- 1. Подготовка этапов (Stage Helpers) ---
-    // Создаем замыкания для фиксации настроек (Settings),
-    // чтобы в pipe передавать только данные (Data).
 
     const generateBaseMask = (): Uint8Array => {
       if (mode === 'flood-clear') {
+        // FIX: Передаем targetColor вместо contourColor.
+        // Теперь flood fill работает как Magic Wand по целевому цвету.
         return applyFloodFillMask(
           imageData,
           width,
           height,
           settings.floodPoints,
-          settings.contourColor,
+          settings.targetColor,
           settings.tolerance,
           settings.maxRgbDistance
         );
@@ -87,18 +87,15 @@ self.onmessage = (e: MessageEvent<WorkerPayload>) => {
       return applyBlur(mask, width, height, settings.edgeBlur);
     };
 
-    // --- 2. Pipeline Execution (Декларативный поток) ---
+    // --- 2. Pipeline Execution ---
 
-    // pipe берет результат первой функции и передает его во вторую и так далее.
-    // Типы выводятся автоматически: Uint8Array -> Uint8Array -> Uint8Array
     const alphaChannel = pipe(
       generateBaseMask(), // Начальные данные
       withChoke, // Шаг 1: Сжатие
       withBlur // Шаг 2: Размытие
     );
 
-    // --- 3. Post-Processing & Merge (Side Effects) ---
-    // Эти операции мутируют исходный imageData, поэтому они идут отдельно от чистого пайплайна маски.
+    // --- 3. Post-Processing & Merge ---
 
     if (settings.edgePaint > 0) {
       applyEdgePaint(

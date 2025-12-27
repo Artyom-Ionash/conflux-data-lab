@@ -4,13 +4,13 @@ import { useEffect, useRef } from 'react';
 import { captureToCanvas, getTopLeftPixelColor, loadImage } from '@/core/browser/canvas';
 import { areColorsSimilar } from '@/core/primitives/colors';
 import { useTask } from '@/core/react/hooks/use-task';
-import { Loader } from '@/ui/feedback/Loader';
-import { Box } from '@/ui/layout/Box';
-import { Group } from '@/ui/layout/Layout';
-import { Overlay } from '@/ui/layout/Overlay';
-import { Surface } from '@/ui/layout/Surface';
-import { LegendItem } from '@/ui/primitive/Legend';
-import { Typography } from '@/ui/primitive/Typography';
+import { Box } from '@/ui/atoms/layout/Box';
+import { Group } from '@/ui/atoms/layout/Layout';
+import { Overlay } from '@/ui/atoms/layout/Overlay';
+import { Surface } from '@/ui/atoms/layout/Surface';
+import { LegendItem } from '@/ui/atoms/primitive/Legend';
+import { Typography } from '@/ui/atoms/primitive/Typography';
+import { Loader } from '@/ui/molecules/feedback/Loader';
 
 interface FrameDiffOverlayProps {
   image1: string | null;

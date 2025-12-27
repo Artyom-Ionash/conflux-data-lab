@@ -2,9 +2,9 @@
 
 import React from 'react';
 
-import { Button } from '@/ui/input/Button';
-import { Box } from '@/ui/layout/Box';
-import { Stack } from '@/ui/layout/Layout';
+import { Box } from '@/ui/atoms/layout/Box';
+import { Stack } from '@/ui/atoms/layout/Layout';
+import { Button } from '@/ui/molecules/input/Button';
 
 import { FileDropzone } from './FileDropzone';
 

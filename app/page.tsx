@@ -1,4 +1,4 @@
-import { Badge } from '@/ui/primitive/Badge';
+import { Badge } from '@/ui/atoms/primitive/Badge';
 
 import { ToolGrid } from './_ui/catalog/ToolGrid';
 import { categoryLabels, TOOLS_MANIFEST, toolsByCategory } from './registry/inventory';

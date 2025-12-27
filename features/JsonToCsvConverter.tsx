@@ -5,15 +5,15 @@ import { useCallback, useState } from 'react';
 import { downloadText } from '@/core/browser/canvas';
 import { useCopyToClipboard } from '@/core/react/hooks/use-copy';
 import { convertJsonToCsv } from '@/lib/converters/json-to-csv';
-import { Card } from '@/ui/container/Card';
-import { PanelHeader } from '@/ui/container/Panel';
-import { Alert } from '@/ui/feedback/Alert';
-import { Button } from '@/ui/input/Button';
-import { TextArea } from '@/ui/input/Input';
-import { Grid, Stack } from '@/ui/layout/Layout';
-import { Workbench } from '@/ui/layout/Workbench';
+import { Card } from '@/ui/atoms/container/Card';
+import { PanelHeader } from '@/ui/atoms/container/Panel';
+import { Alert } from '@/ui/atoms/feedback/Alert';
+import { TextArea } from '@/ui/atoms/input/Input';
+import { Grid, Stack } from '@/ui/atoms/layout/Layout';
+import { Button } from '@/ui/molecules/input/Button';
+import { Workbench } from '@/ui/molecules/layout/Workbench';
 
-import { ResultViewer } from './_io/ResultViewer';
+import { ResultViewer } from '../ui/molecules/display/ResultViewer';
 import { SidebarIO } from './_io/SidebarIO';
 
 const DEFAULT_EXAMPLE = JSON.stringify(

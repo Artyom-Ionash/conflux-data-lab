@@ -61,13 +61,15 @@ export function applyColorFilter(
 
 /**
  * Алгоритм заливки (Flood Fill) для создания маски прозрачности.
+ * FIX: Логика изменена на стандартную "Magic Wand".
+ * Заливаем, пока цвет находится в пределах допуска от referenceColor.
  */
 export function applyFloodFillMask(
   data: Uint8ClampedArray,
   width: number,
   height: number,
   startPoints: Point[],
-  contourColor: RGB,
+  referenceColor: RGB, // Был contourColor, стал reference (обычно targetColor)
   tolerance: number,
   maxRgbDistance: number
 ): Uint8Array {
@@ -85,10 +87,6 @@ export function applyFloodFillMask(
 
     const stack = [startX, startY];
     while (stack.length) {
-      // Использование non-null assertion здесь безопасно, так как мы проверяем length,
-      // но для чистоты стиля можно использовать pop() ?? 0, хотя это изменит логику если стек пуст (чего не будет).
-      // В данном случае, так как это управление стеком алгоритма, а не доступ к внешним данным,
-      // использование ! допустимо как "инвариант алгоритма", но заменим на проверку для строгости.
       const y = stack.pop();
       const x = stack.pop();
 
@@ -102,14 +100,16 @@ export function applyFloodFillMask(
       // Проверка границы (контура)
       const pixelIndex = idx * PIXEL_STRIDE;
 
-      // FIX: Замена ! на ?? 0
       const r = data[pixelIndex + OFFSET_R] ?? 0;
       const g = data[pixelIndex + OFFSET_G] ?? 0;
       const b = data[pixelIndex + OFFSET_B] ?? 0;
 
-      const dist = getColorDistance(r, g, b, contourColor.r, contourColor.g, contourColor.b);
+      const dist = getColorDistance(r, g, b, referenceColor.r, referenceColor.g, referenceColor.b);
 
-      if (dist <= toleranceValue) continue; // Попали в контур, останавливаемся
+      // FIX: Инверсия логики.
+      // Раньше: if (dist <= tol) stop (остановка об контур).
+      // Теперь: if (dist > tol) stop (остановка, если цвет слишком отличается от цели).
+      if (dist > toleranceValue) continue;
 
       alphaChannel[idx] = 0; // Делаем прозрачным
 
