@@ -1,5 +1,6 @@
 import React from 'react';
 
+import { isNumber } from '@/core/primitives/guards';
 import { cn } from '@/core/tailwind/utils';
 
 interface NumberStepperProps {
@@ -26,7 +27,7 @@ export function NumberStepper({
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = Number.parseFloat(e.target.value);
 
-    if (!Number.isNaN(val)) {
+    if (isNumber(val)) {
       onChange(val);
     }
   };

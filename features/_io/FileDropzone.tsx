@@ -9,6 +9,7 @@ import {
   type DirectorySupport,
   getLegacyDirectoryAttributes,
 } from '@/core/browser/compat';
+import { isInstanceOf } from '@/core/primitives/guards';
 import { filterFileList, scanDirectoryHandle, scanEntries } from '@/lib/context-generator/scanner';
 import { DropzoneVisual } from '@/ui/input/Dropzone';
 import { Workbench } from '@/ui/layout/Workbench';
@@ -128,7 +129,7 @@ export const FileDropzone = ({
       // nodeName 'HTML' указывает на выход курсора за пределы окна.
       if (
         e.relatedTarget === null ||
-        (e.relatedTarget instanceof HTMLElement && e.relatedTarget.nodeName === 'HTML')
+        (isInstanceOf(e.relatedTarget, HTMLElement) && e.relatedTarget.nodeName === 'HTML')
       ) {
         setIsDragActive(false);
       }

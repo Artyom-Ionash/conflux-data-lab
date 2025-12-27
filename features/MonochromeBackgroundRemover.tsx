@@ -5,7 +5,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 
 import { downloadDataUrl, getTopLeftPixelColor, loadImage } from '@/core/browser/canvas';
 import { hexToRgb, invertHex, rgbToHex } from '@/core/primitives/colors';
-import { isOneOf } from '@/core/primitives/guards';
+import { isInstanceOf, isOneOf } from '@/core/primitives/guards';
 import { useDebounceEffect } from '@/core/react/hooks/use-debounce';
 import { useHistory } from '@/core/react/hooks/use-history';
 import { useMediaSession } from '@/core/react/hooks/use-media-session';
@@ -193,7 +193,7 @@ export function MonochromeBackgroundRemover() {
       // Это позволяет избежать "as unknown" и копирования данных.
       const buffer = processedData.buffer;
 
-      if (buffer instanceof ArrayBuffer) {
+      if (isInstanceOf(buffer, ArrayBuffer)) {
         const strictView = new Uint8ClampedArray(
           buffer,
           processedData.byteOffset,
