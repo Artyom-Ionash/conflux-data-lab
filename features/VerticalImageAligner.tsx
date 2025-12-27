@@ -501,7 +501,7 @@ export function VerticalImageAligner() {
             {/* 
               2. Слой линеек.
               Используем z-canvas-ui, что гарантирует положение ПОВЕРХ любого контента.
-              !z-[...] необходим, так как GridOverlay имеет инлайн-стиль по умолчанию.
+              z-[...] необходим, так как GridOverlay имеет инлайн-стиль по умолчанию.
             */}
             {showRedGrid && (
               <GridOverlay
@@ -510,7 +510,7 @@ export function VerticalImageAligner() {
                 stepY={slotHeight}
                 offsetX={redGridOffsetX}
                 offsetY={redGridOffsetY}
-                className="!z-[var(--z-canvas-ui)]"
+                className="z-(--z-canvas-ui)!"
               />
             )}
 
@@ -521,7 +521,7 @@ export function VerticalImageAligner() {
                 stepY={slotHeight}
                 dash={GRID_FRAME_DASH}
                 opacity={0.8}
-                className="!z-[var(--z-canvas-ui)]"
+                className="z-(--z-canvas-ui)!"
               />
             )}
           </WorkbenchFrame>
