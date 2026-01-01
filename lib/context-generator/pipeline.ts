@@ -28,6 +28,7 @@ export async function runContextPipeline(
     const ext = source.name.split('.').pop() || 'txt';
 
     // 1. Проверяем политику "Tree Only" (Source of Truth)
+    // Если путь начинается с одной из папок в treeOnly (например "addons/"), мы это запоминаем
     const activeTreeOnlyRule = options.preset?.treeOnly?.find((p) => source.path.startsWith(p));
 
     // 2. Подготовка для дерева (Всегда сохраняем оригинальный размер для метаданных)
@@ -40,15 +41,17 @@ export async function runContextPipeline(
       });
     }
 
-    // 3. Обработка контента: если файл в treeOnly, заменяем контент на заглушку
-    const finalContent = activeTreeOnlyRule
-      ? `[File content omitted: matches tree-only pattern "${activeTreeOnlyRule}"]`
-      : source.content;
+    // 3. Обработка контента:
+    // Если файл попадает под правило treeOnly, мы ПРОПУСКАЕМ его добавление в processedFiles.
+    // Он останется только в ASCII-дереве.
+    if (activeTreeOnlyRule) {
+      continue;
+    }
 
     const raw: RawFile = {
       name: source.name,
       path: source.path,
-      content: finalContent,
+      content: source.content,
       extension: ext,
     };
 

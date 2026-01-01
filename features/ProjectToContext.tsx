@@ -66,13 +66,20 @@ export function ProjectToContext() {
   // --- MAIN TASK ---
   // Signature: first arg is scope { signal, setProgress }
   const processingTask = useTask<ContextGenerationResult, [FileBundle, string[], PresetKey]>(
-    async ({ signal, setProgress }, activeBundle, paths) => {
+    async ({ signal, setProgress }, activeBundle, paths, presetKey) => {
       if (signal.aborted) throw new Error('Aborted');
 
+      const preset = CONTEXT_PRESETS[presetKey];
+
       // 1. Фильтрация списка файлов (Main Thread - быстро)
-      const textNodes = activeBundle
-        .getItems()
-        .filter((item) => paths.includes(item.path) && item.isText);
+      // Исключаем файлы, которые должны быть только в дереве (treeOnly)
+      const textNodes = activeBundle.getItems().filter((item) => {
+        const isSelected = paths.includes(item.path);
+        const isText = item.isText;
+        const isTreeOnly = preset.treeOnly?.some((rule) => item.path.startsWith(rule));
+
+        return isSelected && isText && !isTreeOnly;
+      });
 
       // 2. Подготовка чанков (Map Phase)
       const fileBatches = chunk(textNodes, BATCH_SIZE);
@@ -110,12 +117,16 @@ export function ProjectToContext() {
       let treeString = '';
       if (includeTree) {
         // Собираем ноды для дерева
-        const treeNodes = activeBundle.getItems().map((item) => ({
-          path: item.path,
-          name: item.name,
-          size: item.size,
-          isText: item.isText,
-        }));
+        // Здесь мы берем ВСЕ файлы из paths, даже если они treeOnly
+        const treeNodes = activeBundle
+          .getItems()
+          .filter((item) => paths.includes(item.path))
+          .map((item) => ({
+            path: item.path,
+            name: item.name,
+            size: item.size,
+            isText: item.isText,
+          }));
 
         treeString = generateAsciiTree(treeNodes);
       }

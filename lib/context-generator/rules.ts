@@ -6,6 +6,7 @@
 // Используются для раннего отсечения (Early Exit) в сканерах.
 export const HEAVY_DIRS = [
   'node_modules',
+  '.venv',
   '.git',
   '.next',
   '.vercel',
@@ -19,6 +20,7 @@ export const HEAVY_DIRS = [
   '.idea',
   '.vscode',
   'target', // Rust/Java
+  '__pycache__',
 ];
 
 // Файлы и папки, которые не несут семантической ценности для LLM.
@@ -33,6 +35,7 @@ export const IGNORE_COMMON = [
   'LICENSE',
   'LICENSE.txt',
   'CHANGELOG.md',
+  '*.pyc', // 👈 Игнорирование скомпилированных файлов Python
 ];
 
 export const LOCAL_CONTEXT_FOLDER = '.ai';
