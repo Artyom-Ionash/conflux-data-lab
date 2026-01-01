@@ -41,12 +41,13 @@ const WHITE: RGB = { r: 255, g: 255, b: 255 };
 
 describe('Graphics Filters', () => {
   describe('applyFloodFillMask', () => {
-    it('should fill a bounded area and stop at contour', () => {
+    it('should fill a bounded area based on similarity (Magic Wand)', () => {
       // SCENARIO: 4x4 Grid
       // We draw a "wall" of BLACK pixels vertically in the middle.
       // We start filling from the left side (WHITE).
-      // Left side should become TRANSPARENT (0).
-      // Wall (BLACK) and Right side (WHITE) should remain OPAQUE (255).
+      // Left side should become TRANSPARENT (0) because it matches Target (WHITE).
+      // Wall (BLACK) should remain OPAQUE (255) because it differs from Target.
+      // Right side (WHITE) should remain OPAQUE (255) because it's unreachable.
 
       const width = 4;
       const height = 4;
@@ -57,13 +58,13 @@ describe('Graphics Filters', () => {
         setPixel(data, width, 2, y, BLACK);
       }
 
-      // Action: Fill starting at (0,0) with contour color = BLACK
+      // Action: Fill starting at (0,0) targeting WHITE
       const resultAlpha = applyFloodFillMask(
         data,
         width,
         height,
         [{ x: 0, y: 0 }],
-        BLACK, // Contour Color
+        WHITE, // FIX: Target Color must be WHITE to clear white pixels
         10, // Tolerance
         441 // Max RGB Dist
       );
@@ -98,12 +99,12 @@ describe('Graphics Filters', () => {
           { x: 50, y: 50 },
           { x: -1, y: 0 },
         ], // Invalid points
-        BLACK,
+        WHITE, // Target WHITE (if points were valid, it would clear)
         0,
         441
       );
 
-      // Should return fully opaque mask (nothing happened)
+      // Should return fully opaque mask (nothing happened because coordinates invalid)
       expect(result[0]).toBe(255);
     });
   });
