@@ -35,7 +35,7 @@ export const IGNORE_COMMON = [
   'LICENSE',
   'LICENSE.txt',
   'CHANGELOG.md',
-  '*.pyc', // 👈 Игнорирование скомпилированных файлов Python
+  '*.pyc',
 ];
 
 export const LOCAL_CONTEXT_FOLDER = '.ai';
@@ -55,25 +55,48 @@ export interface ContextPreset {
   treeOnly: string[];
 }
 
+/**
+ * Расширения, которые считаются текстовыми в любом типе проекта.
+ * Включает документацию, конфиги и скрипты.
+ */
+export const UNIVERSAL_TEXT_EXTENSIONS = [
+  // Documentation
+  '.md',
+  '.txt',
+  '.csv',
+  // Configs / Data
+  '.json',
+  '.json5',
+  '.yaml',
+  '.yml',
+  '.toml',
+  '.xml',
+  '.ini',
+  '.cfg',
+  '.conf',
+  '.env',
+  '.env.local',
+  '.env.example',
+  // Shell scripts
+  '.sh',
+  '.bat',
+  '.ps1',
+];
+
 // Используем satisfies вместо явного Record<string, ContextPreset>
 export const CONTEXT_PRESETS = {
   godot: {
     name: 'Godot 4 (Logic Only)',
     textExtensions: [
+      // Godot Specific
       '.gd',
       '.tscn',
       '.godot',
       '.tres',
-      '.cfg',
       '.gdshader',
-      '.json',
-      '.txt',
-      '.md',
-      '.py',
-      '.yaml',
-      '.yml',
-      '.toml',
-      '.xml',
+      '.py', // Python часто используется в тулинге
+      // Universal
+      ...UNIVERSAL_TEXT_EXTENSIONS,
     ],
     // Используем Set для дедупликации, если IGNORE_COMMON пересечется с уникальными
     hardIgnore: [...new Set([...IGNORE_COMMON, 'builds', '*.uid', '*.import'])],
@@ -82,6 +105,7 @@ export const CONTEXT_PRESETS = {
   nextjs: {
     name: 'Next.js / React',
     textExtensions: [
+      // Web Specific
       '.ts',
       '.tsx',
       '.js',
@@ -89,11 +113,12 @@ export const CONTEXT_PRESETS = {
       '.mjs',
       '.cjs',
       '.css',
-      '.json',
-      '.md',
-      '.yaml',
-      '.yml',
-      '.toml',
+      '.scss',
+      '.sass',
+      '.less',
+      '.svg', // SVG часто содержит код иконок
+      // Universal
+      ...UNIVERSAL_TEXT_EXTENSIONS,
     ],
     hardIgnore: [...IGNORE_COMMON],
     treeOnly: ['public/'],
