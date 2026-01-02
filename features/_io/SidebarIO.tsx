@@ -4,9 +4,11 @@ import React from 'react';
 
 import { Box } from '@/ui/atoms/layout/Box';
 import { Stack } from '@/ui/atoms/layout/Layout';
+import { Typography } from '@/ui/atoms/primitive/Typography';
 import { Button } from '@/ui/molecules/input/Button';
 
 import { FileDropzone } from './FileDropzone';
+import { usePasteHandler } from './use-paste-handler';
 
 interface SidebarIOProps {
   onFilesSelected: (files: File[]) => void;
@@ -49,6 +51,16 @@ export function SidebarIO({
   downloadDisabled = false,
   children,
 }: SidebarIOProps) {
+  // --- PASTE SUPPORT ---
+  usePasteHandler({
+    onFilesReceived: (files) => {
+      onScanStarted?.();
+      // Передаем файлы так же, как и дропзона
+      onFilesSelected(files);
+    },
+    enabled: true,
+  });
+
   return (
     <Stack gap={3}>
       <FileDropzone
@@ -60,6 +72,11 @@ export function SidebarIO({
         directory={directory}
         label={dropLabel}
       />
+
+      {/* Подсказка для пользователя */}
+      <Typography.Text variant="dimmed" size="xs" align="center" className="opacity-60">
+        Или нажмите Ctrl+V для вставки
+      </Typography.Text>
 
       {hasFiles && onDownload && (
         <Box className="fx-slide-in border-t border-zinc-200 pt-4 dark:border-zinc-800">
