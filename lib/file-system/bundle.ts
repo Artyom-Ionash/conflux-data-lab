@@ -25,16 +25,17 @@ export abstract class BaseBundle<T extends BaseFileNode> {
   protected readonly nodes = new Map<string, T>();
   public readonly detectedPreset: PresetKey;
 
-  constructor(fileNames: string[], presetOverride?: PresetKey) {
-    this.detectedPreset = presetOverride || this.detectSignature(fileNames);
+  constructor(rootFileNames: string[], presetOverride?: PresetKey) {
+    this.detectedPreset = presetOverride || this.detectSignature(rootFileNames);
   }
 
   /**
    * Детекция "почерка" проекта по списку имен файлов.
+   * Принимает ТОЛЬКО файлы корневого уровня.
    */
-  protected detectSignature(names: string[] | Set<string>): PresetKey {
-    // Оптимизация: проверяем только корневые файлы
-    const nameSet = Array.isArray(names) ? new Set(names) : names;
+  protected detectSignature(rootNames: string[] | Set<string>): PresetKey {
+    const nameSet = Array.isArray(rootNames) ? new Set(rootNames) : rootNames;
+
     if (nameSet.has('project.godot')) return 'godot';
     if (nameSet.has('package.json')) return 'nextjs';
     return 'nextjs';
@@ -79,11 +80,28 @@ export class FileBundle extends BaseBundle<BrowserNode> {
     files: File[],
     options: { customExtensions?: string[]; presetOverride?: PresetKey } = {}
   ) {
-    super(
-      // Передаем только первые 50 имен для детекции пресета (оптимизация)
-      files.slice(0, 50).map((f) => f.name),
-      options.presetOverride
-    );
+    //  Нам нужно найти файлы, у которых не более одного разделителя пути.
+    // "Root/file.txt" -> 1 слэш -> OK
+    // "Root/Sub/file.txt" -> 2 слэша -> Skip
+    const rootCandidates = files
+      .filter((f) => {
+        const path = f.webkitRelativePath || f.name;
+        // Нормализация слэшей нужна только для Windows-путей при paste,
+        // webkitRelativePath обычно всегда использует '/'.
+        const unixPath = path.includes('\\') ? path.replaceAll('\\', '/') : path;
+
+        const firstSlash = unixPath.indexOf('/');
+        if (firstSlash === -1) return true; // Нет слэшей (файл в корне)
+
+        // Ищем второй слэш, начиная сразу после первого
+        const secondSlash = unixPath.indexOf('/', firstSlash + 1);
+
+        // Если второго слэша нет (-1), значит это файл первого уровня вложенности (Root/file.txt)
+        return secondSlash === -1;
+      })
+      .map((f) => f.name);
+
+    super(rootCandidates, options.presetOverride);
 
     const presetExtensions = CONTEXT_PRESETS[this.detectedPreset].textExtensions;
     const finalExtensions = [
