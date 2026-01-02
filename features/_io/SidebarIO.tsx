@@ -55,9 +55,9 @@ export function SidebarIO({
   usePasteHandler({
     onFilesReceived: (files) => {
       onScanStarted?.();
-      // Передаем файлы так же, как и дропзона
       onFilesSelected(files);
     },
+    shouldSkip, // <--- ВАЖНО: Передаем функцию фильтрации
     enabled: true,
   });
 
