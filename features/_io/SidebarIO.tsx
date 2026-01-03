@@ -2,6 +2,7 @@
 
 import React from 'react';
 
+import { type FileSystemDirectoryHandle } from '@/lib/context-generator/scanner';
 import { Box } from '@/ui/atoms/layout/Box';
 import { Stack } from '@/ui/atoms/layout/Layout';
 import { Typography } from '@/ui/atoms/primitive/Typography';
@@ -12,6 +13,7 @@ import { usePasteHandler } from './use-paste-handler';
 
 interface SidebarIOProps {
   onFilesSelected: (files: File[]) => void;
+  onDirectoryHandleReceived?: ((handle: FileSystemDirectoryHandle) => void) | undefined;
   onScanStarted?: (() => void) | undefined;
   /**
    * ⚠️ КРИТИЧНО: Функция фильтрации путей.
@@ -38,6 +40,7 @@ interface SidebarIOProps {
  */
 export function SidebarIO({
   onFilesSelected,
+  onDirectoryHandleReceived,
   onScanStarted,
   shouldSkip,
   accept,
@@ -57,7 +60,7 @@ export function SidebarIO({
       onScanStarted?.();
       onFilesSelected(files);
     },
-    shouldSkip, // <--- ВАЖНО: Передаем функцию фильтрации
+    shouldSkip,
     enabled: true,
   });
 
@@ -65,6 +68,7 @@ export function SidebarIO({
     <Stack gap={3}>
       <FileDropzone
         onFilesSelected={onFilesSelected}
+        onDirectoryHandleReceived={onDirectoryHandleReceived}
         onScanStarted={onScanStarted}
         shouldSkip={shouldSkip}
         accept={accept}

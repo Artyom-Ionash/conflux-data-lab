@@ -10,7 +10,13 @@ import {
   getLegacyDirectoryAttributes,
 } from '@/core/browser/compat';
 import { isInstanceOf } from '@/core/primitives/guards';
-import { filterFileList, scanDirectoryHandle, scanEntries } from '@/lib/context-generator/scanner';
+import {
+  type FileSystemDirectoryHandle,
+  type FileSystemHandle,
+  filterFileList,
+  scanDirectoryHandle,
+  scanEntries,
+} from '@/lib/context-generator/scanner';
 import { HiddenInput } from '@/ui/atoms/input/Input';
 import { Stack } from '@/ui/atoms/layout/Layout';
 import { Icon } from '@/ui/atoms/primitive/Icon';
@@ -18,22 +24,46 @@ import { Typography } from '@/ui/atoms/primitive/Typography';
 import { DropzoneVisual } from '@/ui/molecules/input/Dropzone';
 import { Workbench } from '@/ui/molecules/layout/Workbench';
 
-// --- Type Guards & Interfaces ---
+// --- Type Guards & Interfaces for Native API ---
+
+interface ModernDataTransferItem extends DataTransferItem {
+  getAsFileSystemHandle(): Promise<FileSystemHandle | null>;
+}
+
+function hasGetAsFileSystemHandle(item: DataTransferItem): item is ModernDataTransferItem {
+  return 'getAsFileSystemHandle' in item && typeof item.getAsFileSystemHandle === 'function';
+}
 
 interface WebkitDataTransferItem extends DataTransferItem {
   webkitGetAsEntry(): FileSystemEntry | null;
+}
+
+function hasWebkitGetAsEntry(item: DataTransferItem): item is WebkitDataTransferItem {
+  return 'webkitGetAsEntry' in item && typeof item.webkitGetAsEntry === 'function';
 }
 
 function isFileSystemEntry(entry: unknown): entry is FileSystemEntry {
   return typeof entry === 'object' && entry !== null && 'isFile' in entry && 'isDirectory' in entry;
 }
 
-function hasWebkitGetAsEntry(item: DataTransferItem): item is WebkitDataTransferItem {
-  return 'webkitGetAsEntry' in item;
+function isDirectoryHandle(handle: unknown): handle is FileSystemDirectoryHandle {
+  return (
+    typeof handle === 'object' &&
+    handle !== null &&
+    'kind' in handle &&
+    (handle as FileSystemHandle).kind === 'directory'
+  );
 }
+
+// --- Component ---
 
 interface FileDropzoneProps {
   onFilesSelected: (files: File[]) => void;
+  /**
+   * Колбэк для получения "ручки" директории.
+   * FIX: Явно разрешаем undefined для совместимости с exactOptionalPropertyTypes
+   */
+  onDirectoryHandleReceived?: ((handle: FileSystemDirectoryHandle) => void) | undefined;
   onScanStarted?: (() => void) | undefined;
   shouldSkip?: ((path: string) => boolean) | undefined;
   multiple?: boolean | undefined;
@@ -47,6 +77,7 @@ interface FileDropzoneProps {
 
 export const FileDropzone = ({
   onFilesSelected,
+  onDirectoryHandleReceived,
   onScanStarted,
   shouldSkip,
   multiple = false,
@@ -85,14 +116,19 @@ export const FileDropzone = ({
   const handleClick = async () => {
     if (directory && support.isSupported) {
       try {
-        // @ts-expect-error - TS modern API missing in types
-        const dirHandle = await window.showDirectoryPicker();
-        onScanStarted?.();
-        const files = await scanDirectoryHandle(dirHandle, shouldSkip);
-        handleFinalFiles(files);
-        return;
+        // @ts-expect-error - window.showDirectoryPicker
+        const handle = await window.showDirectoryPicker();
+
+        if (isDirectoryHandle(handle)) {
+          onScanStarted?.();
+          onDirectoryHandleReceived?.(handle);
+          const files = await scanDirectoryHandle(handle, shouldSkip);
+          handleFinalFiles(files);
+          return;
+        }
       } catch (err) {
         if (err instanceof Error && err.name === 'AbortError') return;
+        console.warn('Directory picker failed, falling back to input', err);
       }
     }
     inputRef.current?.click();
@@ -102,6 +138,27 @@ export const FileDropzone = ({
     async (dataTransfer: DataTransfer) => {
       onScanStarted?.();
       const items = Array.from(dataTransfer.items);
+
+      // FIX: Распараллеливание процессов для скорости.
+      // Получение Handle (для будущего релоада) не должно блокировать текущее сканирование файлов.
+
+      // Task 1: Попытка сохранить Handle (Fire & Forget)
+      if (onDirectoryHandleReceived) {
+        const rootItem = items[0];
+        if (rootItem && hasGetAsFileSystemHandle(rootItem)) {
+          // Запускаем асинхронно, не ждем await
+          rootItem
+            .getAsFileSystemHandle()
+            .then((handle) => {
+              if (isDirectoryHandle(handle)) {
+                onDirectoryHandleReceived(handle);
+              }
+            })
+            .catch((e) => console.warn('Failed to get handle:', e));
+        }
+      }
+
+      // Task 2: Основное сканирование (Main Priority)
       const entries = items
         .map((item) => {
           if (hasWebkitGetAsEntry(item)) {
@@ -112,24 +169,27 @@ export const FileDropzone = ({
         .filter(isFileSystemEntry);
 
       if (entries.length > 0) {
+        // Сканируем структуру
         const allFiles = await scanEntries(entries, shouldSkip);
         handleFinalFiles(allFiles);
       } else {
+        // Fallback для простых файлов
         handleFinalFiles(Array.from(dataTransfer.files));
       }
     },
-    [handleFinalFiles, onScanStarted, shouldSkip]
+    [handleFinalFiles, onScanStarted, shouldSkip, onDirectoryHandleReceived]
   );
 
   useEffect(() => {
     if (!enableWindowDrop) return;
+
     const handleDrag = (e: DragEvent) => {
       e.preventDefault();
       setIsDragActive(true);
     };
+
     const handleLeave = (e: DragEvent) => {
       e.preventDefault();
-      // nodeName 'HTML' указывает на выход курсора за пределы окна.
       if (
         e.relatedTarget === null ||
         (isInstanceOf(e.relatedTarget, HTMLElement) && e.relatedTarget.nodeName === 'HTML')
@@ -137,14 +197,17 @@ export const FileDropzone = ({
         setIsDragActive(false);
       }
     };
+
     const handleDrop = (e: DragEvent) => {
       e.preventDefault();
       setIsDragActive(false);
       if (e.dataTransfer) void handleDataTransfer(e.dataTransfer);
     };
+
     window.addEventListener('dragover', handleDrag);
     window.addEventListener('dragleave', handleLeave);
     window.addEventListener('drop', handleDrop);
+
     return () => {
       window.removeEventListener('dragover', handleDrag);
       window.removeEventListener('dragleave', handleLeave);
@@ -216,8 +279,11 @@ export const FileDropzone = ({
   );
 };
 
+// --- Wrapper for Empty States ---
+
 interface PlaceholderProps {
   onUpload: (files: File[]) => void;
+  onDirectoryHandleReceived?: ((handle: FileSystemDirectoryHandle) => void) | undefined;
   shouldSkip?: ((path: string) => boolean) | undefined;
   multiple?: boolean | undefined;
   enableWindowDrop?: boolean | undefined;
@@ -231,6 +297,7 @@ interface PlaceholderProps {
 
 export const FileDropzonePlaceholder = ({
   onUpload,
+  onDirectoryHandleReceived,
   shouldSkip,
   multiple = false,
   enableWindowDrop = false,
@@ -248,6 +315,7 @@ export const FileDropzonePlaceholder = ({
   return (
     <FileDropzone
       onFilesSelected={onUpload}
+      onDirectoryHandleReceived={onDirectoryHandleReceived}
       shouldSkip={shouldSkip}
       multiple={multiple}
       enableWindowDrop={enableWindowDrop}

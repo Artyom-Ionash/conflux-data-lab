@@ -13,9 +13,15 @@ import type {
   ProcessingPayload,
   ProcessingResponse,
 } from '@/lib/context-generator/processing.worker';
+import {
+  createIgnoreManager,
+  type FileSystemDirectoryHandle,
+  scanDirectoryHandle,
+} from '@/lib/context-generator/scanner';
 import { useBundleManager } from '@/lib/context-generator/use-bundle-manager';
+import { isTextFile } from '@/lib/file-system/analyzers';
 import { type FileBundle } from '@/lib/file-system/bundle';
-import { generateAsciiTree } from '@/lib/file-system/topology';
+import { formatBytes, generateAsciiTree } from '@/lib/file-system/topology';
 import { Field } from '@/ui/atoms/input/Field';
 import { TextInput } from '@/ui/atoms/input/Input';
 import { Switch } from '@/ui/atoms/input/Switch';
@@ -43,91 +49,114 @@ export function ProjectToContext() {
   const { filteredPaths, handleFiles, bundle } = useBundleManager();
   const { isCopied, copy } = useCopyToClipboard();
 
+  // UI State
   const [selectedPreset, setSelectedPreset] = useState<PresetKey>('nextjs');
   const [customExtensions, setCustomExtensions] = useState<string>(
     CONTEXT_PRESETS.nextjs.textExtensions.join(', ')
   );
   const [customIgnore, setCustomIgnore] = useState<string>('');
   const [includeTree, setIncludeTree] = useState(true);
-
   const [lastGeneratedAt, setLastGeneratedAt] = useState<Date | null>(null);
+  const [activeDirectoryHandle, setActiveDirectoryHandle] =
+    useState<FileSystemDirectoryHandle | null>(null);
 
-  // --- WORKER POOL ---
+  // Worker Pool
   const createWorker = useCallback(
     () => new Worker(new URL('@/lib/context-generator/processing.worker.ts', import.meta.url)),
     []
   );
-
   const { runTask: runWorkerTask } = useWorkerPool<ProcessingPayload, ProcessingResponse>({
     workerFactory: createWorker,
     // Pool size определяется автоматически (hardwareConcurrency - 1)
   });
 
-  // --- MAIN TASK ---
-  // Signature: first arg is scope { signal, setProgress }
-  const processingTask = useTask<ContextGenerationResult, [FileBundle, string[], PresetKey]>(
-    async ({ signal, setProgress }, activeBundle, paths, presetKey) => {
-      if (signal.aborted) throw new Error('Aborted');
+  // --- MAIN PROCESSING TASK ---
+  // Теперь принимает сырые параметры фильтрации, чтобы не зависеть от stale state
+  const processingTask = useTask<
+    ContextGenerationResult,
+    [FileBundle, PresetKey, string, string] // Bundle, Preset, ExtensionsStr, IgnoreStr
+  >(async ({ signal, setProgress }, activeBundle, presetKey, extensionsStr, ignoreStr) => {
+    if (signal.aborted) throw new Error('Aborted');
 
-      const preset = CONTEXT_PRESETS[presetKey];
+    const preset = CONTEXT_PRESETS[presetKey];
 
-      // Фильтрация списка файлов (Main Thread - быстро)
-      // Исключаем файлы, которые должны быть только в дереве (treeOnly)
-      const textNodes = activeBundle.getItems().filter((item) => {
-        const isSelected = paths.includes(item.path);
-        const isText = item.isText;
-        const isTreeOnly = preset.treeOnly?.some((rule) => item.path.startsWith(rule));
-        return isSelected && isText && !isTreeOnly;
-      });
+    // 1. Парсинг правил "на лету" (Runtime Configuration)
+    const allowedExtensions = extensionsStr
+      .split(',')
+      .map((s) => s.trim())
+      .filter((s) => s.length > 0);
 
-      // Подготовка чанков (Map Phase)
-      const fileBatches = chunk(textNodes, BATCH_SIZE);
-      const totalBatches = fileBatches.length;
-      let completedBatches = 0;
+    const ignoreManager = createIgnoreManager({
+      ignorePatterns: [
+        ...preset.hardIgnore,
+        ...ignoreStr
+          .split(',')
+          .map((s) => s.trim())
+          .filter(Boolean),
+      ],
+    });
 
-      const chunkPromises = fileBatches.map(async (batch) => {
-        const files = batch.map((node) => node.file);
-        const response = await runWorkerTask({ files });
-        if (response.error) throw new Error(response.error);
-        completedBatches++;
-        setProgress(Math.round((completedBatches / totalBatches) * 90));
-        return response.results;
-      });
+    // 2. Фильтрация бандла (Dynamic Filtering)
+    // Мы не верим бандлу на слово про isText, перепроверяем по текущим настройкам
+    const allItems = activeBundle.getItems();
 
-      const resultsNested = await Promise.all(chunkPromises);
+    const targetItems = allItems.filter((item) => {
+      // A. Игнор-лист
+      if (ignoreManager.ignores(item.path)) return false;
 
-      if (signal.aborted) throw new Error('Aborted');
+      // B. Tree Only (файлы, которые нужны в дереве, но не в контексте)
+      // Если файл в treeOnly, мы его пропускаем здесь (он добавится в дерево отдельно)
+      const isTreeOnly = preset.treeOnly?.some((rule) => item.path.startsWith(rule));
+      if (isTreeOnly) return false;
 
-      // Сборка результатов (Reduce Phase)
-      // Flatten массива массивов + Mapping типов
-      const processedFiles = resultsNested.flat().map((file) => ({
-        ...file,
-        size: file.cleanedSize,
-      }));
+      // C. Текстовый ли файл? (Проверка по ТЕКУЩИМ расширениям)
+      return isTextFile(item.name, allowedExtensions);
+    });
 
-      // 5. Финальная сборка строки (Main Thread)
-      let treeString = '';
-      if (includeTree) {
-        // Собираем ноды для дерева
-        // Здесь мы берем ВСЕ файлы из paths, даже если они treeOnly
-        const treeNodes = activeBundle
-          .getItems()
-          .filter((item) => paths.includes(item.path))
-          .map((item) => ({
-            path: item.path,
-            name: item.name,
-            size: item.size,
-            isText: item.isText,
-          }));
-        treeString = generateAsciiTree(treeNodes);
-      }
+    // 3. Подготовка чанков
+    const fileBatches = chunk(targetItems, BATCH_SIZE);
+    const totalBatches = fileBatches.length;
+    let completedBatches = 0;
 
-      const generation = generateContextOutput(processedFiles, treeString);
-      setLastGeneratedAt(new Date());
-      setProgress(100);
-      return generation;
+    const chunkPromises = fileBatches.map(async (batch) => {
+      const files = batch.map((node) => node.file);
+      const response = await runWorkerTask({ files });
+      if (response.error) throw new Error(response.error);
+      completedBatches++;
+      setProgress(Math.round((completedBatches / totalBatches) * 90));
+      return response.results;
+    });
+
+    const resultsNested = await Promise.all(chunkPromises);
+
+    if (signal.aborted) throw new Error('Aborted');
+
+    // Сборка результатов (Reduce Phase)
+    // Flatten массива массивов + Mapping типов
+    const processedFiles = resultsNested.flat().map((file) => ({
+      ...file,
+      size: file.cleanedSize,
+    }));
+
+    // 4. Генерация дерева (включает файлы, которые были отфильтрованы по isText, но не по ignore)
+    let treeString = '';
+    if (includeTree) {
+      const treeNodes = allItems
+        .filter((item) => !ignoreManager.ignores(item.path))
+        .map((item) => ({
+          path: item.path,
+          name: item.name,
+          size: item.size,
+          isText: item.isText,
+        }));
+      treeString = generateAsciiTree(treeNodes);
     }
-  );
+
+    const generation = generateContextOutput(processedFiles, treeString);
+    setLastGeneratedAt(new Date());
+    setProgress(100);
+    return generation;
+  });
 
   const shouldSkipScan = useCallback((path: string) => {
     const parts = path.split('/');
@@ -148,21 +177,20 @@ export function ProjectToContext() {
       if (files.length === 0) return;
 
       try {
-        // FIX: Передаем пустую строку вместо customExtensions.
-        // Это заставляет FileBundle использовать дефолтные расширения для
-        // ТОГО пресета, который он сам определит (godot/nextjs).
-        // Тем самым мы разрываем связь с "прошлым" состоянием UI.
-        const {
-          presetKey,
-          visiblePaths,
-          bundle: newBundle,
-        } = await handleFiles(files, '', customIgnore);
+        // 1. Создаем бандл (это быстро, просто индексация)
+        // Передаем пустые расширения, чтобы бандл сам определил пресет
+        const { presetKey, bundle: newBundle } = await handleFiles(files, '', customIgnore);
 
-        // Обновляем UI уже ПОСЛЕ того, как бандл определился
+        // 2. Вычисляем дефолтные настройки для этого пресета
+        const detectedExtensions = CONTEXT_PRESETS[presetKey].textExtensions.join(', ');
+
+        // 3. Обновляем UI
         setSelectedPreset(presetKey);
-        setCustomExtensions(CONTEXT_PRESETS[presetKey].textExtensions.join(', '));
+        setCustomExtensions(detectedExtensions);
 
-        void processingTask.run(newBundle, visiblePaths, presetKey);
+        // 4. ЗАПУСКАЕМ ТАСК С ЯВНЫМИ ПАРАМЕТРАМИ
+        // Не ждем обновления стейта (customExtensions), передаем detectedExtensions напрямую
+        void processingTask.run(newBundle, presetKey, detectedExtensions, customIgnore);
       } catch (err) {
         console.error('File selection failed:', err);
       }
@@ -172,9 +200,21 @@ export function ProjectToContext() {
 
   const handleManualRun = () => {
     if (bundle) {
-      void processingTask.run(bundle, filteredPaths, selectedPreset);
+      // Здесь используем текущие значения из UI-стейта (пользователь мог их отредактировать)
+      void processingTask.run(bundle, selectedPreset, customExtensions, customIgnore);
     }
   };
+
+  const handleReload = useCallback(async () => {
+    if (!activeDirectoryHandle) return;
+    try {
+      const files = await scanDirectoryHandle(activeDirectoryHandle, shouldSkipScan);
+      void onFilesSelected(files);
+    } catch (err) {
+      console.error('Failed to rescan:', err);
+      setActiveDirectoryHandle(null);
+    }
+  }, [activeDirectoryHandle, shouldSkipScan, onFilesSelected]);
 
   const downloadResult = () => {
     if (!processingTask.result?.output) return;
@@ -187,6 +227,7 @@ export function ProjectToContext() {
 
       <SidebarIO
         onFilesSelected={onFilesSelected}
+        onDirectoryHandleReceived={setActiveDirectoryHandle}
         onScanStarted={() => {}}
         shouldSkip={shouldSkipScan}
         directory
@@ -197,6 +238,18 @@ export function ProjectToContext() {
         downloadLabel="Скачать .txt"
         downloadDisabled={processingTask.isRunning}
       />
+
+      {activeDirectoryHandle && (
+        <Button
+          onClick={handleReload}
+          disabled={processingTask.isRunning}
+          variant="outline"
+          className="w-full border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100 dark:border-blue-900 dark:bg-blue-900/20 dark:text-blue-300"
+        >
+          {processingTask.isRunning ? <Icon.Spinner className="animate-spin" /> : <Icon.Refresh />}
+          {processingTask.isRunning ? 'Сканирование...' : 'Синхронизировать с диском'}
+        </Button>
+      )}
 
       <Stack gap={4}>
         <Field label="2. Конфигурация">
@@ -248,7 +301,7 @@ export function ProjectToContext() {
             variant="default"
             className="w-full bg-blue-600 font-bold tracking-wide text-white uppercase hover:bg-blue-700 dark:bg-blue-600 dark:hover:bg-blue-500"
           >
-            {processingTask.isRunning ? 'Обновление...' : 'Обновить контекст'}
+            {processingTask.isRunning ? 'Сборка...' : 'Применить фильтры'}
           </Button>
         )}
       </Stack>
@@ -258,8 +311,8 @@ export function ProjectToContext() {
           gap={4}
           className="animate-in fade-in slide-in-from-bottom-2 border-t border-zinc-200 pt-4 dark:border-zinc-800"
         >
-          <Indicator label="Токены (Est.)" className="justify-between py-2 text-lg">
-            ~{processingTask.result.stats.totalTokens.toLocaleString()}
+          <Indicator label="Размер" className="justify-between py-2 text-lg">
+            {formatBytes(processingTask.result.stats.cleanedSizeBytes)}
           </Indicator>
         </Stack>
       )}
@@ -296,6 +349,7 @@ export function ProjectToContext() {
         ) : (
           <FileDropzonePlaceholder
             onUpload={onFilesSelected}
+            onDirectoryHandleReceived={setActiveDirectoryHandle}
             directory={true}
             shouldSkip={shouldSkipScan}
             title="Выберите папку проекта"

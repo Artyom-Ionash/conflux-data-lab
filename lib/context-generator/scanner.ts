@@ -12,21 +12,24 @@ export interface ScanOptions {
   shouldSkip?: (path: string) => boolean;
 }
 
-// --- Modern API Guards ---
-interface FileSystemHandle {
+// --- Modern API Types (Exported for consumption in components) ---
+
+export interface FileSystemHandle {
   kind: 'file' | 'directory';
   name: string;
 }
 
-interface FileSystemFileHandle extends FileSystemHandle {
+export interface FileSystemFileHandle extends FileSystemHandle {
   kind: 'file';
   getFile(): Promise<File>;
 }
 
-interface FileSystemDirectoryHandle extends FileSystemHandle {
+export interface FileSystemDirectoryHandle extends FileSystemHandle {
   kind: 'directory';
   values(): AsyncIterableIterator<FileSystemHandle>;
 }
+
+// --- Local Type Guards ---
 
 function isFileHandle(handle: FileSystemHandle): handle is FileSystemFileHandle {
   return handle.kind === 'file';
@@ -51,22 +54,36 @@ function isDirectoryEntry(entry: FileSystemEntry): entry is FileSystemDirectoryE
  */
 export function createIgnoreManager(options: ScanOptions) {
   const ig = ignore();
-  ig.add(['node_modules', '.DS_Store', 'package-lock.json', 'yarn.lock']);
+  // 1. БАЗОВЫЕ ЗАПРЕТЫ (Самый низкий приоритет)
+  ig.add([
+    'node_modules',
+    '.DS_Store',
+    'package-lock.json',
+    'yarn.lock',
+    'pnpm-lock.yaml',
+    'bun.lockb',
+  ]);
 
+  // 2. КОНТЕНТ ИЗ .gitignore
   if (options.gitIgnoreContent) {
     ig.add(options.gitIgnoreContent);
   }
 
+  // 3. КАСТОМНЫЕ ПАТТЕРНЫ ИЗ ПРЕСЕТОВ И UI
   if (options.ignorePatterns) {
     ig.add(options.ignorePatterns.filter(Boolean));
   }
 
+  // 4. ПРИНУДИТЕЛЬНОЕ ВКЛЮЧЕНИЕ (Самый высокий приоритет)
   if (MANDATORY_REPO_FILES.length > 0) {
     ig.add(MANDATORY_REPO_FILES.map((f) => `!${f}`));
   }
 
+  // Разрешаем папку .ai
   ig.add(`!${LOCAL_CONTEXT_FOLDER}`);
   ig.add(`!${LOCAL_CONTEXT_FOLDER}/**`);
+
+  // 5. ФИНАЛЬНЫЙ БАН
   ig.add(['.git', '.git/**']);
 
   return ig;
@@ -83,7 +100,10 @@ export async function scanDirectoryHandle(
   const rootName = dirHandle.name;
 
   async function walk(handle: FileSystemHandle, pathSegments: string[]) {
+    // Формируем путь: Root/Folder/File.ext
     const currentPath = pathSegments.join('/');
+
+    // Проверяем путь, исключая корневую папку из проверки
     const checkPath = pathSegments.length > 1 ? pathSegments.slice(1).join('/') : currentPath;
 
     if (pathSegments.length > 1 && shouldSkip?.(checkPath)) {
@@ -92,18 +112,23 @@ export async function scanDirectoryHandle(
 
     if (isFileHandle(handle)) {
       const file = await handle.getFile();
+
+      // Полифилл для webkitRelativePath, так как он read-only в нативном File
       Object.defineProperty(file, 'webkitRelativePath', {
         value: currentPath,
         writable: false,
         configurable: true,
         enumerable: true,
       });
+
       files.push(file);
     } else if (isDirectoryHandle(handle)) {
       const promises: Promise<void>[] = [];
+
       for await (const entry of handle.values()) {
         promises.push(walk(entry, [...pathSegments, entry.name]));
       }
+
       await Promise.all(promises);
     }
   }
@@ -143,6 +168,7 @@ export async function scanEntries(
         return new Promise((resolve, reject) => directoryReader.readEntries(resolve, reject));
       };
 
+      // Читаем батчами, так как readEntries может вернуть не всё сразу
       let batch = await readBatch();
       while (batch.length > 0) {
         await Promise.all(batch.map((child) => readEntry(child)));

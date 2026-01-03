@@ -48,7 +48,7 @@ export const Icon = {
   Check: createIcon(VECTORS.Check, { strokeWidth: 3 }),
 
   Spinner: createIcon(VECTORS.Spinner, { className: 'animate-spin' }),
-
+  Refresh: createIcon(VECTORS.Refresh),
   AutoContrast: createIcon(VECTORS.AutoContrast),
   Trash: createIcon(VECTORS.Trash),
   Crosshair: createIcon(VECTORS.Crosshair, { strokeWidth: 3 }),
