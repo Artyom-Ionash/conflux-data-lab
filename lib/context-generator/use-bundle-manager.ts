@@ -25,8 +25,14 @@ export function useBundleManager() {
 
   const handleFiles = useCallback(
     async (files: File[], customExtensions: string, customIgnore: string) => {
+      // Фильтруем пустые строки!
+      const parsedExtensions = customExtensions
+        .split(',')
+        .map((s) => s.trim())
+        .filter((s) => s.length > 0);
+
       const newBundle = new FileBundle(files, {
-        customExtensions: customExtensions.split(',').map((s) => s.trim()),
+        customExtensions: parsedExtensions,
       });
 
       const presetKey = newBundle.detectedPreset;

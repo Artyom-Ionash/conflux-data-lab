@@ -71,34 +71,26 @@ export function ProjectToContext() {
 
       const preset = CONTEXT_PRESETS[presetKey];
 
-      // 1. Фильтрация списка файлов (Main Thread - быстро)
+      // Фильтрация списка файлов (Main Thread - быстро)
       // Исключаем файлы, которые должны быть только в дереве (treeOnly)
       const textNodes = activeBundle.getItems().filter((item) => {
         const isSelected = paths.includes(item.path);
         const isText = item.isText;
         const isTreeOnly = preset.treeOnly?.some((rule) => item.path.startsWith(rule));
-
         return isSelected && isText && !isTreeOnly;
       });
 
-      // 2. Подготовка чанков (Map Phase)
+      // Подготовка чанков (Map Phase)
       const fileBatches = chunk(textNodes, BATCH_SIZE);
       const totalBatches = fileBatches.length;
       let completedBatches = 0;
 
-      // 3. Параллельная обработка (Worker Pool)
       const chunkPromises = fileBatches.map(async (batch) => {
-        // Извлекаем сырые File объекты для передачи в воркер
         const files = batch.map((node) => node.file);
-
-        // Отправляем в пул
         const response = await runWorkerTask({ files });
-
         if (response.error) throw new Error(response.error);
-
         completedBatches++;
         setProgress(Math.round((completedBatches / totalBatches) * 90));
-
         return response.results;
       });
 
@@ -106,7 +98,7 @@ export function ProjectToContext() {
 
       if (signal.aborted) throw new Error('Aborted');
 
-      // 4. Сборка результатов (Reduce Phase)
+      // Сборка результатов (Reduce Phase)
       // Flatten массива массивов + Mapping типов
       const processedFiles = resultsNested.flat().map((file) => ({
         ...file,
@@ -127,12 +119,10 @@ export function ProjectToContext() {
             size: item.size,
             isText: item.isText,
           }));
-
         treeString = generateAsciiTree(treeNodes);
       }
 
       const generation = generateContextOutput(processedFiles, treeString);
-
       setLastGeneratedAt(new Date());
       setProgress(100);
       return generation;
@@ -158,23 +148,26 @@ export function ProjectToContext() {
       if (files.length === 0) return;
 
       try {
-        // 1. Индексация (Bundle Manager)
+        // FIX: Передаем пустую строку вместо customExtensions.
+        // Это заставляет FileBundle использовать дефолтные расширения для
+        // ТОГО пресета, который он сам определит (godot/nextjs).
+        // Тем самым мы разрываем связь с "прошлым" состоянием UI.
         const {
           presetKey,
           visiblePaths,
           bundle: newBundle,
-        } = await handleFiles(files, customExtensions, customIgnore);
+        } = await handleFiles(files, '', customIgnore);
 
+        // Обновляем UI уже ПОСЛЕ того, как бандл определился
         setSelectedPreset(presetKey);
         setCustomExtensions(CONTEXT_PRESETS[presetKey].textExtensions.join(', '));
 
-        // 2. Автоматический запуск генерации через таск
         void processingTask.run(newBundle, visiblePaths, presetKey);
       } catch (err) {
         console.error('File selection failed:', err);
       }
     },
-    [handleFiles, customExtensions, customIgnore, processingTask]
+    [handleFiles, customIgnore, processingTask]
   );
 
   const handleManualRun = () => {
@@ -304,7 +297,7 @@ export function ProjectToContext() {
           <FileDropzonePlaceholder
             onUpload={onFilesSelected}
             directory={true}
-            shouldSkip={shouldSkipScan} // ПРОИЗВОДИТЕЛЬНОСТЬ: Smart Scan
+            shouldSkip={shouldSkipScan}
             title="Выберите папку проекта"
             subTitle="Поддерживаются Next.js, Godot и другие структуры"
             icon={FolderIcon}

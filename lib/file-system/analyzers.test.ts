@@ -41,9 +41,12 @@ describe('File Utils', () => {
       expect(isTextFile('next.config.ts', [])).toBe(true);
     });
 
-    it('rejects binary/lock files explicitly', () => {
-      expect(isTextFile('package-lock.json', allowed)).toBe(false);
+    it('distinguishes text vs binary correctly', () => {
+      expect(isTextFile('package-lock.json', allowed)).toBe(true);
+
+      // Бинарные файлы (которых нет в allowed) должны возвращать false
       expect(isTextFile('image.jpg', allowed)).toBe(false);
+      expect(isTextFile('program.exe', allowed)).toBe(false);
     });
   });
 

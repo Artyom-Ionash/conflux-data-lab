@@ -28,7 +28,6 @@ export function usePasteHandler({
   shouldSkip,
   enabled = true,
 }: UsePasteHandlerProps) {
-  // Используем ref для зависимостей, чтобы эффект подписки был стабилен
   const depsRef = useRef({ onFilesReceived, shouldSkip });
 
   useEffect(() => {
@@ -41,7 +40,6 @@ export function usePasteHandler({
     const handlePaste = async (e: ClipboardEvent) => {
       // Это безопасно проверяет, является ли цель DOM-элементом
       const target = e.target;
-      // Игнорируем ввод в поля
       if (
         isInstanceOf(target, HTMLElement) &&
         (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)
@@ -65,7 +63,7 @@ export function usePasteHandler({
 
         // Если удалось получить Entry (Chrome/Edge/Safari) -> используем сканнер
         if (entries.length > 0) {
-          // Передаем shouldSkip в сканер! Это предотвратит сканирование node_modules
+          // Chrome/Edge: Используем мощный сканер
           scanEntries(entries, depsRef.current.shouldSkip)
             .then((files) => {
               if (files.length > 0) depsRef.current.onFilesReceived(files);
@@ -78,7 +76,7 @@ export function usePasteHandler({
             .map((item) => item.getAsFile())
             .filter((f): f is File => f !== null);
 
-          // FIX: Сохраняем функцию в локальную переменную для безопасного сужения типа
+          // Сохраняем функцию в переменную для Type Narrowing (TS не может гарантировать консистентность ref)
           const skipFn = depsRef.current.shouldSkip;
 
           const filteredFiles = skipFn ? directFiles.filter((f) => !skipFn(f.name)) : directFiles;

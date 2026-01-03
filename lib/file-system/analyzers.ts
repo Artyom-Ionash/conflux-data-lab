@@ -1,3 +1,7 @@
+/**
+ * Анализаторы типов файлов и языков программирования.
+ */
+
 export const LANGUAGE_MAP: Record<string, string> = {
   js: 'javascript',
   mjs: 'javascript',
@@ -25,71 +29,89 @@ export const LANGUAGE_MAP: Record<string, string> = {
   toml: 'toml',
   xml: 'xml',
   gitignore: 'gitignore',
+  dockerfile: 'dockerfile',
   editorconfig: 'ini',
   prettierrc: 'json',
   eslintrc: 'json',
   sworc: 'json',
 };
 
-export function getLanguageTag(filename: string): string {
-  const parts = filename.toLowerCase().split('.');
-  const ext = parts.pop() || 'text';
+// Файлы, которые ВСЕГДА являются текстовыми, независимо от расширения
+const ALWAYS_TEXT_FILENAMES = new Set([
+  'project.godot',
+  'package.json',
+  'tsconfig.json',
+  'jsconfig.json',
+  'dockerfile',
+  '.gitignore',
+  '.npmrc',
+  '.editorconfig',
+  '.prettierrc',
+  '.eslintrc',
+  '.sworc',
+  '.env',
+  '.env.local',
+  '.env.example',
+  '.pre-commit-config.yaml',
+  'license', // Часто без расширения
+  'readme', // Часто без расширения
+]);
 
-  if (parts.length === 0 || (parts.length === 1 && parts[0] === '')) {
-    return LANGUAGE_MAP[ext] || 'text';
+// Префиксы файлов, которые всегда текстовые (например, .eslintrc.json)
+const ALWAYS_TEXT_PREFIXES = [
+  '.eslintrc',
+  '.prettierrc',
+  'eslint.config',
+  'next.config',
+  'tailwind.config',
+  'postcss.config',
+  'vite.config',
+  'webpack.config',
+  'jest.config',
+  'vitest.config',
+];
+
+export function getLanguageTag(filename: string): string {
+  const lower = filename.toLowerCase();
+  const parts = lower.split('.');
+
+  // Обработка файлов без расширения (Dockerfile, LICENSE)
+  if (parts.length === 1) {
+    return LANGUAGE_MAP[lower] || 'text';
   }
+
+  const ext = parts.pop() || 'text';
 
   if (ext === 'tscn') return 'text';
 
   return LANGUAGE_MAP[ext] || ext;
 }
 
+/**
+ * Определяет, является ли файл текстовым.
+ * Использует стратегию "Strict Allowlist" (По умолчанию всё - бинарное).
+ */
 export function isTextFile(filename: string, allowedExtensions: string[]): boolean {
   const lowerName = filename.toLowerCase();
 
-  // Hardcoded binary/lock blocklist
-  if (
-    lowerName === 'package-lock.json' ||
-    lowerName === 'yarn.lock' ||
-    lowerName === 'pnpm-lock.yaml' ||
-    lowerName === 'bun.lockb' ||
-    lowerName.endsWith('.png') ||
-    lowerName.endsWith('.jpg') ||
-    lowerName.endsWith('.ico')
-  ) {
-    return false;
+  // 1. Проверка по точному имени (Config Whitelist)
+  if (ALWAYS_TEXT_FILENAMES.has(lowerName)) {
+    return true;
   }
 
-  const configWhitelist = [
-    'project.godot',
-    'package.json',
-    'tsconfig.json',
-    'jsconfig.json',
-    'dockerfile',
-    '.gitignore',
-    '.editorconfig',
-    '.npmrc',
-    '.prettierrc',
-    '.eslintrc',
-    '.sworc',
-  ];
-
-  if (configWhitelist.includes(lowerName)) return true;
-
-  if (lowerName.startsWith('.eslintrc') || lowerName.startsWith('.prettierrc')) return true;
-  if (
-    lowerName.startsWith('eslint.config') ||
-    lowerName.startsWith('next.config') ||
-    lowerName.startsWith('tailwind.config') ||
-    lowerName.startsWith('postcss.config') ||
-    lowerName.startsWith('vite.config')
-  )
+  // 2. Проверка по префиксу конфигурации
+  if (ALWAYS_TEXT_PREFIXES.some((prefix) => lowerName.startsWith(prefix))) {
     return true;
+  }
 
-  return allowedExtensions.some((ext) => lowerName.endsWith(ext));
+  // 3. Проверка по расширению (User Config + Preset)
+  // Если allowedExtensions пуст или содержит только пустые строки, вернется false.
+  // Это автоматически отсекает .bmp, .exe и прочее, чего нет в списке.
+  return allowedExtensions.some((ext) => ext && lowerName.endsWith(ext));
 }
 
 export function shouldIgnore(path: string, ignorePatterns: string[]): boolean {
+  // Нормализация слэшей для кросс-платформенности
   const normalizedPath = path.replaceAll('\\', '/');
   const filename = normalizedPath.split('/').pop() || '';
   const lowerFilename = filename.toLowerCase();
@@ -97,18 +119,19 @@ export function shouldIgnore(path: string, ignorePatterns: string[]): boolean {
   for (const pattern of ignorePatterns) {
     const lowerPattern = pattern.toLowerCase();
 
-    // Handle extensions (*.svg)
+    // Pattern: "*.svg" -> проверка расширения
     if (lowerPattern.startsWith('*.')) {
       if (lowerFilename.endsWith(lowerPattern.slice(1))) return true;
       continue;
     }
 
-    // Handle exact filename match (.git)
+    // Pattern: ".git" -> точное совпадение имени файла/папки
     if (lowerFilename === lowerPattern) {
       return true;
     }
 
-    // Handle directory/path match (node_modules)
+    // Pattern: "node_modules" -> совпадение части пути (директории)
+    // Проверяем вхождение как отдельного сегмента пути
     if (
       normalizedPath.includes(`/${lowerPattern}/`) ||
       normalizedPath.startsWith(`${lowerPattern}/`)
