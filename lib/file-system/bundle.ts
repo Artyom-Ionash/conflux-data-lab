@@ -36,8 +36,30 @@ export abstract class BaseBundle<T extends BaseFileNode> {
   protected detectSignature(rootNames: string[] | Set<string>): PresetKey {
     const nameSet = Array.isArray(rootNames) ? new Set(rootNames) : rootNames;
 
+    // 1. Godot (Самый уникальный)
     if (nameSet.has('project.godot')) return 'godot';
-    if (nameSet.has('package.json')) return 'nextjs';
+
+    // 2. Python / UV Ecosystem
+    if (
+      nameSet.has('uv.lock') ||
+      nameSet.has('poetry.lock') ||
+      nameSet.has('requirements.txt') ||
+      nameSet.has('pyproject.toml') ||
+      nameSet.has('main.py') ||
+      nameSet.has('app.py')
+    ) {
+      return 'python';
+    }
+
+    // 3. JavaScript / Web (Default fallback usually)
+    if (
+      nameSet.has('package.json') ||
+      nameSet.has('next.config.ts') ||
+      nameSet.has('tsconfig.json')
+    ) {
+      return 'nextjs';
+    }
+
     return 'nextjs';
   }
 

@@ -40,9 +40,9 @@ export const TOOLS_MANIFEST: ToolConfig[] = [
     id: 'project-to-context',
     name: 'Project to LLM Context',
     description:
-      'Convert a code project folder into a single Markdown file for LLM context (Godot, Next.js, etc).',
+      'Convert a code project folder into a single Markdown file for LLM context (Godot, Next.js, Python/UV).',
     category: 'conversion',
-    tags: ['llm', 'context', 'markdown', 'code', 'godot'],
+    tags: ['llm', 'context', 'markdown', 'code', 'godot', 'python', 'uv'],
     featured: true,
   },
   {

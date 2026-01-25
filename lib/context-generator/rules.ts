@@ -7,6 +7,8 @@
 export const HEAVY_DIRS = [
   'node_modules',
   '.venv',
+  'venv', // Standard python venv
+  'env', // Legacy python venv
   '.git',
   '.next',
   '.vercel',
@@ -20,7 +22,10 @@ export const HEAVY_DIRS = [
   '.idea',
   '.vscode',
   'target', // Rust/Java
-  '__pycache__',
+  'pycache',
+  '.pytest_cache',
+  '.mypy_cache',
+  '.ruff_cache',
 ];
 
 // Файлы и папки, которые не несут семантической ценности для LLM.
@@ -32,10 +37,13 @@ export const IGNORE_COMMON = [
   'yarn.lock',
   'pnpm-lock.yaml',
   'bun.lockb',
+  'uv.lock', // Lock-файлы обычно слишком большие для контекста
+  'poetry.lock',
   'LICENSE',
   'LICENSE.txt',
   'CHANGELOG.md',
-  '*.pyc',
+  '.pyc',
+  '.whl',
 ];
 
 export const LOCAL_CONTEXT_FOLDER = '.ai';
@@ -99,7 +107,7 @@ export const CONTEXT_PRESETS = {
       ...UNIVERSAL_TEXT_EXTENSIONS,
     ],
     // Используем Set для дедупликации, если IGNORE_COMMON пересечется с уникальными
-    hardIgnore: [...new Set([...IGNORE_COMMON, 'builds', '*.uid', '*.import'])],
+    hardIgnore: [...new Set([...IGNORE_COMMON, 'builds', '.uid', '.import'])],
     treeOnly: ['addons/'],
   },
   nextjs: {
@@ -122,6 +130,20 @@ export const CONTEXT_PRESETS = {
     ],
     hardIgnore: [...IGNORE_COMMON],
     treeOnly: ['public/'],
+  },
+  python: {
+    name: 'Python (UV / Poetry)',
+    textExtensions: [
+      // Python Specific
+      '.py',
+      '.pyi', // Stub files
+      '.pyx', // Cython
+      '.ipynb', // Notebooks (treated as text/json)
+      // Universal
+      ...UNIVERSAL_TEXT_EXTENSIONS,
+    ],
+    hardIgnore: [...new Set([...IGNORE_COMMON, '*.egg-info', 'htmlcov'])],
+    treeOnly: ['data/', 'static/'],
   },
 } satisfies Record<string, ContextPreset>;
 
