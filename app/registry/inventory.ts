@@ -52,6 +52,14 @@ export const TOOLS_MANIFEST: ToolConfig[] = [
     category: 'conversion',
     tags: ['json', 'csv', 'converter', 'developer'],
   },
+  {
+    id: 'context-sculptor',
+    name: 'LLM Context Sculptor',
+    description: 'Оптимизация и сжатие контекста кода с помощью Gemini (via OpenRouter).',
+    category: 'transformation',
+    tags: ['llm', 'ai', 'openrouter', 'gemini', 'refactoring'],
+    featured: true,
+  },
 ];
 
 export const toolsByCategory = TOOLS_MANIFEST.reduce<Record<string, ToolConfig[]>>((acc, tool) => {

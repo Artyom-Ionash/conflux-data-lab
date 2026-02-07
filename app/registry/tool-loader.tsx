@@ -18,6 +18,11 @@ const ToolLoading = () => (
 
 // --- Dynamic Imports ---
 
+const ContextSculptor = dynamic(
+  () => import('@/features/ContextSculptor').then((mod) => mod.ContextSculptor),
+  { loading: ToolLoading }
+);
+
 const JsonToCsvConverter = dynamic(
   () => import('@/features/JsonToCsvConverter').then((mod) => mod.JsonToCsvConverter),
   { loading: ToolLoading }
@@ -47,6 +52,7 @@ const ProjectToContext = dynamic(
 // --- Registry ---
 
 const toolComponents: Record<string, React.ComponentType> = {
+  'context-sculptor': ContextSculptor,
   'json-to-csv': JsonToCsvConverter,
   'video-frame-extractor': VideoFrameExtractor,
   'vertical-image-aligner': VerticalImageAligner,
