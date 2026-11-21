@@ -5,19 +5,20 @@ import { useCallback, useState } from 'react';
 import { downloadText } from '@/core/browser/canvas';
 import { useCopyToClipboard } from '@/core/react/hooks/use-copy';
 import type { CutUpMode } from '@/lib/converters/cut-up';
-import { generateCutUpText } from '@/lib/converters/cut-up';
+import { downloadDocx, extractTextFromFile, generateCutUpText } from '@/lib/converters/cut-up';
 import { Card } from '@/ui/atoms/container/Card';
 import { PanelHeader } from '@/ui/atoms/container/Panel';
 import { Alert } from '@/ui/atoms/feedback/Alert';
 import { Field } from '@/ui/atoms/input/Field';
 import { TextArea } from '@/ui/atoms/input/Input';
 import { NumberStepper } from '@/ui/atoms/input/NumberStepper';
+import { TextOutput } from '@/ui/atoms/input/TextOutput';
 import { ToggleGroup, ToggleGroupItem } from '@/ui/atoms/input/ToggleGroup';
-import { Grid, Stack } from '@/ui/atoms/layout/Layout';
-import { Button } from '@/ui/molecules/input/Button';
+import { Grid, Group, Stack } from '@/ui/atoms/layout/Layout';
+import { Icon } from '@/ui/atoms/primitive/Icon';
+import { Button, CopyButton } from '@/ui/molecules/input/Button';
 import { Workbench } from '@/ui/molecules/layout/Workbench';
 
-import { ResultViewer } from '../ui/molecules/display/ResultViewer';
 import { SidebarIO } from './_io/SidebarIO';
 
 const DEFAULT_TEXT_1 = `When you cut up your text in pieces and rearrange them,
@@ -80,7 +81,7 @@ export function CutUpTextGenerator() {
       if (!file) return;
 
       try {
-        const content = await file.text();
+        const content = await extractTextFromFile(file);
         const updatedTexts = [...texts, content];
         setTexts(updatedTexts);
         try {
@@ -95,8 +96,8 @@ export function CutUpTextGenerator() {
           setError(err instanceof Error ? err.message : 'Ошибка генерации Cut-Up');
           setOutput('');
         }
-      } catch {
-        setError('Не удалось прочитать файл');
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Не удалось прочитать файл');
       }
     },
     [texts, mode, chunkSize, seed]
@@ -107,9 +108,15 @@ export function CutUpTextGenerator() {
     handleGenerate(newTexts, mode, chunkSize, seed);
   };
 
-  const handleDownload = () => {
+  const handleDownloadTxt = () => {
     if (output) {
       downloadText(output, 'cut-up-result.txt');
+    }
+  };
+
+  const handleDownloadDocx = () => {
+    if (output) {
+      void downloadDocx(output, 'cut-up-result.docx');
     }
   };
 
@@ -142,11 +149,11 @@ export function CutUpTextGenerator() {
 
       <SidebarIO
         onFilesSelected={handleFilesSelected}
-        accept=".txt,.md,.json"
-        dropLabel="Загрузить текст"
+        accept=".txt,.md,.json,.docx"
+        dropLabel="Загрузить текст / DOCX"
         hasFiles={!!output}
-        onDownload={handleDownload}
-        downloadLabel="Скачать результат"
+        onDownload={handleDownloadTxt}
+        downloadLabel=".TXT"
       />
 
       <Stack gap={4}>
@@ -207,7 +214,7 @@ export function CutUpTextGenerator() {
       <Workbench.Stage>
         <Workbench.Content>
           <Grid className="h-full grid-cols-1 lg:grid-cols-2" gap={4}>
-            {/* Input Column with multiple source text cards (compact preview view with rows=4) */}
+            {/* Input Column with multiple source text cards */}
             <Stack gap={4} className="h-full overflow-y-auto pr-1">
               {texts.map((t, idx) => (
                 <Card
@@ -244,15 +251,39 @@ export function CutUpTextGenerator() {
             </Stack>
 
             {/* Output Column */}
-            <ResultViewer
+            <Card
               title="Cut-Up Результат"
-              value={output}
-              isCopied={isCopied}
-              onCopy={copy}
-              onDownload={handleDownload}
-              downloadLabel="Скачать TXT"
-              className="flex-1"
-            />
+              className="flex flex-1 flex-col overflow-hidden"
+              contentClassName="p-0 flex-1 flex flex-col overflow-hidden"
+              headerActions={
+                output ? (
+                  <Group gap={2}>
+                    <CopyButton
+                      onCopy={() => copy(output)}
+                      isCopied={isCopied}
+                      variant="outline"
+                      size="xs"
+                    />
+                    <Button onClick={handleDownloadTxt} variant="default" size="xs">
+                      <Icon.Download className="mr-1.5 h-3 w-3" />
+                      .TXT
+                    </Button>
+                    <Button onClick={handleDownloadDocx} variant="default" size="xs">
+                      <Icon.Download className="mr-1.5 h-3 w-3" />
+                      .DOCX
+                    </Button>
+                  </Group>
+                ) : null
+              }
+            >
+              <Stack gap={0} className="min-h-0 flex-1 bg-white dark:bg-zinc-950">
+                <TextOutput
+                  value={output || ''}
+                  placeholder="Результат появится здесь..."
+                  className="flex-1"
+                />
+              </Stack>
+            </Card>
           </Grid>
         </Workbench.Content>
       </Workbench.Stage>

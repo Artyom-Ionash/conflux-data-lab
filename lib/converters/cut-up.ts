@@ -1,3 +1,6 @@
+import { Document, Packer, Paragraph, TextRun } from 'docx';
+import mammoth from 'mammoth';
+
 export type CutUpMode = 'lines' | 'words' | 'chunks';
 
 export interface CutUpOptions {
@@ -53,4 +56,43 @@ export function generateCutUpText(texts: string[], options: CutUpOptions): strin
   }
 
   return mode === 'words' ? combinedSegments.join(' ') : combinedSegments.join('\n');
+}
+
+export async function extractTextFromFile(file: File): Promise<string> {
+  if (file.name.toLowerCase().endsWith('.docx')) {
+    try {
+      const arrayBuffer = await file.arrayBuffer();
+      const result = await mammoth.extractRawText({ arrayBuffer });
+      return result.value;
+    } catch {
+      throw new Error('Не удалось прочитать DOCX файл через mammoth');
+    }
+  }
+  return await file.text();
+}
+
+export async function downloadDocx(text: string, filename = 'cut-up-result.docx') {
+  const doc = new Document({
+    sections: [
+      {
+        properties: {},
+        children: text.split('\n').map(
+          (line) =>
+            new Paragraph({
+              children: [new TextRun(line)],
+            })
+        ),
+      },
+    ],
+  });
+
+  const blob = await Packer.toBlob(doc);
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename.endsWith('.docx') ? filename : filename + '.docx';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
 }
