@@ -60,6 +60,14 @@ export const TOOLS_MANIFEST: ToolConfig[] = [
     tags: ['llm', 'ai', 'openrouter', 'gemini', 'refactoring'],
     featured: true,
   },
+  {
+    id: 'cut-up-text-generator',
+    name: 'Cut-Up Text Generator',
+    description:
+      'William Burroughs style text cut-up generator with words, lines, chunks, and fold-in shuffling.',
+    category: 'transformation',
+    tags: ['text', 'cutup', 'shuffle', 'generator', 'burroughs'],
+  },
 ];
 
 export const toolsByCategory = TOOLS_MANIFEST.reduce<Record<string, ToolConfig[]>>((acc, tool) => {

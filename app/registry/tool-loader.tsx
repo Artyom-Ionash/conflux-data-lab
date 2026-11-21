@@ -49,6 +49,11 @@ const ProjectToContext = dynamic(
   { loading: ToolLoading }
 );
 
+const CutUpTextGenerator = dynamic(
+  () => import('@/features/CutUpTextGenerator').then((mod) => mod.CutUpTextGenerator),
+  { loading: ToolLoading }
+);
+
 // --- Registry ---
 
 const toolComponents: Record<string, React.ComponentType> = {
@@ -58,6 +63,7 @@ const toolComponents: Record<string, React.ComponentType> = {
   'vertical-image-aligner': VerticalImageAligner,
   'monochrome-background-remover': MonochromeBackgroundRemover,
   'project-to-context': ProjectToContext,
+  'cut-up-text-generator': CutUpTextGenerator,
 };
 
 /**
@@ -71,7 +77,7 @@ export function ToolRegistry({ toolId }: { toolId: string }) {
     return (
       <div className="rounded-lg border border-red-200 bg-red-50 p-6 dark:border-red-900/50 dark:bg-red-900/20">
         <p className="text-red-600 dark:text-red-400">
-          Ошибка: Инструмент &quot;{toolId}&quot; не зарегистрирован в системе.
+          Ошибка: Инструмент &#34;{toolId}&#34; не зарегистрирован в системе.
         </p>
       </div>
     );
